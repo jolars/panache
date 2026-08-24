@@ -40,7 +40,7 @@ DOCUMENT@0..610
         MATH_SCRIPTED@220..223
           MATH_TEXT@220..221 "p"
           MATH_SUPERSCRIPT@221..223
-            MATH_SCRIPT@221..222 "^"
+            MATH_CARET@221..222 "^"
             MATH_TEXT@222..223 "k"
         MATH_SCRIPTED@223..245
           MATH_DELIMITED@223..239
@@ -52,7 +52,7 @@ DOCUMENT@0..610
             MATH_COMMAND@232..238 "\\right"
             MATH_CLOSE@238..239 ")"
           MATH_SUPERSCRIPT@239..245
-            MATH_SCRIPT@239..240 "^"
+            MATH_CARET@239..240 "^"
             MATH_GROUP@240..245
               MATH_GROUP_OPEN@240..241 "{"
               MATH_TEXT@241..242 "n"

@@ -74,7 +74,7 @@ DOCUMENT@0..244
         MATH_SCRIPTED@186..189
           MATH_TEXT@186..187 "c"
           MATH_SUPERSCRIPT@187..189
-            MATH_SCRIPT@187..188 "^"
+            MATH_CARET@187..188 "^"
             MATH_TEXT@188..189 "2"
         MATH_SPACE@189..190 " "
       DISPLAY_MATH_MARKER@190..192 "$$"

@@ -37,7 +37,8 @@ fn is_math_content_token(kind: SyntaxKind) -> bool {
             | SyntaxKind::MATH_GROUP_OPEN
             | SyntaxKind::MATH_GROUP_CLOSE
             | SyntaxKind::MATH_ALIGN
-            | SyntaxKind::MATH_SCRIPT
+            | SyntaxKind::MATH_CARET
+            | SyntaxKind::MATH_UNDERSCORE
             | SyntaxKind::MATH_OPERATOR
             | SyntaxKind::MATH_OPEN
             | SyntaxKind::MATH_CLOSE
@@ -227,7 +228,7 @@ impl AstNode for MathSubscript {
 impl MathSubscript {
     /// The `_` marker.
     pub fn marker_token(&self) -> Option<SyntaxToken> {
-        token_child(&self.0, SyntaxKind::MATH_SCRIPT)
+        token_child(&self.0, SyntaxKind::MATH_UNDERSCORE)
     }
 
     /// The optional one-atom argument after the marker and layout trivia.
@@ -258,7 +259,7 @@ impl AstNode for MathSuperscript {
 impl MathSuperscript {
     /// The `^` marker.
     pub fn marker_token(&self) -> Option<SyntaxToken> {
-        token_child(&self.0, SyntaxKind::MATH_SCRIPT)
+        token_child(&self.0, SyntaxKind::MATH_CARET)
     }
 
     /// The optional one-atom argument after the marker and layout trivia.
@@ -537,7 +538,8 @@ fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
     node.children_with_tokens().find(|element| {
         !matches!(
             element.kind(),
-            SyntaxKind::MATH_SCRIPT
+            SyntaxKind::MATH_CARET
+                | SyntaxKind::MATH_UNDERSCORE
                 | SyntaxKind::MATH_SPACE
                 | SyntaxKind::MATH_NEWLINE
                 | SyntaxKind::LINE_PREFIX

@@ -21,7 +21,7 @@ DOCUMENT@0..106
         MATH_SCRIPTED@76..79
           MATH_TEXT@76..77 "c"
           MATH_SUPERSCRIPT@77..79
-            MATH_SCRIPT@77..78 "^"
+            MATH_CARET@77..78 "^"
             MATH_TEXT@78..79 "2"
         MATH_NEWLINE@79..80 "\n"
       DISPLAY_MATH_MARKER@80..82 "$$"

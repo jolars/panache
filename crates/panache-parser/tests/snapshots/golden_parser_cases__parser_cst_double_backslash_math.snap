@@ -25,7 +25,7 @@ DOCUMENT@0..387
         MATH_SCRIPTED@130..133
           MATH_TEXT@130..131 "x"
           MATH_SUPERSCRIPT@131..133
-            MATH_SCRIPT@131..132 "^"
+            MATH_CARET@131..132 "^"
             MATH_TEXT@132..133 "2"
         MATH_SPACE@133..134 " "
         MATH_OPERATOR@134..135 "+"
@@ -33,7 +33,7 @@ DOCUMENT@0..387
         MATH_SCRIPTED@136..139
           MATH_TEXT@136..137 "y"
           MATH_SUPERSCRIPT@137..139
-            MATH_SCRIPT@137..138 "^"
+            MATH_CARET@137..138 "^"
             MATH_TEXT@138..139 "2"
         MATH_SPACE@139..140 " "
         MATH_OPERATOR@140..141 "="
@@ -41,7 +41,7 @@ DOCUMENT@0..387
         MATH_SCRIPTED@142..145
           MATH_TEXT@142..143 "z"
           MATH_SUPERSCRIPT@143..145
-            MATH_SCRIPT@143..144 "^"
+            MATH_CARET@143..144 "^"
             MATH_TEXT@144..145 "2"
       INLINE_MATH_MARKER@145..148 "\\\\)"
     TEXT@148..157 " in text."
@@ -61,23 +61,23 @@ DOCUMENT@0..387
         MATH_SCRIPTED@200..213
           MATH_COMMAND@200..204 "\\int"
           MATH_SUBSCRIPT@204..206
-            MATH_SCRIPT@204..205 "_"
+            MATH_UNDERSCORE@204..205 "_"
             MATH_TEXT@205..206 "0"
           MATH_SUPERSCRIPT@206..213
-            MATH_SCRIPT@206..207 "^"
+            MATH_CARET@206..207 "^"
             MATH_COMMAND@207..213 "\\infty"
         MATH_SPACE@213..214 " "
         MATH_SCRIPTED@214..222
           MATH_TEXT@214..215 "e"
           MATH_SUPERSCRIPT@215..222
-            MATH_SCRIPT@215..216 "^"
+            MATH_CARET@215..216 "^"
             MATH_GROUP@216..222
               MATH_GROUP_OPEN@216..217 "{"
               MATH_OPERATOR@217..218 "-"
               MATH_SCRIPTED@218..221
                 MATH_TEXT@218..219 "x"
                 MATH_SUPERSCRIPT@219..221
-                  MATH_SCRIPT@219..220 "^"
+                  MATH_CARET@219..220 "^"
                   MATH_TEXT@220..221 "2"
               MATH_GROUP_CLOSE@221..222 "}"
         MATH_SPACE@222..223 " "
@@ -130,7 +130,7 @@ DOCUMENT@0..387
         MATH_SCRIPTED@309..312
           MATH_TEXT@309..310 "c"
           MATH_SUPERSCRIPT@310..312
-            MATH_SCRIPT@310..311 "^"
+            MATH_CARET@310..311 "^"
             MATH_TEXT@311..312 "2"
       INLINE_MATH_MARKER@312..315 "\\\\)"
     TEXT@315..316 "."
@@ -151,7 +151,7 @@ DOCUMENT@0..387
         MATH_SCRIPTED@370..373
           MATH_TEXT@370..371 "c"
           MATH_SUPERSCRIPT@371..373
-            MATH_SCRIPT@371..372 "^"
+            MATH_CARET@371..372 "^"
             MATH_TEXT@372..373 "2"
         MATH_SPACE@373..374 " "
       DISPLAY_MATH_MARKER@374..377 "\\\\]"

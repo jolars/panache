@@ -30,7 +30,7 @@ DOCUMENT@0..393
         MATH_SCRIPTED@113..116
           MATH_TEXT@113..114 "x"
           MATH_SUPERSCRIPT@114..116
-            MATH_SCRIPT@114..115 "^"
+            MATH_CARET@114..115 "^"
             MATH_TEXT@115..116 "2"
         MATH_SPACE@116..117 " "
         MATH_OPERATOR@117..118 "+"
@@ -55,7 +55,7 @@ DOCUMENT@0..393
         MATH_SCRIPTED@186..189
           MATH_TEXT@186..187 "x"
           MATH_SUPERSCRIPT@187..189
-            MATH_SCRIPT@187..188 "^"
+            MATH_CARET@187..188 "^"
             MATH_TEXT@188..189 "2"
         MATH_SPACE@189..190 " "
         MATH_OPERATOR@190..191 "+"
@@ -81,7 +81,7 @@ DOCUMENT@0..393
         MATH_SCRIPTED@243..246
           MATH_TEXT@243..244 "x"
           MATH_SUPERSCRIPT@244..246
-            MATH_SCRIPT@244..245 "^"
+            MATH_CARET@244..245 "^"
             MATH_TEXT@245..246 "2"
         MATH_SPACE@246..247 " "
         MATH_OPERATOR@247..248 "+"

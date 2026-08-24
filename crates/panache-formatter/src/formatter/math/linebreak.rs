@@ -360,7 +360,7 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                 star_modifier_pending = false;
                 i += 1;
             }
-            SyntaxKind::MATH_SCRIPT | SyntaxKind::MATH_ALIGN => {
+            SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {
                 prev = Some(AtomClass::Open);
                 star_modifier_pending = false;
                 i += 1;
@@ -515,7 +515,9 @@ fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
         SyntaxKind::MATH_GROUP | SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_DELIMITED => {
             Some(AtomClass::Close)
         }
-        SyntaxKind::MATH_SCRIPT | SyntaxKind::MATH_ALIGN => Some(AtomClass::Open),
+        SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {
+            Some(AtomClass::Open)
+        }
         SyntaxKind::MATH_LINE_BREAK => None,
         _ => Some(AtomClass::Ord),
     }

@@ -98,7 +98,8 @@ pub enum SyntaxKind {
     MATH_COMMAND,     // \foo control word or \% control symbol
     MATH_LINE_BREAK,  // \\
     MATH_ALIGN,       // & alignment tab
-    MATH_SCRIPT,      // ^ or _
+    MATH_CARET,       // ^ superscript marker
+    MATH_UNDERSCORE,  // _ subscript marker
     MATH_COMMENT,     // % to end of line (TeX comment)
     MATH_OPERATOR,
     MATH_OPEN,    // ( or [

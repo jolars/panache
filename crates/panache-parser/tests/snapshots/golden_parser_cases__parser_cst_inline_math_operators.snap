@@ -88,7 +88,7 @@ DOCUMENT@0..183
         MATH_SCRIPTED@127..133
           MATH_TEXT@127..128 "e"
           MATH_SUPERSCRIPT@128..133
-            MATH_SCRIPT@128..129 "^"
+            MATH_CARET@128..129 "^"
             MATH_GROUP@129..133
               MATH_GROUP_OPEN@129..130 "{"
               MATH_OPERATOR@130..131 "-"
@@ -103,7 +103,7 @@ DOCUMENT@0..183
         MATH_SCRIPTED@141..147
           MATH_TEXT@141..142 "0"
           MATH_SUPERSCRIPT@142..147
-            MATH_SCRIPT@142..143 "^"
+            MATH_CARET@142..143 "^"
             MATH_GROUP@143..147
               MATH_GROUP_OPEN@143..144 "{"
               MATH_OPERATOR@144..145 "-"

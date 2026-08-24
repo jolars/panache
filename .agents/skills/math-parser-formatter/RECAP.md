@@ -70,29 +70,32 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Badness parser oracle—first parity slice.** Added the exact, development-only
-`badness-parser = "=0.4.0"` oracle and mechanical canonical projectors for
-Badness `MATH` and Panache `MATH_CONTENT` subtrees.
+**One-to-one kind map + script-marker parity.** Made both oracle kind maps
+explicit and injective, then migrated Panache's combined `MATH_SCRIPT` token to
+Badness-equivalent `MATH_CARET` and `MATH_UNDERSCORE` tokens.
 
-- The projectors compare kind names, ownership, body-relative byte ranges,
-  token text, and exact source gaps. They only shift the `$...$` wrapper and
-  document Panache's host-trivia omission; legacy kinds remain visible as
-  divergences rather than being repaired.
-- Four shared-corpus cases now form the mandatory passing slice (nested groups
-  and scripts). The reproducible ignored report records 4/58 passing and 54/58
-  divergent cases with both canonical trees.
-- No production parser or formatter code changed.
+- The stricter map initially exposed three false script passes: collapsing
+  Badness `CARET`/`UNDERSCORE` into one canonical marker had hidden a real CST
+  difference. Legacy Panache kinds now keep explicit `PANACHE_*` names.
+- Native parsing, typed script accessors, diagnostics/content reconstruction,
+  and the legacy formatter now consume the distinct marker kinds. Twelve parser
+  snapshots changed only in kind names; ranges and bytes stayed fixed.
+- The mandatory slice honestly returns to 4/58 passing; the regenerated report
+  retains 54 divergences.
 
 ### Suggested next sub-targets
-1. Lock the one-to-one kind map and migrate the lexical grain.
-2. Give commands Badness-equivalent argument ownership, then grow the mandatory
-   parity corpus from the report's passing candidates.
-3. Add the pinned formatter oracle only when starting formatter-output parity.
+1. Migrate ordinary characters to Badness-equivalent `MATH_WORD` runs and move
+   operator/delimiter classification into the semantic atom iterator.
+2. Split control words/symbols and give commands Badness-equivalent argument
+   ownership, then grow the mandatory parity corpus.
+3. Add malformed/host-boundary cases before declaring the whole kind map locked.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Badness parser oracle—first parity slice.** Added pinned parser projectors,
+  four mandatory shared-corpus cases, and the 4/58 differential baseline.
 - **Badness-parity roadmap revision.** Made Badness the normative development
   oracle while retaining Panache-owned production parsing and formatting.
 - **Native script CST—first roadmap slice.** Added scripted/subscript/superscript

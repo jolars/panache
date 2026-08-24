@@ -53,7 +53,7 @@ DOCUMENT@0..591
         MATH_SCRIPTED@207..217
           MATH_COMMAND@207..213 "\\sigma"
           MATH_SUPERSCRIPT@213..217
-            MATH_SCRIPT@213..214 "^"
+            MATH_CARET@213..214 "^"
             MATH_GROUP@214..217
               MATH_GROUP_OPEN@214..215 "{"
               MATH_TEXT@215..216 "2"
@@ -64,7 +64,7 @@ DOCUMENT@0..591
         MATH_SCRIPTED@226..231
           MATH_TEXT@226..227 "S"
           MATH_SUPERSCRIPT@227..231
-            MATH_SCRIPT@227..228 "^"
+            MATH_CARET@227..228 "^"
             MATH_GROUP@228..231
               MATH_GROUP_OPEN@228..229 "{"
               MATH_TEXT@229..230 "2"
@@ -76,7 +76,7 @@ DOCUMENT@0..591
           MATH_SCRIPTED@238..250
             MATH_COMMAND@238..246 "\\partial"
             MATH_SUPERSCRIPT@246..250
-              MATH_SCRIPT@246..247 "^"
+              MATH_CARET@246..247 "^"
               MATH_GROUP@247..250
                 MATH_GROUP_OPEN@247..248 "{"
                 MATH_TEXT@248..249 "2"
@@ -95,7 +95,7 @@ DOCUMENT@0..591
           MATH_SCRIPTED@279..282
             MATH_TEXT@279..280 "S"
             MATH_SUPERSCRIPT@280..282
-              MATH_SCRIPT@280..281 "^"
+              MATH_CARET@280..281 "^"
               MATH_TEXT@281..282 "2"
           MATH_GROUP_CLOSE@282..283 "}"
         MATH_NEWLINE@283..284 "\n"

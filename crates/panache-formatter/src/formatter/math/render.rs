@@ -893,7 +893,7 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 star_modifier_pending = false;
                 i += 1;
             }
-            SyntaxKind::MATH_SCRIPT => {
+            SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE => {
                 emit_atom(&mut out, prev_demand, Demand::TightOp, pending_space, text);
                 pending_space = false;
                 prev_demand = Demand::TightOp;
@@ -978,7 +978,9 @@ fn atom_prev_class(kind: SyntaxKind, _text: &str) -> Option<AtomClass> {
         SyntaxKind::MATH_TEXT => AtomClass::Ord,
         SyntaxKind::MATH_GROUP_OPEN => AtomClass::Open,
         SyntaxKind::MATH_GROUP_CLOSE => AtomClass::Close,
-        SyntaxKind::MATH_SCRIPT | SyntaxKind::MATH_ALIGN => AtomClass::Open,
+        SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {
+            AtomClass::Open
+        }
         SyntaxKind::MATH_LINE_BREAK => return None,
         _ => AtomClass::Ord,
     };

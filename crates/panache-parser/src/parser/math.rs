@@ -115,7 +115,8 @@ impl MathParser<'_> {
                     }
                 }
                 '&' => self.bump_bytes(1, SyntaxKind::MATH_ALIGN),
-                '^' | '_' => self.bump_bytes(1, SyntaxKind::MATH_SCRIPT),
+                '^' => self.bump_bytes(1, SyntaxKind::MATH_CARET),
+                '_' => self.bump_bytes(1, SyntaxKind::MATH_UNDERSCORE),
                 '%' => self.parse_comment(),
                 ' ' | '\t' => self.parse_spaces(),
                 '\n' => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
@@ -158,7 +159,12 @@ impl MathParser<'_> {
                 _ => unreachable!("script lookahead must end at a script marker"),
             };
             self.builder.start_node(script_kind.into());
-            self.bump_bytes(1, SyntaxKind::MATH_SCRIPT);
+            let marker_kind = match self.peek_char() {
+                Some('^') => SyntaxKind::MATH_CARET,
+                Some('_') => SyntaxKind::MATH_UNDERSCORE,
+                _ => unreachable!("script parser must be at a script marker"),
+            };
+            self.bump_bytes(1, marker_kind);
 
             let argument_pos = self.layout_end_before_boundary(self.pos);
             self.parse_layout_until(argument_pos);
@@ -604,7 +610,7 @@ mod tests {
                 .children_with_tokens()
                 .map(|el| el.kind())
                 .collect::<Vec<_>>(),
-            vec![SyntaxKind::MATH_SCRIPT, SyntaxKind::MATH_TEXT]
+            vec![SyntaxKind::MATH_CARET, SyntaxKind::MATH_TEXT]
         );
         assert_lossless("x^2_i");
     }

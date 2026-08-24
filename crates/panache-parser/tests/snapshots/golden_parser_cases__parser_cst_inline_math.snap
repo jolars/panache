@@ -50,7 +50,7 @@ DOCUMENT@0..223
           MATH_SCRIPTED@99..102
             MATH_TEXT@99..100 "c"
             MATH_SUPERSCRIPT@100..102
-              MATH_SCRIPT@100..101 "^"
+              MATH_CARET@100..101 "^"
               MATH_TEXT@101..102 "2"
         INLINE_MATH_MARKER@102..103 "$"
       TEXT@103..108 " here"

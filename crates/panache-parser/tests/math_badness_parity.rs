@@ -34,6 +34,86 @@ struct CanonicalElement {
     children: Vec<CanonicalElement>,
 }
 
+/// The canonical spelling is the locked kind map. Within each source language
+/// every source kind has a distinct spelling; equal spellings across the two
+/// tables are the only kinds claimed to be equivalent. Legacy Panache kinds use
+/// an explicit `PANACHE_` spelling so the oracle cannot hide a migration gap.
+const BADNESS_MATH_KIND_MAP: &[(BadnessKind, &str)] = &[
+    (BadnessKind::CONTROL_WORD, "CONTROL_WORD"),
+    (BadnessKind::CONTROL_SYMBOL, "CONTROL_SYMBOL"),
+    (BadnessKind::L_BRACE, "GROUP_OPEN"),
+    (BadnessKind::R_BRACE, "GROUP_CLOSE"),
+    (BadnessKind::L_BRACKET, "BRACKET_OPEN"),
+    (BadnessKind::R_BRACKET, "BRACKET_CLOSE"),
+    (BadnessKind::DOLLAR, "DOLLAR"),
+    (BadnessKind::AMPERSAND, "ALIGN"),
+    (BadnessKind::HASH, "HASH"),
+    (BadnessKind::CARET, "CARET"),
+    (BadnessKind::UNDERSCORE, "UNDERSCORE"),
+    (BadnessKind::TILDE, "TILDE"),
+    (BadnessKind::COMMENT, "COMMENT"),
+    (BadnessKind::WHITESPACE, "SPACE"),
+    (BadnessKind::NEWLINE, "NEWLINE"),
+    (BadnessKind::WORD, "WORD"),
+    (BadnessKind::VERB, "VERB"),
+    (BadnessKind::VERBATIM_BODY, "VERBATIM_BODY"),
+    (BadnessKind::DOC_MARGIN, "BADNESS_DOC_MARGIN"),
+    (BadnessKind::GUARD, "BADNESS_GUARD"),
+    (BadnessKind::ERROR, "ERROR"),
+    (BadnessKind::GROUP, "GROUP"),
+    (BadnessKind::OPTIONAL, "OPTIONAL"),
+    (BadnessKind::ARGUMENT, "ARGUMENT"),
+    (BadnessKind::COMMAND, "COMMAND"),
+    (BadnessKind::ENVIRONMENT, "ENVIRONMENT"),
+    (BadnessKind::BEGIN, "BEGIN"),
+    (BadnessKind::END, "END"),
+    (BadnessKind::NAME_GROUP, "NAME_GROUP"),
+    (BadnessKind::CONDITIONAL, "CONDITIONAL"),
+    (BadnessKind::CONDITIONAL_BRANCH, "CONDITIONAL_BRANCH"),
+    (BadnessKind::INLINE_MATH, "BADNESS_INLINE_MATH"),
+    (BadnessKind::DISPLAY_MATH, "BADNESS_DISPLAY_MATH"),
+    (BadnessKind::MATH, "MATH"),
+    (BadnessKind::SCRIPTED, "SCRIPTED"),
+    (BadnessKind::SUBSCRIPT, "SUBSCRIPT"),
+    (BadnessKind::SUPERSCRIPT, "SUPERSCRIPT"),
+    (BadnessKind::LEFT_RIGHT, "LEFT_RIGHT"),
+    (BadnessKind::PARAGRAPH, "BADNESS_PARAGRAPH"),
+    (BadnessKind::DOC_COMMENT, "BADNESS_DOC_COMMENT"),
+    (BadnessKind::TEXT, "TEXT"),
+    (BadnessKind::LINE_BREAK, "LINE_BREAK"),
+    (BadnessKind::STATEMENT, "STATEMENT"),
+    (BadnessKind::ROOT, "BADNESS_ROOT"),
+];
+
+const PANACHE_MATH_KIND_MAP: &[(PanacheKind, &str)] = &[
+    (PanacheKind::MATH_CONTENT, "MATH"),
+    (PanacheKind::MATH_GROUP, "GROUP"),
+    (PanacheKind::MATH_ENVIRONMENT, "ENVIRONMENT"),
+    (PanacheKind::MATH_DELIMITED, "LEFT_RIGHT"),
+    (PanacheKind::MATH_SCRIPTED, "SCRIPTED"),
+    (PanacheKind::MATH_SUBSCRIPT, "SUBSCRIPT"),
+    (PanacheKind::MATH_SUPERSCRIPT, "SUPERSCRIPT"),
+    (PanacheKind::MATH_GROUP_OPEN, "GROUP_OPEN"),
+    (PanacheKind::MATH_GROUP_CLOSE, "GROUP_CLOSE"),
+    (PanacheKind::MATH_COMMAND, "PANACHE_COMMAND_TOKEN"),
+    (PanacheKind::MATH_LINE_BREAK, "PANACHE_LINE_BREAK_TOKEN"),
+    (PanacheKind::MATH_ALIGN, "ALIGN"),
+    (PanacheKind::MATH_CARET, "CARET"),
+    (PanacheKind::MATH_UNDERSCORE, "UNDERSCORE"),
+    (PanacheKind::MATH_COMMENT, "COMMENT"),
+    (PanacheKind::MATH_OPERATOR, "PANACHE_OPERATOR"),
+    (PanacheKind::MATH_OPEN, "PANACHE_OPEN"),
+    (PanacheKind::MATH_CLOSE, "PANACHE_CLOSE"),
+    (PanacheKind::MATH_PUNCT, "PANACHE_PUNCT"),
+    (PanacheKind::MATH_TEXT, "WORD"),
+    (PanacheKind::MATH_SPACE, "SPACE"),
+    (PanacheKind::MATH_NEWLINE, "NEWLINE"),
+    (
+        PanacheKind::MATH_EQUATION_LABEL,
+        "PANACHE_HOST_EQUATION_LABEL",
+    ),
+];
+
 fn manifest_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
 }
@@ -76,67 +156,22 @@ fn read_passing() -> Vec<String> {
 }
 
 fn badness_kind(kind: BadnessKind) -> String {
-    use BadnessKind as K;
-    match kind {
-        K::MATH => "MATH",
-        K::GROUP => "GROUP",
-        K::SCRIPTED => "SCRIPTED",
-        K::SUBSCRIPT => "SUBSCRIPT",
-        K::SUPERSCRIPT => "SUPERSCRIPT",
-        K::LEFT_RIGHT => "LEFT_RIGHT",
-        K::WHITESPACE => "SPACE",
-        K::NEWLINE => "NEWLINE",
-        K::WORD => "WORD",
-        K::COMMENT => "COMMENT",
-        K::L_BRACE => "GROUP_OPEN",
-        K::R_BRACE => "GROUP_CLOSE",
-        K::CARET | K::UNDERSCORE => "SCRIPT_MARKER",
-        K::AMPERSAND => "ALIGN",
-        K::LINE_BREAK => "LINE_BREAK",
-        K::ENVIRONMENT => "ENVIRONMENT",
-        K::BEGIN => "BEGIN",
-        K::END => "END",
-        K::NAME_GROUP => "NAME_GROUP",
-        K::COMMAND => "COMMAND",
-        K::ARGUMENT => "ARGUMENT",
-        K::OPTIONAL => "OPTIONAL",
-        K::CONTROL_WORD => "CONTROL_WORD",
-        K::CONTROL_SYMBOL => "CONTROL_SYMBOL",
-        K::L_BRACKET => "BRACKET_OPEN",
-        K::R_BRACKET => "BRACKET_CLOSE",
-        other => return format!("BADNESS_{other:?}"),
-    }
-    .to_owned()
+    mapped_kind(BADNESS_MATH_KIND_MAP, kind, "Badness").to_owned()
 }
 
 fn panache_kind(kind: PanacheKind) -> String {
-    use PanacheKind as K;
-    match kind {
-        K::MATH_CONTENT => "MATH",
-        K::MATH_GROUP => "GROUP",
-        K::MATH_SCRIPTED => "SCRIPTED",
-        K::MATH_SUBSCRIPT => "SUBSCRIPT",
-        K::MATH_SUPERSCRIPT => "SUPERSCRIPT",
-        K::MATH_DELIMITED => "LEFT_RIGHT",
-        K::MATH_SPACE => "SPACE",
-        K::MATH_NEWLINE => "NEWLINE",
-        K::MATH_TEXT => "WORD",
-        K::MATH_COMMENT => "COMMENT",
-        K::MATH_GROUP_OPEN => "GROUP_OPEN",
-        K::MATH_GROUP_CLOSE => "GROUP_CLOSE",
-        K::MATH_SCRIPT => "SCRIPT_MARKER",
-        K::MATH_ALIGN => "ALIGN",
-        K::MATH_LINE_BREAK => "LINE_BREAK",
-        K::MATH_ENVIRONMENT => "ENVIRONMENT",
-        K::MATH_COMMAND => "PANACHE_COMMAND",
-        K::MATH_OPERATOR => "PANACHE_OPERATOR",
-        K::MATH_OPEN => "PANACHE_OPEN",
-        K::MATH_CLOSE => "PANACHE_CLOSE",
-        K::MATH_PUNCT => "PANACHE_PUNCT",
-        K::MATH_EQUATION_LABEL => "PANACHE_EQUATION_LABEL",
-        other => return format!("PANACHE_{other:?}"),
-    }
-    .to_owned()
+    mapped_kind(PANACHE_MATH_KIND_MAP, kind, "Panache").to_owned()
+}
+
+fn mapped_kind<K: Copy + PartialEq + std::fmt::Debug>(
+    mapping: &[(K, &'static str)],
+    kind: K,
+    language: &str,
+) -> &'static str {
+    mapping
+        .iter()
+        .find_map(|(source, canonical)| (*source == kind).then_some(*canonical))
+        .unwrap_or_else(|| panic!("unmapped {language} math kind: {kind:?}"))
 }
 
 fn usize_range(range: rowan::TextRange) -> Range<usize> {
@@ -287,6 +322,22 @@ fn rendered(element: &CanonicalElement) -> String {
 
 fn projections(body: &str) -> (CanonicalElement, CanonicalElement) {
     (project_badness(body), project_panache(body))
+}
+
+#[test]
+fn canonical_kind_maps_are_explicit_and_one_to_one() {
+    fn assert_injective<K: Copy + std::fmt::Debug>(language: &str, mapping: &[(K, &'static str)]) {
+        let mut canonical = std::collections::BTreeSet::new();
+        for (kind, name) in mapping {
+            assert!(
+                canonical.insert(*name),
+                "{language} kinds collapse at canonical `{name}` (latest source kind: {kind:?})"
+            );
+        }
+    }
+
+    assert_injective("Badness", BADNESS_MATH_KIND_MAP);
+    assert_injective("Panache", PANACHE_MATH_KIND_MAP);
 }
 
 #[test]
