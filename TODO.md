@@ -273,8 +273,9 @@ the test projector.
   the existing single pass. Environment names use dedicated name groups;
   mismatched closers unwind to the matching level. Keep the Markdown host's
   decision about which raw environments count as math outside this grammar.
-- [ ] Match Badness's `\left`/`\right` structure and recovery in the existing
-  single pass.
+- [x] Match Badness's `\left`/`\right` structure and recovery in the existing
+  single pass. Paired delimiters own a nested math body; unpaired `\left`
+  remains an ordinary command while the diagnostics side channel reports it.
 - [ ] Port the Badness signature, argument-domain, and math-atom models into
   Panache-owned modules. Keep operator class, delimiter role, unary
   coercion, and break priority out of the CST, and expose the same semantic

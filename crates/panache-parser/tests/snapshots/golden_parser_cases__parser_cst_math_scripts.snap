@@ -90,7 +90,8 @@ DOCUMENT@0..171
           MATH_DELIMITED@107..121
             MATH_CONTROL_WORD@107..112 "\\left"
             MATH_WORD@112..113 "("
-            MATH_WORD@113..114 "x"
+            MATH_CONTENT@113..114
+              MATH_WORD@113..114 "x"
             MATH_CONTROL_WORD@114..120 "\\right"
             MATH_WORD@120..121 ")"
           MATH_SUBSCRIPT@121..123

@@ -221,7 +221,7 @@ impl MathParser<'_> {
                 Some("begin") if self.peek_environment_name(self.pos).is_some() => {
                     self.parse_environment();
                 }
-                Some("left") => self.parse_delimited(),
+                Some("left") if self.left_right_closes() => self.parse_delimited(),
                 Some("end") if self.peek_environment_name(self.pos).is_some() => {
                     self.parse_environment_end();
                 }
@@ -441,7 +441,11 @@ impl MathParser<'_> {
         self.builder.start_node(SyntaxKind::MATH_DELIMITED.into());
         self.parse_control_word(); // \left
         self.consume_delimiter(); // opening delimiter argument
+
+        self.builder.start_node(SyntaxKind::MATH_CONTENT.into());
         self.parse_elements(Ctx::LeftRight);
+        self.builder.finish_node(); // MATH_CONTENT
+
         if self.peek_control_word() == Some("right") {
             self.parse_control_word(); // \right
             self.consume_delimiter(); // closing delimiter argument
@@ -450,18 +454,22 @@ impl MathParser<'_> {
     }
 
     /// Consume the single delimiter that follows `\left` / `\right`, when it sits
-    /// immediately at the cursor. Character delimiters stay lexically neutral
-    /// `MATH_WORD` tokens;
-    /// a control-sequence delimiter (`\{`, `\langle`, `\|`, …) is a `MATH_COMMAND`.
-    /// If a space or anything else intervenes, nothing is consumed here and the
-    /// surrounding element loop tokenizes it normally — losslessness holds either
-    /// way; only the token's node membership shifts.
+    /// after optional trivia. Character delimiters retain their lexical token
+    /// kind; a control-sequence delimiter (`\{`, `\langle`, `\|`, …) remains a
+    /// bare control token.
     fn consume_delimiter(&mut self) {
+        self.parse_delimiter_trivia();
         match self.peek_char() {
-            Some('(' | '[' | ')' | ']' | '.' | '|' | '/') => {
-                let len = self.peek_char().map(char::len_utf8).unwrap_or(0);
-                self.bump_bytes(len, SyntaxKind::MATH_WORD);
-            }
+            Some('}') => {}
+            Some('[') => self.bump_bytes(1, SyntaxKind::MATH_BRACKET_OPEN),
+            Some(']') => self.bump_bytes(1, SyntaxKind::MATH_BRACKET_CLOSE),
+            Some('{') => self.bump_bytes(1, SyntaxKind::MATH_GROUP_OPEN),
+            Some('&') => self.bump_bytes(1, SyntaxKind::MATH_ALIGN),
+            Some('^') => self.bump_bytes(1, SyntaxKind::MATH_CARET),
+            Some('_') => self.bump_bytes(1, SyntaxKind::MATH_UNDERSCORE),
+            Some('%') => {}
+            Some('\\') if matches!(self.peek_control_word(), Some("left" | "right" | "end")) => {}
+            Some('\\') if Self::is_host_math_close(self.rest()) => {}
             Some('\\') => {
                 if self.peek_control_word().is_some() {
                     self.parse_control_word();
@@ -469,8 +477,185 @@ impl MathParser<'_> {
                     self.parse_control_symbol();
                 }
             }
-            _ => {}
+            Some(_) => {
+                let len = self.peek_char().map(char::len_utf8).unwrap_or(0);
+                self.bump_bytes(len, SyntaxKind::MATH_WORD);
+            }
+            None => {}
         }
+    }
+
+    fn parse_delimiter_trivia(&mut self) {
+        loop {
+            match self.peek_char() {
+                Some(' ' | '\t') => self.parse_spaces(),
+                Some('\n') => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
+                Some('\r') => {
+                    let len = if self.rest().starts_with("\r\n") {
+                        2
+                    } else {
+                        1
+                    };
+                    self.bump_bytes(len, SyntaxKind::MATH_NEWLINE);
+                }
+                Some('%') => self.parse_comment(),
+                _ => break,
+            }
+        }
+    }
+
+    /// Whether the current `\left` has a same-scope `\right` before a recovery
+    /// boundary. This is a read-only gate; the real parse remains single-pass.
+    fn left_right_closes(&self) -> bool {
+        let command_end = self.pos + self.control_word_len_at(self.pos).unwrap_or(0);
+        let Some(mut pos) = self.delimiter_end_after(command_end) else {
+            return self.scan_for_right(command_end);
+        };
+        self.scan_for_right_from(&mut pos)
+    }
+
+    fn scan_for_right(&self, mut pos: usize) -> bool {
+        self.scan_for_right_from(&mut pos)
+    }
+
+    fn scan_for_right_from(&self, pos: &mut usize) -> bool {
+        let mut brace_depth = 0usize;
+        let mut environment_depth = 0usize;
+        let mut nested_pairs = 0usize;
+        let mut newlines = 0usize;
+
+        while *pos < self.input.len() {
+            let rest = &self.input[*pos..];
+            let c = rest.chars().next().expect("position is in bounds");
+            match c {
+                ' ' | '\t' => *pos += c.len_utf8(),
+                '\n' | '\r' => {
+                    newlines += 1;
+                    if brace_depth == 0
+                        && environment_depth == 0
+                        && nested_pairs == 0
+                        && newlines >= 2
+                    {
+                        return false;
+                    }
+                    if c == '\r' && rest.starts_with("\r\n") {
+                        *pos += 2;
+                    } else {
+                        *pos += c.len_utf8();
+                    }
+                }
+                '%' => {
+                    *pos += rest.find(['\n', '\r']).unwrap_or(rest.len());
+                }
+                '{' => {
+                    brace_depth += 1;
+                    newlines = 0;
+                    *pos += 1;
+                }
+                '}' => {
+                    if brace_depth == 0 && environment_depth == 0 && nested_pairs == 0 {
+                        return false;
+                    }
+                    brace_depth = brace_depth.saturating_sub(1);
+                    newlines = 0;
+                    *pos += 1;
+                }
+                '\\' => {
+                    if Self::is_host_math_close(rest)
+                        && brace_depth == 0
+                        && environment_depth == 0
+                        && nested_pairs == 0
+                    {
+                        return false;
+                    }
+                    let Some(word_len) = self.control_word_len_at(*pos) else {
+                        *pos += rest.chars().nth(1).map_or(1, |next| 1 + next.len_utf8());
+                        newlines = 0;
+                        continue;
+                    };
+                    let word = &self.input[*pos + 1..*pos + word_len];
+                    if brace_depth == 0 {
+                        match word {
+                            "begin" if self.peek_environment_name(*pos).is_some() => {
+                                environment_depth += 1;
+                            }
+                            "end" if self.peek_environment_name(*pos).is_some() => {
+                                if environment_depth == 0 && nested_pairs == 0 {
+                                    return false;
+                                }
+                                environment_depth = environment_depth.saturating_sub(1);
+                            }
+                            "left" if environment_depth == 0 => nested_pairs += 1,
+                            "right" if environment_depth == 0 => {
+                                if nested_pairs == 0 {
+                                    return true;
+                                }
+                                nested_pairs -= 1;
+                            }
+                            _ => {}
+                        }
+                    }
+                    newlines = 0;
+                    *pos += word_len;
+                }
+                _ => {
+                    newlines = 0;
+                    *pos += c.len_utf8();
+                }
+            }
+        }
+        false
+    }
+
+    fn delimiter_end_after(&self, mut pos: usize) -> Option<usize> {
+        let mut newlines = 0usize;
+        loop {
+            let c = self.input[pos..].chars().next()?;
+            match c {
+                ' ' | '\t' => pos += c.len_utf8(),
+                '\n' | '\r' => {
+                    newlines += 1;
+                    if newlines >= 2 {
+                        return None;
+                    }
+                    if c == '\r' && self.input[pos..].starts_with("\r\n") {
+                        pos += 2;
+                    } else {
+                        pos += c.len_utf8();
+                    }
+                }
+                '%' => {
+                    pos += self.input[pos..]
+                        .find(['\n', '\r'])
+                        .unwrap_or(self.input.len() - pos)
+                }
+                '}' => return None,
+                '\\' if matches!(self.control_word_at(pos), Some("left" | "right" | "end")) => {
+                    return None;
+                }
+                '\\' if Self::is_host_math_close(&self.input[pos..]) => return None,
+                '\\' => {
+                    return Some(
+                        pos + self.control_word_len_at(pos).unwrap_or_else(|| {
+                            self.input[pos..]
+                                .chars()
+                                .nth(1)
+                                .map_or(1, |next| 1 + next.len_utf8())
+                        }),
+                    );
+                }
+                _ => return Some(pos + c.len_utf8()),
+            }
+        }
+    }
+
+    fn control_word_at(&self, pos: usize) -> Option<&str> {
+        let len = self.control_word_len_at(pos)?;
+        Some(&self.input[pos + 1..pos + len])
+    }
+
+    fn is_host_math_close(rest: &str) -> bool {
+        rest.starts_with(r"\]") || rest.starts_with(r"\)")
     }
 
     /// Parse a control word as a `MATH_COMMAND` node owning its arguments.
@@ -1462,6 +1647,13 @@ mod tests {
             .map(|t| t.text().to_string())
             .collect();
         assert_eq!(commands, vec![r"\left", r"\right"]);
+        assert_eq!(
+            delim
+                .children()
+                .map(|child| child.kind())
+                .collect::<Vec<_>>(),
+            vec![SyntaxKind::MATH_CONTENT]
+        );
         assert_lossless(content);
     }
 
@@ -1499,8 +1691,19 @@ mod tests {
     }
 
     #[test]
+    fn left_right_gate_observes_nested_pairs_and_scope_boundaries() {
+        let nested = r"\left[ \left( a \right) \right]";
+        assert_eq!(delimited_count(nested), 2);
+
+        for content in [r"\left( { x \right) }", "\\left(\n\n x \\right)"] {
+            assert_eq!(delimited_count(content), 0, "must not pair: {content:?}");
+            assert_lossless(content);
+        }
+    }
+
+    #[test]
     fn unclosed_and_stray_delimiters_stay_lossless() {
-        assert_eq!(delimited_count(r"\left( x"), 1);
+        assert_eq!(delimited_count(r"\left( x"), 0);
         assert_lossless(r"\left( x");
         assert_eq!(delimited_count(r"x \right)"), 0);
         assert_lossless(r"x \right)");

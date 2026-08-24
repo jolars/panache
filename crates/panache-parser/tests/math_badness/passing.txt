@@ -44,6 +44,15 @@ escapes/literal_backslash_in_env.tex
 groups/braced_group.tex
 groups/deep_nesting.tex
 groups/group_with_command.tex
+groups/left_right_asymmetric.tex
+groups/left_right_bracket.tex
+groups/left_right_group_boundary.tex
+groups/left_right_nested.tex
+groups/left_right_null.tex
+groups/left_right_paren.tex
+groups/left_right_stray.tex
+groups/left_right_trivia.tex
+groups/left_right_unclosed.tex
 groups/nested_braces.tex
 inline/binomial_frac.tex
 inline/greek_and_cdot.tex

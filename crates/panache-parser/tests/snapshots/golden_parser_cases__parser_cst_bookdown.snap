@@ -21,7 +21,8 @@ DOCUMENT@0..610
         MATH_DELIMITED@190..204
           MATH_CONTROL_WORD@190..195 "\\left"
           MATH_WORD@195..196 "("
-          MATH_WORD@196..197 "k"
+          MATH_CONTENT@196..197
+            MATH_WORD@196..197 "k"
           MATH_CONTROL_WORD@197..203 "\\right"
           MATH_WORD@203..204 ")"
         MATH_SPACE@204..205 " "
@@ -47,7 +48,8 @@ DOCUMENT@0..610
           MATH_DELIMITED@223..239
             MATH_CONTROL_WORD@223..228 "\\left"
             MATH_WORD@228..229 "("
-            MATH_WORD@229..232 "1-p"
+            MATH_CONTENT@229..232
+              MATH_WORD@229..232 "1-p"
             MATH_CONTROL_WORD@232..238 "\\right"
             MATH_WORD@238..239 ")"
           MATH_SUPERSCRIPT@239..245

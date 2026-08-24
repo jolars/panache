@@ -801,6 +801,9 @@ pub(super) fn render_inline_seeded(elems: &[SyntaxElement], seed: Option<AtomCla
 
 enum FlatToken {
     Token(SyntaxKind, String),
+    /// A `\left`/`\right` delimiter whose role comes from its position, not
+    /// from the delimiter glyph's ordinary lexical class.
+    Delimiter(String, AtomClass),
     /// A starred-variant marker whose command-node ownership proves that it is
     /// a modifier rather than a binary operator.
     CommandStar(String),
@@ -813,7 +816,7 @@ impl FlatToken {
         match self {
             Self::Token(kind, text) => Some((*kind, text)),
             Self::CommandStar(text) => Some((SyntaxKind::MATH_WORD, text)),
-            Self::ScriptStart | Self::ScriptEnd => None,
+            Self::Delimiter(_, _) | Self::ScriptStart | Self::ScriptEnd => None,
         }
     }
 }
@@ -838,6 +841,49 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                 SyntaxKind::MATH_LINE_BREAK,
                 node.text().to_string(),
             ));
+        }
+        NodeOrToken::Node(node) if node.kind() == SyntaxKind::MATH_DELIMITED => {
+            let mut delimiter_role = None;
+            for child in node.children_with_tokens() {
+                match &child {
+                    NodeOrToken::Token(token)
+                        if token.kind() == SyntaxKind::MATH_CONTROL_WORD
+                            && token.text() == r"\left" =>
+                    {
+                        flatten_element(&child, out);
+                        delimiter_role = Some(AtomClass::Open);
+                    }
+                    NodeOrToken::Token(token)
+                        if token.kind() == SyntaxKind::MATH_CONTROL_WORD
+                            && token.text() == r"\right" =>
+                    {
+                        flatten_element(&child, out);
+                        delimiter_role = Some(AtomClass::Close);
+                    }
+                    NodeOrToken::Token(token)
+                        if delimiter_role.is_some()
+                            && matches!(
+                                token.kind(),
+                                SyntaxKind::MATH_SPACE
+                                    | SyntaxKind::MATH_NEWLINE
+                                    | SyntaxKind::MATH_COMMENT
+                            ) =>
+                    {
+                        flatten_element(&child, out);
+                    }
+                    NodeOrToken::Token(token) if delimiter_role.is_some() => {
+                        out.push(FlatToken::Delimiter(
+                            token.text().to_string(),
+                            delimiter_role.take().expect("delimiter role is present"),
+                        ));
+                    }
+                    NodeOrToken::Node(_) => {
+                        delimiter_role = None;
+                        flatten_element(&child, out);
+                    }
+                    _ => flatten_element(&child, out),
+                }
+            }
         }
         NodeOrToken::Node(node) => {
             let is_command = node.kind() == SyntaxKind::MATH_COMMAND;
@@ -931,6 +977,16 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 // Keep `prev_sig_is_text_cmd`: a text-mode command used as an
                 // unbraced script argument (`x_\text{ max }`) still owns the
                 // brace group that follows the script node.
+                star_modifier_pending = false;
+                i += 1;
+                continue;
+            }
+            FlatToken::Delimiter(text, class) => {
+                emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::Plain;
+                prev_class = Some(*class);
+                prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
                 i += 1;
                 continue;

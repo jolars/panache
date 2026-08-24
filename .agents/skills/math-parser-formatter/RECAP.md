@@ -70,25 +70,31 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Badness environment parity.** Replaced the flat environment shape with native
-delimiter and body nodes while retaining the legacy formatter behavior.
+**Badness `\left`/`\right` parity.** Replaced the flat paired-delimiter shape
+while retaining the legacy formatter and linter behavior.
 
-- `MATH_ENVIRONMENT` now owns `MATH_BEGIN`, nested `MATH_CONTENT`, and optional
-  `MATH_END`; delimiters own `MATH_NAME_GROUP` nodes and expose typed accessors.
-- Static-name gating, stray ends, unclosed environments, and mismatched-closer
-  unwinding are lossless and keep the existing linter diagnostics stable.
-- Mandatory parser parity is 73/77 after adding nested and trivia-before-name
-  regressions. Only the four `\left`/`\right` corpus cases remain divergent.
+- `MATH_DELIMITED` now owns direct control/delimiter tokens around a nested
+  `MATH_CONTENT`; bracket delimiters retain their lexical bracket kinds and the
+  typed wrapper exposes both delimiters and the body.
+- A same-scope lookahead gate handles nested pairs and group, environment, and
+  paragraph boundaries. Unpaired `\left` remains a command, with the existing
+  diagnostic derived from that loose token.
+- Mandatory parser parity is 82/82 after adding nested, trivia, stray,
+  unclosed, and group-boundary regressions. The shared corpus has no remaining
+  structural divergences.
 
 ### Suggested next sub-targets
-1. Bring `\left`/`\right` structure and recovery into parity.
-2. Lock the complete kind map before starting signature/domain semantics.
-3. Port the first bounded signature/domain semantic slice.
+1. Lock the complete kind map before starting signature/domain semantics.
+2. Port the first bounded signature/domain semantic slice.
+3. Keep expanding malformed and macro-dependent parser coverage.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Environment hierarchy + recovery.** Added begin/name/body/end nodes,
+  matching-closer unwinding, typed accessors, and formatter compatibility;
+  parity reached 73/77.
 - **Optional arguments + line-break modifiers.** Added tight optional ownership,
   the `\big`-family exception, and `\\` star/length modifiers; parity reached
   56/74.

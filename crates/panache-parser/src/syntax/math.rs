@@ -594,6 +594,21 @@ impl MathDelimited {
         command_child(&self.0, r"\right")
     }
 
+    /// The parsed math body between `\left` and `\right`.
+    pub fn body(&self) -> Option<MathContent> {
+        self.0.children().find_map(MathContent::cast)
+    }
+
+    /// The delimiter token following `\left`, excluding intervening trivia.
+    pub fn opening_delimiter(&self) -> Option<SyntaxToken> {
+        delimiter_after(&self.0, r"\left")
+    }
+
+    /// The delimiter token following `\right`, excluding intervening trivia.
+    pub fn closing_delimiter(&self) -> Option<SyntaxToken> {
+        delimiter_after(&self.0, r"\right")
+    }
+
     /// Whether the run carries a matching `\right`.
     pub fn is_closed(&self) -> bool {
         self.right_token().is_some()
@@ -684,6 +699,14 @@ pub fn math_diagnostics(content: &SyntaxNode) -> Vec<MathDiagnostic> {
                         range: token.text_range(),
                     });
                 }
+                SyntaxKind::MATH_CONTROL_WORD
+                    if node.kind() != SyntaxKind::MATH_DELIMITED && token.text() == r"\left" =>
+                {
+                    out.push(MathDiagnostic {
+                        kind: MathDiagnosticKind::UnclosedDelimiter,
+                        range: token.text_range(),
+                    });
+                }
                 _ => {}
             }
         }
@@ -771,6 +794,33 @@ fn command_child(node: &SyntaxNode, text: &str) -> Option<SyntaxToken> {
     node.children_with_tokens()
         .filter_map(|c| c.into_token())
         .find(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD && t.text() == text)
+}
+
+fn delimiter_after(node: &SyntaxNode, command: &str) -> Option<SyntaxToken> {
+    let mut after_command = false;
+    for child in node.children_with_tokens() {
+        match child {
+            rowan::NodeOrToken::Token(token)
+                if token.kind() == SyntaxKind::MATH_CONTROL_WORD && token.text() == command =>
+            {
+                after_command = true;
+            }
+            rowan::NodeOrToken::Token(token)
+                if after_command
+                    && !matches!(
+                        token.kind(),
+                        SyntaxKind::MATH_SPACE
+                            | SyntaxKind::MATH_NEWLINE
+                            | SyntaxKind::MATH_COMMENT
+                    ) =>
+            {
+                return Some(token);
+            }
+            rowan::NodeOrToken::Node(_) if after_command => return None,
+            _ => {}
+        }
+    }
+    None
 }
 
 fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
@@ -932,6 +982,34 @@ mod tests {
             "x &= y"
         );
         assert!(environment.is_closed());
+    }
+
+    #[test]
+    fn typed_delimited_wrapper_exposes_delimiters_and_body() {
+        let tree = SyntaxNode::new_root(parse_math_content(
+            r"\left[ x \right]",
+            MathParseOptions::default(),
+        ));
+        let delimited = tree
+            .children()
+            .find_map(MathDelimited::cast)
+            .expect("delimited");
+
+        assert_eq!(
+            delimited
+                .opening_delimiter()
+                .as_ref()
+                .map(SyntaxToken::text),
+            Some("[")
+        );
+        assert_eq!(
+            delimited
+                .closing_delimiter()
+                .as_ref()
+                .map(SyntaxToken::text),
+            Some("]")
+        );
+        assert_eq!(delimited.body().expect("body").syntax().to_string(), " x ");
     }
 
     #[test]

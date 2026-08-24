@@ -1,8 +1,8 @@
 Badness math parser parity report
 Oracle: badness-parser =0.4.0
 Corpus: ../panache-formatter/tests/fixtures/math_corpus
-Passing: 73 / 77
-Divergent: 4 / 77
+Passing: 82 / 82
+Divergent: 0 / 82
 
 Regenerate with:
   cargo test -p panache-parser --test math_badness_parity math_badness_full_report -- --ignored --nocapture
@@ -53,6 +53,15 @@ escapes/literal_backslash_in_env.tex
 groups/braced_group.tex
 groups/deep_nesting.tex
 groups/group_with_command.tex
+groups/left_right_asymmetric.tex
+groups/left_right_bracket.tex
+groups/left_right_group_boundary.tex
+groups/left_right_nested.tex
+groups/left_right_null.tex
+groups/left_right_paren.tex
+groups/left_right_stray.tex
+groups/left_right_trivia.tex
+groups/left_right_unclosed.tex
 groups/nested_braces.tex
 inline/binomial_frac.tex
 inline/greek_and_cdot.tex
@@ -83,155 +92,3 @@ scripts/script_on_group.tex
 scripts/sum_bounds.tex
 
 === Remaining divergences ===
-
---- groups/left_right_asymmetric.tex ---
-Badness:
-MATH@0..20 gaps=["", "", ""]
-  LEFT_RIGHT@0..19 gaps=["", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "("
-    MATH@6..12 gaps=["", "", "", "", "", ""]
-      SPACE@6..7 " "
-      WORD@7..9 "a,"
-      SPACE@9..10 " "
-      WORD@10..11 "b"
-      SPACE@11..12 " "
-    CONTROL_WORD@12..18 "\\right"
-    BRACKET_CLOSE@18..19 "]"
-  NEWLINE@19..20 "\n"
-Panache:
-MATH@0..20 gaps=["", "", ""]
-  LEFT_RIGHT@0..19 gaps=["", "", "", "", "", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "("
-    SPACE@6..7 " "
-    WORD@7..9 "a,"
-    SPACE@9..10 " "
-    WORD@10..11 "b"
-    SPACE@11..12 " "
-    CONTROL_WORD@12..18 "\\right"
-    WORD@18..19 "]"
-  NEWLINE@19..20 "\n"
-
-
---- groups/left_right_bracket.tex ---
-Badness:
-MATH@0..27 gaps=["", "", ""]
-  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    BRACKET_OPEN@5..6 "["
-    MATH@6..19 gaps=["", "", "", ""]
-      SPACE@6..7 " "
-      COMMAND@7..18 gaps=["", "", "", ""]
-        CONTROL_WORD@7..12 "\\frac"
-        GROUP@12..15 gaps=["", "", "", ""]
-          GROUP_OPEN@12..13 "{"
-          WORD@13..14 "a"
-          GROUP_CLOSE@14..15 "}"
-        GROUP@15..18 gaps=["", "", "", ""]
-          GROUP_OPEN@15..16 "{"
-          WORD@16..17 "b"
-          GROUP_CLOSE@17..18 "}"
-      SPACE@18..19 " "
-    CONTROL_WORD@19..25 "\\right"
-    BRACKET_CLOSE@25..26 "]"
-  NEWLINE@26..27 "\n"
-Panache:
-MATH@0..27 gaps=["", "", ""]
-  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "["
-    SPACE@6..7 " "
-    COMMAND@7..18 gaps=["", "", "", ""]
-      CONTROL_WORD@7..12 "\\frac"
-      GROUP@12..15 gaps=["", "", "", ""]
-        GROUP_OPEN@12..13 "{"
-        WORD@13..14 "a"
-        GROUP_CLOSE@14..15 "}"
-      GROUP@15..18 gaps=["", "", "", ""]
-        GROUP_OPEN@15..16 "{"
-        WORD@16..17 "b"
-        GROUP_CLOSE@17..18 "}"
-    SPACE@18..19 " "
-    CONTROL_WORD@19..25 "\\right"
-    WORD@25..26 "]"
-  NEWLINE@26..27 "\n"
-
-
---- groups/left_right_null.tex ---
-Badness:
-MATH@0..27 gaps=["", "", ""]
-  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "."
-    MATH@6..19 gaps=["", "", "", ""]
-      SPACE@6..7 " "
-      COMMAND@7..18 gaps=["", "", "", ""]
-        CONTROL_WORD@7..12 "\\frac"
-        GROUP@12..15 gaps=["", "", "", ""]
-          GROUP_OPEN@12..13 "{"
-          WORD@13..14 "a"
-          GROUP_CLOSE@14..15 "}"
-        GROUP@15..18 gaps=["", "", "", ""]
-          GROUP_OPEN@15..16 "{"
-          WORD@16..17 "b"
-          GROUP_CLOSE@17..18 "}"
-      SPACE@18..19 " "
-    CONTROL_WORD@19..25 "\\right"
-    WORD@25..26 "|"
-  NEWLINE@26..27 "\n"
-Panache:
-MATH@0..27 gaps=["", "", ""]
-  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "."
-    SPACE@6..7 " "
-    COMMAND@7..18 gaps=["", "", "", ""]
-      CONTROL_WORD@7..12 "\\frac"
-      GROUP@12..15 gaps=["", "", "", ""]
-        GROUP_OPEN@12..13 "{"
-        WORD@13..14 "a"
-        GROUP_CLOSE@14..15 "}"
-      GROUP@15..18 gaps=["", "", "", ""]
-        GROUP_OPEN@15..16 "{"
-        WORD@16..17 "b"
-        GROUP_CLOSE@17..18 "}"
-    SPACE@18..19 " "
-    CONTROL_WORD@19..25 "\\right"
-    WORD@25..26 "|"
-  NEWLINE@26..27 "\n"
-
-
---- groups/left_right_paren.tex ---
-Badness:
-MATH@0..21 gaps=["", "", ""]
-  LEFT_RIGHT@0..20 gaps=["", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "("
-    MATH@6..13 gaps=["", "", "", "", "", "", "", ""]
-      SPACE@6..7 " "
-      WORD@7..8 "a"
-      SPACE@8..9 " "
-      WORD@9..10 "+"
-      SPACE@10..11 " "
-      WORD@11..12 "b"
-      SPACE@12..13 " "
-    CONTROL_WORD@13..19 "\\right"
-    WORD@19..20 ")"
-  NEWLINE@20..21 "\n"
-Panache:
-MATH@0..21 gaps=["", "", ""]
-  LEFT_RIGHT@0..20 gaps=["", "", "", "", "", "", "", "", "", "", "", ""]
-    CONTROL_WORD@0..5 "\\left"
-    WORD@5..6 "("
-    SPACE@6..7 " "
-    WORD@7..8 "a"
-    SPACE@8..9 " "
-    WORD@9..10 "+"
-    SPACE@10..11 " "
-    WORD@11..12 "b"
-    SPACE@12..13 " "
-    CONTROL_WORD@13..19 "\\right"
-    WORD@19..20 ")"
-  NEWLINE@20..21 "\n"
-
