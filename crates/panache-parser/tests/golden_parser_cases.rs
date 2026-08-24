@@ -748,6 +748,7 @@ golden_test_cases!(
     lists_wrapping_nested,
     lists_wrapping_simple,
     math_left_right,
+    math_scripts,
     myst_directive_basic,
     myst_directive_arg_options,
     myst_directive_options_no_blank,

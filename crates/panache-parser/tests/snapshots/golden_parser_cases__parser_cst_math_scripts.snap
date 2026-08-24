@@ -1,0 +1,139 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..171
+  HEADING@0..15
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..14
+      TEXT@2..14 "Math scripts"
+    NEWLINE@14..15 "\n"
+  BLANK_LINE@15..16
+    BLANK_LINE@15..16 "\n"
+  PARAGRAPH@16..61
+    TEXT@16..26 "Attached: "
+    INLINE_MATH@26..33
+      INLINE_MATH_MARKER@26..27 "$"
+      MATH_CONTENT@27..32
+        MATH_SCRIPTED@27..32
+          MATH_TEXT@27..28 "x"
+          MATH_SUPERSCRIPT@28..30
+            MATH_SCRIPT@28..29 "^"
+            MATH_TEXT@29..30 "2"
+          MATH_SUBSCRIPT@30..32
+            MATH_SCRIPT@30..31 "_"
+            MATH_TEXT@31..32 "i"
+      INLINE_MATH_MARKER@32..33 "$"
+    TEXT@33..35 ", "
+    INLINE_MATH@35..44
+      INLINE_MATH_MARKER@35..36 "$"
+      MATH_CONTENT@36..43
+        MATH_TEXT@36..37 "a"
+        MATH_SCRIPTED@37..40
+          MATH_TEXT@37..38 "b"
+          MATH_SUPERSCRIPT@38..40
+            MATH_SCRIPT@38..39 "^"
+            MATH_TEXT@39..40 "2"
+        MATH_SCRIPTED@40..43
+          MATH_TEXT@40..41 "3"
+          MATH_SUBSCRIPT@41..43
+            MATH_SCRIPT@41..42 "_"
+            MATH_TEXT@42..43 "i"
+      INLINE_MATH_MARKER@43..44 "$"
+    TEXT@44..50 ", and "
+    INLINE_MATH@50..59
+      INLINE_MATH_MARKER@50..51 "$"
+      MATH_CONTENT@51..58
+        MATH_TEXT@51..53 "α"
+        MATH_SCRIPTED@53..58
+          MATH_TEXT@53..55 "β"
+          MATH_SUBSCRIPT@55..58
+            MATH_SCRIPT@55..56 "_"
+            MATH_TEXT@56..58 "γ"
+      INLINE_MATH_MARKER@58..59 "$"
+    TEXT@59..60 "."
+    NEWLINE@60..61 "\n"
+  BLANK_LINE@61..62
+    BLANK_LINE@61..62 "\n"
+  PARAGRAPH@62..126
+    TEXT@62..80 "Structured bases: "
+    INLINE_MATH@80..90
+      INLINE_MATH_MARKER@80..81 "$"
+      MATH_CONTENT@81..89
+        MATH_SCRIPTED@81..89
+          MATH_COMMAND@81..87 "\\alpha"
+          MATH_SUBSCRIPT@87..89
+            MATH_SCRIPT@87..88 "_"
+            MATH_TEXT@88..89 "i"
+      INLINE_MATH_MARKER@89..90 "$"
+    TEXT@90..92 ", "
+    INLINE_MATH@92..100
+      INLINE_MATH_MARKER@92..93 "$"
+      MATH_CONTENT@93..99
+        MATH_SCRIPTED@93..99
+          MATH_GROUP@93..97
+            MATH_GROUP_OPEN@93..94 "{"
+            MATH_TEXT@94..96 "ab"
+            MATH_GROUP_CLOSE@96..97 "}"
+          MATH_SUPERSCRIPT@97..99
+            MATH_SCRIPT@97..98 "^"
+            MATH_TEXT@98..99 "2"
+      INLINE_MATH_MARKER@99..100 "$"
+    TEXT@100..106 ", and "
+    INLINE_MATH@106..124
+      INLINE_MATH_MARKER@106..107 "$"
+      MATH_CONTENT@107..123
+        MATH_SCRIPTED@107..123
+          MATH_DELIMITED@107..121
+            MATH_COMMAND@107..112 "\\left"
+            MATH_OPEN@112..113 "("
+            MATH_TEXT@113..114 "x"
+            MATH_COMMAND@114..120 "\\right"
+            MATH_CLOSE@120..121 ")"
+          MATH_SUBSCRIPT@121..123
+            MATH_SCRIPT@121..122 "_"
+            MATH_TEXT@122..123 "i"
+      INLINE_MATH_MARKER@123..124 "$"
+    TEXT@124..125 "."
+    NEWLINE@125..126 "\n"
+  BLANK_LINE@126..127
+    BLANK_LINE@126..127 "\n"
+  PARAGRAPH@127..145
+    TEXT@127..135 "Trivia: "
+    INLINE_MATH@135..143
+      INLINE_MATH_MARKER@135..136 "$"
+      MATH_CONTENT@136..142
+        MATH_SCRIPTED@136..142
+          MATH_TEXT@136..137 "x"
+          MATH_NEWLINE@137..138 "\n"
+          MATH_SPACE@138..139 " "
+          MATH_SUPERSCRIPT@139..142
+            MATH_SCRIPT@139..140 "^"
+            MATH_SPACE@140..141 " "
+            MATH_TEXT@141..142 "2"
+      INLINE_MATH_MARKER@142..143 "$"
+    TEXT@143..144 "."
+    NEWLINE@144..145 "\n"
+  BLANK_LINE@145..146
+    BLANK_LINE@145..146 "\n"
+  PARAGRAPH@146..171
+    TEXT@146..156 "Recovery: "
+    INLINE_MATH@156..160
+      INLINE_MATH_MARKER@156..157 "$"
+      MATH_CONTENT@157..159
+        MATH_SCRIPTED@157..159
+          MATH_TEXT@157..158 "x"
+          MATH_SUPERSCRIPT@158..159
+            MATH_SCRIPT@158..159 "^"
+      INLINE_MATH_MARKER@159..160 "$"
+    TEXT@160..165 " and "
+    INLINE_MATH@165..169
+      INLINE_MATH_MARKER@165..166 "$"
+      MATH_CONTENT@166..168
+        MATH_SCRIPT@166..167 "^"
+        MATH_TEXT@167..168 "2"
+      INLINE_MATH_MARKER@168..169 "$"
+    TEXT@169..170 "."
+    NEWLINE@170..171 "\n"

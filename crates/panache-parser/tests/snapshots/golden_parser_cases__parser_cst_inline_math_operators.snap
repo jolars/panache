@@ -85,25 +85,30 @@ DOCUMENT@0..183
     INLINE_MATH@126..134
       INLINE_MATH_MARKER@126..127 "$"
       MATH_CONTENT@127..133
-        MATH_TEXT@127..128 "e"
-        MATH_SCRIPT@128..129 "^"
-        MATH_GROUP@129..133
-          MATH_GROUP_OPEN@129..130 "{"
-          MATH_OPERATOR@130..131 "-"
-          MATH_TEXT@131..132 "x"
-          MATH_GROUP_CLOSE@132..133 "}"
+        MATH_SCRIPTED@127..133
+          MATH_TEXT@127..128 "e"
+          MATH_SUPERSCRIPT@128..133
+            MATH_SCRIPT@128..129 "^"
+            MATH_GROUP@129..133
+              MATH_GROUP_OPEN@129..130 "{"
+              MATH_OPERATOR@130..131 "-"
+              MATH_TEXT@131..132 "x"
+              MATH_GROUP_CLOSE@132..133 "}"
       INLINE_MATH_MARKER@133..134 "$"
     TEXT@134..139 " and "
     INLINE_MATH@139..148
       INLINE_MATH_MARKER@139..140 "$"
       MATH_CONTENT@140..147
-        MATH_TEXT@140..142 "10"
-        MATH_SCRIPT@142..143 "^"
-        MATH_GROUP@143..147
-          MATH_GROUP_OPEN@143..144 "{"
-          MATH_OPERATOR@144..145 "-"
-          MATH_TEXT@145..146 "3"
-          MATH_GROUP_CLOSE@146..147 "}"
+        MATH_TEXT@140..141 "1"
+        MATH_SCRIPTED@141..147
+          MATH_TEXT@141..142 "0"
+          MATH_SUPERSCRIPT@142..147
+            MATH_SCRIPT@142..143 "^"
+            MATH_GROUP@143..147
+              MATH_GROUP_OPEN@143..144 "{"
+              MATH_OPERATOR@144..145 "-"
+              MATH_TEXT@145..146 "3"
+              MATH_GROUP_CLOSE@146..147 "}"
       INLINE_MATH_MARKER@147..148 "$"
     NEWLINE@148..149 "\n"
   BLANK_LINE@149..150

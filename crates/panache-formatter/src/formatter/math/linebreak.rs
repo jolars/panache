@@ -86,7 +86,7 @@
 
 use super::operators::{self, AtomClass};
 use super::render;
-use crate::syntax::{SyntaxElement, SyntaxKind};
+use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxToken};
 
 struct Break {
     /// Element index of the atom's first token (where a break lands before it).
@@ -150,7 +150,7 @@ fn first_relation_is_assignment(elems: &[SyntaxElement]) -> bool {
     let Some(b) = first_top_level_relation(elems) else {
         return false;
     };
-    let Some(tok) = elems[b.index].as_token() else {
+    let Some(tok) = semantic_token(&elems[b.index]) else {
         return false;
     };
     match tok.kind() {
@@ -309,14 +309,28 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                 i += 1;
             }
             SyntaxKind::MATH_TEXT
-                if operators::is_definition_colon(
+                if is_definition_colon_element(
                     el.as_token().map(|t| t.text()).unwrap_or_default(),
-                    elems
-                        .get(i + 1)
-                        .and_then(|e| e.as_token())
-                        .map(|t| (t.kind(), t.text())),
+                    elems.get(i + 1),
                 ) =>
             {
+                if elems
+                    .get(i + 1)
+                    .is_some_and(|next| next.kind() == SyntaxKind::MATH_SCRIPTED)
+                {
+                    if depth == 0 {
+                        out.push(Break {
+                            index: i,
+                            end: i + 2,
+                            class: AtomClass::Rel,
+                        });
+                    }
+                    prev = Some(AtomClass::Rel);
+                    star_modifier_pending = false;
+                    i += 2;
+                    continue;
+                }
+
                 let mut run = String::new();
                 let mut j = i + 1;
                 while j < elems.len() && elems[j].kind() == SyntaxKind::MATH_OPERATOR {
@@ -353,6 +367,46 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
             }
             SyntaxKind::MATH_GROUP | SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_DELIMITED => {
                 prev = Some(AtomClass::Close);
+                star_modifier_pending = false;
+                i += 1;
+            }
+            SyntaxKind::MATH_SCRIPTED => {
+                let Some(base) = el
+                    .as_node()
+                    .and_then(|node| MathScripted::cast(node.clone()))
+                    .and_then(|scripted| scripted.base())
+                else {
+                    prev = Some(AtomClass::Ord);
+                    star_modifier_pending = false;
+                    i += 1;
+                    continue;
+                };
+
+                let is_star_modifier = star_modifier_pending
+                    && base.as_token().is_some_and(|token| {
+                        token.kind() == SyntaxKind::MATH_OPERATOR && token.text() == "*"
+                    });
+                let raw_class = if is_star_modifier {
+                    Some(AtomClass::Ord)
+                } else {
+                    scripted_base_class(&base)
+                };
+                let class = raw_class.map(|raw| operators::coerce(raw, prev));
+                match base.kind() {
+                    SyntaxKind::MATH_OPEN => depth += 1,
+                    SyntaxKind::MATH_CLOSE => depth -= 1,
+                    _ => {}
+                }
+                if depth == 0 && class.is_some_and(operators::is_spaced) {
+                    out.push(Break {
+                        index: i,
+                        end: i + 1,
+                        class: class.expect("spaced scripted atom has a class"),
+                    });
+                }
+                prev = class.or(Some(AtomClass::Ord));
+                // A script ends the adjacency required by a following star
+                // modifier, even when the scripted base is a command.
                 star_modifier_pending = false;
                 i += 1;
             }
@@ -428,6 +482,45 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
     out
 }
 
+fn semantic_token(element: &SyntaxElement) -> Option<SyntaxToken> {
+    if let Some(token) = element.as_token() {
+        return Some(token.clone());
+    }
+    let scripted = element
+        .as_node()
+        .and_then(|node| MathScripted::cast(node.clone()))?;
+    scripted.base()?.into_token()
+}
+
+fn is_definition_colon_element(text: &str, next: Option<&SyntaxElement>) -> bool {
+    let next = next.and_then(semantic_token);
+    operators::is_definition_colon(
+        text,
+        next.as_ref().map(|token| (token.kind(), token.text())),
+    )
+}
+
+fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
+    if let Some(class) = operators::delimiter_class(base.kind()) {
+        return Some(class);
+    }
+    match base.kind() {
+        SyntaxKind::MATH_OPERATOR => base
+            .as_token()
+            .map(|token| operators::classify_operator(token.text())),
+        SyntaxKind::MATH_COMMAND => base.as_token().map(|token| {
+            let name = token.text().strip_prefix('\\').unwrap_or(token.text());
+            operators::command_class(name).unwrap_or(AtomClass::Ord)
+        }),
+        SyntaxKind::MATH_GROUP | SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_DELIMITED => {
+            Some(AtomClass::Close)
+        }
+        SyntaxKind::MATH_SCRIPT | SyntaxKind::MATH_ALIGN => Some(AtomClass::Open),
+        SyntaxKind::MATH_LINE_BREAK => None,
+        _ => Some(AtomClass::Ord),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,6 +549,8 @@ mod tests {
     #[test]
     fn starred_command_modifier_is_not_a_break_candidate() {
         assert!(spaced_operator_breaks(&elems("\\operatorname*{minimize} a")).is_empty());
+        assert!(spaced_operator_breaks(&elems("\\operatorname*_i{x}")).is_empty());
+        assert!(!spaced_operator_breaks(&elems("\\operatorname_i*{x}")).is_empty());
     }
 
     #[test]
@@ -524,6 +619,26 @@ mod tests {
     }
 
     #[test]
+    fn scripted_relations_remain_break_points() {
+        assert_eq!(
+            lines("aaaa =_i bbbb =_j cccc", 15),
+            vec!["aaaa =_i bbbb", "     =_j cccc"],
+        );
+    }
+
+    #[test]
+    fn scripted_assignment_relations_keep_the_rhs_anchor() {
+        assert_eq!(
+            lines("A \\gets_i bbbb =_j cccc", 18),
+            vec!["A \\gets_i bbbb", "          =_j cccc"],
+        );
+        assert_eq!(
+            lines("A :=_i bbbb :=_j cccc", 15),
+            vec!["A :=_i bbbb", "       :=_j cccc"],
+        );
+    }
+
+    #[test]
     fn relations_inside_parens_are_not_break_points() {
         let content = "ffffff(xxxxxxxx = yyyyyyyy) zzzzzzzz";
         assert_eq!(rel_indices(content), Vec::<usize>::new());
@@ -567,6 +682,12 @@ mod tests {
     fn relations_inside_braces_are_opaque() {
         let content = "\\frac{aaaa = bbbb}{cccc} dddd eeee";
         assert_eq!(rel_indices(content), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn scripted_group_base_does_not_change_delimiter_depth() {
+        let content = "{x}_i = bbbbbbbbbb = cccccccccc";
+        assert_eq!(rel_indices(content).len(), 2);
     }
 
     #[test]

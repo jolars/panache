@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..398
@@ -23,21 +22,27 @@ DOCUMENT@0..398
     INLINE_MATH@121..140
       INLINE_MATH_MARKER@121..123 "\\("
       MATH_CONTENT@123..138
-        MATH_TEXT@123..124 "x"
-        MATH_SCRIPT@124..125 "^"
-        MATH_TEXT@125..126 "2"
+        MATH_SCRIPTED@123..126
+          MATH_TEXT@123..124 "x"
+          MATH_SUPERSCRIPT@124..126
+            MATH_SCRIPT@124..125 "^"
+            MATH_TEXT@125..126 "2"
         MATH_SPACE@126..127 " "
         MATH_OPERATOR@127..128 "+"
         MATH_SPACE@128..129 " "
-        MATH_TEXT@129..130 "y"
-        MATH_SCRIPT@130..131 "^"
-        MATH_TEXT@131..132 "2"
+        MATH_SCRIPTED@129..132
+          MATH_TEXT@129..130 "y"
+          MATH_SUPERSCRIPT@130..132
+            MATH_SCRIPT@130..131 "^"
+            MATH_TEXT@131..132 "2"
         MATH_SPACE@132..133 " "
         MATH_OPERATOR@133..134 "="
         MATH_SPACE@134..135 " "
-        MATH_TEXT@135..136 "z"
-        MATH_SCRIPT@136..137 "^"
-        MATH_TEXT@137..138 "2"
+        MATH_SCRIPTED@135..138
+          MATH_TEXT@135..136 "z"
+          MATH_SUPERSCRIPT@136..138
+            MATH_SCRIPT@136..137 "^"
+            MATH_TEXT@137..138 "2"
       INLINE_MATH_MARKER@138..140 "\\)"
     TEXT@140..149 " in text."
     NEWLINE@149..150 "\n"
@@ -53,21 +58,28 @@ DOCUMENT@0..398
       DISPLAY_MATH_MARKER@190..192 "\\["
       MATH_CONTENT@192..242
         MATH_NEWLINE@192..193 "\n"
-        MATH_COMMAND@193..197 "\\int"
-        MATH_SCRIPT@197..198 "_"
-        MATH_TEXT@198..199 "0"
-        MATH_SCRIPT@199..200 "^"
-        MATH_COMMAND@200..206 "\\infty"
+        MATH_SCRIPTED@193..206
+          MATH_COMMAND@193..197 "\\int"
+          MATH_SUBSCRIPT@197..199
+            MATH_SCRIPT@197..198 "_"
+            MATH_TEXT@198..199 "0"
+          MATH_SUPERSCRIPT@199..206
+            MATH_SCRIPT@199..200 "^"
+            MATH_COMMAND@200..206 "\\infty"
         MATH_SPACE@206..207 " "
-        MATH_TEXT@207..208 "e"
-        MATH_SCRIPT@208..209 "^"
-        MATH_GROUP@209..215
-          MATH_GROUP_OPEN@209..210 "{"
-          MATH_OPERATOR@210..211 "-"
-          MATH_TEXT@211..212 "x"
-          MATH_SCRIPT@212..213 "^"
-          MATH_TEXT@213..214 "2"
-          MATH_GROUP_CLOSE@214..215 "}"
+        MATH_SCRIPTED@207..215
+          MATH_TEXT@207..208 "e"
+          MATH_SUPERSCRIPT@208..215
+            MATH_SCRIPT@208..209 "^"
+            MATH_GROUP@209..215
+              MATH_GROUP_OPEN@209..210 "{"
+              MATH_OPERATOR@210..211 "-"
+              MATH_SCRIPTED@211..214
+                MATH_TEXT@211..212 "x"
+                MATH_SUPERSCRIPT@212..214
+                  MATH_SCRIPT@212..213 "^"
+                  MATH_TEXT@213..214 "2"
+              MATH_GROUP_CLOSE@214..215 "}"
         MATH_SPACE@215..216 " "
         MATH_TEXT@216..218 "dx"
         MATH_SPACE@218..219 " "
@@ -117,9 +129,12 @@ DOCUMENT@0..398
         MATH_SPACE@310..311 " "
         MATH_OPERATOR@311..312 "="
         MATH_SPACE@312..313 " "
-        MATH_TEXT@313..315 "ax"
-        MATH_SCRIPT@315..316 "^"
-        MATH_TEXT@316..317 "2"
+        MATH_TEXT@313..314 "a"
+        MATH_SCRIPTED@314..317
+          MATH_TEXT@314..315 "x"
+          MATH_SUPERSCRIPT@315..317
+            MATH_SCRIPT@315..316 "^"
+            MATH_TEXT@316..317 "2"
         MATH_SPACE@317..318 " "
         MATH_OPERATOR@318..319 "+"
         MATH_SPACE@319..320 " "
@@ -147,9 +162,12 @@ DOCUMENT@0..398
         MATH_SPACE@387..388 " "
         MATH_OPERATOR@388..389 "="
         MATH_SPACE@389..390 " "
-        MATH_TEXT@390..392 "mc"
-        MATH_SCRIPT@392..393 "^"
-        MATH_TEXT@393..394 "2"
+        MATH_TEXT@390..391 "m"
+        MATH_SCRIPTED@391..394
+          MATH_TEXT@391..392 "c"
+          MATH_SUPERSCRIPT@392..394
+            MATH_SCRIPT@392..393 "^"
+            MATH_TEXT@393..394 "2"
         MATH_NEWLINE@394..395 "\n"
       DISPLAY_MATH_MARKER@395..397 "\\]"
     NEWLINE@397..398 "\n"

@@ -527,6 +527,28 @@ mod tests {
     }
 
     #[test]
+    fn inline_scripts_preserve_their_base_atom_class() {
+        assert_eq!(fmt("a=_ib", MathContext::Inline), "a =_i b");
+        assert_eq!(fmt(r"a\gets_ib", MathContext::Inline), r"a \gets_i b");
+        assert_eq!(fmt("a:=_ib", MathContext::Inline), "a :=_i b");
+        for case in ["a=_ib", r"a\gets_ib", "a:=_ib"] {
+            assert_idempotent(case, MathContext::Inline);
+        }
+    }
+
+    #[test]
+    fn star_modifier_does_not_cross_a_script() {
+        assert_eq!(
+            fmt(r"\operatorname*_i{x}", MathContext::Inline),
+            r"\operatorname*_i{x}"
+        );
+        assert_eq!(
+            fmt(r"\operatorname_i*{x}", MathContext::Inline),
+            r"\operatorname_i * {x}"
+        );
+    }
+
+    #[test]
     fn inline_keeps_unary_operators_tight() {
         assert_eq!(fmt("-x", MathContext::Inline), "-x");
         assert_eq!(fmt("- x", MathContext::Inline), "-x");

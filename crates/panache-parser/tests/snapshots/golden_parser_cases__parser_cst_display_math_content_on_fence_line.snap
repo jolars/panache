@@ -70,9 +70,12 @@ DOCUMENT@0..244
         MATH_SPACE@182..183 " "
         MATH_OPERATOR@183..184 "="
         MATH_SPACE@184..185 " "
-        MATH_TEXT@185..187 "mc"
-        MATH_SCRIPT@187..188 "^"
-        MATH_TEXT@188..189 "2"
+        MATH_TEXT@185..186 "m"
+        MATH_SCRIPTED@186..189
+          MATH_TEXT@186..187 "c"
+          MATH_SUPERSCRIPT@187..189
+            MATH_SCRIPT@187..188 "^"
+            MATH_TEXT@188..189 "2"
         MATH_SPACE@189..190 " "
       DISPLAY_MATH_MARKER@190..192 "$$"
     NEWLINE@192..193 "\n"

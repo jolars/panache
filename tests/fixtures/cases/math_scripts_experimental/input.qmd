@@ -1,0 +1,17 @@
+# Math scripts
+
+Scripts: $ab ^ 23 _ i$.
+
+Relation: $a=_ib$.
+
+Command relation: $a\gets_ib$.
+
+Definition relation: $a:=_ib$.
+
+$$
+aaaaaaaaaa=_ibbbbbbbbbb=_jcccccccccc
+$$
+
+$$
+A:=_ibbbbbbbbbb:=_jcccccccccc
+$$

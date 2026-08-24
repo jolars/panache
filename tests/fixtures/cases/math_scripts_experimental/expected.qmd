@@ -1,0 +1,21 @@
+# Math scripts
+
+Scripts: $ab^23_i$.
+
+Relation: $a =_i b$.
+
+Command relation:
+$a \gets_i b$.
+
+Definition relation:
+$a :=_i b$.
+
+$$
+  aaaaaaaaaa =_i bbbbbbbbbb
+             =_j cccccccccc
+$$
+
+$$
+  A :=_i bbbbbbbbbb
+         :=_j cccccccccc
+$$

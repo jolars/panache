@@ -12,7 +12,7 @@ still-relevant trap into Persistent traps. Keep it short.
 
 - **Read math content via `syntax::math::math_content_text()`**, never
   `MATH_CONTENT.text()`. The block machinery interleaves container prefixes
-  (blockquote `BLOCK_QUOTE_MARKER` + bare `WHITESPACE`) into `MATH_CONTENT` on
+  (`LINE_PREFIX`, and sometimes host `NEWLINE`) into `MATH_CONTENT` on
   continuation lines; the helper strips them by whitelisting `MATH_*` tokens.
   Reading `.text()` directly leaks the `>` and re-accumulates it every format
   pass (a real idempotency bug that was fixed in Phase 1).
@@ -66,35 +66,52 @@ still-relevant trap into Persistent traps. Keep it short.
   `MATH_PUNCT`, and the old `text_tail_class` (which re-lexed a `MATH_TEXT` tail)
   is gone — the formatter reads the token kind via `operators::delimiter_class`.
   `| . /` stay `MATH_TEXT` (their class needs macro context).
+- **Scripts are native CST structure.** `MATH_SCRIPTED` owns one base atom and
+  `MATH_SUBSCRIPT`/`MATH_SUPERSCRIPT` children. Unbraced text bases and
+  arguments split at Unicode-scalar boundaries; comments and blank lines stop
+  attachment. Formatter interpretation must inherit the base atom's class
+  across the script—especially for scripted relation and assignment breaks.
 
 --------------------------------------------------------------------------------
 
 ## Latest session
 
-**Native Panache math-stack roadmap.** Reassessed the parser and formatter
-against `../badness`. Panache will adopt the stronger command-argument, script,
-signature-domain, semantic-atom, and compositional-layout ideas, but will own
-their implementation completely: no Badness dependency, shared crate,
-transient/foreign CST, projection layer, or formatter delegation.
+**Native script CST—first roadmap slice.** Added Panache-owned
+`MATH_SCRIPTED`, `MATH_SUBSCRIPT`, and `MATH_SUPERSCRIPT` nodes during the
+existing single pass, using Rowan checkpoints rather than a repair pass.
 
-- `TODO.md` now records the staged parser/CST, formatter, integration, and
-  validation plan. The authoritative structure remains the native, lossless
-  `MATH_CONTENT` subtree so the linter, Salsa, and LSP retain direct host ranges.
-- Markdown keeps ownership of delimiter recognition, container prefixes, raw
-  math-environment classification, Bookdown labels, and delimiter style. The
-  Panache math parser owns the admitted TeX-math content.
-- No implementation changed in this session.
+- TeX one-token attachment is explicit: ordinary runs split before the final
+  Unicode scalar, while commands, groups, environments, and
+  `MATH_DELIMITED` nodes can serve as structural bases or arguments. Spaces and
+  one physical newline remain lossless inside the attachment; comments and
+  blank lines stop it. Missing arguments stay structured, and stray markers
+  remain bare tokens; no new diagnostic was introduced.
+- Added `MathScripted`, `MathSubscript`, and `MathSuperscript` typed wrappers.
+  Their accessors ignore injected host prefixes, preserving direct host ranges
+  for linter and LSP consumers.
+- Formatter flattening now carries script boundaries: marker/argument gaps are
+  tight, then the base atom's semantic class is restored. Scripted `=`,
+  `\gets`, and `:=` remain relation/assignment break sites, and star-modifier
+  adjacency does not cross a script.
+- Added focused parser and formatter goldens, updated 11 affected parser
+  snapshots, and passed workspace check/test/Clippy/fmt plus the math corpus
+  idempotency/losslessness gate.
 
 ### Suggested next sub-targets
-1. Pin the target native CST with command-argument and script-attachment golden
-   fixtures, including unknown-macro whitespace preservation.
-2. Design the Panache-owned signature/domain model and typed syntax wrappers.
-3. Implement one bounded structural slice before revisiting formatter layout.
+1. Specify and implement one bounded native command-call/argument shape,
+   beginning with signature-proven built-ins and unknown-macro whitespace
+   preservation.
+2. Design the Panache-owned signature/domain model before recursing into
+   command arguments in the formatter.
+3. Decide missing/duplicate-script diagnostics separately; do not infer them
+   merely from the richer CST.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Native Panache math-stack roadmap.** Recorded the no-Badness-dependency
+  parser/CST, formatter, integration, and validation plan in `TODO.md`.
 - **Composable embedded math environments.** Added the math-local Wadler-style
   document model, structured mixed-environment layout, and focused idempotency
   and MathML coverage; unsupported shapes remain verbatim.

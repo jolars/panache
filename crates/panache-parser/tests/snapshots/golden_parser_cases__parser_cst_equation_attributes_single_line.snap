@@ -17,9 +17,12 @@ DOCUMENT@0..91
         MATH_SPACE@37..38 " "
         MATH_OPERATOR@38..39 "="
         MATH_SPACE@39..40 " "
-        MATH_TEXT@40..42 "mc"
-        MATH_SCRIPT@42..43 "^"
-        MATH_TEXT@43..44 "2"
+        MATH_TEXT@40..41 "m"
+        MATH_SCRIPTED@41..44
+          MATH_TEXT@41..42 "c"
+          MATH_SUPERSCRIPT@42..44
+            MATH_SCRIPT@42..43 "^"
+            MATH_TEXT@43..44 "2"
         MATH_SPACE@44..45 " "
       DISPLAY_MATH_MARKER@45..47 "$$"
     WHITESPACE@47..48 " "

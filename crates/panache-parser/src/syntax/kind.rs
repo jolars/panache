@@ -90,6 +90,9 @@ pub enum SyntaxKind {
     MATH_GROUP,       // { ... } brace group (node)
     MATH_ENVIRONMENT, // \begin{env} ... \end{env} (node)
     MATH_DELIMITED,   // \left<d> ... \right<d> paired delimiters (node)
+    MATH_SCRIPTED,    // base atom with one or more sub/superscripts (node)
+    MATH_SUBSCRIPT,   // _ plus its optional one-atom argument (node)
+    MATH_SUPERSCRIPT, // ^ plus its optional one-atom argument (node)
     MATH_GROUP_OPEN,  // {
     MATH_GROUP_CLOSE, // }
     MATH_COMMAND,     // \foo control word or \% control symbol

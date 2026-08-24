@@ -222,7 +222,7 @@ that host layer.
 - [ ] Replace bare `MATH_COMMAND` tokens followed by unrelated groups with
   native Panache command-call nodes that own their syntactically attached
   arguments. Preserve every source byte and recover without hard failure.
-- [ ] Add native scripted structure for bases, subscripts, and superscripts,
+- [x] Add native scripted structure for bases, subscripts, and superscripts,
   including unbraced one-token arguments and Unicode-scalar boundaries.
 - [ ] Strengthen environment and `\left`/`\right` pairing without introducing a
   post-parse repair pass. Keep Pandoc's decision about which raw

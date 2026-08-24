@@ -106,34 +106,16 @@ impl MathParser<'_> {
                         self.bump_bytes(2, SyntaxKind::MATH_LINE_BREAK);
                     } else if let Some(word) = self.peek_control_word() {
                         match word {
-                            "begin" => self.parse_environment(),
                             "end" if ctx == Ctx::Env => break,
-                            "end" => {
-                                self.parse_control_word();
-                            }
-                            "left" => self.parse_delimited(),
                             "right" if ctx == Ctx::LeftRight => break,
-                            "right" => {
-                                self.parse_control_word();
-                            }
-                            _ => self.parse_control_word(),
+                            _ => self.parse_scripted_atom(ctx),
                         }
                     } else {
-                        self.parse_control_symbol();
+                        self.parse_scripted_atom(ctx);
                     }
                 }
-                '{' => self.parse_group(),
-                '(' if self.opts.bookdown_equation_labels => match self.equation_label_len() {
-                    Some(len) => self.bump_bytes(len, SyntaxKind::MATH_EQUATION_LABEL),
-                    None => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
-                },
-                '(' | '[' => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
-                ')' | ']' => self.bump_bytes(1, SyntaxKind::MATH_CLOSE),
-                ',' | ';' => self.bump_bytes(1, SyntaxKind::MATH_PUNCT),
-                ':' => self.bump_bytes(1, SyntaxKind::MATH_TEXT),
                 '&' => self.bump_bytes(1, SyntaxKind::MATH_ALIGN),
                 '^' | '_' => self.bump_bytes(1, SyntaxKind::MATH_SCRIPT),
-                c if is_operator(c) => self.bump_bytes(1, SyntaxKind::MATH_OPERATOR),
                 '%' => self.parse_comment(),
                 ' ' | '\t' => self.parse_spaces(),
                 '\n' => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
@@ -145,7 +127,153 @@ impl MathParser<'_> {
                     };
                     self.bump_bytes(len, SyntaxKind::MATH_NEWLINE);
                 }
-                _ => self.parse_text(),
+                _ => self.parse_scripted_atom(ctx),
+            }
+        }
+    }
+
+    /// Parse one atom and attach any immediately following TeX scripts to it.
+    ///
+    /// Rowan checkpoints let the parser wrap the base after it has been emitted,
+    /// which keeps script attachment in this single pass. An ordinary-text run
+    /// is split before its final Unicode scalar when a script follows because
+    /// TeX attaches an unbraced script to one token, not to the whole run.
+    fn parse_scripted_atom(&mut self, ctx: Ctx) {
+        self.split_text_prefix_before_script();
+
+        let checkpoint = self.builder.checkpoint();
+        self.parse_atom();
+
+        if self.script_marker_after_layout(self.pos).is_none() {
+            return;
+        }
+
+        self.builder
+            .start_node_at(checkpoint, SyntaxKind::MATH_SCRIPTED.into());
+        while let Some(marker_pos) = self.script_marker_after_layout(self.pos) {
+            self.parse_layout_until(marker_pos);
+            let script_kind = match self.peek_char() {
+                Some('^') => SyntaxKind::MATH_SUPERSCRIPT,
+                Some('_') => SyntaxKind::MATH_SUBSCRIPT,
+                _ => unreachable!("script lookahead must end at a script marker"),
+            };
+            self.builder.start_node(script_kind.into());
+            self.bump_bytes(1, SyntaxKind::MATH_SCRIPT);
+
+            let argument_pos = self.layout_end_before_boundary(self.pos);
+            self.parse_layout_until(argument_pos);
+            if self.can_start_script_argument(ctx) {
+                self.parse_script_argument();
+            }
+            self.builder.finish_node();
+        }
+        self.builder.finish_node();
+    }
+
+    /// Emit all but the final Unicode scalar in an ordinary-text run when the
+    /// run is followed by a script. The final scalar is then parsed as the base.
+    fn split_text_prefix_before_script(&mut self) {
+        let len = self.text_len();
+        if len == 0 || self.script_marker_after_layout(self.pos + len).is_none() {
+            return;
+        }
+
+        let text = &self.input[self.pos..self.pos + len];
+        let Some((last_offset, _)) = text.char_indices().next_back() else {
+            return;
+        };
+        if last_offset > 0 {
+            self.bump_bytes(last_offset, SyntaxKind::MATH_TEXT);
+        }
+    }
+
+    /// Parse one atom without considering scripts that follow it.
+    fn parse_atom(&mut self) {
+        match self.peek_char() {
+            Some('\\') if self.peek_control_word() == Some("begin") => self.parse_environment(),
+            Some('\\') if self.peek_control_word() == Some("left") => self.parse_delimited(),
+            Some('\\') if self.peek_control_word().is_some() => self.parse_control_word(),
+            Some('\\') => self.parse_control_symbol(),
+            Some('{') => self.parse_group(),
+            Some('(') if self.opts.bookdown_equation_labels => match self.equation_label_len() {
+                Some(len) => self.bump_bytes(len, SyntaxKind::MATH_EQUATION_LABEL),
+                None => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
+            },
+            Some('(' | '[') => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
+            Some(')' | ']') => self.bump_bytes(1, SyntaxKind::MATH_CLOSE),
+            Some(',' | ';') => self.bump_bytes(1, SyntaxKind::MATH_PUNCT),
+            Some(':') => self.bump_bytes(1, SyntaxKind::MATH_TEXT),
+            Some(c) if is_operator(c) => self.bump_bytes(c.len_utf8(), SyntaxKind::MATH_OPERATOR),
+            Some(_) => self.parse_text(),
+            None => {}
+        }
+    }
+
+    /// Parse the single TeX token that forms an unbraced script argument.
+    fn parse_script_argument(&mut self) {
+        if self.text_len() > 0 {
+            let len = self.peek_char().map(char::len_utf8).unwrap_or(0);
+            self.bump_bytes(len, SyntaxKind::MATH_TEXT);
+        } else {
+            self.parse_atom();
+        }
+    }
+
+    fn can_start_script_argument(&self, ctx: Ctx) -> bool {
+        match self.peek_char() {
+            None | Some('}' | '&' | '%' | '^' | '_') => false,
+            Some('\\') if self.rest().starts_with("\\\\") => false,
+            Some('\\') if ctx == Ctx::Env && self.peek_control_word() == Some("end") => false,
+            Some('\\') if ctx == Ctx::LeftRight && self.peek_control_word() == Some("right") => {
+                false
+            }
+            Some(' ' | '\t' | '\n' | '\r') => false,
+            Some(_) => true,
+        }
+    }
+
+    /// Find a script marker after horizontal trivia and at most one physical
+    /// newline. Comments and blank lines deliberately stop attachment.
+    fn script_marker_after_layout(&self, pos: usize) -> Option<usize> {
+        let end = self.layout_end_before_boundary(pos);
+        self.input[end..].starts_with(['^', '_']).then_some(end)
+    }
+
+    /// Return the end of attachable layout trivia. The second physical newline
+    /// is a boundary and remains outside the scripted node.
+    fn layout_end_before_boundary(&self, mut pos: usize) -> usize {
+        let mut saw_newline = false;
+        while let Some(c) = self.input[pos..].chars().next() {
+            match c {
+                ' ' | '\t' => pos += c.len_utf8(),
+                '\n' | '\r' if !saw_newline => {
+                    saw_newline = true;
+                    if c == '\r' && self.input[pos..].starts_with("\r\n") {
+                        pos += 2;
+                    } else {
+                        pos += c.len_utf8();
+                    }
+                }
+                _ => break,
+            }
+        }
+        pos
+    }
+
+    fn parse_layout_until(&mut self, end: usize) {
+        while self.pos < end {
+            match self.peek_char() {
+                Some(' ' | '\t') => self.parse_spaces(),
+                Some('\n') => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
+                Some('\r') => {
+                    let len = if self.rest().starts_with("\r\n") {
+                        2
+                    } else {
+                        1
+                    };
+                    self.bump_bytes(len, SyntaxKind::MATH_NEWLINE);
+                }
+                _ => unreachable!("layout lookahead may only skip layout trivia"),
             }
         }
     }
@@ -242,12 +370,15 @@ impl MathParser<'_> {
     }
 
     fn parse_text(&mut self) {
-        let len = self
-            .rest()
-            .find(|c: char| is_special(c))
-            .unwrap_or_else(|| self.rest().len());
+        let len = self.text_len();
         debug_assert!(len > 0, "parse_text on a special char");
         self.bump_bytes(len, SyntaxKind::MATH_TEXT);
+    }
+
+    fn text_len(&self) -> usize {
+        self.rest()
+            .find(|c: char| is_special(c))
+            .unwrap_or_else(|| self.rest().len())
     }
 
     fn equation_label_len(&self) -> Option<usize> {
@@ -428,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    fn line_break_alignment_and_scripts() {
+    fn line_break_and_alignment_tokens() {
         assert_eq!(
             token_kinds(r"x &= 1 \\"),
             vec![
@@ -443,16 +574,123 @@ mod tests {
             ]
         );
         assert_lossless(r"x &= 1 \\");
+    }
+
+    #[test]
+    fn scripts_attach_to_their_base_and_one_atom_arguments() {
+        let tree = node("x^2_i");
+        let scripted = tree
+            .children()
+            .find(|child| child.kind() == SyntaxKind::MATH_SCRIPTED)
+            .expect("scripted atom");
+        assert_eq!(scripted.text().to_string(), "x^2_i");
         assert_eq!(
-            token_kinds("x^2_i"),
+            scripted
+                .children_with_tokens()
+                .map(|el| el.kind())
+                .collect::<Vec<_>>(),
             vec![
                 SyntaxKind::MATH_TEXT,
-                SyntaxKind::MATH_SCRIPT,
-                SyntaxKind::MATH_TEXT,
-                SyntaxKind::MATH_SCRIPT,
-                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_SUPERSCRIPT,
+                SyntaxKind::MATH_SUBSCRIPT,
             ]
         );
+        let superscript = scripted
+            .children()
+            .find(|child| child.kind() == SyntaxKind::MATH_SUPERSCRIPT)
+            .expect("superscript");
+        assert_eq!(
+            superscript
+                .children_with_tokens()
+                .map(|el| el.kind())
+                .collect::<Vec<_>>(),
+            vec![SyntaxKind::MATH_SCRIPT, SyntaxKind::MATH_TEXT]
+        );
+        assert_lossless("x^2_i");
+    }
+
+    #[test]
+    fn scripts_follow_tex_one_token_attachment() {
+        let tree = node("ab^23_i");
+        let children: Vec<_> = tree.children_with_tokens().collect();
+        assert_eq!(
+            children.iter().map(|el| el.kind()).collect::<Vec<_>>(),
+            vec![
+                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_SCRIPTED,
+                SyntaxKind::MATH_SCRIPTED,
+            ]
+        );
+        assert_eq!(children[0].to_string(), "a");
+        assert_eq!(children[1].to_string(), "b^2");
+        assert_eq!(children[2].to_string(), "3_i");
+        assert_lossless("ab^23_i");
+    }
+
+    #[test]
+    fn structured_atoms_and_unicode_scalars_can_be_script_bases() {
+        for (content, base_kind) in [
+            (r"\alpha_i", SyntaxKind::MATH_COMMAND),
+            (r"{ab}^2", SyntaxKind::MATH_GROUP),
+            (r"\left(x\right)_i", SyntaxKind::MATH_DELIMITED),
+        ] {
+            let scripted = node(content)
+                .children()
+                .find(|child| child.kind() == SyntaxKind::MATH_SCRIPTED)
+                .unwrap_or_else(|| panic!("scripted atom: {content:?}"));
+            assert_eq!(
+                scripted.children_with_tokens().next().map(|el| el.kind()),
+                Some(base_kind),
+                "base: {content:?}"
+            );
+            assert_lossless(content);
+        }
+
+        let tree = node("αβ_γ");
+        let children: Vec<_> = tree.children_with_tokens().collect();
+        assert_eq!(children[0].to_string(), "α");
+        assert_eq!(children[1].kind(), SyntaxKind::MATH_SCRIPTED);
+        assert_eq!(children[1].to_string(), "β_γ");
+        assert_lossless("αβ_γ");
+    }
+
+    #[test]
+    fn script_attachment_skips_layout_trivia_but_not_comments_or_blank_lines() {
+        let attached = node("x \n ^ 2");
+        let scripted = attached
+            .children()
+            .find(|child| child.kind() == SyntaxKind::MATH_SCRIPTED)
+            .expect("script across one newline");
+        assert_eq!(scripted.text().to_string(), "x \n ^ 2");
+        assert_lossless("x \n ^ 2");
+
+        for content in ["x% stop\n^2", "x\n\n^2"] {
+            assert!(
+                node(content)
+                    .children()
+                    .all(|child| child.kind() != SyntaxKind::MATH_SCRIPTED),
+                "must not attach: {content:?}"
+            );
+            assert_lossless(content);
+        }
+    }
+
+    #[test]
+    fn missing_and_stray_scripts_recover_losslessly() {
+        let missing = node("x^");
+        let superscript = missing
+            .descendants()
+            .find(|child| child.kind() == SyntaxKind::MATH_SUPERSCRIPT)
+            .expect("missing superscript argument remains structured");
+        assert_eq!(superscript.text().to_string(), "^");
+        assert_lossless("x^");
+
+        assert!(
+            node("^2")
+                .children()
+                .all(|child| child.kind() != SyntaxKind::MATH_SCRIPTED)
+        );
+        assert_lossless("^2");
     }
 
     #[test]

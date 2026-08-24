@@ -418,6 +418,7 @@ golden_test_cases!(
     math_linebreak_indent_budget_experimental,
     math_linebreak_nested_experimental,
     math_operator_spacing_experimental,
+    math_scripts_experimental,
     math_relation_chain_long_lhs_experimental,
     math_relation_chain_hardbreak_experimental,
     math_malformed_delimiter_experimental,

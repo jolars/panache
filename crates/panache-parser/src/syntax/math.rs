@@ -159,6 +159,114 @@ impl MathContent {
     }
 }
 
+/// An atom with one or more attached subscript or superscript nodes.
+pub struct MathScripted(SyntaxNode);
+
+impl AstNode for MathScripted {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_SCRIPTED
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathScripted {
+    /// The atom to which the scripts attach.
+    pub fn base(&self) -> Option<SyntaxElement> {
+        self.0.children_with_tokens().find(|element| {
+            !matches!(
+                element.kind(),
+                SyntaxKind::MATH_SUBSCRIPT
+                    | SyntaxKind::MATH_SUPERSCRIPT
+                    | SyntaxKind::MATH_SPACE
+                    | SyntaxKind::MATH_NEWLINE
+                    | SyntaxKind::LINE_PREFIX
+                    | SyntaxKind::NEWLINE
+            )
+        })
+    }
+
+    /// The first attached subscript, if present.
+    pub fn subscript(&self) -> Option<MathSubscript> {
+        self.0.children().find_map(MathSubscript::cast)
+    }
+
+    /// The first attached superscript, if present.
+    pub fn superscript(&self) -> Option<MathSuperscript> {
+        self.0.children().find_map(MathSuperscript::cast)
+    }
+}
+
+/// An `_` marker and its optional one-atom argument.
+pub struct MathSubscript(SyntaxNode);
+
+impl AstNode for MathSubscript {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_SUBSCRIPT
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathSubscript {
+    /// The `_` marker.
+    pub fn marker_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_SCRIPT)
+    }
+
+    /// The optional one-atom argument after the marker and layout trivia.
+    pub fn argument(&self) -> Option<SyntaxElement> {
+        script_argument(&self.0)
+    }
+}
+
+/// A `^` marker and its optional one-atom argument.
+pub struct MathSuperscript(SyntaxNode);
+
+impl AstNode for MathSuperscript {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_SUPERSCRIPT
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathSuperscript {
+    /// The `^` marker.
+    pub fn marker_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_SCRIPT)
+    }
+
+    /// The optional one-atom argument after the marker and layout trivia.
+    pub fn argument(&self) -> Option<SyntaxElement> {
+        script_argument(&self.0)
+    }
+}
+
 /// A `{ ... }` brace group.
 pub struct MathGroup(SyntaxNode);
 
@@ -425,6 +533,19 @@ fn command_child(node: &SyntaxNode, text: &str) -> Option<SyntaxToken> {
         .find(|t| t.kind() == SyntaxKind::MATH_COMMAND && t.text() == text)
 }
 
+fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
+    node.children_with_tokens().find(|element| {
+        !matches!(
+            element.kind(),
+            SyntaxKind::MATH_SCRIPT
+                | SyntaxKind::MATH_SPACE
+                | SyntaxKind::MATH_NEWLINE
+                | SyntaxKind::LINE_PREFIX
+                | SyntaxKind::NEWLINE
+        )
+    })
+}
+
 fn is_command(el: &SyntaxElement, text: &str) -> bool {
     el.as_token()
         .is_some_and(|t| t.kind() == SyntaxKind::MATH_COMMAND && t.text() == text)
@@ -456,6 +577,7 @@ fn group_range_after(children: &[SyntaxElement], idx: usize) -> Option<TextRange
 mod tests {
     use super::*;
     use crate::parse;
+    use crate::syntax::InlineMath;
 
     #[test]
     fn display_math_dollar_markers_and_content() {
@@ -502,6 +624,79 @@ mod tests {
             .into_iter()
             .map(|d| d.kind)
             .collect()
+    }
+
+    #[test]
+    fn typed_script_wrappers_expose_base_markers_and_arguments() {
+        let node = SyntaxNode::new_root(parse_math_content("x^2_i", MathParseOptions::default()));
+        let scripted = node
+            .children()
+            .find_map(MathScripted::cast)
+            .expect("scripted atom");
+
+        assert_eq!(
+            scripted.base().map(|base| base.to_string()).as_deref(),
+            Some("x")
+        );
+        let superscript = scripted.superscript().expect("superscript");
+        assert_eq!(
+            superscript.marker_token().as_ref().map(SyntaxToken::text),
+            Some("^")
+        );
+        assert_eq!(
+            superscript
+                .argument()
+                .map(|argument| argument.to_string())
+                .as_deref(),
+            Some("2")
+        );
+        let subscript = scripted.subscript().expect("subscript");
+        assert_eq!(
+            subscript.marker_token().as_ref().map(SyntaxToken::text),
+            Some("_")
+        );
+        assert_eq!(
+            subscript
+                .argument()
+                .map(|argument| argument.to_string())
+                .as_deref(),
+            Some("i")
+        );
+    }
+
+    #[test]
+    fn typed_script_wrapper_allows_a_missing_argument() {
+        let node = SyntaxNode::new_root(parse_math_content("x^", MathParseOptions::default()));
+        let superscript = node
+            .descendants()
+            .find_map(MathSuperscript::cast)
+            .expect("superscript");
+
+        assert!(superscript.argument().is_none());
+    }
+
+    #[test]
+    fn typed_script_wrapper_ignores_multiline_container_prefixes() {
+        let tree = parse("> $x\n>  ^ 2$\n", None);
+        let math = tree
+            .descendants()
+            .find_map(InlineMath::cast)
+            .expect("inline math");
+        let scripted = math
+            .syntax()
+            .descendants()
+            .find_map(MathScripted::cast)
+            .expect("scripted atom");
+
+        assert_eq!(math.content(), "x\n ^ 2");
+        assert_eq!(
+            scripted
+                .superscript()
+                .and_then(|script| script.argument())
+                .map(|argument| argument.to_string())
+                .as_deref(),
+            Some("2")
+        );
     }
 
     #[test]

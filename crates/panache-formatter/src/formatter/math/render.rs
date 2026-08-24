@@ -284,7 +284,7 @@ fn contains_unsafe_mixed_trivia(element: &SyntaxElement) -> bool {
 
 fn render_before_operand(before: &[SyntaxElement]) -> String {
     let mut tokens = flatten_tokens(before);
-    tokens.push((SyntaxKind::MATH_TEXT, "X".to_string()));
+    tokens.push(FlatToken::Token(SyntaxKind::MATH_TEXT, "X".to_string()));
     let rendered = collapse_spaces(&space_operators(&tokens, None));
     rendered
         .strip_suffix('X')
@@ -705,22 +705,50 @@ pub(super) fn render_inline_seeded(elems: &[SyntaxElement], seed: Option<AtomCla
     collapse_spaces(&space_operators(&toks, seed))
 }
 
-fn flatten_tokens(elems: &[SyntaxElement]) -> Vec<(SyntaxKind, String)> {
-    let mut out: Vec<(SyntaxKind, String)> = Vec::new();
+enum FlatToken {
+    Token(SyntaxKind, String),
+    ScriptStart,
+    ScriptEnd,
+}
+
+impl FlatToken {
+    fn token(&self) -> Option<(SyntaxKind, &str)> {
+        match self {
+            Self::Token(kind, text) => Some((*kind, text)),
+            Self::ScriptStart | Self::ScriptEnd => None,
+        }
+    }
+}
+
+fn flatten_tokens(elems: &[SyntaxElement]) -> Vec<FlatToken> {
+    let mut out = Vec::new();
     for el in elems {
-        match el {
-            NodeOrToken::Token(tok) => out.push((tok.kind(), tok.text().to_string())),
-            NodeOrToken::Node(node) => {
-                for tok in node
-                    .descendants_with_tokens()
-                    .filter_map(|e| e.into_token())
-                {
-                    out.push((tok.kind(), tok.text().to_string()));
-                }
+        flatten_element(el, &mut out);
+    }
+    out
+}
+
+fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
+    match element {
+        NodeOrToken::Token(token) => {
+            out.push(FlatToken::Token(token.kind(), token.text().to_string()))
+        }
+        NodeOrToken::Node(node) => {
+            let is_script = matches!(
+                node.kind(),
+                SyntaxKind::MATH_SUBSCRIPT | SyntaxKind::MATH_SUPERSCRIPT
+            );
+            if is_script {
+                out.push(FlatToken::ScriptStart);
+            }
+            for child in node.children_with_tokens() {
+                flatten_element(&child, out);
+            }
+            if is_script {
+                out.push(FlatToken::ScriptEnd);
             }
         }
     }
-    out
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -735,7 +763,7 @@ enum Demand {
     TightOp,
 }
 
-fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> String {
+fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
     let mut out = String::new();
     let mut prev_class: Option<AtomClass> = seed;
     let mut prev_demand = Demand::Start;
@@ -744,11 +772,41 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
     let mut prev_sig_is_text_cmd = false;
     let mut star_modifier_pending = false;
     let mut colon_head = false;
+    let mut script_stack = Vec::new();
 
     let mut i = 0;
     while i < toks.len() {
-        let (kind, text) = &toks[i];
-        match *kind {
+        match &toks[i] {
+            FlatToken::ScriptStart => {
+                script_stack.push((prev_class, prev_demand, group_stack.len()));
+                pending_space = false;
+                prev_class = Some(AtomClass::Open);
+                prev_demand = Demand::TightOp;
+                prev_sig_is_text_cmd = false;
+                star_modifier_pending = false;
+                colon_head = false;
+                i += 1;
+                continue;
+            }
+            FlatToken::ScriptEnd => {
+                if let Some((class, demand, group_depth)) = script_stack.pop() {
+                    prev_class = class;
+                    prev_demand = demand;
+                    group_stack.truncate(group_depth);
+                }
+                pending_space = false;
+                prev_sig_is_text_cmd = false;
+                star_modifier_pending = false;
+                colon_head = false;
+                i += 1;
+                continue;
+            }
+            FlatToken::Token(_, _) => {}
+        }
+        let (kind, text) = toks[i]
+            .token()
+            .expect("script boundaries are handled before math tokens");
+        match kind {
             SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE => {
                 pending_space = true;
                 i += 1;
@@ -756,7 +814,7 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
             SyntaxKind::MATH_TEXT
                 if operators::is_definition_colon(
                     text,
-                    toks.get(i + 1).map(|(k, t)| (*k, t.as_str())),
+                    toks.get(i + 1).and_then(FlatToken::token),
                 ) =>
             {
                 colon_head = true;
@@ -766,8 +824,10 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
             }
             SyntaxKind::MATH_OPERATOR => {
                 let mut run = String::new();
-                while i < toks.len() && toks[i].0 == SyntaxKind::MATH_OPERATOR {
-                    run.push_str(&toks[i].1);
+                while let Some((SyntaxKind::MATH_OPERATOR, text)) =
+                    toks.get(i).and_then(FlatToken::token)
+                {
+                    run.push_str(text);
                     i += 1;
                 }
                 for (n, atom) in operators::split_operator_atoms(&run)
@@ -877,7 +937,7 @@ fn space_operators(toks: &[(SyntaxKind, String)], seed: Option<AtomClass>) -> St
                 emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
                 pending_space = false;
                 prev_demand = Demand::Plain;
-                prev_class = atom_prev_class(*kind, text);
+                prev_class = atom_prev_class(kind, text);
                 prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
                 i += 1;

@@ -1,6 +1,5 @@
 ---
 source: crates/panache-parser/tests/golden_parser_cases.rs
-assertion_line: 97
 expression: cst_output
 ---
 DOCUMENT@0..591
@@ -51,31 +50,37 @@ DOCUMENT@0..591
           MATH_GROUP_OPEN@204..205 "{"
           MATH_TEXT@205..206 "2"
           MATH_GROUP_CLOSE@206..207 "}"
-        MATH_COMMAND@207..213 "\\sigma"
-        MATH_SCRIPT@213..214 "^"
-        MATH_GROUP@214..217
-          MATH_GROUP_OPEN@214..215 "{"
-          MATH_TEXT@215..216 "2"
-          MATH_GROUP_CLOSE@216..217 "}"
+        MATH_SCRIPTED@207..217
+          MATH_COMMAND@207..213 "\\sigma"
+          MATH_SUPERSCRIPT@213..217
+            MATH_SCRIPT@213..214 "^"
+            MATH_GROUP@214..217
+              MATH_GROUP_OPEN@214..215 "{"
+              MATH_TEXT@215..216 "2"
+              MATH_GROUP_CLOSE@216..217 "}"
         MATH_SPACE@217..218 " "
         MATH_COMMAND@218..225 "\\mathrm"
         MATH_SPACE@225..226 " "
-        MATH_TEXT@226..227 "S"
-        MATH_SCRIPT@227..228 "^"
-        MATH_GROUP@228..231
-          MATH_GROUP_OPEN@228..229 "{"
-          MATH_TEXT@229..230 "2"
-          MATH_GROUP_CLOSE@230..231 "}"
+        MATH_SCRIPTED@226..231
+          MATH_TEXT@226..227 "S"
+          MATH_SUPERSCRIPT@227..231
+            MATH_SCRIPT@227..228 "^"
+            MATH_GROUP@228..231
+              MATH_GROUP_OPEN@228..229 "{"
+              MATH_TEXT@229..230 "2"
+              MATH_GROUP_CLOSE@230..231 "}"
         MATH_NEWLINE@231..232 "\n"
         MATH_COMMAND@232..237 "\\frac"
         MATH_GROUP@237..261
           MATH_GROUP_OPEN@237..238 "{"
-          MATH_COMMAND@238..246 "\\partial"
-          MATH_SCRIPT@246..247 "^"
-          MATH_GROUP@247..250
-            MATH_GROUP_OPEN@247..248 "{"
-            MATH_TEXT@248..249 "2"
-            MATH_GROUP_CLOSE@249..250 "}"
+          MATH_SCRIPTED@238..250
+            MATH_COMMAND@238..246 "\\partial"
+            MATH_SUPERSCRIPT@246..250
+              MATH_SCRIPT@246..247 "^"
+              MATH_GROUP@247..250
+                MATH_GROUP_OPEN@247..248 "{"
+                MATH_TEXT@248..249 "2"
+                MATH_GROUP_CLOSE@249..250 "}"
           MATH_SPACE@250..251 " "
           MATH_COMMAND@251..258 "\\mathrm"
           MATH_SPACE@258..259 " "
@@ -87,9 +92,11 @@ DOCUMENT@0..591
           MATH_SPACE@270..271 " "
           MATH_COMMAND@271..278 "\\mathrm"
           MATH_SPACE@278..279 " "
-          MATH_TEXT@279..280 "S"
-          MATH_SCRIPT@280..281 "^"
-          MATH_TEXT@281..282 "2"
+          MATH_SCRIPTED@279..282
+            MATH_TEXT@279..280 "S"
+            MATH_SUPERSCRIPT@280..282
+              MATH_SCRIPT@280..281 "^"
+              MATH_TEXT@281..282 "2"
           MATH_GROUP_CLOSE@282..283 "}"
         MATH_NEWLINE@283..284 "\n"
         MATH_SPACE@284..285 " "
