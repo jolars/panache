@@ -222,16 +222,16 @@ the test projector.
 
 ### Badness oracle
 
-- [ ] Add exact, pinned development dependencies on `badness-parser` and
+- [x] Add exact, pinned development dependencies on `badness-parser` and
   `badness-formatter`. Use registry versions in committed manifests so CI
   does not depend on a sibling checkout; update the pins deliberately when
   adopting a new Badness release.
-- [ ] Add test-only Badness and Panache projectors into one minimal canonical
+- [x] Add test-only Badness and Panache projectors into one minimal canonical
   math shape. Compare structural kinds, parent-child ownership, adjusted
   source ranges, and exact source gaps. The projectors may rename kinds,
   remove wrapper offsets, and discard documented host trivia, but must never
   infer arguments, attach scripts, repair recovery, or otherwise parse TeX.
-- [ ] Add a formatter oracle that wraps the same source body in controlled
+- [x] Add a formatter oracle that wraps the same source body in controlled
   inline, display, and environment contexts, formats it with Badness,
   extracts the resulting math body, and compares it byte-for-byte with
   Panache.
@@ -241,7 +241,7 @@ the test projector.
 
 ### Parser and CST
 
-- [ ] Specify and lock the one-to-one Badness-to-Panache kind mapping before
+- [x] Specify and lock the one-to-one Badness-to-Panache kind mapping before
   changing more grammar. Cover commands and arguments, groups, scripts,
   `\left`/`\right`, environments, comments, malformed input, Unicode atoms,
   and every intentional host boundary.

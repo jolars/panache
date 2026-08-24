@@ -32,6 +32,7 @@ serde = ["dep:serde", "panache-parser/serde"]
 schema = ["serde", "dep:schemars", "panache-parser/schema"]
 
 [dev-dependencies]
+badness-formatter = "=0.5.0"
 serde_json = "1.0.150"
 insta = { version = "1.47.2", features = ["json"] }
 # TEMPORARY: cross-validation oracle only (tests/yaml_cross_validation.rs).
