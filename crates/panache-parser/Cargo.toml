@@ -36,5 +36,6 @@ serde = ["dep:serde"]
 schema = ["serde", "dep:schemars"]
 
 [dev-dependencies]
+badness-parser = "=0.4.0"
 insta = "1.47.2"
 toml = "1.1.2"

@@ -70,32 +70,31 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Badness-parity roadmap revision.** Rewrote `TODO.md` so Badness is the
-normative parser and formatter oracle, while Panache retains independent native
-production code.
+**Badness parser oracle—first parity slice.** Added the exact, development-only
+`badness-parser = "=0.4.0"` oracle and mechanical canonical projectors for
+Badness `MATH` and Panache `MATH_CONTENT` subtrees.
 
-- The target math CST is structurally isomorphic to Badness after mechanical
-  `MATH_*` renaming and host-trivia removal. The old fine-grained operator and
-  delimiter tokens are no longer protected behavior.
-- Exact, pinned `badness-parser` and `badness-formatter` development dependencies
-  will drive test-only structural projectors and byte-for-byte formatter parity.
-- Existing Panache formatting is not allowlisted. The only deliberate style
-  extension is alignment of trailing `\\` markers in alignment-capable
-  environments.
-- The first native script slice remains useful but incomplete until scripts bind
-  to complete Badness-equivalent command atoms.
+- The projectors compare kind names, ownership, body-relative byte ranges,
+  token text, and exact source gaps. They only shift the `$...$` wrapper and
+  document Panache's host-trivia omission; legacy kinds remain visible as
+  divergences rather than being repaired.
+- Four shared-corpus cases now form the mandatory passing slice (nested groups
+  and scripts). The reproducible ignored report records 4/58 passing and 54/58
+  divergent cases with both canonical trees.
+- No production parser or formatter code changed.
 
 ### Suggested next sub-targets
-1. Add the pinned dev-only Badness dependencies, canonical structural projector,
-   and formatter wrapper/extractor.
-2. Generate the initial differential report and lock the one-to-one kind map.
-3. Migrate the lexical grain and command-call structure before extending the
-   formatter further.
+1. Lock the one-to-one kind map and migrate the lexical grain.
+2. Give commands Badness-equivalent argument ownership, then grow the mandatory
+   parity corpus from the report's passing candidates.
+3. Add the pinned formatter oracle only when starting formatter-output parity.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Badness-parity roadmap revision.** Made Badness the normative development
+  oracle while retaining Panache-owned production parsing and formatting.
 - **Native script CST—first roadmap slice.** Added scripted/subscript/superscript
   nodes, typed wrappers, Unicode-scalar attachment, and temporary legacy-renderer
   support; full parity still depends on Badness-equivalent command atoms.

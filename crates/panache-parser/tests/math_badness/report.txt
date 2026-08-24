@@ -1,0 +1,2441 @@
+Badness math parser parity report
+Oracle: badness-parser =0.4.0
+Corpus: ../panache-formatter/tests/fixtures/math_corpus
+Passing: 4 / 58
+Divergent: 54 / 58
+
+Regenerate with:
+  cargo test -p panache-parser --test math_badness_parity math_badness_full_report -- --ignored --nocapture
+
+=== Passing candidates ===
+groups/deep_nesting.tex
+inline/subscript.tex
+inline/superscript.tex
+scripts/nested_superscript.tex
+
+=== Remaining divergences ===
+
+--- comments/comment_line.tex ---
+Badness:
+MATH@0..24 gaps=["", "", "", "", "", "", "", "", ""]
+  COMMENT@0..17 "% leading comment"
+  NEWLINE@17..18 "\n"
+  WORD@18..19 "x"
+  SPACE@19..20 " "
+  WORD@20..21 "="
+  SPACE@21..22 " "
+  WORD@22..23 "1"
+  NEWLINE@23..24 "\n"
+Panache:
+MATH@0..24 gaps=["", "", "", "", "", "", "", "", ""]
+  COMMENT@0..17 "% leading comment"
+  NEWLINE@17..18 "\n"
+  WORD@18..19 "x"
+  SPACE@19..20 " "
+  PANACHE_OPERATOR@20..21 "="
+  SPACE@21..22 " "
+  WORD@22..23 "1"
+  NEWLINE@23..24 "\n"
+
+
+--- comments/trailing_comment.tex ---
+Badness:
+MATH@0..26 gaps=["", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  WORD@2..3 "+"
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  SPACE@5..6 " "
+  COMMENT@6..25 "% this is a comment"
+  NEWLINE@25..26 "\n"
+Panache:
+MATH@0..26 gaps=["", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "+"
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  SPACE@5..6 " "
+  COMMENT@6..25 "% this is a comment"
+  NEWLINE@25..26 "\n"
+
+
+--- display/fraction_block.tex ---
+Badness:
+MATH@0..35 gaps=["", "", "", "", "", "", ""]
+  COMMAND@0..29 gaps=["", "", "", ""]
+    CONTROL_WORD@0..5 "\\frac"
+    GROUP@5..17 gaps=["", "", "", "", "", ""]
+      GROUP_OPEN@5..6 "{"
+      COMMAND@6..14 gaps=["", ""]
+        CONTROL_WORD@6..14 "\\partial"
+      SPACE@14..15 " "
+      WORD@15..16 "f"
+      GROUP_CLOSE@16..17 "}"
+    GROUP@17..29 gaps=["", "", "", "", "", ""]
+      GROUP_OPEN@17..18 "{"
+      COMMAND@18..26 gaps=["", ""]
+        CONTROL_WORD@18..26 "\\partial"
+      SPACE@26..27 " "
+      WORD@27..28 "x"
+      GROUP_CLOSE@28..29 "}"
+  SPACE@29..30 " "
+  WORD@30..31 "="
+  SPACE@31..32 " "
+  WORD@32..34 "2x"
+  NEWLINE@34..35 "\n"
+Panache:
+MATH@0..35 gaps=["", "", "", "", "", "", "", "", ""]
+  PANACHE_COMMAND@0..5 "\\frac"
+  GROUP@5..17 gaps=["", "", "", "", "", ""]
+    GROUP_OPEN@5..6 "{"
+    PANACHE_COMMAND@6..14 "\\partial"
+    SPACE@14..15 " "
+    WORD@15..16 "f"
+    GROUP_CLOSE@16..17 "}"
+  GROUP@17..29 gaps=["", "", "", "", "", ""]
+    GROUP_OPEN@17..18 "{"
+    PANACHE_COMMAND@18..26 "\\partial"
+    SPACE@26..27 " "
+    WORD@27..28 "x"
+    GROUP_CLOSE@28..29 "}"
+  SPACE@29..30 " "
+  PANACHE_OPERATOR@30..31 "="
+  SPACE@31..32 " "
+  WORD@32..34 "2x"
+  NEWLINE@34..35 "\n"
+
+
+--- display/integral.tex ---
+Badness:
+MATH@0..52 gaps=["", "", "", "", "", "", "", "", "", "", "", "", ""]
+  SCRIPTED@0..23 gaps=["", "", "", ""]
+    COMMAND@0..4 gaps=["", ""]
+      CONTROL_WORD@0..4 "\\int"
+    SUBSCRIPT@4..14 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      GROUP@5..14 gaps=["", "", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..7 "-"
+        COMMAND@7..13 gaps=["", ""]
+          CONTROL_WORD@7..13 "\\infty"
+        GROUP_CLOSE@13..14 "}"
+    SUPERSCRIPT@14..23 gaps=["", "", ""]
+      SCRIPT_MARKER@14..15 "^"
+      GROUP@15..23 gaps=["", "", "", ""]
+        GROUP_OPEN@15..16 "{"
+        COMMAND@16..22 gaps=["", ""]
+          CONTROL_WORD@16..22 "\\infty"
+        GROUP_CLOSE@22..23 "}"
+  SPACE@23..24 " "
+  SCRIPTED@24..32 gaps=["", "", ""]
+    WORD@24..25 "e"
+    SUPERSCRIPT@25..32 gaps=["", "", ""]
+      SCRIPT_MARKER@25..26 "^"
+      GROUP@26..32 gaps=["", "", "", "", ""]
+        GROUP_OPEN@26..27 "{"
+        WORD@27..28 "-"
+        SCRIPTED@28..31 gaps=["", "", ""]
+          WORD@28..29 "x"
+          SUPERSCRIPT@29..31 gaps=["", "", ""]
+            SCRIPT_MARKER@29..30 "^"
+            WORD@30..31 "2"
+        GROUP_CLOSE@31..32 "}"
+  SPACE@32..33 " "
+  CONTROL_SYMBOL@33..35 "\\,"
+  SPACE@35..36 " "
+  WORD@36..38 "dx"
+  SPACE@38..39 " "
+  WORD@39..40 "="
+  SPACE@40..41 " "
+  COMMAND@41..51 gaps=["", "", ""]
+    CONTROL_WORD@41..46 "\\sqrt"
+    GROUP@46..51 gaps=["", "", "", ""]
+      GROUP_OPEN@46..47 "{"
+      COMMAND@47..50 gaps=["", ""]
+        CONTROL_WORD@47..50 "\\pi"
+      GROUP_CLOSE@50..51 "}"
+  NEWLINE@51..52 "\n"
+Panache:
+MATH@0..52 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  SCRIPTED@0..23 gaps=["", "", "", ""]
+    PANACHE_COMMAND@0..4 "\\int"
+    SUBSCRIPT@4..14 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      GROUP@5..14 gaps=["", "", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        PANACHE_OPERATOR@6..7 "-"
+        PANACHE_COMMAND@7..13 "\\infty"
+        GROUP_CLOSE@13..14 "}"
+    SUPERSCRIPT@14..23 gaps=["", "", ""]
+      SCRIPT_MARKER@14..15 "^"
+      GROUP@15..23 gaps=["", "", "", ""]
+        GROUP_OPEN@15..16 "{"
+        PANACHE_COMMAND@16..22 "\\infty"
+        GROUP_CLOSE@22..23 "}"
+  SPACE@23..24 " "
+  SCRIPTED@24..32 gaps=["", "", ""]
+    WORD@24..25 "e"
+    SUPERSCRIPT@25..32 gaps=["", "", ""]
+      SCRIPT_MARKER@25..26 "^"
+      GROUP@26..32 gaps=["", "", "", "", ""]
+        GROUP_OPEN@26..27 "{"
+        PANACHE_OPERATOR@27..28 "-"
+        SCRIPTED@28..31 gaps=["", "", ""]
+          WORD@28..29 "x"
+          SUPERSCRIPT@29..31 gaps=["", "", ""]
+            SCRIPT_MARKER@29..30 "^"
+            WORD@30..31 "2"
+        GROUP_CLOSE@31..32 "}"
+  SPACE@32..33 " "
+  PANACHE_COMMAND@33..35 "\\,"
+  SPACE@35..36 " "
+  WORD@36..38 "dx"
+  SPACE@38..39 " "
+  PANACHE_OPERATOR@39..40 "="
+  SPACE@40..41 " "
+  PANACHE_COMMAND@41..46 "\\sqrt"
+  GROUP@46..51 gaps=["", "", "", ""]
+    GROUP_OPEN@46..47 "{"
+    PANACHE_COMMAND@47..50 "\\pi"
+    GROUP_CLOSE@50..51 "}"
+  NEWLINE@51..52 "\n"
+
+
+--- display/long_chain.tex ---
+Badness:
+MATH@0..48 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..3 "P(X"
+  SPACE@3..4 " "
+  WORD@4..5 ">"
+  SPACE@5..6 " "
+  COMMAND@6..17 gaps=["", ""]
+    CONTROL_WORD@6..17 "\\varepsilon"
+  WORD@17..18 ")"
+  SPACE@18..19 " "
+  COMMAND@19..23 gaps=["", ""]
+    CONTROL_WORD@19..23 "\\leq"
+  SPACE@23..24 " "
+  SCRIPTED@24..42 gaps=["", "", ""]
+    WORD@24..25 "e"
+    SUPERSCRIPT@25..42 gaps=["", "", ""]
+      SCRIPT_MARKER@25..26 "^"
+      GROUP@26..42 gaps=["", "", "", "", "", ""]
+        GROUP_OPEN@26..27 "{"
+        WORD@27..29 "-t"
+        SPACE@29..30 " "
+        COMMAND@30..41 gaps=["", ""]
+          CONTROL_WORD@30..41 "\\varepsilon"
+        GROUP_CLOSE@41..42 "}"
+  SPACE@42..43 " "
+  WORD@43..47 "M(t)"
+  NEWLINE@47..48 "\n"
+Panache:
+MATH@0..48 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "P"
+  PANACHE_OPEN@1..2 "("
+  WORD@2..3 "X"
+  SPACE@3..4 " "
+  PANACHE_OPERATOR@4..5 ">"
+  SPACE@5..6 " "
+  PANACHE_COMMAND@6..17 "\\varepsilon"
+  PANACHE_CLOSE@17..18 ")"
+  SPACE@18..19 " "
+  PANACHE_COMMAND@19..23 "\\leq"
+  SPACE@23..24 " "
+  SCRIPTED@24..42 gaps=["", "", ""]
+    WORD@24..25 "e"
+    SUPERSCRIPT@25..42 gaps=["", "", ""]
+      SCRIPT_MARKER@25..26 "^"
+      GROUP@26..42 gaps=["", "", "", "", "", "", ""]
+        GROUP_OPEN@26..27 "{"
+        PANACHE_OPERATOR@27..28 "-"
+        WORD@28..29 "t"
+        SPACE@29..30 " "
+        PANACHE_COMMAND@30..41 "\\varepsilon"
+        GROUP_CLOSE@41..42 "}"
+  SPACE@42..43 " "
+  WORD@43..44 "M"
+  PANACHE_OPEN@44..45 "("
+  WORD@45..46 "t"
+  PANACHE_CLOSE@46..47 ")"
+  NEWLINE@47..48 "\n"
+
+
+--- display/single_equation.tex ---
+Badness:
+MATH@0..9 gaps=["", "", "", "", "", "", "", ""]
+  WORD@0..1 "E"
+  SPACE@1..2 " "
+  WORD@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "m"
+  SCRIPTED@5..8 gaps=["", "", ""]
+    WORD@5..6 "c"
+    SUPERSCRIPT@6..8 gaps=["", "", ""]
+      SCRIPT_MARKER@6..7 "^"
+      WORD@7..8 "2"
+  NEWLINE@8..9 "\n"
+Panache:
+MATH@0..9 gaps=["", "", "", "", "", "", "", ""]
+  WORD@0..1 "E"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "m"
+  SCRIPTED@5..8 gaps=["", "", ""]
+    WORD@5..6 "c"
+    SUPERSCRIPT@6..8 gaps=["", "", ""]
+      SCRIPT_MARKER@6..7 "^"
+      WORD@7..8 "2"
+  NEWLINE@8..9 "\n"
+
+
+--- display/sum_over_n.tex ---
+Badness:
+MATH@0..23 gaps=["", "", "", "", "", "", ""]
+  SCRIPTED@0..14 gaps=["", "", "", ""]
+    COMMAND@0..4 gaps=["", ""]
+      CONTROL_WORD@0..4 "\\sum"
+    SUBSCRIPT@4..10 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      GROUP@5..10 gaps=["", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..9 "i=1"
+        GROUP_CLOSE@9..10 "}"
+    SUPERSCRIPT@10..14 gaps=["", "", ""]
+      SCRIPT_MARKER@10..11 "^"
+      GROUP@11..14 gaps=["", "", "", ""]
+        GROUP_OPEN@11..12 "{"
+        WORD@12..13 "N"
+        GROUP_CLOSE@13..14 "}"
+  SPACE@14..15 " "
+  SCRIPTED@15..18 gaps=["", "", ""]
+    WORD@15..16 "x"
+    SUBSCRIPT@16..18 gaps=["", "", ""]
+      SCRIPT_MARKER@16..17 "_"
+      WORD@17..18 "i"
+  SPACE@18..19 " "
+  SCRIPTED@19..22 gaps=["", "", ""]
+    WORD@19..20 "y"
+    SUBSCRIPT@20..22 gaps=["", "", ""]
+      SCRIPT_MARKER@20..21 "_"
+      WORD@21..22 "i"
+  NEWLINE@22..23 "\n"
+Panache:
+MATH@0..23 gaps=["", "", "", "", "", "", ""]
+  SCRIPTED@0..14 gaps=["", "", "", ""]
+    PANACHE_COMMAND@0..4 "\\sum"
+    SUBSCRIPT@4..10 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      GROUP@5..10 gaps=["", "", "", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..7 "i"
+        PANACHE_OPERATOR@7..8 "="
+        WORD@8..9 "1"
+        GROUP_CLOSE@9..10 "}"
+    SUPERSCRIPT@10..14 gaps=["", "", ""]
+      SCRIPT_MARKER@10..11 "^"
+      GROUP@11..14 gaps=["", "", "", ""]
+        GROUP_OPEN@11..12 "{"
+        WORD@12..13 "N"
+        GROUP_CLOSE@13..14 "}"
+  SPACE@14..15 " "
+  SCRIPTED@15..18 gaps=["", "", ""]
+    WORD@15..16 "x"
+    SUBSCRIPT@16..18 gaps=["", "", ""]
+      SCRIPT_MARKER@16..17 "_"
+      WORD@17..18 "i"
+  SPACE@18..19 " "
+  SCRIPTED@19..22 gaps=["", "", ""]
+    WORD@19..20 "y"
+    SUBSCRIPT@20..22 gaps=["", "", ""]
+      SCRIPT_MARKER@20..21 "_"
+      WORD@21..22 "i"
+  NEWLINE@22..23 "\n"
+
+
+--- display/with_text.tex ---
+Badness:
+MATH@0..35 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "x"
+  SPACE@1..2 " "
+  WORD@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "y"
+  SPACE@5..6 " "
+  COMMAND@6..11 gaps=["", ""]
+    CONTROL_WORD@6..11 "\\quad"
+  SPACE@11..12 " "
+  COMMAND@12..22 gaps=["", "", ""]
+    CONTROL_WORD@12..17 "\\text"
+    GROUP@17..22 gaps=["", "", "", ""]
+      GROUP_OPEN@17..18 "{"
+      WORD@18..21 "and"
+      GROUP_CLOSE@21..22 "}"
+  SPACE@22..23 " "
+  COMMAND@23..28 gaps=["", ""]
+    CONTROL_WORD@23..28 "\\quad"
+  SPACE@28..29 " "
+  WORD@29..30 "z"
+  SPACE@30..31 " "
+  WORD@31..32 "="
+  SPACE@32..33 " "
+  WORD@33..34 "w"
+  NEWLINE@34..35 "\n"
+Panache:
+MATH@0..35 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "x"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "y"
+  SPACE@5..6 " "
+  PANACHE_COMMAND@6..11 "\\quad"
+  SPACE@11..12 " "
+  PANACHE_COMMAND@12..17 "\\text"
+  GROUP@17..22 gaps=["", "", "", ""]
+    GROUP_OPEN@17..18 "{"
+    WORD@18..21 "and"
+    GROUP_CLOSE@21..22 "}"
+  SPACE@22..23 " "
+  PANACHE_COMMAND@23..28 "\\quad"
+  SPACE@28..29 " "
+  WORD@29..30 "z"
+  SPACE@30..31 " "
+  PANACHE_OPERATOR@31..32 "="
+  SPACE@32..33 " "
+  WORD@33..34 "w"
+  NEWLINE@34..35 "\n"
+
+
+--- environments/aligned/multi_ampersand.tex ---
+Badness:
+MATH@0..65 gaps=["", "", ""]
+  ENVIRONMENT@0..64 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "aligned"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..51 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..17 "a"
+      SPACE@17..18 " "
+      ALIGN@18..19 "&"
+      WORD@19..20 "="
+      SPACE@20..21 " "
+      WORD@21..22 "1"
+      SPACE@22..23 " "
+      ALIGN@23..24 "&"
+      SPACE@24..25 " "
+      WORD@25..26 "b"
+      SPACE@26..27 " "
+      ALIGN@27..28 "&"
+      WORD@28..29 "="
+      SPACE@29..30 " "
+      WORD@30..31 "2"
+      SPACE@31..32 " "
+      LINE_BREAK@32..34 gaps=["", ""]
+        CONTROL_SYMBOL@32..34 "\\\\"
+      NEWLINE@34..35 "\n"
+      WORD@35..36 "c"
+      SPACE@36..37 " "
+      ALIGN@37..38 "&"
+      WORD@38..39 "="
+      SPACE@39..40 " "
+      WORD@40..41 "3"
+      SPACE@41..42 " "
+      ALIGN@42..43 "&"
+      SPACE@43..44 " "
+      WORD@44..45 "d"
+      SPACE@45..46 " "
+      ALIGN@46..47 "&"
+      WORD@47..48 "="
+      SPACE@48..49 " "
+      WORD@49..50 "4"
+      NEWLINE@50..51 "\n"
+    END@51..64 gaps=["", "", ""]
+      CONTROL_WORD@51..55 "\\end"
+      NAME_GROUP@55..64 gaps=["", "", "", ""]
+        GROUP_OPEN@55..56 "{"
+        WORD@56..63 "aligned"
+        GROUP_CLOSE@63..64 "}"
+  NEWLINE@64..65 "\n"
+Panache:
+MATH@0..65 gaps=["", "", ""]
+  ENVIRONMENT@0..64 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "aligned"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "a"
+    SPACE@17..18 " "
+    ALIGN@18..19 "&"
+    PANACHE_OPERATOR@19..20 "="
+    SPACE@20..21 " "
+    WORD@21..22 "1"
+    SPACE@22..23 " "
+    ALIGN@23..24 "&"
+    SPACE@24..25 " "
+    WORD@25..26 "b"
+    SPACE@26..27 " "
+    ALIGN@27..28 "&"
+    PANACHE_OPERATOR@28..29 "="
+    SPACE@29..30 " "
+    WORD@30..31 "2"
+    SPACE@31..32 " "
+    LINE_BREAK@32..34 "\\\\"
+    NEWLINE@34..35 "\n"
+    WORD@35..36 "c"
+    SPACE@36..37 " "
+    ALIGN@37..38 "&"
+    PANACHE_OPERATOR@38..39 "="
+    SPACE@39..40 " "
+    WORD@40..41 "3"
+    SPACE@41..42 " "
+    ALIGN@42..43 "&"
+    SPACE@43..44 " "
+    WORD@44..45 "d"
+    SPACE@45..46 " "
+    ALIGN@46..47 "&"
+    PANACHE_OPERATOR@47..48 "="
+    SPACE@48..49 " "
+    WORD@49..50 "4"
+    NEWLINE@50..51 "\n"
+    PANACHE_COMMAND@51..55 "\\end"
+    GROUP@55..64 gaps=["", "", "", ""]
+      GROUP_OPEN@55..56 "{"
+      WORD@56..63 "aligned"
+      GROUP_CLOSE@63..64 "}"
+  NEWLINE@64..65 "\n"
+
+
+--- environments/aligned/ragged_columns.tex ---
+Badness:
+MATH@0..53 gaps=["", "", ""]
+  ENVIRONMENT@0..52 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "aligned"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..39 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      COMMAND@16..22 gaps=["", ""]
+        CONTROL_WORD@16..22 "\\alpha"
+      SPACE@22..23 " "
+      ALIGN@23..24 "&"
+      WORD@24..25 "="
+      SPACE@25..26 " "
+      WORD@26..27 "1"
+      SPACE@27..28 " "
+      LINE_BREAK@28..30 gaps=["", ""]
+        CONTROL_SYMBOL@28..30 "\\\\"
+      NEWLINE@30..31 "\n"
+      WORD@31..32 "x"
+      SPACE@32..33 " "
+      ALIGN@33..34 "&"
+      WORD@34..35 "="
+      SPACE@35..36 " "
+      WORD@36..38 "22"
+      NEWLINE@38..39 "\n"
+    END@39..52 gaps=["", "", ""]
+      CONTROL_WORD@39..43 "\\end"
+      NAME_GROUP@43..52 gaps=["", "", "", ""]
+        GROUP_OPEN@43..44 "{"
+        WORD@44..51 "aligned"
+        GROUP_CLOSE@51..52 "}"
+  NEWLINE@52..53 "\n"
+Panache:
+MATH@0..53 gaps=["", "", ""]
+  ENVIRONMENT@0..52 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "aligned"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    PANACHE_COMMAND@16..22 "\\alpha"
+    SPACE@22..23 " "
+    ALIGN@23..24 "&"
+    PANACHE_OPERATOR@24..25 "="
+    SPACE@25..26 " "
+    WORD@26..27 "1"
+    SPACE@27..28 " "
+    LINE_BREAK@28..30 "\\\\"
+    NEWLINE@30..31 "\n"
+    WORD@31..32 "x"
+    SPACE@32..33 " "
+    ALIGN@33..34 "&"
+    PANACHE_OPERATOR@34..35 "="
+    SPACE@35..36 " "
+    WORD@36..38 "22"
+    NEWLINE@38..39 "\n"
+    PANACHE_COMMAND@39..43 "\\end"
+    GROUP@43..52 gaps=["", "", "", ""]
+      GROUP_OPEN@43..44 "{"
+      WORD@44..51 "aligned"
+      GROUP_CLOSE@51..52 "}"
+  NEWLINE@52..53 "\n"
+
+
+--- environments/aligned/single_row.tex ---
+Badness:
+MATH@0..41 gaps=["", "", ""]
+  ENVIRONMENT@0..40 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "aligned"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..27 gaps=["", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..17 "x"
+      SPACE@17..18 " "
+      ALIGN@18..19 "&"
+      WORD@19..20 "="
+      SPACE@20..21 " "
+      WORD@21..22 "y"
+      SPACE@22..23 " "
+      WORD@23..24 "+"
+      SPACE@24..25 " "
+      WORD@25..26 "z"
+      NEWLINE@26..27 "\n"
+    END@27..40 gaps=["", "", ""]
+      CONTROL_WORD@27..31 "\\end"
+      NAME_GROUP@31..40 gaps=["", "", "", ""]
+        GROUP_OPEN@31..32 "{"
+        WORD@32..39 "aligned"
+        GROUP_CLOSE@39..40 "}"
+  NEWLINE@40..41 "\n"
+Panache:
+MATH@0..41 gaps=["", "", ""]
+  ENVIRONMENT@0..40 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "aligned"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "x"
+    SPACE@17..18 " "
+    ALIGN@18..19 "&"
+    PANACHE_OPERATOR@19..20 "="
+    SPACE@20..21 " "
+    WORD@21..22 "y"
+    SPACE@22..23 " "
+    PANACHE_OPERATOR@23..24 "+"
+    SPACE@24..25 " "
+    WORD@25..26 "z"
+    NEWLINE@26..27 "\n"
+    PANACHE_COMMAND@27..31 "\\end"
+    GROUP@31..40 gaps=["", "", "", ""]
+      GROUP_OPEN@31..32 "{"
+      WORD@32..39 "aligned"
+      GROUP_CLOSE@39..40 "}"
+  NEWLINE@40..41 "\n"
+
+
+--- environments/aligned/three_rows.tex ---
+Badness:
+MATH@0..60 gaps=["", "", ""]
+  ENVIRONMENT@0..59 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "aligned"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..46 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..17 "x"
+      SPACE@17..18 " "
+      ALIGN@18..19 "&"
+      WORD@19..20 "="
+      SPACE@20..21 " "
+      WORD@21..22 "1"
+      SPACE@22..23 " "
+      LINE_BREAK@23..25 gaps=["", ""]
+        CONTROL_SYMBOL@23..25 "\\\\"
+      NEWLINE@25..26 "\n"
+      WORD@26..27 "y"
+      SPACE@27..28 " "
+      ALIGN@28..29 "&"
+      WORD@29..30 "="
+      SPACE@30..31 " "
+      WORD@31..33 "22"
+      SPACE@33..34 " "
+      LINE_BREAK@34..36 gaps=["", ""]
+        CONTROL_SYMBOL@34..36 "\\\\"
+      NEWLINE@36..37 "\n"
+      WORD@37..38 "z"
+      SPACE@38..39 " "
+      ALIGN@39..40 "&"
+      WORD@40..41 "="
+      SPACE@41..42 " "
+      WORD@42..45 "333"
+      NEWLINE@45..46 "\n"
+    END@46..59 gaps=["", "", ""]
+      CONTROL_WORD@46..50 "\\end"
+      NAME_GROUP@50..59 gaps=["", "", "", ""]
+        GROUP_OPEN@50..51 "{"
+        WORD@51..58 "aligned"
+        GROUP_CLOSE@58..59 "}"
+  NEWLINE@59..60 "\n"
+Panache:
+MATH@0..60 gaps=["", "", ""]
+  ENVIRONMENT@0..59 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "aligned"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "x"
+    SPACE@17..18 " "
+    ALIGN@18..19 "&"
+    PANACHE_OPERATOR@19..20 "="
+    SPACE@20..21 " "
+    WORD@21..22 "1"
+    SPACE@22..23 " "
+    LINE_BREAK@23..25 "\\\\"
+    NEWLINE@25..26 "\n"
+    WORD@26..27 "y"
+    SPACE@27..28 " "
+    ALIGN@28..29 "&"
+    PANACHE_OPERATOR@29..30 "="
+    SPACE@30..31 " "
+    WORD@31..33 "22"
+    SPACE@33..34 " "
+    LINE_BREAK@34..36 "\\\\"
+    NEWLINE@36..37 "\n"
+    WORD@37..38 "z"
+    SPACE@38..39 " "
+    ALIGN@39..40 "&"
+    PANACHE_OPERATOR@40..41 "="
+    SPACE@41..42 " "
+    WORD@42..45 "333"
+    NEWLINE@45..46 "\n"
+    PANACHE_COMMAND@46..50 "\\end"
+    GROUP@50..59 gaps=["", "", "", ""]
+      GROUP_OPEN@50..51 "{"
+      WORD@51..58 "aligned"
+      GROUP_CLOSE@58..59 "}"
+  NEWLINE@59..60 "\n"
+
+
+--- environments/aligned/two_rows.tex ---
+Badness:
+MATH@0..48 gaps=["", "", ""]
+  ENVIRONMENT@0..47 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "aligned"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..34 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..17 "x"
+      SPACE@17..18 " "
+      ALIGN@18..19 "&"
+      WORD@19..20 "="
+      SPACE@20..21 " "
+      WORD@21..22 "1"
+      SPACE@22..23 " "
+      LINE_BREAK@23..25 gaps=["", ""]
+        CONTROL_SYMBOL@23..25 "\\\\"
+      NEWLINE@25..26 "\n"
+      WORD@26..27 "y"
+      SPACE@27..28 " "
+      ALIGN@28..29 "&"
+      WORD@29..30 "="
+      SPACE@30..31 " "
+      WORD@31..33 "22"
+      NEWLINE@33..34 "\n"
+    END@34..47 gaps=["", "", ""]
+      CONTROL_WORD@34..38 "\\end"
+      NAME_GROUP@38..47 gaps=["", "", "", ""]
+        GROUP_OPEN@38..39 "{"
+        WORD@39..46 "aligned"
+        GROUP_CLOSE@46..47 "}"
+  NEWLINE@47..48 "\n"
+Panache:
+MATH@0..48 gaps=["", "", ""]
+  ENVIRONMENT@0..47 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "aligned"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "x"
+    SPACE@17..18 " "
+    ALIGN@18..19 "&"
+    PANACHE_OPERATOR@19..20 "="
+    SPACE@20..21 " "
+    WORD@21..22 "1"
+    SPACE@22..23 " "
+    LINE_BREAK@23..25 "\\\\"
+    NEWLINE@25..26 "\n"
+    WORD@26..27 "y"
+    SPACE@27..28 " "
+    ALIGN@28..29 "&"
+    PANACHE_OPERATOR@29..30 "="
+    SPACE@30..31 " "
+    WORD@31..33 "22"
+    NEWLINE@33..34 "\n"
+    PANACHE_COMMAND@34..38 "\\end"
+    GROUP@38..47 gaps=["", "", "", ""]
+      GROUP_OPEN@38..39 "{"
+      WORD@39..46 "aligned"
+      GROUP_CLOSE@46..47 "}"
+  NEWLINE@47..48 "\n"
+
+
+--- environments/aligned/with_frac.tex ---
+Badness:
+MATH@0..65 gaps=["", "", ""]
+  ENVIRONMENT@0..64 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "aligned"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..51 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..20 "f(x)"
+      SPACE@20..21 " "
+      ALIGN@21..22 "&"
+      WORD@22..23 "="
+      SPACE@23..24 " "
+      COMMAND@24..35 gaps=["", "", "", ""]
+        CONTROL_WORD@24..29 "\\frac"
+        GROUP@29..32 gaps=["", "", "", ""]
+          GROUP_OPEN@29..30 "{"
+          WORD@30..31 "1"
+          GROUP_CLOSE@31..32 "}"
+        GROUP@32..35 gaps=["", "", "", ""]
+          GROUP_OPEN@32..33 "{"
+          WORD@33..34 "2"
+          GROUP_CLOSE@34..35 "}"
+      SPACE@35..36 " "
+      LINE_BREAK@36..38 gaps=["", ""]
+        CONTROL_SYMBOL@36..38 "\\\\"
+      NEWLINE@38..39 "\n"
+      WORD@39..43 "g(x)"
+      SPACE@43..44 " "
+      ALIGN@44..45 "&"
+      WORD@45..46 "="
+      SPACE@46..47 " "
+      SCRIPTED@47..50 gaps=["", "", ""]
+        WORD@47..48 "x"
+        SUPERSCRIPT@48..50 gaps=["", "", ""]
+          SCRIPT_MARKER@48..49 "^"
+          WORD@49..50 "2"
+      NEWLINE@50..51 "\n"
+    END@51..64 gaps=["", "", ""]
+      CONTROL_WORD@51..55 "\\end"
+      NAME_GROUP@55..64 gaps=["", "", "", ""]
+        GROUP_OPEN@55..56 "{"
+        WORD@56..63 "aligned"
+        GROUP_CLOSE@63..64 "}"
+  NEWLINE@64..65 "\n"
+Panache:
+MATH@0..65 gaps=["", "", ""]
+  ENVIRONMENT@0..64 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "aligned"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "f"
+    PANACHE_OPEN@17..18 "("
+    WORD@18..19 "x"
+    PANACHE_CLOSE@19..20 ")"
+    SPACE@20..21 " "
+    ALIGN@21..22 "&"
+    PANACHE_OPERATOR@22..23 "="
+    SPACE@23..24 " "
+    PANACHE_COMMAND@24..29 "\\frac"
+    GROUP@29..32 gaps=["", "", "", ""]
+      GROUP_OPEN@29..30 "{"
+      WORD@30..31 "1"
+      GROUP_CLOSE@31..32 "}"
+    GROUP@32..35 gaps=["", "", "", ""]
+      GROUP_OPEN@32..33 "{"
+      WORD@33..34 "2"
+      GROUP_CLOSE@34..35 "}"
+    SPACE@35..36 " "
+    LINE_BREAK@36..38 "\\\\"
+    NEWLINE@38..39 "\n"
+    WORD@39..40 "g"
+    PANACHE_OPEN@40..41 "("
+    WORD@41..42 "x"
+    PANACHE_CLOSE@42..43 ")"
+    SPACE@43..44 " "
+    ALIGN@44..45 "&"
+    PANACHE_OPERATOR@45..46 "="
+    SPACE@46..47 " "
+    SCRIPTED@47..50 gaps=["", "", ""]
+      WORD@47..48 "x"
+      SUPERSCRIPT@48..50 gaps=["", "", ""]
+        SCRIPT_MARKER@48..49 "^"
+        WORD@49..50 "2"
+    NEWLINE@50..51 "\n"
+    PANACHE_COMMAND@51..55 "\\end"
+    GROUP@55..64 gaps=["", "", "", ""]
+      GROUP_OPEN@55..56 "{"
+      WORD@56..63 "aligned"
+      GROUP_CLOSE@63..64 "}"
+  NEWLINE@64..65 "\n"
+
+
+--- environments/cases/piecewise.tex ---
+Badness:
+MATH@0..55 gaps=["", "", ""]
+  ENVIRONMENT@0..54 gaps=["", "", "", ""]
+    BEGIN@0..13 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..13 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..12 "cases"
+        GROUP_CLOSE@12..13 "}"
+    MATH@13..43 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@13..14 "\n"
+      SCRIPTED@14..17 gaps=["", "", ""]
+        WORD@14..15 "x"
+        SUPERSCRIPT@15..17 gaps=["", "", ""]
+          SCRIPT_MARKER@15..16 "^"
+          WORD@16..17 "2"
+      SPACE@17..18 " "
+      ALIGN@18..19 "&"
+      SPACE@19..20 " "
+      WORD@20..21 "x"
+      SPACE@21..22 " "
+      COMMAND@22..26 gaps=["", ""]
+        CONTROL_WORD@22..26 "\\geq"
+      SPACE@26..27 " "
+      WORD@27..28 "0"
+      SPACE@28..29 " "
+      LINE_BREAK@29..31 gaps=["", ""]
+        CONTROL_SYMBOL@29..31 "\\\\"
+      NEWLINE@31..32 "\n"
+      WORD@32..34 "-x"
+      SPACE@34..35 " "
+      ALIGN@35..36 "&"
+      SPACE@36..37 " "
+      WORD@37..38 "x"
+      SPACE@38..39 " "
+      WORD@39..40 "<"
+      SPACE@40..41 " "
+      WORD@41..42 "0"
+      NEWLINE@42..43 "\n"
+    END@43..54 gaps=["", "", ""]
+      CONTROL_WORD@43..47 "\\end"
+      NAME_GROUP@47..54 gaps=["", "", "", ""]
+        GROUP_OPEN@47..48 "{"
+        WORD@48..53 "cases"
+        GROUP_CLOSE@53..54 "}"
+  NEWLINE@54..55 "\n"
+Panache:
+MATH@0..55 gaps=["", "", ""]
+  ENVIRONMENT@0..54 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..13 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..12 "cases"
+      GROUP_CLOSE@12..13 "}"
+    NEWLINE@13..14 "\n"
+    SCRIPTED@14..17 gaps=["", "", ""]
+      WORD@14..15 "x"
+      SUPERSCRIPT@15..17 gaps=["", "", ""]
+        SCRIPT_MARKER@15..16 "^"
+        WORD@16..17 "2"
+    SPACE@17..18 " "
+    ALIGN@18..19 "&"
+    SPACE@19..20 " "
+    WORD@20..21 "x"
+    SPACE@21..22 " "
+    PANACHE_COMMAND@22..26 "\\geq"
+    SPACE@26..27 " "
+    WORD@27..28 "0"
+    SPACE@28..29 " "
+    LINE_BREAK@29..31 "\\\\"
+    NEWLINE@31..32 "\n"
+    PANACHE_OPERATOR@32..33 "-"
+    WORD@33..34 "x"
+    SPACE@34..35 " "
+    ALIGN@35..36 "&"
+    SPACE@36..37 " "
+    WORD@37..38 "x"
+    SPACE@38..39 " "
+    PANACHE_OPERATOR@39..40 "<"
+    SPACE@40..41 " "
+    WORD@41..42 "0"
+    NEWLINE@42..43 "\n"
+    PANACHE_COMMAND@43..47 "\\end"
+    GROUP@47..54 gaps=["", "", "", ""]
+      GROUP_OPEN@47..48 "{"
+      WORD@48..53 "cases"
+      GROUP_CLOSE@53..54 "}"
+  NEWLINE@54..55 "\n"
+
+
+--- environments/cases/sign.tex ---
+Badness:
+MATH@0..63 gaps=["", "", ""]
+  ENVIRONMENT@0..62 gaps=["", "", "", ""]
+    BEGIN@0..13 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..13 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..12 "cases"
+        GROUP_CLOSE@12..13 "}"
+    MATH@13..51 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@13..14 "\n"
+      WORD@14..15 "1"
+      SPACE@15..16 " "
+      ALIGN@16..17 "&"
+      SPACE@17..18 " "
+      WORD@18..19 "x"
+      SPACE@19..20 " "
+      WORD@20..21 ">"
+      SPACE@21..22 " "
+      WORD@22..23 "0"
+      SPACE@23..24 " "
+      LINE_BREAK@24..26 gaps=["", ""]
+        CONTROL_SYMBOL@24..26 "\\\\"
+      NEWLINE@26..27 "\n"
+      WORD@27..28 "0"
+      SPACE@28..29 " "
+      ALIGN@29..30 "&"
+      SPACE@30..31 " "
+      WORD@31..32 "x"
+      SPACE@32..33 " "
+      WORD@33..34 "="
+      SPACE@34..35 " "
+      WORD@35..36 "0"
+      SPACE@36..37 " "
+      LINE_BREAK@37..39 gaps=["", ""]
+        CONTROL_SYMBOL@37..39 "\\\\"
+      NEWLINE@39..40 "\n"
+      WORD@40..42 "-1"
+      SPACE@42..43 " "
+      ALIGN@43..44 "&"
+      SPACE@44..45 " "
+      WORD@45..46 "x"
+      SPACE@46..47 " "
+      WORD@47..48 "<"
+      SPACE@48..49 " "
+      WORD@49..50 "0"
+      NEWLINE@50..51 "\n"
+    END@51..62 gaps=["", "", ""]
+      CONTROL_WORD@51..55 "\\end"
+      NAME_GROUP@55..62 gaps=["", "", "", ""]
+        GROUP_OPEN@55..56 "{"
+        WORD@56..61 "cases"
+        GROUP_CLOSE@61..62 "}"
+  NEWLINE@62..63 "\n"
+Panache:
+MATH@0..63 gaps=["", "", ""]
+  ENVIRONMENT@0..62 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..13 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..12 "cases"
+      GROUP_CLOSE@12..13 "}"
+    NEWLINE@13..14 "\n"
+    WORD@14..15 "1"
+    SPACE@15..16 " "
+    ALIGN@16..17 "&"
+    SPACE@17..18 " "
+    WORD@18..19 "x"
+    SPACE@19..20 " "
+    PANACHE_OPERATOR@20..21 ">"
+    SPACE@21..22 " "
+    WORD@22..23 "0"
+    SPACE@23..24 " "
+    LINE_BREAK@24..26 "\\\\"
+    NEWLINE@26..27 "\n"
+    WORD@27..28 "0"
+    SPACE@28..29 " "
+    ALIGN@29..30 "&"
+    SPACE@30..31 " "
+    WORD@31..32 "x"
+    SPACE@32..33 " "
+    PANACHE_OPERATOR@33..34 "="
+    SPACE@34..35 " "
+    WORD@35..36 "0"
+    SPACE@36..37 " "
+    LINE_BREAK@37..39 "\\\\"
+    NEWLINE@39..40 "\n"
+    PANACHE_OPERATOR@40..41 "-"
+    WORD@41..42 "1"
+    SPACE@42..43 " "
+    ALIGN@43..44 "&"
+    SPACE@44..45 " "
+    WORD@45..46 "x"
+    SPACE@46..47 " "
+    PANACHE_OPERATOR@47..48 "<"
+    SPACE@48..49 " "
+    WORD@49..50 "0"
+    NEWLINE@50..51 "\n"
+    PANACHE_COMMAND@51..55 "\\end"
+    GROUP@55..62 gaps=["", "", "", ""]
+      GROUP_OPEN@55..56 "{"
+      WORD@56..61 "cases"
+      GROUP_CLOSE@61..62 "}"
+  NEWLINE@62..63 "\n"
+
+
+--- environments/cases/single.tex ---
+Badness:
+MATH@0..32 gaps=["", "", ""]
+  ENVIRONMENT@0..31 gaps=["", "", "", ""]
+    BEGIN@0..13 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..13 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..12 "cases"
+        GROUP_CLOSE@12..13 "}"
+    MATH@13..20 gaps=["", "", "", "", "", "", "", ""]
+      NEWLINE@13..14 "\n"
+      WORD@14..15 "a"
+      SPACE@15..16 " "
+      ALIGN@16..17 "&"
+      SPACE@17..18 " "
+      WORD@18..19 "b"
+      NEWLINE@19..20 "\n"
+    END@20..31 gaps=["", "", ""]
+      CONTROL_WORD@20..24 "\\end"
+      NAME_GROUP@24..31 gaps=["", "", "", ""]
+        GROUP_OPEN@24..25 "{"
+        WORD@25..30 "cases"
+        GROUP_CLOSE@30..31 "}"
+  NEWLINE@31..32 "\n"
+Panache:
+MATH@0..32 gaps=["", "", ""]
+  ENVIRONMENT@0..31 gaps=["", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..13 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..12 "cases"
+      GROUP_CLOSE@12..13 "}"
+    NEWLINE@13..14 "\n"
+    WORD@14..15 "a"
+    SPACE@15..16 " "
+    ALIGN@16..17 "&"
+    SPACE@17..18 " "
+    WORD@18..19 "b"
+    NEWLINE@19..20 "\n"
+    PANACHE_COMMAND@20..24 "\\end"
+    GROUP@24..31 gaps=["", "", "", ""]
+      GROUP_OPEN@24..25 "{"
+      WORD@25..30 "cases"
+      GROUP_CLOSE@30..31 "}"
+  NEWLINE@31..32 "\n"
+
+
+--- environments/matrix/bmatrix.tex ---
+Badness:
+MATH@0..37 gaps=["", "", ""]
+  ENVIRONMENT@0..36 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "bmatrix"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..23 gaps=["", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..17 "x"
+      SPACE@17..18 " "
+      LINE_BREAK@18..20 gaps=["", ""]
+        CONTROL_SYMBOL@18..20 "\\\\"
+      NEWLINE@20..21 "\n"
+      WORD@21..22 "y"
+      NEWLINE@22..23 "\n"
+    END@23..36 gaps=["", "", ""]
+      CONTROL_WORD@23..27 "\\end"
+      NAME_GROUP@27..36 gaps=["", "", "", ""]
+        GROUP_OPEN@27..28 "{"
+        WORD@28..35 "bmatrix"
+        GROUP_CLOSE@35..36 "}"
+  NEWLINE@36..37 "\n"
+Panache:
+MATH@0..37 gaps=["", "", ""]
+  ENVIRONMENT@0..36 gaps=["", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "bmatrix"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "x"
+    SPACE@17..18 " "
+    LINE_BREAK@18..20 "\\\\"
+    NEWLINE@20..21 "\n"
+    WORD@21..22 "y"
+    NEWLINE@22..23 "\n"
+    PANACHE_COMMAND@23..27 "\\end"
+    GROUP@27..36 gaps=["", "", "", ""]
+      GROUP_OPEN@27..28 "{"
+      WORD@28..35 "bmatrix"
+      GROUP_CLOSE@35..36 "}"
+  NEWLINE@36..37 "\n"
+
+
+--- environments/matrix/plain.tex ---
+Badness:
+MATH@0..43 gaps=["", "", ""]
+  ENVIRONMENT@0..42 gaps=["", "", "", ""]
+    BEGIN@0..14 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..14 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..13 "matrix"
+        GROUP_CLOSE@13..14 "}"
+    MATH@14..30 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@14..15 "\n"
+      WORD@15..16 "a"
+      SPACE@16..17 " "
+      ALIGN@17..18 "&"
+      SPACE@18..19 " "
+      WORD@19..20 "b"
+      SPACE@20..21 " "
+      LINE_BREAK@21..23 gaps=["", ""]
+        CONTROL_SYMBOL@21..23 "\\\\"
+      NEWLINE@23..24 "\n"
+      WORD@24..25 "c"
+      SPACE@25..26 " "
+      ALIGN@26..27 "&"
+      SPACE@27..28 " "
+      WORD@28..29 "d"
+      NEWLINE@29..30 "\n"
+    END@30..42 gaps=["", "", ""]
+      CONTROL_WORD@30..34 "\\end"
+      NAME_GROUP@34..42 gaps=["", "", "", ""]
+        GROUP_OPEN@34..35 "{"
+        WORD@35..41 "matrix"
+        GROUP_CLOSE@41..42 "}"
+  NEWLINE@42..43 "\n"
+Panache:
+MATH@0..43 gaps=["", "", ""]
+  ENVIRONMENT@0..42 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..14 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..13 "matrix"
+      GROUP_CLOSE@13..14 "}"
+    NEWLINE@14..15 "\n"
+    WORD@15..16 "a"
+    SPACE@16..17 " "
+    ALIGN@17..18 "&"
+    SPACE@18..19 " "
+    WORD@19..20 "b"
+    SPACE@20..21 " "
+    LINE_BREAK@21..23 "\\\\"
+    NEWLINE@23..24 "\n"
+    WORD@24..25 "c"
+    SPACE@25..26 " "
+    ALIGN@26..27 "&"
+    SPACE@27..28 " "
+    WORD@28..29 "d"
+    NEWLINE@29..30 "\n"
+    PANACHE_COMMAND@30..34 "\\end"
+    GROUP@34..42 gaps=["", "", "", ""]
+      GROUP_OPEN@34..35 "{"
+      WORD@35..41 "matrix"
+      GROUP_CLOSE@41..42 "}"
+  NEWLINE@42..43 "\n"
+
+
+--- environments/matrix/pmatrix.tex ---
+Badness:
+MATH@0..45 gaps=["", "", ""]
+  ENVIRONMENT@0..44 gaps=["", "", "", ""]
+    BEGIN@0..15 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..15 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..14 "pmatrix"
+        GROUP_CLOSE@14..15 "}"
+    MATH@15..31 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@15..16 "\n"
+      WORD@16..17 "1"
+      SPACE@17..18 " "
+      ALIGN@18..19 "&"
+      SPACE@19..20 " "
+      WORD@20..21 "0"
+      SPACE@21..22 " "
+      LINE_BREAK@22..24 gaps=["", ""]
+        CONTROL_SYMBOL@22..24 "\\\\"
+      NEWLINE@24..25 "\n"
+      WORD@25..26 "0"
+      SPACE@26..27 " "
+      ALIGN@27..28 "&"
+      SPACE@28..29 " "
+      WORD@29..30 "1"
+      NEWLINE@30..31 "\n"
+    END@31..44 gaps=["", "", ""]
+      CONTROL_WORD@31..35 "\\end"
+      NAME_GROUP@35..44 gaps=["", "", "", ""]
+        GROUP_OPEN@35..36 "{"
+        WORD@36..43 "pmatrix"
+        GROUP_CLOSE@43..44 "}"
+  NEWLINE@44..45 "\n"
+Panache:
+MATH@0..45 gaps=["", "", ""]
+  ENVIRONMENT@0..44 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..15 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..14 "pmatrix"
+      GROUP_CLOSE@14..15 "}"
+    NEWLINE@15..16 "\n"
+    WORD@16..17 "1"
+    SPACE@17..18 " "
+    ALIGN@18..19 "&"
+    SPACE@19..20 " "
+    WORD@20..21 "0"
+    SPACE@21..22 " "
+    LINE_BREAK@22..24 "\\\\"
+    NEWLINE@24..25 "\n"
+    WORD@25..26 "0"
+    SPACE@26..27 " "
+    ALIGN@27..28 "&"
+    SPACE@28..29 " "
+    WORD@29..30 "1"
+    NEWLINE@30..31 "\n"
+    PANACHE_COMMAND@31..35 "\\end"
+    GROUP@35..44 gaps=["", "", "", ""]
+      GROUP_OPEN@35..36 "{"
+      WORD@36..43 "pmatrix"
+      GROUP_CLOSE@43..44 "}"
+  NEWLINE@44..45 "\n"
+
+
+--- environments/matrix/three_by_three.tex ---
+Badness:
+MATH@0..64 gaps=["", "", ""]
+  ENVIRONMENT@0..63 gaps=["", "", "", ""]
+    BEGIN@0..14 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..14 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..13 "matrix"
+        GROUP_CLOSE@13..14 "}"
+    MATH@14..51 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+      NEWLINE@14..15 "\n"
+      WORD@15..16 "1"
+      SPACE@16..17 " "
+      ALIGN@17..18 "&"
+      SPACE@18..19 " "
+      WORD@19..20 "2"
+      SPACE@20..21 " "
+      ALIGN@21..22 "&"
+      SPACE@22..23 " "
+      WORD@23..24 "3"
+      SPACE@24..25 " "
+      LINE_BREAK@25..27 gaps=["", ""]
+        CONTROL_SYMBOL@25..27 "\\\\"
+      NEWLINE@27..28 "\n"
+      WORD@28..29 "4"
+      SPACE@29..30 " "
+      ALIGN@30..31 "&"
+      SPACE@31..32 " "
+      WORD@32..33 "5"
+      SPACE@33..34 " "
+      ALIGN@34..35 "&"
+      SPACE@35..36 " "
+      WORD@36..37 "6"
+      SPACE@37..38 " "
+      LINE_BREAK@38..40 gaps=["", ""]
+        CONTROL_SYMBOL@38..40 "\\\\"
+      NEWLINE@40..41 "\n"
+      WORD@41..42 "7"
+      SPACE@42..43 " "
+      ALIGN@43..44 "&"
+      SPACE@44..45 " "
+      WORD@45..46 "8"
+      SPACE@46..47 " "
+      ALIGN@47..48 "&"
+      SPACE@48..49 " "
+      WORD@49..50 "9"
+      NEWLINE@50..51 "\n"
+    END@51..63 gaps=["", "", ""]
+      CONTROL_WORD@51..55 "\\end"
+      NAME_GROUP@55..63 gaps=["", "", "", ""]
+        GROUP_OPEN@55..56 "{"
+        WORD@56..62 "matrix"
+        GROUP_CLOSE@62..63 "}"
+  NEWLINE@63..64 "\n"
+Panache:
+MATH@0..64 gaps=["", "", ""]
+  ENVIRONMENT@0..63 gaps=["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..14 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..13 "matrix"
+      GROUP_CLOSE@13..14 "}"
+    NEWLINE@14..15 "\n"
+    WORD@15..16 "1"
+    SPACE@16..17 " "
+    ALIGN@17..18 "&"
+    SPACE@18..19 " "
+    WORD@19..20 "2"
+    SPACE@20..21 " "
+    ALIGN@21..22 "&"
+    SPACE@22..23 " "
+    WORD@23..24 "3"
+    SPACE@24..25 " "
+    LINE_BREAK@25..27 "\\\\"
+    NEWLINE@27..28 "\n"
+    WORD@28..29 "4"
+    SPACE@29..30 " "
+    ALIGN@30..31 "&"
+    SPACE@31..32 " "
+    WORD@32..33 "5"
+    SPACE@33..34 " "
+    ALIGN@34..35 "&"
+    SPACE@35..36 " "
+    WORD@36..37 "6"
+    SPACE@37..38 " "
+    LINE_BREAK@38..40 "\\\\"
+    NEWLINE@40..41 "\n"
+    WORD@41..42 "7"
+    SPACE@42..43 " "
+    ALIGN@43..44 "&"
+    SPACE@44..45 " "
+    WORD@45..46 "8"
+    SPACE@46..47 " "
+    ALIGN@47..48 "&"
+    SPACE@48..49 " "
+    WORD@49..50 "9"
+    NEWLINE@50..51 "\n"
+    PANACHE_COMMAND@51..55 "\\end"
+    GROUP@55..63 gaps=["", "", "", ""]
+      GROUP_OPEN@55..56 "{"
+      WORD@56..62 "matrix"
+      GROUP_CLOSE@62..63 "}"
+  NEWLINE@63..64 "\n"
+
+
+--- escapes/escaped_brace.tex ---
+Badness:
+MATH@0..8 gaps=["", "", "", "", "", "", ""]
+  CONTROL_SYMBOL@0..2 "\\{"
+  SPACE@2..3 " "
+  WORD@3..4 "a"
+  SPACE@4..5 " "
+  CONTROL_SYMBOL@5..7 "\\}"
+  NEWLINE@7..8 "\n"
+Panache:
+MATH@0..8 gaps=["", "", "", "", "", "", ""]
+  PANACHE_COMMAND@0..2 "\\{"
+  SPACE@2..3 " "
+  WORD@3..4 "a"
+  SPACE@4..5 " "
+  PANACHE_COMMAND@5..7 "\\}"
+  NEWLINE@7..8 "\n"
+
+
+--- escapes/escaped_dollar.tex ---
+Badness:
+MATH@0..9 gaps=["", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  WORD@2..3 "="
+  SPACE@3..4 " "
+  CONTROL_SYMBOL@4..6 "\\$"
+  SPACE@6..7 " "
+  WORD@7..8 "5"
+  NEWLINE@8..9 "\n"
+Panache:
+MATH@0..9 gaps=["", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "="
+  SPACE@3..4 " "
+  PANACHE_COMMAND@4..6 "\\$"
+  SPACE@6..7 " "
+  WORD@7..8 "5"
+  NEWLINE@8..9 "\n"
+
+
+--- escapes/literal_backslash_in_env.tex ---
+Badness:
+MATH@0..35 gaps=["", "", ""]
+  ENVIRONMENT@0..34 gaps=["", "", "", ""]
+    BEGIN@0..14 gaps=["", "", ""]
+      CONTROL_WORD@0..6 "\\begin"
+      NAME_GROUP@6..14 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..13 "matrix"
+        GROUP_CLOSE@13..14 "}"
+    MATH@14..22 gaps=["", "", "", "", "", "", "", ""]
+      NEWLINE@14..15 "\n"
+      WORD@15..16 "a"
+      SPACE@16..17 " "
+      LINE_BREAK@17..19 gaps=["", ""]
+        CONTROL_SYMBOL@17..19 "\\\\"
+      NEWLINE@19..20 "\n"
+      WORD@20..21 "b"
+      NEWLINE@21..22 "\n"
+    END@22..34 gaps=["", "", ""]
+      CONTROL_WORD@22..26 "\\end"
+      NAME_GROUP@26..34 gaps=["", "", "", ""]
+        GROUP_OPEN@26..27 "{"
+        WORD@27..33 "matrix"
+        GROUP_CLOSE@33..34 "}"
+  NEWLINE@34..35 "\n"
+Panache:
+MATH@0..35 gaps=["", "", ""]
+  ENVIRONMENT@0..34 gaps=["", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..6 "\\begin"
+    GROUP@6..14 gaps=["", "", "", ""]
+      GROUP_OPEN@6..7 "{"
+      WORD@7..13 "matrix"
+      GROUP_CLOSE@13..14 "}"
+    NEWLINE@14..15 "\n"
+    WORD@15..16 "a"
+    SPACE@16..17 " "
+    LINE_BREAK@17..19 "\\\\"
+    NEWLINE@19..20 "\n"
+    WORD@20..21 "b"
+    NEWLINE@21..22 "\n"
+    PANACHE_COMMAND@22..26 "\\end"
+    GROUP@26..34 gaps=["", "", "", ""]
+      GROUP_OPEN@26..27 "{"
+      WORD@27..33 "matrix"
+      GROUP_CLOSE@33..34 "}"
+  NEWLINE@34..35 "\n"
+
+
+--- groups/braced_group.tex ---
+Badness:
+MATH@0..8 gaps=["", "", ""]
+  GROUP@0..7 gaps=["", "", "", "", "", "", "", ""]
+    GROUP_OPEN@0..1 "{"
+    WORD@1..2 "a"
+    SPACE@2..3 " "
+    WORD@3..4 "+"
+    SPACE@4..5 " "
+    WORD@5..6 "b"
+    GROUP_CLOSE@6..7 "}"
+  NEWLINE@7..8 "\n"
+Panache:
+MATH@0..8 gaps=["", "", ""]
+  GROUP@0..7 gaps=["", "", "", "", "", "", "", ""]
+    GROUP_OPEN@0..1 "{"
+    WORD@1..2 "a"
+    SPACE@2..3 " "
+    PANACHE_OPERATOR@3..4 "+"
+    SPACE@4..5 " "
+    WORD@5..6 "b"
+    GROUP_CLOSE@6..7 "}"
+  NEWLINE@7..8 "\n"
+
+
+--- groups/group_with_command.tex ---
+Badness:
+MATH@0..13 gaps=["", "", ""]
+  SCRIPTED@0..12 gaps=["", "", ""]
+    COMMAND@0..10 gaps=["", "", ""]
+      CONTROL_WORD@0..7 "\\mathbb"
+      GROUP@7..10 gaps=["", "", "", ""]
+        GROUP_OPEN@7..8 "{"
+        WORD@8..9 "R"
+        GROUP_CLOSE@9..10 "}"
+    SUPERSCRIPT@10..12 gaps=["", "", ""]
+      SCRIPT_MARKER@10..11 "^"
+      WORD@11..12 "n"
+  NEWLINE@12..13 "\n"
+Panache:
+MATH@0..13 gaps=["", "", "", ""]
+  PANACHE_COMMAND@0..7 "\\mathbb"
+  SCRIPTED@7..12 gaps=["", "", ""]
+    GROUP@7..10 gaps=["", "", "", ""]
+      GROUP_OPEN@7..8 "{"
+      WORD@8..9 "R"
+      GROUP_CLOSE@9..10 "}"
+    SUPERSCRIPT@10..12 gaps=["", "", ""]
+      SCRIPT_MARKER@10..11 "^"
+      WORD@11..12 "n"
+  NEWLINE@12..13 "\n"
+
+
+--- groups/left_right_asymmetric.tex ---
+Badness:
+MATH@0..20 gaps=["", "", ""]
+  LEFT_RIGHT@0..19 gaps=["", "", "", "", "", ""]
+    CONTROL_WORD@0..5 "\\left"
+    WORD@5..6 "("
+    MATH@6..12 gaps=["", "", "", "", "", ""]
+      SPACE@6..7 " "
+      WORD@7..9 "a,"
+      SPACE@9..10 " "
+      WORD@10..11 "b"
+      SPACE@11..12 " "
+    CONTROL_WORD@12..18 "\\right"
+    BRACKET_CLOSE@18..19 "]"
+  NEWLINE@19..20 "\n"
+Panache:
+MATH@0..20 gaps=["", "", ""]
+  LEFT_RIGHT@0..19 gaps=["", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..5 "\\left"
+    PANACHE_OPEN@5..6 "("
+    SPACE@6..7 " "
+    WORD@7..8 "a"
+    PANACHE_PUNCT@8..9 ","
+    SPACE@9..10 " "
+    WORD@10..11 "b"
+    SPACE@11..12 " "
+    PANACHE_COMMAND@12..18 "\\right"
+    PANACHE_CLOSE@18..19 "]"
+  NEWLINE@19..20 "\n"
+
+
+--- groups/left_right_bracket.tex ---
+Badness:
+MATH@0..27 gaps=["", "", ""]
+  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", ""]
+    CONTROL_WORD@0..5 "\\left"
+    BRACKET_OPEN@5..6 "["
+    MATH@6..19 gaps=["", "", "", ""]
+      SPACE@6..7 " "
+      COMMAND@7..18 gaps=["", "", "", ""]
+        CONTROL_WORD@7..12 "\\frac"
+        GROUP@12..15 gaps=["", "", "", ""]
+          GROUP_OPEN@12..13 "{"
+          WORD@13..14 "a"
+          GROUP_CLOSE@14..15 "}"
+        GROUP@15..18 gaps=["", "", "", ""]
+          GROUP_OPEN@15..16 "{"
+          WORD@16..17 "b"
+          GROUP_CLOSE@17..18 "}"
+      SPACE@18..19 " "
+    CONTROL_WORD@19..25 "\\right"
+    BRACKET_CLOSE@25..26 "]"
+  NEWLINE@26..27 "\n"
+Panache:
+MATH@0..27 gaps=["", "", ""]
+  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..5 "\\left"
+    PANACHE_OPEN@5..6 "["
+    SPACE@6..7 " "
+    PANACHE_COMMAND@7..12 "\\frac"
+    GROUP@12..15 gaps=["", "", "", ""]
+      GROUP_OPEN@12..13 "{"
+      WORD@13..14 "a"
+      GROUP_CLOSE@14..15 "}"
+    GROUP@15..18 gaps=["", "", "", ""]
+      GROUP_OPEN@15..16 "{"
+      WORD@16..17 "b"
+      GROUP_CLOSE@17..18 "}"
+    SPACE@18..19 " "
+    PANACHE_COMMAND@19..25 "\\right"
+    PANACHE_CLOSE@25..26 "]"
+  NEWLINE@26..27 "\n"
+
+
+--- groups/left_right_null.tex ---
+Badness:
+MATH@0..27 gaps=["", "", ""]
+  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", ""]
+    CONTROL_WORD@0..5 "\\left"
+    WORD@5..6 "."
+    MATH@6..19 gaps=["", "", "", ""]
+      SPACE@6..7 " "
+      COMMAND@7..18 gaps=["", "", "", ""]
+        CONTROL_WORD@7..12 "\\frac"
+        GROUP@12..15 gaps=["", "", "", ""]
+          GROUP_OPEN@12..13 "{"
+          WORD@13..14 "a"
+          GROUP_CLOSE@14..15 "}"
+        GROUP@15..18 gaps=["", "", "", ""]
+          GROUP_OPEN@15..16 "{"
+          WORD@16..17 "b"
+          GROUP_CLOSE@17..18 "}"
+      SPACE@18..19 " "
+    CONTROL_WORD@19..25 "\\right"
+    WORD@25..26 "|"
+  NEWLINE@26..27 "\n"
+Panache:
+MATH@0..27 gaps=["", "", ""]
+  LEFT_RIGHT@0..26 gaps=["", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..5 "\\left"
+    WORD@5..6 "."
+    SPACE@6..7 " "
+    PANACHE_COMMAND@7..12 "\\frac"
+    GROUP@12..15 gaps=["", "", "", ""]
+      GROUP_OPEN@12..13 "{"
+      WORD@13..14 "a"
+      GROUP_CLOSE@14..15 "}"
+    GROUP@15..18 gaps=["", "", "", ""]
+      GROUP_OPEN@15..16 "{"
+      WORD@16..17 "b"
+      GROUP_CLOSE@17..18 "}"
+    SPACE@18..19 " "
+    PANACHE_COMMAND@19..25 "\\right"
+    WORD@25..26 "|"
+  NEWLINE@26..27 "\n"
+
+
+--- groups/left_right_paren.tex ---
+Badness:
+MATH@0..21 gaps=["", "", ""]
+  LEFT_RIGHT@0..20 gaps=["", "", "", "", "", ""]
+    CONTROL_WORD@0..5 "\\left"
+    WORD@5..6 "("
+    MATH@6..13 gaps=["", "", "", "", "", "", "", ""]
+      SPACE@6..7 " "
+      WORD@7..8 "a"
+      SPACE@8..9 " "
+      WORD@9..10 "+"
+      SPACE@10..11 " "
+      WORD@11..12 "b"
+      SPACE@12..13 " "
+    CONTROL_WORD@13..19 "\\right"
+    WORD@19..20 ")"
+  NEWLINE@20..21 "\n"
+Panache:
+MATH@0..21 gaps=["", "", ""]
+  LEFT_RIGHT@0..20 gaps=["", "", "", "", "", "", "", "", "", "", "", ""]
+    PANACHE_COMMAND@0..5 "\\left"
+    PANACHE_OPEN@5..6 "("
+    SPACE@6..7 " "
+    WORD@7..8 "a"
+    SPACE@8..9 " "
+    PANACHE_OPERATOR@9..10 "+"
+    SPACE@10..11 " "
+    WORD@11..12 "b"
+    SPACE@12..13 " "
+    PANACHE_COMMAND@13..19 "\\right"
+    PANACHE_CLOSE@19..20 ")"
+  NEWLINE@20..21 "\n"
+
+
+--- groups/nested_braces.tex ---
+Badness:
+MATH@0..14 gaps=["", "", ""]
+  GROUP@0..13 gaps=["", "", "", "", "", "", "", ""]
+    GROUP_OPEN@0..1 "{"
+    WORD@1..2 "a"
+    SPACE@2..3 " "
+    WORD@3..4 "+"
+    SPACE@4..5 " "
+    GROUP@5..12 gaps=["", "", "", "", "", "", "", ""]
+      GROUP_OPEN@5..6 "{"
+      WORD@6..7 "b"
+      SPACE@7..8 " "
+      WORD@8..9 "+"
+      SPACE@9..10 " "
+      WORD@10..11 "c"
+      GROUP_CLOSE@11..12 "}"
+    GROUP_CLOSE@12..13 "}"
+  NEWLINE@13..14 "\n"
+Panache:
+MATH@0..14 gaps=["", "", ""]
+  GROUP@0..13 gaps=["", "", "", "", "", "", "", ""]
+    GROUP_OPEN@0..1 "{"
+    WORD@1..2 "a"
+    SPACE@2..3 " "
+    PANACHE_OPERATOR@3..4 "+"
+    SPACE@4..5 " "
+    GROUP@5..12 gaps=["", "", "", "", "", "", "", ""]
+      GROUP_OPEN@5..6 "{"
+      WORD@6..7 "b"
+      SPACE@7..8 " "
+      PANACHE_OPERATOR@8..9 "+"
+      SPACE@9..10 " "
+      WORD@10..11 "c"
+      GROUP_CLOSE@11..12 "}"
+    GROUP_CLOSE@12..13 "}"
+  NEWLINE@13..14 "\n"
+
+
+--- inline/binomial_frac.tex ---
+Badness:
+MATH@0..20 gaps=["", "", ""]
+  COMMAND@0..19 gaps=["", "", "", ""]
+    CONTROL_WORD@0..5 "\\frac"
+    GROUP@5..9 gaps=["", "", "", ""]
+      GROUP_OPEN@5..6 "{"
+      WORD@6..8 "n!"
+      GROUP_CLOSE@8..9 "}"
+    GROUP@9..19 gaps=["", "", "", ""]
+      GROUP_OPEN@9..10 "{"
+      WORD@10..18 "k!(n-k)!"
+      GROUP_CLOSE@18..19 "}"
+  NEWLINE@19..20 "\n"
+Panache:
+MATH@0..20 gaps=["", "", "", "", ""]
+  PANACHE_COMMAND@0..5 "\\frac"
+  GROUP@5..9 gaps=["", "", "", ""]
+    GROUP_OPEN@5..6 "{"
+    WORD@6..8 "n!"
+    GROUP_CLOSE@8..9 "}"
+  GROUP@9..19 gaps=["", "", "", "", "", "", "", "", "", ""]
+    GROUP_OPEN@9..10 "{"
+    WORD@10..12 "k!"
+    PANACHE_OPEN@12..13 "("
+    WORD@13..14 "n"
+    PANACHE_OPERATOR@14..15 "-"
+    WORD@15..16 "k"
+    PANACHE_CLOSE@16..17 ")"
+    WORD@17..18 "!"
+    GROUP_CLOSE@18..19 "}"
+  NEWLINE@19..20 "\n"
+
+
+--- inline/greek_and_cdot.tex ---
+Badness:
+MATH@0..19 gaps=["", "", "", "", "", "", ""]
+  COMMAND@0..6 gaps=["", ""]
+    CONTROL_WORD@0..6 "\\alpha"
+  SPACE@6..7 " "
+  COMMAND@7..12 gaps=["", ""]
+    CONTROL_WORD@7..12 "\\cdot"
+  SPACE@12..13 " "
+  COMMAND@13..18 gaps=["", ""]
+    CONTROL_WORD@13..18 "\\beta"
+  NEWLINE@18..19 "\n"
+Panache:
+MATH@0..19 gaps=["", "", "", "", "", "", ""]
+  PANACHE_COMMAND@0..6 "\\alpha"
+  SPACE@6..7 " "
+  PANACHE_COMMAND@7..12 "\\cdot"
+  SPACE@12..13 " "
+  PANACHE_COMMAND@13..18 "\\beta"
+  NEWLINE@18..19 "\n"
+
+
+--- inline/mixed_scripts.tex ---
+Badness:
+MATH@0..14 gaps=["", "", "", "", "", "", ""]
+  SCRIPTED@0..5 gaps=["", "", "", ""]
+    WORD@0..1 "a"
+    SUBSCRIPT@1..3 gaps=["", "", ""]
+      SCRIPT_MARKER@1..2 "_"
+      WORD@2..3 "i"
+    SUPERSCRIPT@3..5 gaps=["", "", ""]
+      SCRIPT_MARKER@3..4 "^"
+      WORD@4..5 "2"
+  SPACE@5..6 " "
+  WORD@6..7 "+"
+  SPACE@7..8 " "
+  SCRIPTED@8..13 gaps=["", "", "", ""]
+    WORD@8..9 "b"
+    SUBSCRIPT@9..11 gaps=["", "", ""]
+      SCRIPT_MARKER@9..10 "_"
+      WORD@10..11 "j"
+    SUPERSCRIPT@11..13 gaps=["", "", ""]
+      SCRIPT_MARKER@11..12 "^"
+      WORD@12..13 "3"
+  NEWLINE@13..14 "\n"
+Panache:
+MATH@0..14 gaps=["", "", "", "", "", "", ""]
+  SCRIPTED@0..5 gaps=["", "", "", ""]
+    WORD@0..1 "a"
+    SUBSCRIPT@1..3 gaps=["", "", ""]
+      SCRIPT_MARKER@1..2 "_"
+      WORD@2..3 "i"
+    SUPERSCRIPT@3..5 gaps=["", "", ""]
+      SCRIPT_MARKER@3..4 "^"
+      WORD@4..5 "2"
+  SPACE@5..6 " "
+  PANACHE_OPERATOR@6..7 "+"
+  SPACE@7..8 " "
+  SCRIPTED@8..13 gaps=["", "", "", ""]
+    WORD@8..9 "b"
+    SUBSCRIPT@9..11 gaps=["", "", ""]
+      SCRIPT_MARKER@9..10 "_"
+      WORD@10..11 "j"
+    SUPERSCRIPT@11..13 gaps=["", "", ""]
+      SCRIPT_MARKER@11..12 "^"
+      WORD@12..13 "3"
+  NEWLINE@13..14 "\n"
+
+
+--- inline/nested_frac.tex ---
+Badness:
+MATH@0..26 gaps=["", "", ""]
+  COMMAND@0..25 gaps=["", "", "", ""]
+    CONTROL_WORD@0..5 "\\frac"
+    GROUP@5..8 gaps=["", "", "", ""]
+      GROUP_OPEN@5..6 "{"
+      WORD@6..7 "1"
+      GROUP_CLOSE@7..8 "}"
+    GROUP@8..25 gaps=["", "", "", "", "", "", "", ""]
+      GROUP_OPEN@8..9 "{"
+      WORD@9..10 "1"
+      SPACE@10..11 " "
+      WORD@11..12 "+"
+      SPACE@12..13 " "
+      COMMAND@13..24 gaps=["", "", "", ""]
+        CONTROL_WORD@13..18 "\\frac"
+        GROUP@18..21 gaps=["", "", "", ""]
+          GROUP_OPEN@18..19 "{"
+          WORD@19..20 "1"
+          GROUP_CLOSE@20..21 "}"
+        GROUP@21..24 gaps=["", "", "", ""]
+          GROUP_OPEN@21..22 "{"
+          WORD@22..23 "x"
+          GROUP_CLOSE@23..24 "}"
+      GROUP_CLOSE@24..25 "}"
+  NEWLINE@25..26 "\n"
+Panache:
+MATH@0..26 gaps=["", "", "", "", ""]
+  PANACHE_COMMAND@0..5 "\\frac"
+  GROUP@5..8 gaps=["", "", "", ""]
+    GROUP_OPEN@5..6 "{"
+    WORD@6..7 "1"
+    GROUP_CLOSE@7..8 "}"
+  GROUP@8..25 gaps=["", "", "", "", "", "", "", "", "", ""]
+    GROUP_OPEN@8..9 "{"
+    WORD@9..10 "1"
+    SPACE@10..11 " "
+    PANACHE_OPERATOR@11..12 "+"
+    SPACE@12..13 " "
+    PANACHE_COMMAND@13..18 "\\frac"
+    GROUP@18..21 gaps=["", "", "", ""]
+      GROUP_OPEN@18..19 "{"
+      WORD@19..20 "1"
+      GROUP_CLOSE@20..21 "}"
+    GROUP@21..24 gaps=["", "", "", ""]
+      GROUP_OPEN@21..22 "{"
+      WORD@22..23 "x"
+      GROUP_CLOSE@23..24 "}"
+    GROUP_CLOSE@24..25 "}"
+  NEWLINE@25..26 "\n"
+
+
+--- inline/simple_equality.tex ---
+Badness:
+MATH@0..6 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "x"
+  SPACE@1..2 " "
+  WORD@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "y"
+  NEWLINE@5..6 "\n"
+Panache:
+MATH@0..6 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "x"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "y"
+  NEWLINE@5..6 "\n"
+
+
+--- inline/sqrt.tex ---
+Badness:
+MATH@0..17 gaps=["", "", ""]
+  COMMAND@0..16 gaps=["", "", ""]
+    CONTROL_WORD@0..5 "\\sqrt"
+    GROUP@5..16 gaps=["", "", "", "", "", "", "", ""]
+      GROUP_OPEN@5..6 "{"
+      SCRIPTED@6..9 gaps=["", "", ""]
+        WORD@6..7 "x"
+        SUPERSCRIPT@7..9 gaps=["", "", ""]
+          SCRIPT_MARKER@7..8 "^"
+          WORD@8..9 "2"
+      SPACE@9..10 " "
+      WORD@10..11 "+"
+      SPACE@11..12 " "
+      SCRIPTED@12..15 gaps=["", "", ""]
+        WORD@12..13 "y"
+        SUPERSCRIPT@13..15 gaps=["", "", ""]
+          SCRIPT_MARKER@13..14 "^"
+          WORD@14..15 "2"
+      GROUP_CLOSE@15..16 "}"
+  NEWLINE@16..17 "\n"
+Panache:
+MATH@0..17 gaps=["", "", "", ""]
+  PANACHE_COMMAND@0..5 "\\sqrt"
+  GROUP@5..16 gaps=["", "", "", "", "", "", "", ""]
+    GROUP_OPEN@5..6 "{"
+    SCRIPTED@6..9 gaps=["", "", ""]
+      WORD@6..7 "x"
+      SUPERSCRIPT@7..9 gaps=["", "", ""]
+        SCRIPT_MARKER@7..8 "^"
+        WORD@8..9 "2"
+    SPACE@9..10 " "
+    PANACHE_OPERATOR@10..11 "+"
+    SPACE@11..12 " "
+    SCRIPTED@12..15 gaps=["", "", ""]
+      WORD@12..13 "y"
+      SUPERSCRIPT@13..15 gaps=["", "", ""]
+        SCRIPT_MARKER@13..14 "^"
+        WORD@14..15 "2"
+    GROUP_CLOSE@15..16 "}"
+  NEWLINE@16..17 "\n"
+
+
+--- inline/sum_expression.tex ---
+Badness:
+MATH@0..10 gaps=["", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  WORD@2..3 "+"
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  SPACE@5..6 " "
+  WORD@6..7 "="
+  SPACE@7..8 " "
+  WORD@8..9 "c"
+  NEWLINE@9..10 "\n"
+Panache:
+MATH@0..10 gaps=["", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "+"
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  SPACE@5..6 " "
+  PANACHE_OPERATOR@6..7 "="
+  SPACE@7..8 " "
+  WORD@8..9 "c"
+  NEWLINE@9..10 "\n"
+
+
+--- inline/whitespace_heavy.tex ---
+Badness:
+MATH@0..23 gaps=["", "", "", "", "", "", "", "", ""]
+  COMMAND@0..6 gaps=["", ""]
+    CONTROL_WORD@0..6 "\\alpha"
+  SPACE@6..9 "   "
+  WORD@9..10 "x"
+  SPACE@10..13 "   "
+  WORD@13..14 "+"
+  SPACE@14..17 "   "
+  COMMAND@17..22 gaps=["", ""]
+    CONTROL_WORD@17..22 "\\beta"
+  NEWLINE@22..23 "\n"
+Panache:
+MATH@0..23 gaps=["", "", "", "", "", "", "", "", ""]
+  PANACHE_COMMAND@0..6 "\\alpha"
+  SPACE@6..9 "   "
+  WORD@9..10 "x"
+  SPACE@10..13 "   "
+  PANACHE_OPERATOR@13..14 "+"
+  SPACE@14..17 "   "
+  PANACHE_COMMAND@17..22 "\\beta"
+  NEWLINE@22..23 "\n"
+
+
+--- macro_dependent/custom_var.tex ---
+Badness:
+MATH@0..19 gaps=["", "", "", "", "", "", "", ""]
+  COMMAND@0..4 gaps=["", ""]
+    CONTROL_WORD@0..4 "\\Var"
+  WORD@4..7 "(X)"
+  SPACE@7..8 " "
+  WORD@8..9 "="
+  SPACE@9..10 " "
+  SCRIPTED@10..18 gaps=["", "", ""]
+    COMMAND@10..16 gaps=["", ""]
+      CONTROL_WORD@10..16 "\\sigma"
+    SUPERSCRIPT@16..18 gaps=["", "", ""]
+      SCRIPT_MARKER@16..17 "^"
+      WORD@17..18 "2"
+  NEWLINE@18..19 "\n"
+Panache:
+MATH@0..19 gaps=["", "", "", "", "", "", "", "", "", ""]
+  PANACHE_COMMAND@0..4 "\\Var"
+  PANACHE_OPEN@4..5 "("
+  WORD@5..6 "X"
+  PANACHE_CLOSE@6..7 ")"
+  SPACE@7..8 " "
+  PANACHE_OPERATOR@8..9 "="
+  SPACE@9..10 " "
+  SCRIPTED@10..18 gaps=["", "", ""]
+    PANACHE_COMMAND@10..16 "\\sigma"
+    SUPERSCRIPT@16..18 gaps=["", "", ""]
+      SCRIPT_MARKER@16..17 "^"
+      WORD@17..18 "2"
+  NEWLINE@18..19 "\n"
+
+
+--- macro_dependent/expectation.tex ---
+Badness:
+MATH@0..11 gaps=["", "", "", "", "", ""]
+  COMMAND@0..2 gaps=["", ""]
+    CONTROL_WORD@0..2 "\\E"
+  WORD@2..3 "("
+  SCRIPTED@3..9 gaps=["", "", ""]
+    WORD@3..4 "e"
+    SUPERSCRIPT@4..9 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "^"
+      GROUP@5..9 gaps=["", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..8 "tX"
+        GROUP_CLOSE@8..9 "}"
+  WORD@9..10 ")"
+  NEWLINE@10..11 "\n"
+Panache:
+MATH@0..11 gaps=["", "", "", "", "", ""]
+  PANACHE_COMMAND@0..2 "\\E"
+  PANACHE_OPEN@2..3 "("
+  SCRIPTED@3..9 gaps=["", "", ""]
+    WORD@3..4 "e"
+    SUPERSCRIPT@4..9 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "^"
+      GROUP@5..9 gaps=["", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..8 "tX"
+        GROUP_CLOSE@8..9 "}"
+  PANACHE_CLOSE@9..10 ")"
+  NEWLINE@10..11 "\n"
+
+
+--- operators/cdot.tex ---
+Badness:
+MATH@0..10 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  COMMAND@2..7 gaps=["", ""]
+    CONTROL_WORD@2..7 "\\cdot"
+  SPACE@7..8 " "
+  WORD@8..9 "b"
+  NEWLINE@9..10 "\n"
+Panache:
+MATH@0..10 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_COMMAND@2..7 "\\cdot"
+  SPACE@7..8 " "
+  WORD@8..9 "b"
+  NEWLINE@9..10 "\n"
+
+
+--- operators/double_minus.tex ---
+Badness:
+MATH@0..7 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  WORD@2..3 "-"
+  SPACE@3..4 " "
+  WORD@4..6 "-b"
+  NEWLINE@6..7 "\n"
+Panache:
+MATH@0..7 gaps=["", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "-"
+  SPACE@3..4 " "
+  PANACHE_OPERATOR@4..5 "-"
+  WORD@5..6 "b"
+  NEWLINE@6..7 "\n"
+
+
+--- operators/leq.tex ---
+Badness:
+MATH@0..9 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  COMMAND@2..6 gaps=["", ""]
+    CONTROL_WORD@2..6 "\\leq"
+  SPACE@6..7 " "
+  WORD@7..8 "b"
+  NEWLINE@8..9 "\n"
+Panache:
+MATH@0..9 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_COMMAND@2..6 "\\leq"
+  SPACE@6..7 " "
+  WORD@7..8 "b"
+  NEWLINE@8..9 "\n"
+
+
+--- operators/neq.tex ---
+Badness:
+MATH@0..9 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  COMMAND@2..6 gaps=["", ""]
+    CONTROL_WORD@2..6 "\\neq"
+  SPACE@6..7 " "
+  WORD@7..8 "b"
+  NEWLINE@8..9 "\n"
+Panache:
+MATH@0..9 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_COMMAND@2..6 "\\neq"
+  SPACE@6..7 " "
+  WORD@7..8 "b"
+  NEWLINE@8..9 "\n"
+
+
+--- operators/plus.tex ---
+Badness:
+MATH@0..6 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  WORD@2..3 "+"
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  NEWLINE@5..6 "\n"
+Panache:
+MATH@0..6 gaps=["", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "+"
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  NEWLINE@5..6 "\n"
+
+
+--- operators/plus_tight.tex ---
+Badness:
+MATH@0..4 gaps=["", "", ""]
+  WORD@0..3 "a+b"
+  NEWLINE@3..4 "\n"
+Panache:
+MATH@0..4 gaps=["", "", "", "", ""]
+  WORD@0..1 "a"
+  PANACHE_OPERATOR@1..2 "+"
+  WORD@2..3 "b"
+  NEWLINE@3..4 "\n"
+
+
+--- operators/relation_chain.tex ---
+Badness:
+MATH@0..10 gaps=["", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  WORD@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  SPACE@5..6 " "
+  WORD@6..7 "="
+  SPACE@7..8 " "
+  WORD@8..9 "c"
+  NEWLINE@9..10 "\n"
+Panache:
+MATH@0..10 gaps=["", "", "", "", "", "", "", "", "", "", ""]
+  WORD@0..1 "a"
+  SPACE@1..2 " "
+  PANACHE_OPERATOR@2..3 "="
+  SPACE@3..4 " "
+  WORD@4..5 "b"
+  SPACE@5..6 " "
+  PANACHE_OPERATOR@6..7 "="
+  SPACE@7..8 " "
+  WORD@8..9 "c"
+  NEWLINE@9..10 "\n"
+
+
+--- operators/unary_minus.tex ---
+Badness:
+MATH@0..3 gaps=["", "", ""]
+  WORD@0..2 "-x"
+  NEWLINE@2..3 "\n"
+Panache:
+MATH@0..3 gaps=["", "", "", ""]
+  PANACHE_OPERATOR@0..1 "-"
+  WORD@1..2 "x"
+  NEWLINE@2..3 "\n"
+
+
+--- scripts/double_subscript.tex ---
+Badness:
+MATH@0..8 gaps=["", "", ""]
+  SCRIPTED@0..7 gaps=["", "", ""]
+    WORD@0..1 "x"
+    SUBSCRIPT@1..7 gaps=["", "", ""]
+      SCRIPT_MARKER@1..2 "_"
+      GROUP@2..7 gaps=["", "", "", ""]
+        GROUP_OPEN@2..3 "{"
+        WORD@3..6 "i,j"
+        GROUP_CLOSE@6..7 "}"
+  NEWLINE@7..8 "\n"
+Panache:
+MATH@0..8 gaps=["", "", ""]
+  SCRIPTED@0..7 gaps=["", "", ""]
+    WORD@0..1 "x"
+    SUBSCRIPT@1..7 gaps=["", "", ""]
+      SCRIPT_MARKER@1..2 "_"
+      GROUP@2..7 gaps=["", "", "", "", "", ""]
+        GROUP_OPEN@2..3 "{"
+        WORD@3..4 "i"
+        PANACHE_PUNCT@4..5 ","
+        WORD@5..6 "j"
+        GROUP_CLOSE@6..7 "}"
+  NEWLINE@7..8 "\n"
+
+
+--- scripts/integral_bounds.tex ---
+Badness:
+MATH@0..17 gaps=["", "", "", "", "", "", "", "", ""]
+  SCRIPTED@0..8 gaps=["", "", "", ""]
+    COMMAND@0..4 gaps=["", ""]
+      CONTROL_WORD@0..4 "\\int"
+    SUBSCRIPT@4..6 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      WORD@5..6 "0"
+    SUPERSCRIPT@6..8 gaps=["", "", ""]
+      SCRIPT_MARKER@6..7 "^"
+      WORD@7..8 "1"
+  SPACE@8..9 " "
+  WORD@9..10 "x"
+  SPACE@10..11 " "
+  CONTROL_SYMBOL@11..13 "\\,"
+  SPACE@13..14 " "
+  WORD@14..16 "dx"
+  NEWLINE@16..17 "\n"
+Panache:
+MATH@0..17 gaps=["", "", "", "", "", "", "", "", ""]
+  SCRIPTED@0..8 gaps=["", "", "", ""]
+    PANACHE_COMMAND@0..4 "\\int"
+    SUBSCRIPT@4..6 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      WORD@5..6 "0"
+    SUPERSCRIPT@6..8 gaps=["", "", ""]
+      SCRIPT_MARKER@6..7 "^"
+      WORD@7..8 "1"
+  SPACE@8..9 " "
+  WORD@9..10 "x"
+  SPACE@10..11 " "
+  PANACHE_COMMAND@11..13 "\\,"
+  SPACE@13..14 " "
+  WORD@14..16 "dx"
+  NEWLINE@16..17 "\n"
+
+
+--- scripts/prod_bounds.tex ---
+Badness:
+MATH@0..20 gaps=["", "", "", "", ""]
+  SCRIPTED@0..15 gaps=["", "", "", ""]
+    COMMAND@0..5 gaps=["", ""]
+      CONTROL_WORD@0..5 "\\prod"
+    SUBSCRIPT@5..11 gaps=["", "", ""]
+      SCRIPT_MARKER@5..6 "_"
+      GROUP@6..11 gaps=["", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..10 "k=1"
+        GROUP_CLOSE@10..11 "}"
+    SUPERSCRIPT@11..15 gaps=["", "", ""]
+      SCRIPT_MARKER@11..12 "^"
+      GROUP@12..15 gaps=["", "", "", ""]
+        GROUP_OPEN@12..13 "{"
+        WORD@13..14 "m"
+        GROUP_CLOSE@14..15 "}"
+  SPACE@15..16 " "
+  SCRIPTED@16..19 gaps=["", "", ""]
+    WORD@16..17 "a"
+    SUBSCRIPT@17..19 gaps=["", "", ""]
+      SCRIPT_MARKER@17..18 "_"
+      WORD@18..19 "k"
+  NEWLINE@19..20 "\n"
+Panache:
+MATH@0..20 gaps=["", "", "", "", ""]
+  SCRIPTED@0..15 gaps=["", "", "", ""]
+    PANACHE_COMMAND@0..5 "\\prod"
+    SUBSCRIPT@5..11 gaps=["", "", ""]
+      SCRIPT_MARKER@5..6 "_"
+      GROUP@6..11 gaps=["", "", "", "", "", ""]
+        GROUP_OPEN@6..7 "{"
+        WORD@7..8 "k"
+        PANACHE_OPERATOR@8..9 "="
+        WORD@9..10 "1"
+        GROUP_CLOSE@10..11 "}"
+    SUPERSCRIPT@11..15 gaps=["", "", ""]
+      SCRIPT_MARKER@11..12 "^"
+      GROUP@12..15 gaps=["", "", "", ""]
+        GROUP_OPEN@12..13 "{"
+        WORD@13..14 "m"
+        GROUP_CLOSE@14..15 "}"
+  SPACE@15..16 " "
+  SCRIPTED@16..19 gaps=["", "", ""]
+    WORD@16..17 "a"
+    SUBSCRIPT@17..19 gaps=["", "", ""]
+      SCRIPT_MARKER@17..18 "_"
+      WORD@18..19 "k"
+  NEWLINE@19..20 "\n"
+
+
+--- scripts/script_on_group.tex ---
+Badness:
+MATH@0..8 gaps=["", "", ""]
+  SCRIPTED@0..7 gaps=["", "", ""]
+    GROUP@0..5 gaps=["", "", "", ""]
+      GROUP_OPEN@0..1 "{"
+      WORD@1..4 "a+b"
+      GROUP_CLOSE@4..5 "}"
+    SUPERSCRIPT@5..7 gaps=["", "", ""]
+      SCRIPT_MARKER@5..6 "^"
+      WORD@6..7 "2"
+  NEWLINE@7..8 "\n"
+Panache:
+MATH@0..8 gaps=["", "", ""]
+  SCRIPTED@0..7 gaps=["", "", ""]
+    GROUP@0..5 gaps=["", "", "", "", "", ""]
+      GROUP_OPEN@0..1 "{"
+      WORD@1..2 "a"
+      PANACHE_OPERATOR@2..3 "+"
+      WORD@3..4 "b"
+      GROUP_CLOSE@4..5 "}"
+    SUPERSCRIPT@5..7 gaps=["", "", ""]
+      SCRIPT_MARKER@5..6 "^"
+      WORD@6..7 "2"
+  NEWLINE@7..8 "\n"
+
+
+--- scripts/sum_bounds.tex ---
+Badness:
+MATH@0..17 gaps=["", "", "", "", ""]
+  SCRIPTED@0..14 gaps=["", "", "", ""]
+    COMMAND@0..4 gaps=["", ""]
+      CONTROL_WORD@0..4 "\\sum"
+    SUBSCRIPT@4..10 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      GROUP@5..10 gaps=["", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..9 "i=1"
+        GROUP_CLOSE@9..10 "}"
+    SUPERSCRIPT@10..14 gaps=["", "", ""]
+      SCRIPT_MARKER@10..11 "^"
+      GROUP@11..14 gaps=["", "", "", ""]
+        GROUP_OPEN@11..12 "{"
+        WORD@12..13 "n"
+        GROUP_CLOSE@13..14 "}"
+  SPACE@14..15 " "
+  WORD@15..16 "i"
+  NEWLINE@16..17 "\n"
+Panache:
+MATH@0..17 gaps=["", "", "", "", ""]
+  SCRIPTED@0..14 gaps=["", "", "", ""]
+    PANACHE_COMMAND@0..4 "\\sum"
+    SUBSCRIPT@4..10 gaps=["", "", ""]
+      SCRIPT_MARKER@4..5 "_"
+      GROUP@5..10 gaps=["", "", "", "", "", ""]
+        GROUP_OPEN@5..6 "{"
+        WORD@6..7 "i"
+        PANACHE_OPERATOR@7..8 "="
+        WORD@8..9 "1"
+        GROUP_CLOSE@9..10 "}"
+    SUPERSCRIPT@10..14 gaps=["", "", ""]
+      SCRIPT_MARKER@10..11 "^"
+      GROUP@11..14 gaps=["", "", "", ""]
+        GROUP_OPEN@11..12 "{"
+        WORD@12..13 "n"
+        GROUP_CLOSE@13..14 "}"
+  SPACE@14..15 " "
+  WORD@15..16 "i"
+  NEWLINE@16..17 "\n"
+

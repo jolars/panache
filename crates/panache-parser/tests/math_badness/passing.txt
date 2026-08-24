@@ -1,0 +1,5 @@
+# Mandatory Badness parser-parity cases from the shared math corpus.
+groups/deep_nesting.tex
+inline/subscript.tex
+inline/superscript.tex
+scripts/nested_superscript.tex
