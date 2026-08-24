@@ -32,11 +32,11 @@ DOCUMENT@0..72
           DISPLAY_MATH@23..36
             DISPLAY_MATH_MARKER@23..25 "$$"
             MATH_CONTENT@25..34
-              MATH_TEXT@25..26 "m"
+              MATH_WORD@25..26 "m"
               MATH_NEWLINE@26..27 "\n"
               LINE_PREFIX@27..31 "    "
               MATH_SPACE@31..33 "  "
-              MATH_TEXT@33..34 "n"
+              MATH_WORD@33..34 "n"
             DISPLAY_MATH_MARKER@34..36 "$$"
           NEWLINE@36..37 "\n"
     BLANK_LINE@37..38

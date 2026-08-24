@@ -31,9 +31,9 @@ DOCUMENT@0..31
         INLINE_MATH@23..30
           INLINE_MATH_MARKER@23..24 "$"
           MATH_CONTENT@24..29
-            MATH_TEXT@24..25 "t"
+            MATH_WORD@24..25 "t"
             MATH_NEWLINE@25..26 "\n"
             LINE_PREFIX@26..28 "  "
-            MATH_TEXT@28..29 "u"
+            MATH_WORD@28..29 "u"
           INLINE_MATH_MARKER@29..30 "$"
         NEWLINE@30..31 "\n"

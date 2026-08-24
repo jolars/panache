@@ -70,30 +70,32 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**One-to-one kind map + script-marker parity.** Made both oracle kind maps
-explicit and injective, then migrated Panache's combined `MATH_SCRIPT` token to
-Badness-equivalent `MATH_CARET` and `MATH_UNDERSCORE` tokens.
+**Badness lexical word grain.** Replaced `MATH_TEXT`, `MATH_OPERATOR`,
+`MATH_OPEN`, `MATH_CLOSE`, and `MATH_PUNCT` with maximal Badness-equivalent
+`MATH_WORD` runs.
 
-- The stricter map initially exposed three false script passes: collapsing
-  Badness `CARET`/`UNDERSCORE` into one canonical marker had hidden a real CST
-  difference. Legacy Panache kinds now keep explicit `PANACHE_*` names.
-- Native parsing, typed script accessors, diagnostics/content reconstruction,
-  and the legacy formatter now consume the distinct marker kinds. Twelve parser
-  snapshots changed only in kind names; ranges and bytes stayed fixed.
-- The mandatory slice honestly returns to 4/58 passing; the regenerated report
-  retains 54 divergences.
+- Added a Unicode-safe semantic word-atom iterator for operators, delimiters,
+  punctuation, and `:=`; spacing and line-breaking consume that interpretation
+  instead of CST kinds.
+- The experimental formatter retains its existing output, including compact
+  operators, scripted assignments, delimiter depth, and mixed embedded
+  environments. Thirty parser snapshots changed only in the intended math-word
+  token grain while remaining lossless.
+- Mandatory parser parity grew from 4/58 to 19/58. The reproducible report now
+  records 39 command/environment/structural divergences.
 
 ### Suggested next sub-targets
-1. Migrate ordinary characters to Badness-equivalent `MATH_WORD` runs and move
-   operator/delimiter classification into the semantic atom iterator.
-2. Split control words/symbols and give commands Badness-equivalent argument
+1. Split control words/symbols and give commands Badness-equivalent argument
    ownership, then grow the mandatory parity corpus.
+2. Bring scripted command bases into parity once commands own their arguments.
 3. Add malformed/host-boundary cases before declaring the whole kind map locked.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **One-to-one kind map + script-marker parity.** Locked injective oracle maps,
+  split caret/underscore tokens, and retained an honest 4/58 baseline.
 - **Badness parser oracle—first parity slice.** Added pinned parser projectors,
   four mandatory shared-corpus cases, and the 4/58 differential baseline.
 - **Badness-parity roadmap revision.** Made Badness the normative development

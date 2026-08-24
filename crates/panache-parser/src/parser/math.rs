@@ -10,17 +10,17 @@
 //! macro language, so we only capture structure that a formatter can safely act
 //! on — brace groups, `\begin`/`\end` environments, control sequences,
 //! alignment tabs (`&`), line breaks (`\\`), sub/superscript markers, comments,
-//! and whitespace. Everything else is an ordinary-atom run ([`MATH_TEXT`]).
+//! and whitespace. Everything else is an ordinary-atom run ([`MATH_WORD`]).
 //!
 //! The **CST is lossless and never fails** (`node.text() == content` for every
-//! input; worst case is a single `MATH_TEXT` atom). Structural problems
+//! input; worst case is a single `MATH_WORD` atom). Structural problems
 //! (unbalanced braces, unclosed or mismatched environments) are *not* reported
 //! here: they are derived from the realized tree shape by
 //! [`crate::syntax::math_diagnostics`], the single source of truth shared by the
 //! linter, formatter, and LSP. Keeping the parser diagnostic-free means the
 //! host-aligned ranges come for free from the spliced subtree.
 //!
-//! [`MATH_TEXT`]: SyntaxKind::MATH_TEXT
+//! [`MATH_WORD`]: SyntaxKind::MATH_WORD
 
 use crate::parser::inlines::bookdown::try_parse_bookdown_equation_definition;
 use crate::syntax::SyntaxKind;
@@ -140,7 +140,7 @@ impl MathParser<'_> {
     /// is split before its final Unicode scalar when a script follows because
     /// TeX attaches an unbraced script to one token, not to the whole run.
     fn parse_scripted_atom(&mut self, ctx: Ctx) {
-        self.split_text_prefix_before_script();
+        self.split_word_prefix_before_script();
 
         let checkpoint = self.builder.checkpoint();
         self.parse_atom();
@@ -178,8 +178,8 @@ impl MathParser<'_> {
 
     /// Emit all but the final Unicode scalar in an ordinary-text run when the
     /// run is followed by a script. The final scalar is then parsed as the base.
-    fn split_text_prefix_before_script(&mut self) {
-        let len = self.text_len();
+    fn split_word_prefix_before_script(&mut self) {
+        let len = self.word_len();
         if len == 0 || self.script_marker_after_layout(self.pos + len).is_none() {
             return;
         }
@@ -189,7 +189,7 @@ impl MathParser<'_> {
             return;
         };
         if last_offset > 0 {
-            self.bump_bytes(last_offset, SyntaxKind::MATH_TEXT);
+            self.bump_bytes(last_offset, SyntaxKind::MATH_WORD);
         }
     }
 
@@ -203,23 +203,18 @@ impl MathParser<'_> {
             Some('{') => self.parse_group(),
             Some('(') if self.opts.bookdown_equation_labels => match self.equation_label_len() {
                 Some(len) => self.bump_bytes(len, SyntaxKind::MATH_EQUATION_LABEL),
-                None => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
+                None => self.parse_word(),
             },
-            Some('(' | '[') => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
-            Some(')' | ']') => self.bump_bytes(1, SyntaxKind::MATH_CLOSE),
-            Some(',' | ';') => self.bump_bytes(1, SyntaxKind::MATH_PUNCT),
-            Some(':') => self.bump_bytes(1, SyntaxKind::MATH_TEXT),
-            Some(c) if is_operator(c) => self.bump_bytes(c.len_utf8(), SyntaxKind::MATH_OPERATOR),
-            Some(_) => self.parse_text(),
+            Some(_) => self.parse_word(),
             None => {}
         }
     }
 
     /// Parse the single TeX token that forms an unbraced script argument.
     fn parse_script_argument(&mut self) {
-        if self.text_len() > 0 {
+        if self.word_len() > 0 {
             let len = self.peek_char().map(char::len_utf8).unwrap_or(0);
-            self.bump_bytes(len, SyntaxKind::MATH_TEXT);
+            self.bump_bytes(len, SyntaxKind::MATH_WORD);
         } else {
             self.parse_atom();
         }
@@ -325,17 +320,18 @@ impl MathParser<'_> {
     }
 
     /// Consume the single delimiter that follows `\left` / `\right`, when it sits
-    /// immediately at the cursor. Brackets keep their fixed `MATH_OPEN`/
-    /// `MATH_CLOSE` kind; the ambiguous `. | /` stay `MATH_TEXT` (as elsewhere);
+    /// immediately at the cursor. Character delimiters stay lexically neutral
+    /// `MATH_WORD` tokens;
     /// a control-sequence delimiter (`\{`, `\langle`, `\|`, …) is a `MATH_COMMAND`.
     /// If a space or anything else intervenes, nothing is consumed here and the
     /// surrounding element loop tokenizes it normally — losslessness holds either
     /// way; only the token's node membership shifts.
     fn consume_delimiter(&mut self) {
         match self.peek_char() {
-            Some('(' | '[') => self.bump_bytes(1, SyntaxKind::MATH_OPEN),
-            Some(')' | ']') => self.bump_bytes(1, SyntaxKind::MATH_CLOSE),
-            Some('.' | '|' | '/') => self.bump_bytes(1, SyntaxKind::MATH_TEXT),
+            Some('(' | '[' | ')' | ']' | '.' | '|' | '/') => {
+                let len = self.peek_char().map(char::len_utf8).unwrap_or(0);
+                self.bump_bytes(len, SyntaxKind::MATH_WORD);
+            }
             Some('\\') => {
                 if self.peek_control_word().is_some() {
                     self.parse_control_word();
@@ -375,41 +371,39 @@ impl MathParser<'_> {
         self.bump_bytes(len, SyntaxKind::MATH_SPACE);
     }
 
-    fn parse_text(&mut self) {
-        let len = self.text_len();
-        debug_assert!(len > 0, "parse_text on a special char");
-        self.bump_bytes(len, SyntaxKind::MATH_TEXT);
+    fn parse_word(&mut self) {
+        let len = self.word_len();
+        debug_assert!(len > 0, "parse_word on a structural character");
+        self.bump_bytes(len, SyntaxKind::MATH_WORD);
     }
 
-    fn text_len(&self) -> usize {
+    fn word_len(&self) -> usize {
         self.rest()
-            .find(|c: char| is_special(c))
+            .char_indices()
+            .find_map(|(offset, c)| {
+                let structural = is_structural(c);
+                let host_label = self.opts.bookdown_equation_labels
+                    && c == '('
+                    && self.equation_label_len_at(offset).is_some();
+                (structural || host_label).then_some(offset)
+            })
             .unwrap_or_else(|| self.rest().len())
     }
 
     fn equation_label_len(&self) -> Option<usize> {
         try_parse_bookdown_equation_definition(self.rest()).map(|(len, _)| len)
     }
+
+    fn equation_label_len_at(&self, offset: usize) -> Option<usize> {
+        try_parse_bookdown_equation_definition(&self.rest()[offset..]).map(|(len, _)| len)
+    }
 }
 
-fn is_special(c: char) -> bool {
-    is_operator(c)
-        || is_delimiter(c)
-        || matches!(
-            c,
-            '\\' | '{' | '}' | '&' | '^' | '_' | '%' | ':' | ' ' | '\t' | '\n' | '\r'
-        )
-}
-
-fn is_delimiter(c: char) -> bool {
-    matches!(c, '(' | ')' | '[' | ']' | ',' | ';')
-}
-
-/// Operator atoms split out of ordinary text into their own
-/// [`SyntaxKind::MATH_OPERATOR`] token. The TeX mathbin (`+ - *`) and mathrel
-/// (`= < >`) core; the formatter assigns class/precedence/spacing downstream.
-fn is_operator(c: char) -> bool {
-    matches!(c, '+' | '-' | '*' | '=' | '<' | '>')
+fn is_structural(c: char) -> bool {
+    matches!(
+        c,
+        '\\' | '{' | '}' | '&' | '^' | '_' | '%' | ' ' | '\t' | '\n' | '\r'
+    )
 }
 
 #[cfg(test)]
@@ -449,79 +443,52 @@ mod tests {
 
     #[test]
     fn plain_text_is_one_atom_run() {
-        assert_eq!(token_kinds("abc"), vec![SyntaxKind::MATH_TEXT]);
+        assert_eq!(token_kinds("abc"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("abc");
-        assert_eq!(
-            token_kinds("f(x)/2.5"),
-            vec![
-                SyntaxKind::MATH_TEXT,  // f
-                SyntaxKind::MATH_OPEN,  // (
-                SyntaxKind::MATH_TEXT,  // x
-                SyntaxKind::MATH_CLOSE, // )
-                SyntaxKind::MATH_TEXT,  // /2.5
-            ]
-        );
+        assert_eq!(token_kinds("f(x)/2.5"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("f(x)/2.5");
     }
 
     #[test]
-    fn delimiters_and_punctuation_split_atom_runs() {
-        assert_eq!(
-            token_kinds("[a,b);"),
-            vec![
-                SyntaxKind::MATH_OPEN,  // [
-                SyntaxKind::MATH_TEXT,  // a
-                SyntaxKind::MATH_PUNCT, // ,
-                SyntaxKind::MATH_TEXT,  // b
-                SyntaxKind::MATH_CLOSE, // )
-                SyntaxKind::MATH_PUNCT, // ;
-            ]
-        );
+    fn badness_word_grain_keeps_semantic_characters_lexically_neutral() {
+        for content in ["P(X", "M(t)", "i=1", "a+b", "[a,b);"] {
+            assert_eq!(
+                token_kinds(content),
+                vec![SyntaxKind::MATH_WORD],
+                "word run: {content:?}"
+            );
+            assert_lossless(content);
+        }
+    }
+
+    #[test]
+    fn delimiters_and_punctuation_remain_in_word_runs() {
+        assert_eq!(token_kinds("[a,b);"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("[a,b);");
-        assert_eq!(token_kinds("a|b.c/d"), vec![SyntaxKind::MATH_TEXT]);
+        assert_eq!(token_kinds("a|b.c/d"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("a|b.c/d");
         assert_eq!(token_kinds(r"\(\)\[\]"), vec![SyntaxKind::MATH_COMMAND; 4]);
         assert_lossless(r"\(\)\[\]");
     }
 
     #[test]
-    fn operators_split_atom_runs() {
-        assert_eq!(
-            token_kinds("a+b=c"),
-            vec![
-                SyntaxKind::MATH_TEXT,     // a
-                SyntaxKind::MATH_OPERATOR, // +
-                SyntaxKind::MATH_TEXT,     // b
-                SyntaxKind::MATH_OPERATOR, // =
-                SyntaxKind::MATH_TEXT,     // c
-            ]
-        );
+    fn operators_remain_in_word_runs() {
+        assert_eq!(token_kinds("a+b=c"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("a+b=c");
     }
 
     #[test]
-    fn each_operator_char_is_its_own_token() {
+    fn operator_runs_are_lexically_neutral() {
         for op in ["+", "-", "*", "=", "<", ">"] {
             assert_eq!(
                 token_kinds(op),
-                vec![SyntaxKind::MATH_OPERATOR],
+                vec![SyntaxKind::MATH_WORD],
                 "operator {op:?}"
             );
             assert_lossless(op);
         }
-        assert_eq!(
-            token_kinds("a<=b"),
-            vec![
-                SyntaxKind::MATH_TEXT,
-                SyntaxKind::MATH_OPERATOR, // <
-                SyntaxKind::MATH_OPERATOR, // =
-                SyntaxKind::MATH_TEXT,
-            ]
-        );
-        assert_eq!(
-            token_kinds("-x"),
-            vec![SyntaxKind::MATH_OPERATOR, SyntaxKind::MATH_TEXT]
-        );
+        assert_eq!(token_kinds("a<=b"), vec![SyntaxKind::MATH_WORD]);
+        assert_eq!(token_kinds("-x"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("-x");
         assert_eq!(token_kinds(r"\<"), vec![SyntaxKind::MATH_COMMAND]);
         assert_lossless(r"\<");
@@ -557,7 +524,7 @@ mod tests {
             kinds,
             vec![
                 SyntaxKind::MATH_GROUP_OPEN,
-                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_WORD,
                 SyntaxKind::MATH_GROUP_CLOSE
             ]
         );
@@ -569,12 +536,12 @@ mod tests {
         assert_eq!(
             token_kinds(r"x &= 1 \\"),
             vec![
-                SyntaxKind::MATH_TEXT,       // x
+                SyntaxKind::MATH_WORD,       // x
                 SyntaxKind::MATH_SPACE,      // ' '
                 SyntaxKind::MATH_ALIGN,      // &
-                SyntaxKind::MATH_OPERATOR,   // =
+                SyntaxKind::MATH_WORD,       // =
                 SyntaxKind::MATH_SPACE,      // ' '
-                SyntaxKind::MATH_TEXT,       // 1
+                SyntaxKind::MATH_WORD,       // 1
                 SyntaxKind::MATH_SPACE,      // ' '
                 SyntaxKind::MATH_LINE_BREAK, // \\
             ]
@@ -596,7 +563,7 @@ mod tests {
                 .map(|el| el.kind())
                 .collect::<Vec<_>>(),
             vec![
-                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_WORD,
                 SyntaxKind::MATH_SUPERSCRIPT,
                 SyntaxKind::MATH_SUBSCRIPT,
             ]
@@ -610,7 +577,7 @@ mod tests {
                 .children_with_tokens()
                 .map(|el| el.kind())
                 .collect::<Vec<_>>(),
-            vec![SyntaxKind::MATH_CARET, SyntaxKind::MATH_TEXT]
+            vec![SyntaxKind::MATH_CARET, SyntaxKind::MATH_WORD]
         );
         assert_lossless("x^2_i");
     }
@@ -622,7 +589,7 @@ mod tests {
         assert_eq!(
             children.iter().map(|el| el.kind()).collect::<Vec<_>>(),
             vec![
-                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_WORD,
                 SyntaxKind::MATH_SCRIPTED,
                 SyntaxKind::MATH_SCRIPTED,
             ]
@@ -732,11 +699,11 @@ mod tests {
         assert_eq!(
             token_kinds("a % tail\nb"),
             vec![
-                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_WORD,
                 SyntaxKind::MATH_SPACE,
                 SyntaxKind::MATH_COMMENT,
                 SyntaxKind::MATH_NEWLINE,
-                SyntaxKind::MATH_TEXT,
+                SyntaxKind::MATH_WORD,
             ]
         );
         assert_lossless("a % tail\nb");
@@ -758,7 +725,7 @@ mod tests {
     fn trailing_backslash() {
         assert_eq!(
             token_kinds("a\\"),
-            vec![SyntaxKind::MATH_TEXT, SyntaxKind::MATH_COMMAND]
+            vec![SyntaxKind::MATH_WORD, SyntaxKind::MATH_COMMAND]
         );
         assert_lossless("a\\");
     }
@@ -808,10 +775,10 @@ mod tests {
             token_kinds(r"\left(x\right)"),
             vec![
                 SyntaxKind::MATH_COMMAND, // \left
-                SyntaxKind::MATH_OPEN,    // (
-                SyntaxKind::MATH_TEXT,    // x
+                SyntaxKind::MATH_WORD,    // (
+                SyntaxKind::MATH_WORD,    // x
                 SyntaxKind::MATH_COMMAND, // \right
-                SyntaxKind::MATH_CLOSE,   // )
+                SyntaxKind::MATH_WORD,    // )
             ]
         );
     }
@@ -882,12 +849,7 @@ mod tests {
 
     #[test]
     fn plain_parens_tokenize_the_same_with_or_without_bookdown() {
-        let expected = vec![
-            SyntaxKind::MATH_TEXT,  // f
-            SyntaxKind::MATH_OPEN,  // (
-            SyntaxKind::MATH_TEXT,  // x
-            SyntaxKind::MATH_CLOSE, // )
-        ];
+        let expected = vec![SyntaxKind::MATH_WORD];
         assert_eq!(token_kinds("f(x)"), expected);
         assert_eq!(label_kinds("f(x)", BOOKDOWN), expected);
     }

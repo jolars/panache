@@ -17,11 +17,11 @@ DOCUMENT@0..223
     INLINE_MATH@28..35
       INLINE_MATH_MARKER@28..29 "$"
       MATH_CONTENT@29..34
-        MATH_TEXT@29..30 "x"
+        MATH_WORD@29..30 "x"
         MATH_SPACE@30..31 " "
-        MATH_OPERATOR@31..32 "="
+        MATH_WORD@31..32 "="
         MATH_SPACE@32..33 " "
-        MATH_TEXT@33..34 "y"
+        MATH_WORD@33..34 "y"
       INLINE_MATH_MARKER@34..35 "$"
     NEWLINE@35..36 "\n"
   BLANK_LINE@36..37
@@ -42,16 +42,16 @@ DOCUMENT@0..223
       INLINE_MATH@93..103
         INLINE_MATH_MARKER@93..94 "$"
         MATH_CONTENT@94..102
-          MATH_TEXT@94..95 "E"
+          MATH_WORD@94..95 "E"
           MATH_SPACE@95..96 " "
-          MATH_OPERATOR@96..97 "="
+          MATH_WORD@96..97 "="
           MATH_SPACE@97..98 " "
-          MATH_TEXT@98..99 "m"
+          MATH_WORD@98..99 "m"
           MATH_SCRIPTED@99..102
-            MATH_TEXT@99..100 "c"
+            MATH_WORD@99..100 "c"
             MATH_SUPERSCRIPT@100..102
               MATH_CARET@100..101 "^"
-              MATH_TEXT@101..102 "2"
+              MATH_WORD@101..102 "2"
         INLINE_MATH_MARKER@102..103 "$"
       TEXT@103..108 " here"
       EMPHASIS_MARKER@108..109 "*"
@@ -63,13 +63,13 @@ DOCUMENT@0..223
     INLINE_MATH@126..129
       INLINE_MATH_MARKER@126..127 "$"
       MATH_CONTENT@127..128
-        MATH_TEXT@127..128 "x"
+        MATH_WORD@127..128 "x"
       INLINE_MATH_MARKER@128..129 "$"
     TEXT@129..134 " and "
     INLINE_MATH@134..137
       INLINE_MATH_MARKER@134..135 "$"
       MATH_CONTENT@135..136
-        MATH_TEXT@135..136 "y"
+        MATH_WORD@135..136 "y"
       INLINE_MATH_MARKER@136..137 "$"
     TEXT@137..147 " variables"
     NEWLINE@147..148 "\n"
@@ -83,17 +83,11 @@ DOCUMENT@0..223
         MATH_COMMAND@159..164 "\\frac"
         MATH_GROUP@164..168
           MATH_GROUP_OPEN@164..165 "{"
-          MATH_TEXT@165..167 "n!"
+          MATH_WORD@165..167 "n!"
           MATH_GROUP_CLOSE@167..168 "}"
         MATH_GROUP@168..178
           MATH_GROUP_OPEN@168..169 "{"
-          MATH_TEXT@169..171 "k!"
-          MATH_OPEN@171..172 "("
-          MATH_TEXT@172..173 "n"
-          MATH_OPERATOR@173..174 "-"
-          MATH_TEXT@174..175 "k"
-          MATH_CLOSE@175..176 ")"
-          MATH_TEXT@176..177 "!"
+          MATH_WORD@169..177 "k!(n-k)!"
           MATH_GROUP_CLOSE@177..178 "}"
       INLINE_MATH_MARKER@178..179 "$"
     NEWLINE@179..180 "\n"
@@ -107,9 +101,9 @@ DOCUMENT@0..223
         MATH_COMMAND@201..206 "\\text"
         MATH_GROUP@206..220
           MATH_GROUP_OPEN@206..207 "{"
-          MATH_TEXT@207..214 "display"
+          MATH_WORD@207..214 "display"
           MATH_SPACE@214..215 " "
-          MATH_TEXT@215..219 "math"
+          MATH_WORD@215..219 "math"
           MATH_GROUP_CLOSE@219..220 "}"
       DISPLAY_MATH_MARKER@220..222 "$$"
     NEWLINE@222..223 "\n"

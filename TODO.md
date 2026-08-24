@@ -245,7 +245,7 @@ the test projector.
   changing more grammar. Cover commands and arguments, groups, scripts,
   `\left`/`\right`, environments, comments, malformed input, Unicode atoms,
   and every intentional host boundary.
-- [ ] Replace the formatter-oriented `MATH_TEXT`, `MATH_OPERATOR`, `MATH_OPEN`,
+- [x] Replace the formatter-oriented `MATH_TEXT`, `MATH_OPERATOR`, `MATH_OPEN`,
   `MATH_CLOSE`, and `MATH_PUNCT` grain with Badness's lexical model. Use
   math-prefixed equivalents such as `MATH_WORD`, `MATH_CONTROL_WORD`, and
   `MATH_CONTROL_SYMBOL` only where Panache needs namespacing; expose

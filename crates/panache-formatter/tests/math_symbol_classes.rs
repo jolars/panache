@@ -30,8 +30,6 @@ use std::fs;
 use std::path::PathBuf;
 
 use panache_formatter::formatter::math::operators::{self, AtomClass};
-use panache_parser::parser::math::{MathParseOptions, parse_math_content};
-use panache_parser::syntax::{SyntaxKind, SyntaxNode};
 use pulldown_latex::event::{Content, DelimiterType, Event};
 use pulldown_latex::{Parser, Storage};
 
@@ -116,29 +114,9 @@ fn load_rows() -> Vec<Row> {
 }
 
 fn char_class(token: &str) -> AtomClass {
-    match token {
-        "+" | "-" | "*" | "=" | "<" | ">" => operators::classify_operator(token),
-        _ => {
-            let kind = sole_token_kind(token);
-            operators::delimiter_class(kind)
-                .unwrap_or_else(|| panic!("char {token:?} parsed as {kind:?}, not a delimiter"))
-        }
-    }
-}
-
-fn sole_token_kind(token: &str) -> SyntaxKind {
-    let root = SyntaxNode::new_root(parse_math_content(token, MathParseOptions::default()));
-    let kinds: Vec<SyntaxKind> = root
-        .descendants_with_tokens()
-        .filter_map(|el| el.into_token())
-        .map(|t| t.kind())
-        .collect();
-    assert_eq!(
-        kinds.len(),
-        1,
-        "expected a single math token for {token:?}, got {kinds:?}"
-    );
-    kinds[0]
+    let atoms = operators::word_atoms(token).collect::<Vec<_>>();
+    assert_eq!(atoms.len(), 1, "expected one semantic atom for {token:?}");
+    atoms[0].class
 }
 
 fn classify_content(content: Content<'_>) -> Oracle {

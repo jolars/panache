@@ -17,12 +17,11 @@ DOCUMENT@0..174
     INLINE_MATH@33..41
       INLINE_MATH_MARKER@33..34 "$"
       MATH_CONTENT@34..40
-        MATH_TEXT@34..35 "a"
+        MATH_WORD@34..35 "a"
         MATH_SPACE@35..36 " "
-        MATH_TEXT@36..37 ":"
-        MATH_OPERATOR@37..38 "="
+        MATH_WORD@36..38 ":="
         MATH_SPACE@38..39 " "
-        MATH_TEXT@39..40 "b"
+        MATH_WORD@39..40 "b"
       INLINE_MATH_MARKER@40..41 "$"
     NEWLINE@41..42 "\n"
   BLANK_LINE@42..43
@@ -32,10 +31,7 @@ DOCUMENT@0..174
     INLINE_MATH@50..58
       INLINE_MATH_MARKER@50..51 "$"
       MATH_CONTENT@51..57
-        MATH_TEXT@51..53 "ab"
-        MATH_TEXT@53..54 ":"
-        MATH_OPERATOR@54..55 "="
-        MATH_TEXT@55..57 "cd"
+        MATH_WORD@51..57 "ab:=cd"
       INLINE_MATH_MARKER@57..58 "$"
     NEWLINE@58..59 "\n"
   BLANK_LINE@59..60
@@ -45,12 +41,11 @@ DOCUMENT@0..174
     INLINE_MATH@70..78
       INLINE_MATH_MARKER@70..71 "$"
       MATH_CONTENT@71..77
-        MATH_TEXT@71..72 "f"
+        MATH_WORD@71..72 "f"
         MATH_SPACE@72..73 " "
-        MATH_OPERATOR@73..74 "="
-        MATH_TEXT@74..75 ":"
+        MATH_WORD@73..75 "=:"
         MATH_SPACE@75..76 " "
-        MATH_TEXT@76..77 "g"
+        MATH_WORD@76..77 "g"
       INLINE_MATH_MARKER@77..78 "$"
     NEWLINE@78..79 "\n"
   BLANK_LINE@79..80
@@ -60,11 +55,7 @@ DOCUMENT@0..174
     INLINE_MATH@89..96
       INLINE_MATH_MARKER@89..90 "$"
       MATH_CONTENT@90..95
-        MATH_TEXT@90..91 "a"
-        MATH_TEXT@91..92 ":"
-        MATH_TEXT@92..93 ":"
-        MATH_OPERATOR@93..94 "="
-        MATH_TEXT@94..95 "b"
+        MATH_WORD@90..95 "a::=b"
       INLINE_MATH_MARKER@95..96 "$"
     NEWLINE@96..97 "\n"
   BLANK_LINE@97..98
@@ -74,22 +65,19 @@ DOCUMENT@0..174
     INLINE_MATH@116..121
       INLINE_MATH_MARKER@116..117 "$"
       MATH_CONTENT@117..120
-        MATH_TEXT@117..118 "x"
-        MATH_TEXT@118..119 ":"
-        MATH_TEXT@119..120 "y"
+        MATH_WORD@117..120 "x:y"
       INLINE_MATH_MARKER@120..121 "$"
     TEXT@121..126 " and "
     INLINE_MATH@126..138
       INLINE_MATH_MARKER@126..127 "$"
       MATH_CONTENT@127..137
-        MATH_TEXT@127..128 "f"
-        MATH_TEXT@128..129 ":"
+        MATH_WORD@127..129 "f:"
         MATH_SPACE@129..130 " "
-        MATH_TEXT@130..131 "A"
+        MATH_WORD@130..131 "A"
         MATH_SPACE@131..132 " "
         MATH_COMMAND@132..135 "\\to"
         MATH_SPACE@135..136 " "
-        MATH_TEXT@136..137 "B"
+        MATH_WORD@136..137 "B"
       INLINE_MATH_MARKER@137..138 "$"
     NEWLINE@138..139 "\n"
   BLANK_LINE@139..140
@@ -102,10 +90,9 @@ DOCUMENT@0..174
         MATH_COMMAND@155..160 "\\text"
         MATH_GROUP@160..172
           MATH_GROUP_OPEN@160..161 "{"
-          MATH_TEXT@161..165 "Cost"
-          MATH_TEXT@165..166 ":"
+          MATH_WORD@161..166 "Cost:"
           MATH_SPACE@166..167 " "
-          MATH_TEXT@167..171 "high"
+          MATH_WORD@167..171 "high"
           MATH_GROUP_CLOSE@171..172 "}"
       INLINE_MATH_MARKER@172..173 "$"
     NEWLINE@173..174 "\n"

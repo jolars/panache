@@ -18,40 +18,40 @@ DOCUMENT@0..171
       INLINE_MATH_MARKER@26..27 "$"
       MATH_CONTENT@27..32
         MATH_SCRIPTED@27..32
-          MATH_TEXT@27..28 "x"
+          MATH_WORD@27..28 "x"
           MATH_SUPERSCRIPT@28..30
             MATH_CARET@28..29 "^"
-            MATH_TEXT@29..30 "2"
+            MATH_WORD@29..30 "2"
           MATH_SUBSCRIPT@30..32
             MATH_UNDERSCORE@30..31 "_"
-            MATH_TEXT@31..32 "i"
+            MATH_WORD@31..32 "i"
       INLINE_MATH_MARKER@32..33 "$"
     TEXT@33..35 ", "
     INLINE_MATH@35..44
       INLINE_MATH_MARKER@35..36 "$"
       MATH_CONTENT@36..43
-        MATH_TEXT@36..37 "a"
+        MATH_WORD@36..37 "a"
         MATH_SCRIPTED@37..40
-          MATH_TEXT@37..38 "b"
+          MATH_WORD@37..38 "b"
           MATH_SUPERSCRIPT@38..40
             MATH_CARET@38..39 "^"
-            MATH_TEXT@39..40 "2"
+            MATH_WORD@39..40 "2"
         MATH_SCRIPTED@40..43
-          MATH_TEXT@40..41 "3"
+          MATH_WORD@40..41 "3"
           MATH_SUBSCRIPT@41..43
             MATH_UNDERSCORE@41..42 "_"
-            MATH_TEXT@42..43 "i"
+            MATH_WORD@42..43 "i"
       INLINE_MATH_MARKER@43..44 "$"
     TEXT@44..50 ", and "
     INLINE_MATH@50..59
       INLINE_MATH_MARKER@50..51 "$"
       MATH_CONTENT@51..58
-        MATH_TEXT@51..53 "α"
+        MATH_WORD@51..53 "α"
         MATH_SCRIPTED@53..58
-          MATH_TEXT@53..55 "β"
+          MATH_WORD@53..55 "β"
           MATH_SUBSCRIPT@55..58
             MATH_UNDERSCORE@55..56 "_"
-            MATH_TEXT@56..58 "γ"
+            MATH_WORD@56..58 "γ"
       INLINE_MATH_MARKER@58..59 "$"
     TEXT@59..60 "."
     NEWLINE@60..61 "\n"
@@ -66,7 +66,7 @@ DOCUMENT@0..171
           MATH_COMMAND@81..87 "\\alpha"
           MATH_SUBSCRIPT@87..89
             MATH_UNDERSCORE@87..88 "_"
-            MATH_TEXT@88..89 "i"
+            MATH_WORD@88..89 "i"
       INLINE_MATH_MARKER@89..90 "$"
     TEXT@90..92 ", "
     INLINE_MATH@92..100
@@ -75,11 +75,11 @@ DOCUMENT@0..171
         MATH_SCRIPTED@93..99
           MATH_GROUP@93..97
             MATH_GROUP_OPEN@93..94 "{"
-            MATH_TEXT@94..96 "ab"
+            MATH_WORD@94..96 "ab"
             MATH_GROUP_CLOSE@96..97 "}"
           MATH_SUPERSCRIPT@97..99
             MATH_CARET@97..98 "^"
-            MATH_TEXT@98..99 "2"
+            MATH_WORD@98..99 "2"
       INLINE_MATH_MARKER@99..100 "$"
     TEXT@100..106 ", and "
     INLINE_MATH@106..124
@@ -88,13 +88,13 @@ DOCUMENT@0..171
         MATH_SCRIPTED@107..123
           MATH_DELIMITED@107..121
             MATH_COMMAND@107..112 "\\left"
-            MATH_OPEN@112..113 "("
-            MATH_TEXT@113..114 "x"
+            MATH_WORD@112..113 "("
+            MATH_WORD@113..114 "x"
             MATH_COMMAND@114..120 "\\right"
-            MATH_CLOSE@120..121 ")"
+            MATH_WORD@120..121 ")"
           MATH_SUBSCRIPT@121..123
             MATH_UNDERSCORE@121..122 "_"
-            MATH_TEXT@122..123 "i"
+            MATH_WORD@122..123 "i"
       INLINE_MATH_MARKER@123..124 "$"
     TEXT@124..125 "."
     NEWLINE@125..126 "\n"
@@ -106,13 +106,13 @@ DOCUMENT@0..171
       INLINE_MATH_MARKER@135..136 "$"
       MATH_CONTENT@136..142
         MATH_SCRIPTED@136..142
-          MATH_TEXT@136..137 "x"
+          MATH_WORD@136..137 "x"
           MATH_NEWLINE@137..138 "\n"
           MATH_SPACE@138..139 " "
           MATH_SUPERSCRIPT@139..142
             MATH_CARET@139..140 "^"
             MATH_SPACE@140..141 " "
-            MATH_TEXT@141..142 "2"
+            MATH_WORD@141..142 "2"
       INLINE_MATH_MARKER@142..143 "$"
     TEXT@143..144 "."
     NEWLINE@144..145 "\n"
@@ -124,7 +124,7 @@ DOCUMENT@0..171
       INLINE_MATH_MARKER@156..157 "$"
       MATH_CONTENT@157..159
         MATH_SCRIPTED@157..159
-          MATH_TEXT@157..158 "x"
+          MATH_WORD@157..158 "x"
           MATH_SUPERSCRIPT@158..159
             MATH_CARET@158..159 "^"
       INLINE_MATH_MARKER@159..160 "$"
@@ -133,7 +133,7 @@ DOCUMENT@0..171
       INLINE_MATH_MARKER@165..166 "$"
       MATH_CONTENT@166..168
         MATH_CARET@166..167 "^"
-        MATH_TEXT@167..168 "2"
+        MATH_WORD@167..168 "2"
       INLINE_MATH_MARKER@168..169 "$"
     TEXT@169..170 "."
     NEWLINE@170..171 "\n"

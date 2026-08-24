@@ -101,11 +101,7 @@ const PANACHE_MATH_KIND_MAP: &[(PanacheKind, &str)] = &[
     (PanacheKind::MATH_CARET, "CARET"),
     (PanacheKind::MATH_UNDERSCORE, "UNDERSCORE"),
     (PanacheKind::MATH_COMMENT, "COMMENT"),
-    (PanacheKind::MATH_OPERATOR, "PANACHE_OPERATOR"),
-    (PanacheKind::MATH_OPEN, "PANACHE_OPEN"),
-    (PanacheKind::MATH_CLOSE, "PANACHE_CLOSE"),
-    (PanacheKind::MATH_PUNCT, "PANACHE_PUNCT"),
-    (PanacheKind::MATH_TEXT, "WORD"),
+    (PanacheKind::MATH_WORD, "WORD"),
     (PanacheKind::MATH_SPACE, "SPACE"),
     (PanacheKind::MATH_NEWLINE, "NEWLINE"),
     (

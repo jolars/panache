@@ -13,16 +13,16 @@ DOCUMENT@0..106
       DISPLAY_MATH_MARKER@68..70 "$$"
       MATH_CONTENT@70..80
         MATH_NEWLINE@70..71 "\n"
-        MATH_TEXT@71..72 "E"
+        MATH_WORD@71..72 "E"
         MATH_SPACE@72..73 " "
-        MATH_OPERATOR@73..74 "="
+        MATH_WORD@73..74 "="
         MATH_SPACE@74..75 " "
-        MATH_TEXT@75..76 "m"
+        MATH_WORD@75..76 "m"
         MATH_SCRIPTED@76..79
-          MATH_TEXT@76..77 "c"
+          MATH_WORD@76..77 "c"
           MATH_SUPERSCRIPT@77..79
             MATH_CARET@77..78 "^"
-            MATH_TEXT@78..79 "2"
+            MATH_WORD@78..79 "2"
         MATH_NEWLINE@79..80 "\n"
       DISPLAY_MATH_MARKER@80..82 "$$"
     TEXT@82..105 " some text coming here."

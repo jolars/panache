@@ -23,11 +23,10 @@
 //! with the arrow. [`continuation_anchor`] picks the column per the leading
 //! relation (via [`first_relation_is_assignment`]).
 //!
-//! A `:=` is such an assignment, and it is *one* relation atom spanning two
-//! tokens (the `:` and the `=`; see [`operators::is_definition_colon`]). Its
-//! break candidate is anchored on the `:` and spans through the `=`, so a chain
-//! is never split between them and the alignment columns measure the whole
-//! symbol — the same treatment a composite `<=` gets.
+//! A `:=` is such an assignment, and [`operators::word_atoms`] interprets it as
+//! one relation atom. When a script splits its lexical word after the colon,
+//! the break candidate still spans the colon and scripted equals, so a chain is
+//! never split between them.
 //!
 //! ## What "top-level" means, and why groups are opaque
 //!
@@ -86,7 +85,8 @@
 
 use super::operators::{self, AtomClass};
 use super::render;
-use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxToken};
+use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode};
+use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 
 struct Break {
     /// Element index of the atom's first token (where a break lands before it).
@@ -113,7 +113,7 @@ fn first_top_level_relation(elems: &[SyntaxElement]) -> Option<Break> {
 /// top-level relation, the anchor is the full rendered width + 1 (where an `&`
 /// would sit), used only for a relation-led continuation whose head row lacks a
 /// relation; an empty row yields 0.
-pub(super) fn rhs_start_column(elems: &[SyntaxElement]) -> usize {
+fn rhs_start_column(elems: &[SyntaxElement]) -> usize {
     match first_top_level_relation(elems) {
         Some(b) => {
             render::render_inline(&elems[..b.end])
@@ -133,7 +133,7 @@ pub(super) fn rhs_start_column(elems: &[SyntaxElement]) -> usize {
 /// rendered width of everything before it, plus one for the separating space.
 /// This aligns continuation relations *under the first relation* — the classic
 /// chain layout for an equality/comparison chain (`x = a = b` ⇒ the `=` stack).
-fn relation_column(elems: &[SyntaxElement]) -> usize {
+fn relation_column_normalized(elems: &[SyntaxElement]) -> usize {
     match first_top_level_relation(elems) {
         Some(b) => {
             let w = render::render_inline(&elems[..b.index])
@@ -158,9 +158,25 @@ fn first_relation_is_assignment(elems: &[SyntaxElement]) -> bool {
             let name = tok.text().strip_prefix('\\').unwrap_or(tok.text());
             matches!(name, "gets" | "leftarrow" | "mapsto" | "coloneqq")
         }
-        SyntaxKind::MATH_TEXT => tok.text() == ":",
+        SyntaxKind::MATH_WORD => {
+            tok.text() == ":"
+                || operators::word_atoms(tok.text())
+                    .next()
+                    .is_some_and(|atom| atom.text.starts_with(":="))
+        }
         _ => false,
     }
+}
+
+fn semantic_token(element: &SyntaxElement) -> Option<crate::syntax::SyntaxToken> {
+    if let Some(token) = element.as_token() {
+        return Some(token.clone());
+    }
+    element
+        .as_node()
+        .and_then(|node| MathScripted::cast(node.clone()))
+        .and_then(|scripted| scripted.base())
+        .and_then(|base| base.into_token())
 }
 
 /// The column continuation relations hang under, given the leading relation's
@@ -168,9 +184,12 @@ fn first_relation_is_assignment(elems: &[SyntaxElement]) -> bool {
 /// ([`relation_column`]), but under the assignment's right-hand side for an
 /// assignment-led chain (or a relationless head) ([`rhs_start_column`]).
 pub(super) fn continuation_anchor(elems: &[SyntaxElement]) -> usize {
-    match first_top_level_relation(elems) {
-        Some(_) if !first_relation_is_assignment(elems) => relation_column(elems),
-        _ => rhs_start_column(elems),
+    let normalized = normalized_elements(elems);
+    match first_top_level_relation(&normalized) {
+        Some(_) if !first_relation_is_assignment(&normalized) => {
+            relation_column_normalized(&normalized)
+        }
+        _ => rhs_start_column(&normalized),
     }
 }
 
@@ -178,9 +197,13 @@ pub(super) fn continuation_anchor(elems: &[SyntaxElement]) -> usize {
 /// relation operator (e.g. a continuation line `= b`). Used to detect a
 /// relation chain spread across `\\` hard breaks.
 pub(super) fn begins_with_top_level_relation(elems: &[SyntaxElement]) -> bool {
-    match spaced_operator_breaks(elems).first() {
+    let normalized = normalized_elements(elems);
+    match spaced_operator_breaks(&normalized).first() {
         Some(b) => {
-            b.class == AtomClass::Rel && elems[..b.index].iter().all(render::is_layout_whitespace)
+            b.class == AtomClass::Rel
+                && normalized[..b.index]
+                    .iter()
+                    .all(render::is_layout_whitespace)
         }
         None => false,
     }
@@ -203,6 +226,8 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
         return vec![single];
     }
 
+    let normalized = normalized_elements_from_text(&single);
+    let elems = normalized.as_slice();
     let breaks = spaced_operator_breaks(elems);
     let rels: Vec<usize> = breaks
         .iter()
@@ -232,6 +257,16 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
         out.extend(break_binary_segment(seg, seg_indent, line_width));
     }
     out
+}
+
+fn normalized_elements(elems: &[SyntaxElement]) -> Vec<SyntaxElement> {
+    normalized_elements_from_text(render::render_inline(elems).trim())
+}
+
+fn normalized_elements_from_text(text: &str) -> Vec<SyntaxElement> {
+    SyntaxNode::new_root(parse_math_content(text, MathParseOptions::default()))
+        .children_with_tokens()
+        .collect()
 }
 
 /// Lay out one relation segment: keep it on a single line at `base_indent` if it
@@ -291,72 +326,44 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
     while i < elems.len() {
         let el = &elems[i];
         match el.kind() {
-            SyntaxKind::MATH_OPEN => {
-                depth += 1;
-                prev = Some(AtomClass::Open);
-                star_modifier_pending = false;
-                i += 1;
-            }
-            SyntaxKind::MATH_CLOSE => {
-                depth -= 1;
-                prev = Some(AtomClass::Close);
-                star_modifier_pending = false;
-                i += 1;
-            }
-            SyntaxKind::MATH_PUNCT => {
-                prev = Some(AtomClass::Punct);
-                star_modifier_pending = false;
-                i += 1;
-            }
-            SyntaxKind::MATH_TEXT
-                if is_definition_colon_element(
-                    el.as_token().map(|t| t.text()).unwrap_or_default(),
-                    elems.get(i + 1),
-                ) =>
+            SyntaxKind::MATH_WORD
+                if el.as_token().is_some_and(|token| token.text() == ":")
+                    && elems.get(i + 1).is_some_and(scripted_equals_base) =>
             {
-                if elems
-                    .get(i + 1)
-                    .is_some_and(|next| next.kind() == SyntaxKind::MATH_SCRIPTED)
-                {
-                    if depth == 0 {
-                        out.push(Break {
-                            index: i,
-                            end: i + 2,
-                            class: AtomClass::Rel,
-                        });
-                    }
-                    prev = Some(AtomClass::Rel);
-                    star_modifier_pending = false;
-                    i += 2;
-                    continue;
-                }
-
-                let mut run = String::new();
-                let mut j = i + 1;
-                while j < elems.len() && elems[j].kind() == SyntaxKind::MATH_OPERATOR {
-                    if let Some(tok) = elems[j].as_token() {
-                        run.push_str(tok.text());
-                    }
-                    j += 1;
-                }
-                let head = operators::split_operator_atoms(&run)
-                    .first()
-                    .map(|a| a.chars().count())
-                    .unwrap_or(0);
-                let end = i + 1 + head;
                 if depth == 0 {
                     out.push(Break {
                         index: i,
-                        end,
+                        end: i + 2,
                         class: AtomClass::Rel,
                     });
                 }
                 prev = Some(AtomClass::Rel);
                 star_modifier_pending = false;
-                i = end;
+                i += 2;
             }
-            SyntaxKind::MATH_TEXT => {
-                prev = Some(AtomClass::Ord);
+            SyntaxKind::MATH_WORD => {
+                let text = el.as_token().map(|token| token.text()).unwrap_or_default();
+                for (atom_index, atom) in operators::word_atoms(text).enumerate() {
+                    let is_modifier = atom_index == 0 && atom.text == "*" && star_modifier_pending;
+                    let class = if is_modifier {
+                        AtomClass::Ord
+                    } else {
+                        operators::coerce(atom.class, prev)
+                    };
+                    if depth == 0 && operators::is_spaced(class) {
+                        out.push(Break {
+                            index: i,
+                            end: i + 1,
+                            class,
+                        });
+                    }
+                    match class {
+                        AtomClass::Open => depth += 1,
+                        AtomClass::Close => depth -= 1,
+                        _ => {}
+                    }
+                    prev = Some(class);
+                }
                 star_modifier_pending = false;
                 i += 1;
             }
@@ -384,7 +391,7 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
 
                 let is_star_modifier = star_modifier_pending
                     && base.as_token().is_some_and(|token| {
-                        token.kind() == SyntaxKind::MATH_OPERATOR && token.text() == "*"
+                        token.kind() == SyntaxKind::MATH_WORD && token.text() == "*"
                     });
                 let raw_class = if is_star_modifier {
                     Some(AtomClass::Ord)
@@ -392,10 +399,12 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                     scripted_base_class(&base)
                 };
                 let class = raw_class.map(|raw| operators::coerce(raw, prev));
-                match base.kind() {
-                    SyntaxKind::MATH_OPEN => depth += 1,
-                    SyntaxKind::MATH_CLOSE => depth -= 1,
-                    _ => {}
+                if base.kind() == SyntaxKind::MATH_WORD {
+                    match class {
+                        Some(AtomClass::Open) => depth += 1,
+                        Some(AtomClass::Close) => depth -= 1,
+                        _ => {}
+                    }
                 }
                 if depth == 0 && class.is_some_and(operators::is_spaced) {
                     out.push(Break {
@@ -440,38 +449,6 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                 star_modifier_pending = operators::takes_star_modifier(name);
                 i += 1;
             }
-            SyntaxKind::MATH_OPERATOR => {
-                let run_start = i;
-                let mut run = String::new();
-                while i < elems.len() && elems[i].kind() == SyntaxKind::MATH_OPERATOR {
-                    if let Some(tok) = elems[i].as_token() {
-                        run.push_str(tok.text());
-                    }
-                    i += 1;
-                }
-                let mut char_off = 0usize;
-                for (n, atom) in operators::split_operator_atoms(&run)
-                    .into_iter()
-                    .enumerate()
-                {
-                    let is_modifier = n == 0 && atom == "*" && star_modifier_pending;
-                    let class = if is_modifier {
-                        AtomClass::Ord
-                    } else {
-                        operators::coerce(operators::classify_operator(atom), prev)
-                    };
-                    if depth == 0 && operators::is_spaced(class) {
-                        out.push(Break {
-                            index: run_start + char_off,
-                            end: run_start + char_off + atom.chars().count(),
-                            class,
-                        });
-                    }
-                    prev = Some(class);
-                    char_off += atom.chars().count();
-                }
-                star_modifier_pending = false;
-            }
             _ => {
                 prev = Some(AtomClass::Ord);
                 star_modifier_pending = false;
@@ -482,32 +459,26 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
     out
 }
 
-fn semantic_token(element: &SyntaxElement) -> Option<SyntaxToken> {
-    if let Some(token) = element.as_token() {
-        return Some(token.clone());
-    }
-    let scripted = element
+fn scripted_equals_base(element: &SyntaxElement) -> bool {
+    element
         .as_node()
-        .and_then(|node| MathScripted::cast(node.clone()))?;
-    scripted.base()?.into_token()
-}
-
-fn is_definition_colon_element(text: &str, next: Option<&SyntaxElement>) -> bool {
-    let next = next.and_then(semantic_token);
-    operators::is_definition_colon(
-        text,
-        next.as_ref().map(|token| (token.kind(), token.text())),
-    )
+        .and_then(|node| MathScripted::cast(node.clone()))
+        .and_then(|scripted| scripted.base())
+        .and_then(|base| base.into_token())
+        .is_some_and(|token| {
+            token.kind() == SyntaxKind::MATH_WORD
+                && operators::word_atoms(token.text())
+                    .next()
+                    .is_some_and(|atom| atom.class == AtomClass::Rel && atom.text.starts_with('='))
+        })
 }
 
 fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
-    if let Some(class) = operators::delimiter_class(base.kind()) {
-        return Some(class);
-    }
     match base.kind() {
-        SyntaxKind::MATH_OPERATOR => base
+        SyntaxKind::MATH_WORD => base
             .as_token()
-            .map(|token| operators::classify_operator(token.text())),
+            .and_then(|token| operators::word_atoms(token.text()).next())
+            .map(|atom| atom.class),
         SyntaxKind::MATH_COMMAND => base.as_token().map(|token| {
             let name = token.text().strip_prefix('\\').unwrap_or(token.text());
             operators::command_class(name).unwrap_or(AtomClass::Ord)

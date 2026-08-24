@@ -1,26 +1,17 @@
 //! Math operator *interpretation* — the analog of YAML scalar cooking
 //! ([`panache_parser::parser::yaml`]'s `cooking.rs`).
 //!
-//! The parser emits a *neutral* `MATH_OPERATOR` token (one per char of
-//! `+ - * = < >`) and never tags bin/rel or builds a precedence tree: TeX
+//! The parser emits neutral `MATH_WORD` runs and never tags bin/rel or builds a
+//! precedence tree: TeX
 //! assigns an atom's class contextually during mlist→hlist (a Bin atom after
 //! Bin/Rel/Open/Punct becomes Ord — that *is* unary minus), it is
 //! override-able (`\mathbin`) and macro-dependent. So class/precedence is a
 //! pure *interpretation* shared between consumers, not a CST shape — it lives
 //! here, keyed on operator text and command name, never in `MATH_*` kinds.
 //!
-//! This module is intentionally `pub` so the LSP can reuse it later (semantic
-//! tokens / hover). Today only the formatter's spacing pass
-//! ([`super::render`]) consumes it.
-//!
-//! Scope of *this* slice (Phase 5): classify the char operators and apply
-//! precedence-aware spacing to them. The command table below is consumed for
-//! the *preceding-atom* class (so a `-` after `\leq` reads as unary), but
-//! command operators are not themselves re-spaced yet — that, and a
-//! break-priority column for semantic line-breaking, are Phase 5b/6. The table
-//! is a plain `match` so extending it stays trivial.
-
-use crate::syntax::SyntaxKind;
+//! [`word_atoms`] supplies the shared character-level semantic view used by
+//! spacing and line-breaking. The command table supplies the corresponding
+//! view for known control words.
 
 /// TeX atom classes (the subset the formatter's spacing pass needs; see The
 /// TeXbook Appendix G).
@@ -45,54 +36,81 @@ pub enum AtomClass {
     Op,
 }
 
-/// Split a run of consecutive `MATH_OPERATOR` chars into operator *atoms*: a
-/// maximal sub-run of relation chars (`= < >`) is one composite relation (so
-/// `<=`, `>=`, `==` stay one spaced unit, not `< =`), while each sign char
-/// (`+ - *`) is its own atom — because a sign is contextually unary. Thus
-/// `=-` splits into `=` (relation) and `-` (a sign that coerces to unary after
-/// the relation), giving `x = -y` rather than `x =- y`. (`->` likewise splits
-/// into the binary `-` and the relation `>` — TeX-faithful, since `->` is not a
-/// real arrow command.)
-pub fn split_operator_atoms(run: &str) -> Vec<&str> {
-    let bytes = run.as_bytes();
-    let mut atoms: Vec<&str> = Vec::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        if matches!(bytes[i], b'=' | b'<' | b'>') {
-            let start = i;
-            while i < bytes.len() && matches!(bytes[i], b'=' | b'<' | b'>') {
-                i += 1;
-            }
-            atoms.push(&run[start..i]);
-        } else {
-            atoms.push(&run[i..i + 1]); // a single `+ - *` sign char
-            i += 1;
-        }
-    }
-    atoms
+/// One semantic slice of a lexically neutral `MATH_WORD` token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WordAtom<'a> {
+    pub text: &'a str,
+    pub class: AtomClass,
 }
 
-/// The `:` of a definition `:=`, which the parser emits as its own `MATH_TEXT`
-/// token: a `:` immediately followed (no whitespace) by an `=`-led operator run
-/// is not an ordinary atom but the head of one composite relation. Keeping the
-/// two together is what stops the formatter from rendering `x := y` as the
-/// nonsense `x : = y` and from breaking a long row between the `:` and its `=`.
+impl<'a> WordAtom<'a> {
+    pub const fn new(text: &'a str, class: AtomClass) -> Self {
+        Self { text, class }
+    }
+}
+
+/// Semantic atoms derived from one Badness-grain `MATH_WORD` run.
+pub struct WordAtoms<'a> {
+    rest: &'a str,
+}
+
+/// Slice a lexical word into TeX atom candidates without changing the CST.
 ///
-/// `next` is the text of the token directly after the `:`, `None` at end of
-/// input; only an `=` starts a relation atom the colon can fuse onto (`:<` and
-/// `:>` are not definition symbols).
-pub fn is_definition_colon(text: &str, next: Option<(SyntaxKind, &str)>) -> bool {
-    text == ":" && matches!(next, Some((SyntaxKind::MATH_OPERATOR, "=")))
+/// Relations (`=<>`) form maximal runs, `:=` joins the same relation run,
+/// binary signs and fixed delimiters are single-scalar atoms, and all other
+/// characters remain maximal ordinary runs.
+pub fn word_atoms(word: &str) -> WordAtoms<'_> {
+    WordAtoms { rest: word }
 }
 
-/// Classify a single operator atom (from [`split_operator_atoms`]): any of
-/// `= < >` makes it a [`AtomClass::Rel`], otherwise it is a [`AtomClass::Bin`].
-pub fn classify_operator(atom: &str) -> AtomClass {
-    if atom.bytes().any(|b| matches!(b, b'=' | b'<' | b'>')) {
-        AtomClass::Rel
-    } else {
-        AtomClass::Bin
+impl<'a> Iterator for WordAtoms<'a> {
+    type Item = WordAtom<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rest.is_empty() {
+            return None;
+        }
+
+        let (len, class) = if self.rest.starts_with(":=") {
+            let tail = &self.rest[1..];
+            (1 + relation_prefix_len(tail), AtomClass::Rel)
+        } else {
+            let first = self.rest.chars().next().expect("non-empty word");
+            match first {
+                '=' | '<' | '>' => (relation_prefix_len(self.rest), AtomClass::Rel),
+                '+' | '-' | '*' => (first.len_utf8(), AtomClass::Bin),
+                '(' | '[' => (first.len_utf8(), AtomClass::Open),
+                ')' | ']' => (first.len_utf8(), AtomClass::Close),
+                ',' | ';' => (first.len_utf8(), AtomClass::Punct),
+                ':' => (first.len_utf8(), AtomClass::Ord),
+                _ => (ordinary_prefix_len(self.rest), AtomClass::Ord),
+            }
+        };
+        let (text, rest) = self.rest.split_at(len);
+        self.rest = rest;
+        Some(WordAtom::new(text, class))
     }
+}
+
+fn relation_prefix_len(text: &str) -> usize {
+    text.char_indices()
+        .find_map(|(offset, ch)| (!matches!(ch, '=' | '<' | '>')).then_some(offset))
+        .unwrap_or(text.len())
+}
+
+fn ordinary_prefix_len(text: &str) -> usize {
+    text.char_indices()
+        .skip(1)
+        .find_map(|(offset, ch)| {
+            let starts_definition = ch == ':' && text[offset..].starts_with(":=");
+            (starts_definition
+                || matches!(
+                    ch,
+                    '+' | '-' | '*' | '=' | '<' | '>' | '(' | '[' | ')' | ']' | ',' | ';' | ':'
+                ))
+            .then_some(offset)
+        })
+        .unwrap_or(text.len())
 }
 
 /// Class of a command operator, keyed on its name **without** the leading
@@ -151,24 +169,6 @@ pub fn is_text_mode_command(name: &str) -> bool {
     )
 }
 
-/// Atom class of a delimiter/punctuation **token kind**. The parser tokenizes
-/// the unambiguous delimiters into dedicated kinds (`( [` → `MATH_OPEN`,
-/// `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`) because their TeX mathcode class
-/// is fixed at the character level — a CST fact, not the contextual
-/// *interpretation* operator class is. This maps those kinds onto the
-/// formatter's [`AtomClass`]: an opening delimiter makes a following `+`/`-`
-/// unary (`f(-x)`), a closing one is a binary-inducing operand, and `,`/`;` are
-/// punctuation. Returns `None` for any non-delimiter kind (the caller treats
-/// those as ordinary or handles them specially).
-pub fn delimiter_class(kind: SyntaxKind) -> Option<AtomClass> {
-    Some(match kind {
-        SyntaxKind::MATH_OPEN => AtomClass::Open,
-        SyntaxKind::MATH_CLOSE => AtomClass::Close,
-        SyntaxKind::MATH_PUNCT => AtomClass::Punct,
-        _ => return None,
-    })
-}
-
 /// TeX Bin→Ord coercion (the rule that yields unary minus): a [`AtomClass::Bin`]
 /// run becomes [`AtomClass::Ord`] when the preceding atom is absent (list start)
 /// or one of Bin/Rel/Open/Punct/Op. [`AtomClass::Rel`] never coerces.
@@ -212,48 +212,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn operator_runs_split_into_atoms() {
-        assert_eq!(split_operator_atoms("+"), vec!["+"]);
-        assert_eq!(split_operator_atoms("="), vec!["="]);
-        assert_eq!(split_operator_atoms("<="), vec!["<="]);
-        assert_eq!(split_operator_atoms("=="), vec!["=="]);
-        assert_eq!(split_operator_atoms("=-"), vec!["=", "-"]);
-        assert_eq!(split_operator_atoms("->"), vec!["-", ">"]);
-        assert_eq!(split_operator_atoms("--"), vec!["-", "-"]);
-        assert_eq!(split_operator_atoms("=-="), vec!["=", "-", "="]);
-    }
-
-    #[test]
-    fn definition_colon_needs_an_adjacent_equals() {
-        let eq = Some((SyntaxKind::MATH_OPERATOR, "="));
-        assert!(is_definition_colon(":", eq));
-        assert!(!is_definition_colon(":", None));
-        assert!(!is_definition_colon(
-            ":",
-            Some((SyntaxKind::MATH_SPACE, " "))
-        ));
-        assert!(!is_definition_colon(
-            ":",
-            Some((SyntaxKind::MATH_TEXT, "="))
-        ));
-        assert!(!is_definition_colon(
-            ":",
-            Some((SyntaxKind::MATH_OPERATOR, "<"))
-        ));
-        assert!(!is_definition_colon("ab:", eq));
-        assert!(!is_definition_colon("::", eq));
-    }
-
-    #[test]
-    fn operator_atoms_classify_bin_vs_rel() {
-        assert_eq!(classify_operator("+"), AtomClass::Bin);
-        assert_eq!(classify_operator("-"), AtomClass::Bin);
-        assert_eq!(classify_operator("*"), AtomClass::Bin);
-        assert_eq!(classify_operator("="), AtomClass::Rel);
-        assert_eq!(classify_operator("<"), AtomClass::Rel);
-        assert_eq!(classify_operator(">"), AtomClass::Rel);
-        assert_eq!(classify_operator("<="), AtomClass::Rel);
-        assert_eq!(classify_operator("=="), AtomClass::Rel);
+    fn word_atoms_slice_lexical_runs_without_changing_the_cst() {
+        assert_eq!(
+            word_atoms("f(-x):=a+b,y<=z").collect::<Vec<_>>(),
+            vec![
+                WordAtom::new("f", AtomClass::Ord),
+                WordAtom::new("(", AtomClass::Open),
+                WordAtom::new("-", AtomClass::Bin),
+                WordAtom::new("x", AtomClass::Ord),
+                WordAtom::new(")", AtomClass::Close),
+                WordAtom::new(":=", AtomClass::Rel),
+                WordAtom::new("a", AtomClass::Ord),
+                WordAtom::new("+", AtomClass::Bin),
+                WordAtom::new("b", AtomClass::Ord),
+                WordAtom::new(",", AtomClass::Punct),
+                WordAtom::new("y", AtomClass::Ord),
+                WordAtom::new("<=", AtomClass::Rel),
+                WordAtom::new("z", AtomClass::Ord),
+            ]
+        );
+        assert_eq!(
+            word_atoms("α+β").collect::<Vec<_>>(),
+            vec![
+                WordAtom::new("α", AtomClass::Ord),
+                WordAtom::new("+", AtomClass::Bin),
+                WordAtom::new("β", AtomClass::Ord),
+            ]
+        );
     }
 
     #[test]
@@ -278,24 +263,6 @@ mod tests {
         assert!(!is_text_mode_command("frac"));
         assert!(!is_text_mode_command("alpha"));
         assert!(!is_text_mode_command("textcolor"));
-    }
-
-    #[test]
-    fn delimiter_kind_classification() {
-        assert_eq!(
-            delimiter_class(SyntaxKind::MATH_OPEN),
-            Some(AtomClass::Open)
-        );
-        assert_eq!(
-            delimiter_class(SyntaxKind::MATH_CLOSE),
-            Some(AtomClass::Close)
-        );
-        assert_eq!(
-            delimiter_class(SyntaxKind::MATH_PUNCT),
-            Some(AtomClass::Punct)
-        );
-        assert_eq!(delimiter_class(SyntaxKind::MATH_TEXT), None);
-        assert_eq!(delimiter_class(SyntaxKind::MATH_OPERATOR), None);
     }
 
     #[test]

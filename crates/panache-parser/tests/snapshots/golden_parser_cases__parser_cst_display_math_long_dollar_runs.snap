@@ -28,14 +28,14 @@ DOCUMENT@0..393
       MATH_CONTENT@112..121
         MATH_NEWLINE@112..113 "\n"
         MATH_SCRIPTED@113..116
-          MATH_TEXT@113..114 "x"
+          MATH_WORD@113..114 "x"
           MATH_SUPERSCRIPT@114..116
             MATH_CARET@114..115 "^"
-            MATH_TEXT@115..116 "2"
+            MATH_WORD@115..116 "2"
         MATH_SPACE@116..117 " "
-        MATH_OPERATOR@117..118 "+"
+        MATH_WORD@117..118 "+"
         MATH_SPACE@118..119 " "
-        MATH_TEXT@119..120 "y"
+        MATH_WORD@119..120 "y"
         MATH_NEWLINE@120..121 "\n"
       DISPLAY_MATH_MARKER@121..123 "$$"
     TEXT@123..124 "$"
@@ -53,14 +53,14 @@ DOCUMENT@0..393
       MATH_CONTENT@185..194
         MATH_NEWLINE@185..186 "\n"
         MATH_SCRIPTED@186..189
-          MATH_TEXT@186..187 "x"
+          MATH_WORD@186..187 "x"
           MATH_SUPERSCRIPT@187..189
             MATH_CARET@187..188 "^"
-            MATH_TEXT@188..189 "2"
+            MATH_WORD@188..189 "2"
         MATH_SPACE@189..190 " "
-        MATH_OPERATOR@190..191 "+"
+        MATH_WORD@190..191 "+"
         MATH_SPACE@191..192 " "
-        MATH_TEXT@192..193 "y"
+        MATH_WORD@192..193 "y"
         MATH_NEWLINE@193..194 "\n"
       DISPLAY_MATH_MARKER@194..196 "$$"
     TEXT@196..197 "$"
@@ -79,12 +79,12 @@ DOCUMENT@0..393
       MATH_CONTENT@242..248
         MATH_NEWLINE@242..243 "\n"
         MATH_SCRIPTED@243..246
-          MATH_TEXT@243..244 "x"
+          MATH_WORD@243..244 "x"
           MATH_SUPERSCRIPT@244..246
             MATH_CARET@244..245 "^"
-            MATH_TEXT@245..246 "2"
+            MATH_WORD@245..246 "2"
         MATH_SPACE@246..247 " "
-        MATH_OPERATOR@247..248 "+"
+        MATH_WORD@247..248 "+"
       DISPLAY_MATH_MARKER@248..250 "$$"
     TEXT@250..251 "$"
     TEXT@251..252 "$"
@@ -100,11 +100,11 @@ DOCUMENT@0..393
     DISPLAY_MATH@316..326
       DISPLAY_MATH_MARKER@316..318 "$$"
       MATH_CONTENT@318..324
-        MATH_TEXT@318..320 "$x"
+        MATH_WORD@318..320 "$x"
         MATH_SPACE@320..321 " "
-        MATH_OPERATOR@321..322 "="
+        MATH_WORD@321..322 "="
         MATH_SPACE@322..323 " "
-        MATH_TEXT@323..324 "y"
+        MATH_WORD@323..324 "y"
       DISPLAY_MATH_MARKER@324..326 "$$"
     TEXT@326..327 "$"
     NEWLINE@327..328 "\n"

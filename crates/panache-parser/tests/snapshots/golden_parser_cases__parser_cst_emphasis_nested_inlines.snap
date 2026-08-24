@@ -105,7 +105,7 @@ DOCUMENT@0..1387
       INLINE_MATH@236..242
         INLINE_MATH_MARKER@236..237 "$"
         MATH_CONTENT@237..241
-          MATH_TEXT@237..241 "math"
+          MATH_WORD@237..241 "math"
         INLINE_MATH_MARKER@241..242 "$"
       TEXT@242..246 " end"
       EMPHASIS_MARKER@246..247 "*"
@@ -119,7 +119,7 @@ DOCUMENT@0..1387
       INLINE_MATH@256..262
         INLINE_MATH_MARKER@256..257 "$"
         MATH_CONTENT@257..261
-          MATH_TEXT@257..261 "math"
+          MATH_WORD@257..261 "math"
         INLINE_MATH_MARKER@261..262 "$"
       TEXT@262..266 " end"
       STRONG_MARKER@266..268 "**"
@@ -133,11 +133,11 @@ DOCUMENT@0..1387
       INLINE_MATH@276..283
         INLINE_MATH_MARKER@276..277 "$"
         MATH_CONTENT@277..282
-          MATH_TEXT@277..278 "a"
+          MATH_WORD@277..278 "a"
           MATH_SPACE@278..279 " "
-          MATH_OPERATOR@279..280 "*"
+          MATH_WORD@279..280 "*"
           MATH_SPACE@280..281 " "
-          MATH_TEXT@281..282 "b"
+          MATH_WORD@281..282 "b"
         INLINE_MATH_MARKER@282..283 "$"
       TEXT@283..287 " end"
       EMPHASIS_MARKER@287..288 "*"
@@ -151,12 +151,11 @@ DOCUMENT@0..1387
       INLINE_MATH@297..305
         INLINE_MATH_MARKER@297..298 "$"
         MATH_CONTENT@298..304
-          MATH_TEXT@298..299 "a"
+          MATH_WORD@298..299 "a"
           MATH_SPACE@299..300 " "
-          MATH_OPERATOR@300..301 "*"
-          MATH_OPERATOR@301..302 "*"
+          MATH_WORD@300..302 "**"
           MATH_SPACE@302..303 " "
-          MATH_TEXT@303..304 "b"
+          MATH_WORD@303..304 "b"
         INLINE_MATH_MARKER@304..305 "$"
       TEXT@305..309 " end"
       STRONG_MARKER@309..311 "**"

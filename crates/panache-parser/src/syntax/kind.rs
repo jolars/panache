@@ -101,13 +101,9 @@ pub enum SyntaxKind {
     MATH_CARET,       // ^ superscript marker
     MATH_UNDERSCORE,  // _ subscript marker
     MATH_COMMENT,     // % to end of line (TeX comment)
-    MATH_OPERATOR,
-    MATH_OPEN,    // ( or [
-    MATH_CLOSE,   // ) or ]
-    MATH_PUNCT,   // , or ;
-    MATH_TEXT,    // run of ordinary atoms
-    MATH_SPACE,   // run of spaces/tabs
-    MATH_NEWLINE, // newline within math content
+    MATH_WORD,        // Badness-equivalent run of ordinary math characters
+    MATH_SPACE,       // run of spaces/tabs
+    MATH_NEWLINE,     // newline within math content
     MATH_EQUATION_LABEL,
 
     INLINE_FOOTNOTE_START, // ^[

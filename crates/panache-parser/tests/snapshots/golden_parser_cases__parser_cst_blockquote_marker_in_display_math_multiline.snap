@@ -10,12 +10,12 @@ DOCUMENT@0..14
       DISPLAY_MATH@2..13
         DISPLAY_MATH_MARKER@2..4 "$$"
         MATH_CONTENT@4..11
-          MATH_TEXT@4..5 "x"
+          MATH_WORD@4..5 "x"
           MATH_SPACE@5..6 " "
-          MATH_OPERATOR@6..7 "+"
+          MATH_WORD@6..7 "+"
           MATH_NEWLINE@7..8 "\n"
           LINE_PREFIX@8..9 ">"
           LINE_PREFIX@9..10 " "
-          MATH_TEXT@10..11 "y"
+          MATH_WORD@10..11 "y"
         DISPLAY_MATH_MARKER@11..13 "$$"
       NEWLINE@13..14 "\n"

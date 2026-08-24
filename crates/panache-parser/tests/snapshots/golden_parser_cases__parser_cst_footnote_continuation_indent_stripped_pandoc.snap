@@ -82,10 +82,10 @@ DOCUMENT@0..113
       INLINE_MATH@85..94
         INLINE_MATH_MARKER@85..86 "$"
         MATH_CONTENT@86..93
-          MATH_TEXT@86..87 "m"
+          MATH_WORD@86..87 "m"
           MATH_NEWLINE@87..88 "\n"
           LINE_PREFIX@88..92 "    "
-          MATH_TEXT@92..93 "n"
+          MATH_WORD@92..93 "n"
         INLINE_MATH_MARKER@93..94 "$"
       NEWLINE@94..95 "\n"
   BLANK_LINE@95..96

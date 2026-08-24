@@ -14,7 +14,7 @@
 //! [`panache_parser::syntax::math::math_content_text`]) sidesteps that entirely.
 //!
 //! Operator spacing is *interpretation*, not a CST shape: the parser emits
-//! neutral `MATH_OPERATOR` tokens and the class/precedence logic lives in
+//! neutral `MATH_WORD` runs and the class/precedence logic lives in
 //! [`operators`] (the math analog of YAML scalar cooking), keyed on operator
 //! text + command name. Still out of scope: `\frac` canonicalization, auto-`&`
 //! insertion, and macro rewriting.

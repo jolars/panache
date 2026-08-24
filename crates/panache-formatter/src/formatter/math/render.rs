@@ -7,7 +7,7 @@
 //! *trailing only*, so a second pass measures the same content widths and emits
 //! identical bytes.
 
-use rowan::NodeOrToken;
+use rowan::{GreenNodeBuilder, NodeOrToken};
 
 use super::layout::{Doc, Printer};
 use super::operators::{self, AtomClass};
@@ -28,8 +28,9 @@ pub(super) fn render(tree: &SyntaxNode, opts: &MathFormatOptions) -> String {
 
 fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
     if has_mixed_environment_content(top) {
-        return render_mixed_delimited_display(top, opts)
-            .or_else(|| render_top_level_mixed_environment(top, opts))
+        let semantic = expand_word_elements(top);
+        return render_mixed_delimited_display(&semantic, opts)
+            .or_else(|| render_top_level_mixed_environment(&semantic, opts))
             .unwrap_or_else(|| {
                 let content: String = top.iter().map(ToString::to_string).collect();
                 content.trim_matches(['\r', '\n']).to_string()
@@ -53,6 +54,36 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
     }
     flush_free_rows(&pending, &flat_indent, opts.line_width, &mut lines);
     lines.join("\n")
+}
+
+fn expand_word_elements(elems: &[SyntaxElement]) -> Vec<SyntaxElement> {
+    fn emit(element: &SyntaxElement, builder: &mut GreenNodeBuilder<'static>) {
+        match element {
+            NodeOrToken::Token(token) if token.kind() == SyntaxKind::MATH_WORD => {
+                for atom in operators::word_atoms(token.text()) {
+                    builder.token(SyntaxKind::MATH_WORD.into(), atom.text);
+                }
+            }
+            NodeOrToken::Token(token) => builder.token(token.kind().into(), token.text()),
+            NodeOrToken::Node(node) => {
+                builder.start_node(node.kind().into());
+                for child in node.children_with_tokens() {
+                    emit(&child, builder);
+                }
+                builder.finish_node();
+            }
+        }
+    }
+
+    let mut builder = GreenNodeBuilder::new();
+    builder.start_node(SyntaxKind::MATH_CONTENT.into());
+    for element in elems {
+        emit(element, &mut builder);
+    }
+    builder.finish_node();
+    SyntaxNode::new_root(builder.finish())
+        .children_with_tokens()
+        .collect()
 }
 
 fn has_mixed_environment_content(elems: &[SyntaxElement]) -> bool {
@@ -116,14 +147,14 @@ fn contains_comment(element: &SyntaxElement) -> bool {
 
 fn enclosing_delimiters(elems: &[SyntaxElement], environments: &[usize]) -> Option<(usize, usize)> {
     for open in 0..elems.len() {
-        if elems[open].kind() != SyntaxKind::MATH_OPEN {
+        if element_word_class(&elems[open]) != Some(AtomClass::Open) {
             continue;
         }
         let mut delimiters = vec![element_text(&elems[open])?];
         for (close, element) in elems.iter().enumerate().skip(open + 1) {
-            match element.kind() {
-                SyntaxKind::MATH_OPEN => delimiters.push(element_text(element)?),
-                SyntaxKind::MATH_CLOSE => {
+            match element_word_class(element) {
+                Some(AtomClass::Open) => delimiters.push(element_text(element)?),
+                Some(AtomClass::Close) => {
                     let opening = delimiters.pop()?;
                     if !delimiters_match(opening, element_text(element)?) {
                         break;
@@ -149,6 +180,16 @@ fn element_text(element: &SyntaxElement) -> Option<&str> {
     element.as_token().map(|token| token.text())
 }
 
+fn element_word_class(element: &SyntaxElement) -> Option<AtomClass> {
+    let token = element.as_token()?;
+    if token.kind() != SyntaxKind::MATH_WORD {
+        return None;
+    }
+    let mut atoms = operators::word_atoms(token.text());
+    let atom = atoms.next()?;
+    atoms.next().is_none().then_some(atom.class)
+}
+
 fn delimiters_match(open: &str, close: &str) -> bool {
     matches!((open, close), ("(", ")") | ("[", "]"))
 }
@@ -167,14 +208,14 @@ fn render_top_level_mixed_environment(
 fn ordinary_delimiters_balanced(elems: &[SyntaxElement]) -> bool {
     let mut openings = Vec::new();
     for element in elems {
-        match element.kind() {
-            SyntaxKind::MATH_OPEN => {
+        match element_word_class(element) {
+            Some(AtomClass::Open) => {
                 let Some(text) = element_text(element) else {
                     return false;
                 };
                 openings.push(text);
             }
-            SyntaxKind::MATH_CLOSE => {
+            Some(AtomClass::Close) => {
                 let Some(opening) = openings.pop() else {
                     return false;
                 };
@@ -197,10 +238,10 @@ fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Optio
     let mut depth = 0usize;
 
     for (index, element) in body.iter().enumerate() {
-        match element.kind() {
-            SyntaxKind::MATH_OPEN => depth += 1,
-            SyntaxKind::MATH_CLOSE => depth = depth.saturating_sub(1),
-            SyntaxKind::MATH_PUNCT if depth == 0 => {
+        match element_word_class(element) {
+            Some(AtomClass::Open) => depth += 1,
+            Some(AtomClass::Close) => depth = depth.saturating_sub(1),
+            Some(AtomClass::Punct) if depth == 0 => {
                 segments.push(Doc::concat([
                     mixed_segment_doc(&body[start..index], opts)?,
                     Doc::text(element.to_string()),
@@ -284,7 +325,7 @@ fn contains_unsafe_mixed_trivia(element: &SyntaxElement) -> bool {
 
 fn render_before_operand(before: &[SyntaxElement]) -> String {
     let mut tokens = flatten_tokens(before);
-    tokens.push(FlatToken::Token(SyntaxKind::MATH_TEXT, "X".to_string()));
+    tokens.push(FlatToken::Token(SyntaxKind::MATH_WORD, "X".to_string()));
     let rendered = collapse_spaces(&space_operators(&tokens, None));
     rendered
         .strip_suffix('X')
@@ -301,11 +342,11 @@ fn needs_space_after_environment(after: &[SyntaxElement]) -> bool {
     let Some(token) = element.as_token() else {
         return had_space;
     };
-    if token.kind() == SyntaxKind::MATH_OPERATOR {
-        return operators::is_spaced(operators::coerce(
-            operators::classify_operator(token.text()),
-            Some(AtomClass::Close),
-        ));
+    if token.kind() == SyntaxKind::MATH_WORD {
+        let Some(first) = operators::word_atoms(token.text()).next() else {
+            return had_space;
+        };
+        return operators::is_spaced(operators::coerce(first.class, Some(AtomClass::Close)));
     }
     if token.kind() == SyntaxKind::MATH_COMMAND {
         let name = token.text().strip_prefix('\\').unwrap_or(token.text());
@@ -784,7 +825,6 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 prev_demand = Demand::TightOp;
                 prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
-                colon_head = false;
                 i += 1;
                 continue;
             }
@@ -797,7 +837,6 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 pending_space = false;
                 prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
-                colon_head = false;
                 i += 1;
                 continue;
             }
@@ -808,60 +847,86 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
             .expect("script boundaries are handled before math tokens");
         match kind {
             SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE => {
+                if colon_head {
+                    emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                    prev_demand = Demand::Plain;
+                    prev_class = Some(AtomClass::Ord);
+                    colon_head = false;
+                }
                 pending_space = true;
                 i += 1;
             }
-            SyntaxKind::MATH_TEXT
-                if operators::is_definition_colon(
-                    text,
-                    toks.get(i + 1).and_then(FlatToken::token),
-                ) =>
-            {
-                colon_head = true;
-                prev_sig_is_text_cmd = false;
-                star_modifier_pending = false;
-                i += 1;
-            }
-            SyntaxKind::MATH_OPERATOR => {
-                let mut run = String::new();
-                while let Some((SyntaxKind::MATH_OPERATOR, text)) =
-                    toks.get(i).and_then(FlatToken::token)
-                {
-                    run.push_str(text);
-                    i += 1;
-                }
-                for (n, atom) in operators::split_operator_atoms(&run)
-                    .into_iter()
-                    .enumerate()
-                {
-                    let atom = if n == 0 && colon_head {
-                        format!(":{atom}")
-                    } else {
-                        atom.to_string()
-                    };
-                    let is_modifier = n == 0 && atom == "*" && star_modifier_pending;
+            SyntaxKind::MATH_WORD => {
+                for (n, atom) in operators::word_atoms(text).enumerate() {
+                    if atom.text == ":" {
+                        let adjacent_equals = toks
+                            .get(i + 1)
+                            .and_then(FlatToken::token)
+                            .is_some_and(|(kind, text)| {
+                                kind == SyntaxKind::MATH_WORD && text.starts_with('=')
+                            });
+                        if adjacent_equals {
+                            colon_head = true;
+                            pending_space = false;
+                            continue;
+                        }
+                        if colon_head {
+                            emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                        }
+                        emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                        prev_demand = Demand::Plain;
+                        prev_class = Some(AtomClass::Ord);
+                        pending_space = false;
+                        continue;
+                    }
+                    let fused;
+                    let atom_text =
+                        if colon_head && atom.class == AtomClass::Rel && atom.text.starts_with('=')
+                        {
+                            fused = format!(":{}", atom.text);
+                            colon_head = false;
+                            &fused
+                        } else {
+                            if colon_head {
+                                emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                                prev_demand = Demand::Plain;
+                                prev_class = Some(AtomClass::Ord);
+                                pending_space = false;
+                                colon_head = false;
+                            }
+                            atom.text
+                        };
+                    let is_modifier = n == 0 && atom.text == "*" && star_modifier_pending;
                     let class = if is_modifier {
                         AtomClass::Ord
                     } else {
-                        operators::coerce(operators::classify_operator(&atom), prev_class)
+                        operators::coerce(atom.class, prev_class)
                     };
                     let demand = if is_modifier {
                         Demand::TightOp
                     } else if operators::is_spaced(class) {
                         Demand::SpacedOp
-                    } else {
+                    } else if atom.class == AtomClass::Bin {
                         Demand::TightOp
+                    } else {
+                        Demand::Plain
                     };
-                    emit_atom(&mut out, prev_demand, demand, pending_space, &atom);
-                    pending_space = false; // only the first atom sees the run's leading space
+                    emit_atom(&mut out, prev_demand, demand, pending_space, atom_text);
+                    pending_space = false;
                     prev_demand = demand;
                     prev_class = Some(class);
                 }
-                colon_head = false;
+                i += 1;
                 prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
             }
             SyntaxKind::MATH_COMMAND => {
+                if colon_head {
+                    emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                    prev_demand = Demand::Plain;
+                    pending_space = false;
+                    colon_head = false;
+                }
                 let name = text.strip_prefix('\\').unwrap_or(text);
                 let demand = match operators::command_class(name) {
                     Some(raw) => {
@@ -886,6 +951,12 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 i += 1;
             }
             SyntaxKind::MATH_COMMENT => {
+                if colon_head {
+                    emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                    prev_demand = Demand::Plain;
+                    pending_space = false;
+                    colon_head = false;
+                }
                 emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
                 pending_space = false;
                 prev_demand = Demand::Plain;
@@ -903,6 +974,12 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 i += 1;
             }
             SyntaxKind::MATH_GROUP_OPEN => {
+                if colon_head {
+                    emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                    prev_demand = Demand::Plain;
+                    pending_space = false;
+                    colon_head = false;
+                }
                 let parent_text = group_stack.last().copied().unwrap_or(false);
                 let is_text = prev_sig_is_text_cmd || parent_text;
                 group_stack.push(is_text);
@@ -934,6 +1011,12 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 i += 1;
             }
             _ => {
+                if colon_head {
+                    emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, ":");
+                    prev_demand = Demand::Plain;
+                    pending_space = false;
+                    colon_head = false;
+                }
                 emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
                 pending_space = false;
                 prev_demand = Demand::Plain;
@@ -971,11 +1054,8 @@ fn gap_space(prev: Demand, cur: Demand, pending_space: bool) -> bool {
 }
 
 fn atom_prev_class(kind: SyntaxKind, _text: &str) -> Option<AtomClass> {
-    if let Some(class) = operators::delimiter_class(kind) {
-        return Some(class);
-    }
     let class = match kind {
-        SyntaxKind::MATH_TEXT => AtomClass::Ord,
+        SyntaxKind::MATH_WORD => AtomClass::Ord,
         SyntaxKind::MATH_GROUP_OPEN => AtomClass::Open,
         SyntaxKind::MATH_GROUP_CLOSE => AtomClass::Close,
         SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {

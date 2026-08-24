@@ -1,5 +1,20 @@
 # Mandatory Badness parser-parity cases from the shared math corpus.
+comments/comment_line.tex
+comments/trailing_comment.tex
+display/single_equation.tex
+groups/braced_group.tex
 groups/deep_nesting.tex
+groups/nested_braces.tex
+inline/mixed_scripts.tex
+inline/simple_equality.tex
 inline/subscript.tex
+inline/sum_expression.tex
 inline/superscript.tex
+operators/double_minus.tex
+operators/plus.tex
+operators/plus_tight.tex
+operators/relation_chain.tex
+operators/unary_minus.tex
+scripts/double_subscript.tex
 scripts/nested_superscript.tex
+scripts/script_on_group.tex
