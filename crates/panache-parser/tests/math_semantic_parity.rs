@@ -3,14 +3,18 @@
 use badness_parser::parser::parse as parse_badness;
 use badness_parser::semantic::{
     ArgKind as BadnessArgKind, ArgumentDomain as BadnessDomain,
-    argument_domain as badness_argument_domain, signature::builtin as badness_builtin,
+    DelimiterRole as BadnessDelimiterRole, MathClass as BadnessMathClass,
+    argument_domain as badness_argument_domain, math_atoms as badness_math_atoms,
+    math_char_info as badness_char_info, math_command_info as badness_command_info,
+    signature::builtin as badness_builtin,
 };
 use badness_parser::syntax::SyntaxKind as BadnessKind;
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::semantic::math::{
-    ArgKind, ArgumentDomain, SignatureScope, argument_domain, builtin_command_signature,
+    ArgKind, ArgumentDomain, DelimiterRole, MathClass, SignatureScope, argument_domain,
+    builtin_command_signature, math_atoms, math_char_info, math_command_info,
 };
-use panache_parser::syntax::{SyntaxKind, SyntaxNode};
+use panache_parser::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::{ParserOptions, parse};
 
 fn badness_domains(body: &str) -> Vec<BadnessDomain> {
@@ -201,4 +205,126 @@ fn blockquoted_raw_tex_redefinitions_are_visible() {
         panache_document_domains(source),
         vec![ArgumentDomain::Unknown; 2],
     );
+}
+
+fn class_from_badness(class: BadnessMathClass) -> MathClass {
+    match class {
+        BadnessMathClass::Ord => MathClass::Ord,
+        BadnessMathClass::Op => MathClass::Op,
+        BadnessMathClass::Bin => MathClass::Bin,
+        BadnessMathClass::Rel => MathClass::Rel,
+        BadnessMathClass::Open => MathClass::Open,
+        BadnessMathClass::Close => MathClass::Close,
+        BadnessMathClass::Punct => MathClass::Punct,
+        BadnessMathClass::Fence => MathClass::Fence,
+        BadnessMathClass::Inner => MathClass::Inner,
+    }
+}
+
+fn delimiter_from_badness(role: BadnessDelimiterRole) -> DelimiterRole {
+    match role {
+        BadnessDelimiterRole::Open => DelimiterRole::Open,
+        BadnessDelimiterRole::Close => DelimiterRole::Close,
+        BadnessDelimiterRole::Fence => DelimiterRole::Fence,
+    }
+}
+
+#[test]
+fn curated_math_atom_info_matches_badness() {
+    for character in ['*', '-', '!', '√', '∛', '∜', '⟌', '🦀'] {
+        let panache = math_char_info(character);
+        let badness = badness_char_info(character);
+        assert_eq!(
+            panache.class,
+            class_from_badness(badness.class),
+            "{character}"
+        );
+        assert_eq!(
+            panache.delimiter,
+            badness.delimiter.map(delimiter_from_badness),
+            "{character}",
+        );
+    }
+
+    for name in [
+        "sin",
+        "operatorname",
+        "mathbin",
+        "leq",
+        "cdot",
+        "lvert",
+        "rvert",
+        "|",
+        "sqrt",
+        "not-a-real-command",
+    ] {
+        let panache = math_command_info(name);
+        let badness = badness_command_info(name);
+        assert_eq!(panache.class, class_from_badness(badness.class), "\\{name}");
+        assert_eq!(
+            panache.delimiter,
+            badness.delimiter.map(delimiter_from_badness),
+            "\\{name}",
+        );
+    }
+}
+
+#[test]
+fn math_atoms_match_badness_for_words_and_structural_atoms() {
+    let body = r"a🦀-b \leq \}^{1/2} {x}";
+    let panache_root = SyntaxNode::new_root(parse_math_content(body, MathParseOptions::default()));
+    let badness_root = parse_badness(&format!("${body}$"));
+
+    let panache_elements = panache_root
+        .descendants_with_tokens()
+        .filter(|element| {
+            matches!(
+                element.kind(),
+                SyntaxKind::MATH_WORD
+                    | SyntaxKind::MATH_COMMAND
+                    | SyntaxKind::MATH_SCRIPTED
+                    | SyntaxKind::MATH_GROUP
+            )
+        })
+        .collect::<Vec<SyntaxElement>>();
+    let badness_elements = badness_root
+        .syntax()
+        .descendants_with_tokens()
+        .filter(|element| {
+            matches!(
+                element.kind(),
+                BadnessKind::WORD
+                    | BadnessKind::COMMAND
+                    | BadnessKind::SCRIPTED
+                    | BadnessKind::GROUP
+            )
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(panache_elements.len(), badness_elements.len());
+    for (panache_element, badness_element) in panache_elements.iter().zip(badness_elements.iter()) {
+        let panache_start = panache_element.text_range().start();
+        let badness_start = badness_element.text_range().start();
+        let panache = math_atoms(panache_element)
+            .map(|atom| {
+                (
+                    atom.range.start() - panache_start,
+                    atom.range.end() - panache_start,
+                    atom.class,
+                    atom.delimiter,
+                )
+            })
+            .collect::<Vec<_>>();
+        let badness = badness_math_atoms(badness_element)
+            .map(|atom| {
+                (
+                    atom.range.start() - badness_start,
+                    atom.range.end() - badness_start,
+                    class_from_badness(atom.class),
+                    atom.delimiter.map(delimiter_from_badness),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(panache, badness, "{}", panache_element);
+    }
 }

@@ -70,27 +70,29 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Document signature overlays.** Made argument-domain lookup redefinition-aware
-without inferring macro replacement semantics.
+**Native math atoms—first semantic slice.** Ported the Badness-shaped atom API
+and iterator without introducing a runtime Badness dependency.
 
-- `SignatureScope` scans `TEX_BLOCK` and `LATEX_COMMAND` nodes for the LaTeX2e,
-  primitive `\def`, and xparse command-definition families.
-- Any recognized document definition shadows the built-in signature and makes
-  every attached argument domain `Unknown`; no replacement-body meaning is
-  guessed. Callers may precompute and reuse the scope.
-- Differential tests match Badness for braced/unbraced, primitive, xparse, and
-  definition-after-use cases; host coverage includes blockquoted raw TeX.
-- Explicit configuration remains a later part of the declaration-model task.
+- Added `MathClass`, `DelimiterRole`, `MathAtomInfo`, and source-ranged
+  `MathAtom`, plus the public `math_atoms()` Unicode-scalar iterator.
+- Commands, scripted bases, groups, optionals, delimited bodies, and
+  environments now expose Badness-equivalent structural atom semantics.
+- Ported Badness's curated character/command overrides and named-operator set;
+  the generated unicode-math baseline remains deliberately separate.
+- Differential tests cover curated lookup parity, multibyte ranges, commands,
+  scripted delimiter inheritance, and structural `Inner` atoms.
 
 ### Suggested next sub-targets
-1. Port Badness's math-atom info and Unicode-scalar iterator.
-2. Add explicit configured command signatures.
-3. Move formatter-local operator interpretation onto the shared semantic API.
+1. Vendor and generate the pinned unicode-math atom lookup baseline.
+2. Add contextual Bin-to-Ord coercion and break-priority semantics.
+3. Add explicit configured command signatures.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Document signature overlays.** Raw-TeX definitions now shadow built-in
+  argument domains without inferring replacement semantics.
 - **Built-in signature/domain semantics.** Added native signature types,
   positional lookup, and a Badness differential suite.
 - **Badness `\left`/`\right` parity.** Added nested delimiter bodies and

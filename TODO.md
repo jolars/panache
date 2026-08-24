@@ -281,7 +281,10 @@ the test projector.
   coercion, and break priority out of the CST, and expose the same semantic
   results to the formatter, linter, and language server. (Built-in
   math-command signatures, conservative positional matching, and document
-  redefinition overlays have landed; math atoms remain.)
+  redefinition overlays have landed. The native atom metadata types,
+  Badness-curated lookup tier, Unicode-scalar iterator, structural atoms,
+  and scripted-base inheritance have also landed; the generated unicode-math
+  baseline, contextual coercion, and break priority remain.)
 - [ ] Model document-provided command declarations conservatively, including
   definitions in relevant raw TeX and explicit configuration. Match Badness
   when the same context is available; otherwise fall back conservatively. A

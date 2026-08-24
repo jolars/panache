@@ -7,7 +7,250 @@
 
 use std::collections::HashSet;
 
-use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
+use rowan::{TextRange, TextSize};
+
+use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+
+/// The useful TeX math-atom class family.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MathClass {
+    #[default]
+    Ord,
+    Op,
+    Bin,
+    Rel,
+    Open,
+    Close,
+    Punct,
+    Fence,
+    Inner,
+}
+
+/// Whether an atom is a genuinely pairable delimiter, independently of its
+/// TeX spacing class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DelimiterRole {
+    Open,
+    Close,
+    Fence,
+}
+
+/// Math-atom metadata without a source location.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MathAtomInfo {
+    pub class: MathClass,
+    pub delimiter: Option<DelimiterRole>,
+}
+
+/// One virtual math atom and the exact source bytes that produced it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MathAtom {
+    pub range: TextRange,
+    pub class: MathClass,
+    pub delimiter: Option<DelimiterRole>,
+}
+
+const fn atom_info(class: MathClass, delimiter: Option<DelimiterRole>) -> MathAtomInfo {
+    MathAtomInfo { class, delimiter }
+}
+
+/// LaTeX and amsmath's named, upright function operators.
+pub const NAMED_MATH_OPERATORS: &[&str] = &[
+    "arccos", "arcsin", "arctan", "arg", "cos", "cosh", "cot", "coth", "csc", "deg", "det", "dim",
+    "exp", "gcd", "hom", "inf", "ker", "lg", "lim", "liminf", "limsup", "ln", "log", "max", "min",
+    "Pr", "sec", "sin", "sinh", "sup", "tan", "tanh",
+];
+
+/// Classify a control-sequence name without its leading backslash.
+///
+/// This initial table contains Badness's curated overrides. Unknown commands
+/// conservatively behave as ordinary atoms; the generated unicode-math
+/// baseline will extend this lookup in a separate migration slice.
+pub fn math_command_info(name: &str) -> MathAtomInfo {
+    curated_command_info(name).unwrap_or_default()
+}
+
+/// Classify a literal Unicode scalar.
+///
+/// This initial table contains Badness's curated overrides. Unknown characters
+/// conservatively behave as ordinary atoms; the generated unicode-math
+/// baseline will extend this lookup in a separate migration slice.
+pub fn math_char_info(character: char) -> MathAtomInfo {
+    curated_char_info(character).unwrap_or_default()
+}
+
+/// Virtual atoms for one CST element. A coalesced `MATH_WORD` yields one atom
+/// per Unicode scalar; structural nodes remain one source-spanning atom.
+pub fn math_atoms(element: &SyntaxElement) -> MathAtoms<'_> {
+    match element {
+        SyntaxElement::Token(token) if token.kind() == SyntaxKind::MATH_WORD => MathAtoms {
+            inner: MathAtomsInner::Word {
+                text: token.text(),
+                start: token.text_range().start(),
+                offset: 0,
+            },
+        },
+        SyntaxElement::Token(token) => MathAtoms {
+            inner: MathAtomsInner::One(Some(atom(token.text_range(), token_info(token)))),
+        },
+        SyntaxElement::Node(node) => MathAtoms {
+            inner: MathAtomsInner::One(Some(atom(node.text_range(), node_info(node)))),
+        },
+    }
+}
+
+/// Iterator returned by [`math_atoms`].
+pub struct MathAtoms<'a> {
+    inner: MathAtomsInner<'a>,
+}
+
+enum MathAtomsInner<'a> {
+    Word {
+        text: &'a str,
+        start: TextSize,
+        offset: usize,
+    },
+    One(Option<MathAtom>),
+}
+
+impl Iterator for MathAtoms<'_> {
+    type Item = MathAtom;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.inner {
+            MathAtomsInner::One(atom) => atom.take(),
+            MathAtomsInner::Word {
+                text,
+                start,
+                offset,
+            } => {
+                let character = text.get(*offset..)?.chars().next()?;
+                let len = character.len_utf8();
+                let atom_start = *start + TextSize::from(*offset as u32);
+                *offset += len;
+                let atom_end = *start + TextSize::from(*offset as u32);
+                let value = math_char_info(character);
+                Some(MathAtom {
+                    range: TextRange::new(atom_start, atom_end),
+                    class: value.class,
+                    delimiter: value.delimiter,
+                })
+            }
+        }
+    }
+}
+
+fn atom(range: TextRange, value: MathAtomInfo) -> MathAtom {
+    MathAtom {
+        range,
+        class: value.class,
+        delimiter: value.delimiter,
+    }
+}
+
+fn token_info(token: &SyntaxToken) -> MathAtomInfo {
+    match token.kind() {
+        SyntaxKind::MATH_CONTROL_WORD | SyntaxKind::MATH_CONTROL_SYMBOL => token
+            .text()
+            .strip_prefix('\\')
+            .map_or_else(MathAtomInfo::default, math_command_info),
+        _ => {
+            let mut characters = token.text().chars();
+            match (characters.next(), characters.next()) {
+                (Some(character), None) => math_char_info(character),
+                _ => MathAtomInfo::default(),
+            }
+        }
+    }
+}
+
+fn node_info(node: &SyntaxNode) -> MathAtomInfo {
+    match node.kind() {
+        SyntaxKind::MATH_COMMAND => node
+            .children_with_tokens()
+            .filter_map(SyntaxElement::into_token)
+            .find(|token| {
+                matches!(
+                    token.kind(),
+                    SyntaxKind::MATH_CONTROL_WORD | SyntaxKind::MATH_CONTROL_SYMBOL
+                )
+            })
+            .as_ref()
+            .map_or_else(MathAtomInfo::default, token_info),
+        SyntaxKind::MATH_SCRIPTED => node
+            .children_with_tokens()
+            .find(|element| {
+                !matches!(
+                    element.kind(),
+                    SyntaxKind::MATH_SPACE
+                        | SyntaxKind::MATH_NEWLINE
+                        | SyntaxKind::MATH_SUBSCRIPT
+                        | SyntaxKind::MATH_SUPERSCRIPT
+                        | SyntaxKind::LINE_PREFIX
+                        | SyntaxKind::NEWLINE
+                )
+            })
+            .and_then(|base| math_atoms(&base).next())
+            .map_or_else(MathAtomInfo::default, |base| {
+                atom_info(base.class, base.delimiter)
+            }),
+        SyntaxKind::MATH_GROUP
+        | SyntaxKind::MATH_OPTIONAL
+        | SyntaxKind::MATH_DELIMITED
+        | SyntaxKind::MATH_ENVIRONMENT => atom_info(MathClass::Inner, None),
+        _ => MathAtomInfo::default(),
+    }
+}
+
+fn curated_char_info(character: char) -> Option<MathAtomInfo> {
+    match character {
+        '*' | '-' => Some(atom_info(MathClass::Bin, None)),
+        '!' => Some(atom_info(MathClass::Close, None)),
+        '√' => Some(atom_info(MathClass::Ord, None)),
+        '∛' | '∜' | '⟌' => Some(atom_info(MathClass::Open, None)),
+        _ => None,
+    }
+}
+
+fn curated_command_info(name: &str) -> Option<MathAtomInfo> {
+    if NAMED_MATH_OPERATORS.contains(&name) {
+        return Some(atom_info(MathClass::Op, None));
+    }
+    let value = match name {
+        "operatorname" => atom_info(MathClass::Op, None),
+        "mathord" => atom_info(MathClass::Ord, None),
+        "mathop" => atom_info(MathClass::Op, None),
+        "mathbin" => atom_info(MathClass::Bin, None),
+        "mathrel" => atom_info(MathClass::Rel, None),
+        "mathopen" => atom_info(MathClass::Open, None),
+        "mathclose" => atom_info(MathClass::Close, None),
+        "mathpunct" => atom_info(MathClass::Punct, None),
+        "mathinner" => atom_info(MathClass::Inner, None),
+        "le" | "leq" | "ge" | "geq" | "ne" | "neq" | "equiv" | "approx" | "approxeq" | "sim"
+        | "simeq" | "cong" | "propto" | "asymp" | "doteq" | "models" | "vdash" | "dashv"
+        | "perp" | "parallel" | "mid" | "in" | "ni" | "notin" | "subset" | "subseteq"
+        | "subsetneq" | "supset" | "supseteq" | "supsetneq" | "sqsubseteq" | "sqsupseteq"
+        | "prec" | "preceq" | "succ" | "succeq" | "ll" | "gg" | "lll" | "ggg" | "to"
+        | "rightarrow" | "longrightarrow" | "Rightarrow" | "Longrightarrow" | "implies"
+        | "impliedby" | "iff" | "mapsto" | "longmapsto" | "leftarrow" | "Leftarrow" | "gets"
+        | "leftrightarrow" | "Leftrightarrow" | "Longleftrightarrow" | "hookrightarrow"
+        | "hookleftarrow" | "triangleq" | "coloneq" | "Coloneq" | "coloneqq" | "Coloneqq"
+        | "eqcolon" | "Eqcolon" | "eqqcolon" | "Eqqcolon" | "colonapprox" | "Colonapprox"
+        | "colonsim" | "Colonsim" | "lesssim" | "gtrsim" => atom_info(MathClass::Rel, None),
+        "pm" | "mp" | "times" | "div" | "cdot" | "ast" | "star" | "circ" | "bullet" | "cup"
+        | "cap" | "uplus" | "sqcup" | "sqcap" | "vee" | "wedge" | "lor" | "land" | "oplus"
+        | "ominus" | "otimes" | "oslash" | "odot" | "setminus" | "amalg" | "diamond" | "wr"
+        | "dagger" | "ddagger" | "bigtriangleup" | "bigtriangledown" | "triangleleft"
+        | "triangleright" => atom_info(MathClass::Bin, None),
+        "{" | "lvert" | "lVert" => atom_info(MathClass::Open, Some(DelimiterRole::Open)),
+        "}" | "rvert" | "rVert" => atom_info(MathClass::Close, Some(DelimiterRole::Close)),
+        "|" => atom_info(MathClass::Fence, Some(DelimiterRole::Fence)),
+        "sqrt" | "cuberoot" | "fourthroot" | "longdivision" => atom_info(MathClass::Open, None),
+        "mathexclam" => atom_info(MathClass::Close, None),
+        _ => return None,
+    };
+    Some(value)
+}
 
 /// The delimiter shape of an attached command argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
