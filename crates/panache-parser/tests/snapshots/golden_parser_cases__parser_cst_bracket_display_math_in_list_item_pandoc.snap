@@ -20,23 +20,26 @@ DOCUMENT@0..79
             MATH_NEWLINE@12..13 "\n"
             LINE_PREFIX@13..15 "  "
             MATH_ENVIRONMENT@15..50
-              MATH_CONTROL_WORD@15..21 "\\begin"
-              MATH_GROUP@21..30
-                MATH_GROUP_OPEN@21..22 "{"
-                MATH_WORD@22..29 "bmatrix"
-                MATH_GROUP_CLOSE@29..30 "}"
-              MATH_WORD@30..31 "1"
-              MATH_LINE_BREAK@31..33
-                MATH_CONTROL_SYMBOL@31..33 "\\\\"
-              MATH_WORD@33..34 "1"
-              MATH_LINE_BREAK@34..36
-                MATH_CONTROL_SYMBOL@34..36 "\\\\"
-              MATH_WORD@36..37 "0"
-              MATH_CONTROL_WORD@37..41 "\\end"
-              MATH_GROUP@41..50
-                MATH_GROUP_OPEN@41..42 "{"
-                MATH_WORD@42..49 "bmatrix"
-                MATH_GROUP_CLOSE@49..50 "}"
+              MATH_BEGIN@15..30
+                MATH_CONTROL_WORD@15..21 "\\begin"
+                MATH_NAME_GROUP@21..30
+                  MATH_GROUP_OPEN@21..22 "{"
+                  MATH_WORD@22..29 "bmatrix"
+                  MATH_GROUP_CLOSE@29..30 "}"
+              MATH_CONTENT@30..37
+                MATH_WORD@30..31 "1"
+                MATH_LINE_BREAK@31..33
+                  MATH_CONTROL_SYMBOL@31..33 "\\\\"
+                MATH_WORD@33..34 "1"
+                MATH_LINE_BREAK@34..36
+                  MATH_CONTROL_SYMBOL@34..36 "\\\\"
+                MATH_WORD@36..37 "0"
+              MATH_END@37..50
+                MATH_CONTROL_WORD@37..41 "\\end"
+                MATH_NAME_GROUP@41..50
+                  MATH_GROUP_OPEN@41..42 "{"
+                  MATH_WORD@42..49 "bmatrix"
+                  MATH_GROUP_CLOSE@49..50 "}"
             MATH_NEWLINE@50..51 "\n"
           LINE_PREFIX@51..53 "  "
           DISPLAY_MATH_MARKER@53..55 "\\]"

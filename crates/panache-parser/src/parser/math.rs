@@ -115,7 +115,12 @@ impl MathParser<'_> {
                     } else if let Some(word) = self.peek_control_word() {
                         match word {
                             "begin" | "end" if ctx == Ctx::Optional => break,
-                            "end" if ctx == Ctx::Env => break,
+                            "end"
+                                if ctx == Ctx::Env
+                                    && self.peek_environment_name(self.pos).is_some() =>
+                            {
+                                break;
+                            }
                             "right" if ctx == Ctx::LeftRight => break,
                             _ => self.parse_scripted_atom(ctx),
                         }
@@ -213,12 +218,16 @@ impl MathParser<'_> {
     fn parse_atom(&mut self) {
         match self.peek_char() {
             Some('\\') => match self.peek_control_word() {
-                Some("begin") => self.parse_environment(),
+                Some("begin") if self.peek_environment_name(self.pos).is_some() => {
+                    self.parse_environment();
+                }
                 Some("left") => self.parse_delimited(),
-                // Stray `\end`/`\right` stay bare tokens (Badness leaves them
-                // loose for the enclosing level too); matched ones are consumed
-                // by their environment/delimited parsers before reaching here.
-                Some("end" | "right") => self.parse_control_word(),
+                Some("end") if self.peek_environment_name(self.pos).is_some() => {
+                    self.parse_environment_end();
+                }
+                // A matched `\right` is consumed by its delimited parser before
+                // reaching here. A stray one stays lexically bare for now.
+                Some("right") => self.parse_control_word(),
                 Some(_) => self.parse_command(),
                 None => self.parse_control_symbol(),
             },
@@ -304,20 +313,117 @@ impl MathParser<'_> {
     }
 
     fn parse_environment(&mut self) {
+        let (begin_group_start, begin_name) = self
+            .peek_environment_name(self.pos)
+            .expect("environment parsing requires a name");
         self.builder.start_node(SyntaxKind::MATH_ENVIRONMENT.into());
+        self.builder.start_node(SyntaxKind::MATH_BEGIN.into());
         self.parse_control_word(); // \begin
-        self.parse_environment_name(); // {name} group, if present
+        self.parse_environment_name(begin_group_start);
+        self.builder.finish_node(); // MATH_BEGIN
+
+        self.builder.start_node(SyntaxKind::MATH_CONTENT.into());
         self.parse_elements(Ctx::Env);
-        if self.peek_control_word() == Some("end") {
-            self.parse_control_word(); // \end
-            self.parse_environment_name(); // {name} group, if present
+        self.builder.finish_node(); // MATH_CONTENT
+
+        if self.peek_control_word() == Some("end")
+            && self
+                .peek_environment_name(self.pos)
+                .is_some_and(|(_, end_name)| end_name == begin_name)
+        {
+            self.parse_environment_end();
         }
         self.builder.finish_node();
     }
 
-    fn parse_environment_name(&mut self) {
-        if self.peek_char() == Some('{') {
-            self.parse_group();
+    fn parse_environment_name(&mut self, group_start: usize) {
+        self.parse_trivia_until(group_start);
+        self.builder.start_node(SyntaxKind::MATH_NAME_GROUP.into());
+        self.bump_bytes(1, SyntaxKind::MATH_GROUP_OPEN);
+        self.parse_elements(Ctx::Group);
+        if self.peek_char() == Some('}') {
+            self.bump_bytes(1, SyntaxKind::MATH_GROUP_CLOSE);
+        }
+        self.builder.finish_node();
+    }
+
+    fn parse_environment_end(&mut self) {
+        let (group_start, _) = self
+            .peek_environment_name(self.pos)
+            .expect("environment end parsing requires a name");
+        self.builder.start_node(SyntaxKind::MATH_END.into());
+        self.parse_control_word();
+        self.parse_environment_name(group_start);
+        self.builder.finish_node();
+    }
+
+    /// Return the opening brace and trimmed name for a delimiter-like
+    /// `\begin`/`\end`, or `None` when the following bytes are macro data.
+    fn peek_environment_name(&self, command_pos: usize) -> Option<(usize, String)> {
+        let mut pos = command_pos + self.control_word_len_at(command_pos)?;
+        let mut saw_newline = false;
+        loop {
+            let c = self.input[pos..].chars().next()?;
+            match c {
+                ' ' | '\t' => pos += c.len_utf8(),
+                '%' => {
+                    pos += self.input[pos..]
+                        .find(['\n', '\r'])
+                        .unwrap_or(self.input.len() - pos);
+                }
+                '\n' | '\r' if !saw_newline => {
+                    saw_newline = true;
+                    if c == '\r' && self.input[pos..].starts_with("\r\n") {
+                        pos += 2;
+                    } else {
+                        pos += c.len_utf8();
+                    }
+                }
+                '\n' | '\r' => return None,
+                '{' => break,
+                _ => return None,
+            }
+        }
+
+        let group_start = pos;
+        pos += 1;
+        let name_start = pos;
+        while let Some(c) = self.input[pos..].chars().next() {
+            match c {
+                '}' => return Some((group_start, self.input[name_start..pos].trim().to_owned())),
+                '#' | '\\' | '{' => return None,
+                '\n' | '\r' => break,
+                _ => pos += c.len_utf8(),
+            }
+        }
+        Some((group_start, self.input[name_start..pos].trim().to_owned()))
+    }
+
+    fn control_word_len_at(&self, pos: usize) -> Option<usize> {
+        let after = self.input[pos..].strip_prefix('\\')?;
+        let name_len = after
+            .bytes()
+            .take_while(|byte| byte.is_ascii_alphabetic() || *byte == b'@')
+            .count();
+        (name_len > 0).then_some(name_len + 1)
+    }
+
+    fn parse_trivia_until(&mut self, end: usize) {
+        while self.pos < end {
+            match self.peek_char() {
+                Some(' ' | '\t') => self.parse_spaces(),
+                Some('\n') => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
+                Some('\r') => {
+                    let len = if self.rest().starts_with("\r\n") {
+                        2
+                    } else {
+                        1
+                    };
+                    self.bump_bytes(len, SyntaxKind::MATH_NEWLINE);
+                }
+                Some('%') => self.parse_comment(),
+                _ => unreachable!("environment-name lookahead may only skip trivia"),
+            }
         }
     }
 
@@ -1215,11 +1321,14 @@ mod tests {
             .find(|n| n.kind() == SyntaxKind::MATH_ENVIRONMENT)
             .expect("environment");
         assert_eq!(env.text().to_string(), content);
-        let commands = env
-            .children_with_tokens()
-            .filter(|el| el.kind() == SyntaxKind::MATH_CONTROL_WORD)
-            .count();
-        assert_eq!(commands, 2);
+        assert_eq!(
+            env.children().map(|child| child.kind()).collect::<Vec<_>>(),
+            vec![
+                SyntaxKind::MATH_BEGIN,
+                SyntaxKind::MATH_CONTENT,
+                SyntaxKind::MATH_END,
+            ]
+        );
         assert_lossless(content);
     }
 
@@ -1232,6 +1341,53 @@ mod tests {
             .count();
         assert_eq!(envs, 2);
         assert_lossless(content);
+    }
+
+    #[test]
+    fn mismatched_environment_end_unwinds_to_the_matching_level() {
+        let content = r"\begin{a}\begin{b}x\end{a}";
+        let tree = node(content);
+        let envs = tree
+            .descendants()
+            .filter(|node| node.kind() == SyntaxKind::MATH_ENVIRONMENT)
+            .collect::<Vec<_>>();
+        assert_eq!(envs.len(), 2);
+        assert!(
+            envs[0]
+                .children()
+                .any(|child| child.kind() == SyntaxKind::MATH_END)
+        );
+        assert!(
+            envs[1]
+                .children()
+                .all(|child| child.kind() != SyntaxKind::MATH_END)
+        );
+        assert_lossless(content);
+    }
+
+    #[test]
+    fn stray_environment_end_is_a_structural_end_node() {
+        let content = r"x \end{aligned}";
+        assert_eq!(
+            node(content)
+                .children()
+                .filter(|node| node.kind() == SyntaxKind::MATH_END)
+                .count(),
+            1
+        );
+        assert_lossless(content);
+    }
+
+    #[test]
+    fn delimiter_like_environment_commands_require_a_static_name() {
+        for content in [r"\begin x", r"\begin{\foo}x", "\\begin\n\n{aligned}x"] {
+            assert!(
+                node(content)
+                    .descendants()
+                    .all(|node| node.kind() != SyntaxKind::MATH_ENVIRONMENT)
+            );
+            assert_lossless(content);
+        }
     }
 
     #[test]

@@ -409,14 +409,29 @@ impl AstNode for MathEnvironment {
 }
 
 impl MathEnvironment {
+    /// The opening delimiter node.
+    pub fn begin(&self) -> Option<MathBegin> {
+        self.0.children().find_map(MathBegin::cast)
+    }
+
+    /// The parsed math body between the environment delimiters.
+    pub fn body(&self) -> Option<MathContent> {
+        self.0.children().find_map(MathContent::cast)
+    }
+
+    /// The closing delimiter node, absent when the environment is unclosed.
+    pub fn end(&self) -> Option<MathEnd> {
+        self.0.children().find_map(MathEnd::cast)
+    }
+
     /// The `\begin` command token.
     pub fn begin_token(&self) -> Option<SyntaxToken> {
-        command_child(&self.0, r"\begin")
+        self.begin()?.command_token()
     }
 
     /// The `\end` command token, absent when the environment is unclosed.
     pub fn end_token(&self) -> Option<SyntaxToken> {
-        command_child(&self.0, r"\end")
+        self.end()?.command_token()
     }
 
     /// Whether the environment carries a matching `\end`.
@@ -426,16 +441,126 @@ impl MathEnvironment {
 
     /// The `{name}` group following `\begin`, braces stripped.
     pub fn begin_name(&self) -> Option<String> {
-        let children: Vec<SyntaxElement> = self.0.children_with_tokens().collect();
-        let bi = children.iter().position(|c| is_command(c, r"\begin"))?;
-        group_name_after(&children, bi)
+        self.begin()?.name()
     }
 
     /// The `{name}` group following `\end`, braces stripped.
     pub fn end_name(&self) -> Option<String> {
-        let children: Vec<SyntaxElement> = self.0.children_with_tokens().collect();
-        let ei = children.iter().position(|c| is_command(c, r"\end"))?;
-        group_name_after(&children, ei)
+        self.end()?.name()
+    }
+}
+
+/// A `\begin{name}` environment opener.
+pub struct MathBegin(SyntaxNode);
+
+impl AstNode for MathBegin {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_BEGIN
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathBegin {
+    /// The `\begin` control-word token.
+    pub fn command_token(&self) -> Option<SyntaxToken> {
+        command_child(&self.0, r"\begin")
+    }
+
+    /// The environment-name group.
+    pub fn name_group(&self) -> Option<MathNameGroup> {
+        self.0.children().find_map(MathNameGroup::cast)
+    }
+
+    /// The trimmed environment name without braces.
+    pub fn name(&self) -> Option<String> {
+        self.name_group()?.name()
+    }
+}
+
+/// A `\end{name}` environment closer.
+pub struct MathEnd(SyntaxNode);
+
+impl AstNode for MathEnd {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_END
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathEnd {
+    /// The `\end` control-word token.
+    pub fn command_token(&self) -> Option<SyntaxToken> {
+        command_child(&self.0, r"\end")
+    }
+
+    /// The environment-name group.
+    pub fn name_group(&self) -> Option<MathNameGroup> {
+        self.0.children().find_map(MathNameGroup::cast)
+    }
+
+    /// The trimmed environment name without braces.
+    pub fn name(&self) -> Option<String> {
+        self.name_group()?.name()
+    }
+}
+
+/// The `{name}` group owned by an environment delimiter.
+pub struct MathNameGroup(SyntaxNode);
+
+impl AstNode for MathNameGroup {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_NAME_GROUP
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathNameGroup {
+    /// The opening `{` token.
+    pub fn open_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_GROUP_OPEN)
+    }
+
+    /// The closing `}` token, absent when the group is unclosed.
+    pub fn close_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_GROUP_CLOSE)
+    }
+
+    /// The trimmed name between the braces.
+    pub fn name(&self) -> Option<String> {
+        self.open_token()?;
+        let mut text = self.0.text().to_string();
+        text.remove(0);
+        if self.close_token().is_some() {
+            text.pop();
+        }
+        Some(text.trim().to_owned())
     }
 }
 
@@ -515,30 +640,39 @@ pub enum MathDiagnosticKind {
 /// work.
 pub fn math_diagnostics(content: &SyntaxNode) -> Vec<MathDiagnostic> {
     let mut out = Vec::new();
+    let mut mismatched_ends = Vec::new();
     for node in content.descendants() {
         if let Some(group) = MathGroup::cast(node.clone()) {
             check_group(&group, &mut out);
         } else if let Some(env) = MathEnvironment::cast(node.clone()) {
-            check_environment(&env, &mut out);
+            check_environment(&env, &mut out, &mut mismatched_ends);
         } else if let Some(delim) = MathDelimited::cast(node.clone()) {
             check_delimited(&delim, &mut out);
+        } else if let Some(end) = MathEnd::cast(node.clone())
+            && !mismatched_ends.contains(&node.text_range())
+            && node
+                .parent()
+                .is_none_or(|parent| parent.kind() != SyntaxKind::MATH_ENVIRONMENT)
+            && let Some(token) = end.command_token()
+        {
+            out.push(MathDiagnostic {
+                kind: MathDiagnosticKind::UnexpectedEnd,
+                range: token.text_range(),
+            });
         }
         for child in node.children_with_tokens() {
             let Some(token) = child.as_token() else {
                 continue;
             };
             match token.kind() {
-                SyntaxKind::MATH_GROUP_CLOSE if node.kind() != SyntaxKind::MATH_GROUP => {
-                    out.push(MathDiagnostic {
-                        kind: MathDiagnosticKind::UnexpectedCloseBrace,
-                        range: token.text_range(),
-                    });
-                }
-                SyntaxKind::MATH_CONTROL_WORD
-                    if node.kind() != SyntaxKind::MATH_ENVIRONMENT && token.text() == r"\end" =>
+                SyntaxKind::MATH_GROUP_CLOSE
+                    if !matches!(
+                        node.kind(),
+                        SyntaxKind::MATH_GROUP | SyntaxKind::MATH_NAME_GROUP
+                    ) =>
                 {
                     out.push(MathDiagnostic {
-                        kind: MathDiagnosticKind::UnexpectedEnd,
+                        kind: MathDiagnosticKind::UnexpectedCloseBrace,
                         range: token.text_range(),
                     });
                 }
@@ -569,8 +703,25 @@ fn check_group(group: &MathGroup, out: &mut Vec<MathDiagnostic>) {
     }
 }
 
-fn check_environment(env: &MathEnvironment, out: &mut Vec<MathDiagnostic>) {
+fn check_environment(
+    env: &MathEnvironment,
+    out: &mut Vec<MathDiagnostic>,
+    mismatched_ends: &mut Vec<TextRange>,
+) {
     let Some(end) = env.end_token() else {
+        if let Some(end) = following_environment_end(env.syntax()) {
+            let range = end
+                .name_group()
+                .map(|group| group.syntax().text_range())
+                .or_else(|| end.command_token().map(|token| token.text_range()))
+                .unwrap_or_else(|| end.syntax().text_range());
+            mismatched_ends.push(end.syntax().text_range());
+            out.push(MathDiagnostic {
+                kind: MathDiagnosticKind::MismatchedEnvironment,
+                range,
+            });
+            return;
+        }
         let range = env
             .begin_token()
             .map(|t| t.text_range())
@@ -582,17 +733,20 @@ fn check_environment(env: &MathEnvironment, out: &mut Vec<MathDiagnostic>) {
         return;
     };
     if env.begin_name().unwrap_or_default() != env.end_name().unwrap_or_default() {
-        let children: Vec<SyntaxElement> = env.syntax().children_with_tokens().collect();
-        let range = children
-            .iter()
-            .position(|c| is_command(c, r"\end"))
-            .and_then(|ei| group_range_after(&children, ei))
+        let range = env
+            .end()
+            .and_then(|end| end.name_group())
+            .map(|group| group.syntax().text_range())
             .unwrap_or_else(|| end.text_range());
         out.push(MathDiagnostic {
             kind: MathDiagnosticKind::MismatchedEnvironment,
             range,
         });
     }
+}
+
+fn following_environment_end(environment: &SyntaxNode) -> Option<MathEnd> {
+    environment.next_sibling().and_then(MathEnd::cast)
 }
 
 fn check_delimited(delim: &MathDelimited, out: &mut Vec<MathDiagnostic>) {
@@ -630,33 +784,6 @@ fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
                 | SyntaxKind::LINE_PREFIX
                 | SyntaxKind::NEWLINE
         )
-    })
-}
-
-fn is_command(el: &SyntaxElement, text: &str) -> bool {
-    el.as_token()
-        .is_some_and(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD && t.text() == text)
-}
-
-fn group_name_after(children: &[SyntaxElement], idx: usize) -> Option<String> {
-    children[idx + 1..].iter().find_map(|c| {
-        c.as_node()
-            .filter(|n| n.kind() == SyntaxKind::MATH_GROUP)
-            .map(|g| {
-                g.text()
-                    .to_string()
-                    .trim_start_matches('{')
-                    .trim_end_matches('}')
-                    .to_string()
-            })
-    })
-}
-
-fn group_range_after(children: &[SyntaxElement], idx: usize) -> Option<TextRange> {
-    children[idx + 1..].iter().find_map(|c| {
-        c.as_node()
-            .filter(|n| n.kind() == SyntaxKind::MATH_GROUP)
-            .map(|g| g.text_range())
     })
 }
 
@@ -788,6 +915,26 @@ mod tests {
     }
 
     #[test]
+    fn typed_environment_wrappers_expose_delimiters_names_and_body() {
+        let tree = SyntaxNode::new_root(parse_math_content(
+            r"\begin {aligned}x &= y\end{aligned}",
+            MathParseOptions::default(),
+        ));
+        let environment = tree
+            .descendants()
+            .find_map(MathEnvironment::cast)
+            .expect("environment");
+
+        assert_eq!(environment.begin_name().as_deref(), Some("aligned"));
+        assert_eq!(environment.end_name().as_deref(), Some("aligned"));
+        assert_eq!(
+            environment.body().expect("body").syntax().to_string(),
+            "x &= y"
+        );
+        assert!(environment.is_closed());
+    }
+
+    #[test]
     fn typed_script_wrapper_ignores_multiline_container_prefixes() {
         let tree = parse("> $x\n>  ^ 2$\n", None);
         let math = tree
@@ -845,6 +992,14 @@ mod tests {
         assert_eq!(
             diag_kinds(r"\begin{aligned}x\end{matrix}"),
             vec![MathDiagnosticKind::MismatchedEnvironment]
+        );
+    }
+
+    #[test]
+    fn matching_outer_end_leaves_only_the_inner_environment_unclosed() {
+        assert_eq!(
+            diag_kinds(r"\begin{aligned}\begin{matrix}x\end{aligned}"),
+            vec![MathDiagnosticKind::UnclosedEnvironment]
         );
     }
 

@@ -70,27 +70,28 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Badness optional-argument parity.** Added native optional nodes and line-break
-modifiers on top of the command-owned CST.
+**Badness environment parity.** Replaced the flat environment shape with native
+delimiter and body nodes while retaining the legacy formatter behavior.
 
-- `MATH_OPTIONAL` owns distinct bracket tokens. Commands attach only tight,
-  structurally closed optionals, account for nested command arguments, and ban
-  attachment for the exact `\big`/`\Big` families.
-- `MATH_LINE_BREAK` owns directly abutting lone `*` and `[length]` modifiers;
-  the legacy formatter keeps those modifiers attached through row layout and
-  uses command-node ownership to preserve arbitrary starred variants.
-- Mandatory parser parity is 56/74. All six new oracle cases pass; the same 18
-  environment and `\left`/`\right` cases remain divergent.
+- `MATH_ENVIRONMENT` now owns `MATH_BEGIN`, nested `MATH_CONTENT`, and optional
+  `MATH_END`; delimiters own `MATH_NAME_GROUP` nodes and expose typed accessors.
+- Static-name gating, stray ends, unclosed environments, and mismatched-closer
+  unwinding are lossless and keep the existing linter diagnostics stable.
+- Mandatory parser parity is 73/77 after adding nested and trivia-before-name
+  regressions. Only the four `\left`/`\right` corpus cases remain divergent.
 
 ### Suggested next sub-targets
-1. Match Badness's environment `BEGIN`/body/`END` hierarchy and recovery.
-2. Bring `\left`/`\right` structure and recovery into parity.
-3. Lock the complete kind map before starting signature/domain semantics.
+1. Bring `\left`/`\right` structure and recovery into parity.
+2. Lock the complete kind map before starting signature/domain semantics.
+3. Port the first bounded signature/domain semantic slice.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Optional arguments + line-break modifiers.** Added tight optional ownership,
+  the `\big`-family exception, and `\\` star/length modifiers; parity reached
+  56/74.
 - **Command ownership + scripted bases.** Commands now own their brace groups,
   control symbols stay bare, line breaks are nodes, and scripts bind to complete
   command atoms; mandatory parity reached 50/68.

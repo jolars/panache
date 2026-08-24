@@ -12,7 +12,9 @@ use rowan::{GreenNodeBuilder, NodeOrToken};
 use super::layout::{Doc, Printer};
 use super::operators::{self, AtomClass};
 use super::{MathContext, MathFormatOptions, linebreak};
-use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::syntax::{
+    AstNode, MathEnvironment, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken,
+};
 use panache_parser::parser::math::MathParseOptions;
 
 const INDENT: &str = "  ";
@@ -513,39 +515,20 @@ struct EnvParts {
 
 impl EnvParts {
     fn of(env: &SyntaxNode) -> Option<Self> {
-        let children: Vec<SyntaxElement> = env.children_with_tokens().collect();
-        let is_cmd = |el: &SyntaxElement, text: &str| {
-            el.as_token()
-                .is_some_and(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD && t.text() == text)
-        };
-        let begin_idx = children.iter().position(|c| is_cmd(c, r"\begin"))?;
-        let end_idx = children.iter().position(|c| is_cmd(c, r"\end"))?;
-        let begin_name = first_group_after(&children, begin_idx);
-        let end_name = first_group_after(&children, end_idx);
-
-        let begin_line = format!(r"\begin{}", group_text(&children, begin_name));
-        let end_line = format!(r"\end{}", group_text(&children, end_name));
-        let body_start = begin_name.map(|i| i + 1).unwrap_or(begin_idx + 1);
-        let body = children[body_start..end_idx].to_vec();
+        let environment = MathEnvironment::cast(env.clone())?;
+        let begin_line = environment.begin()?.syntax().text().to_string();
+        let end_line = environment.end()?.syntax().text().to_string();
+        let body = environment
+            .body()?
+            .syntax()
+            .children_with_tokens()
+            .collect();
         Some(Self {
             begin_line,
             end_line,
             body,
         })
     }
-}
-
-fn first_group_after(children: &[SyntaxElement], idx: usize) -> Option<usize> {
-    children[idx + 1..]
-        .iter()
-        .position(|c| c.kind() == SyntaxKind::MATH_GROUP)
-        .map(|p| p + idx + 1)
-}
-
-fn group_text(children: &[SyntaxElement], idx: Option<usize>) -> String {
-    idx.and_then(|i| children[i].as_node())
-        .map(|n| n.text().to_string())
-        .unwrap_or_default()
 }
 
 enum BodyItem {

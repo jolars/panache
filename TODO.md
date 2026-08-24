@@ -269,9 +269,12 @@ the test projector.
   splitting have landed, but scripts must bind to complete
   Badness-equivalent atoms, especially command calls with their arguments.
   (Scripts now wrap the complete command node, arguments included.)
-- [ ] Match Badness's environment and `\left`/`\right` structure and recovery in
-  the existing single pass. Keep the Markdown host's decision about which
-  raw environments count as math outside this grammar.
+- [x] Match Badness's environment `BEGIN`/body/`END` hierarchy and recovery in
+  the existing single pass. Environment names use dedicated name groups;
+  mismatched closers unwind to the matching level. Keep the Markdown host's
+  decision about which raw environments count as math outside this grammar.
+- [ ] Match Badness's `\left`/`\right` structure and recovery in the existing
+  single pass.
 - [ ] Port the Badness signature, argument-domain, and math-atom models into
   Panache-owned modules. Keep operator class, delimiter role, unary
   coercion, and break priority out of the CST, and expose the same semantic
