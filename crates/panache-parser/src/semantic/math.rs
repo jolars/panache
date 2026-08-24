@@ -1,9 +1,11 @@
 //! Conservative semantic facts for TeX math content.
 //!
 //! These facts remain separate from the CST because a visible macro definition
-//! may replace any built-in meaning. This first slice covers the built-in
-//! commands whose arguments establish math or text domains; document-provided
-//! definitions will be layered over this table separately.
+//! may replace any built-in meaning. The built-in table covers the initial
+//! commands whose arguments establish math or text domains, while a document
+//! overlay suppresses those facts for names redefined in raw TeX.
+
+use std::collections::HashSet;
 
 use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 
@@ -35,6 +37,46 @@ pub struct ArgSpec {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommandSignature {
     pub arguments: &'static [ArgSpec],
+}
+
+/// Document-provided command definitions layered over built-in signatures.
+///
+/// Panache does not expand replacement bodies. A recognized definition therefore
+/// suppresses built-in argument-domain knowledge instead of attempting to infer
+/// the replacement command's meaning.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SignatureScope {
+    redefined_commands: HashSet<String>,
+}
+
+impl SignatureScope {
+    /// Collect command definitions from raw TeX nodes in a parsed document.
+    pub fn from_root(root: &SyntaxNode) -> Self {
+        let mut scope = Self::default();
+        for node in root.descendants().filter(|node| {
+            matches!(
+                node.kind(),
+                SyntaxKind::TEX_BLOCK | SyntaxKind::LATEX_COMMAND
+            )
+        }) {
+            collect_definition_targets(&node.text().to_string(), &mut scope.redefined_commands);
+        }
+        scope
+    }
+
+    /// Whether a document definition shadows the built-in command name.
+    pub fn is_redefined(&self, name: &str) -> bool {
+        self.redefined_commands.contains(name)
+    }
+
+    /// Resolve a command against the document overlay, then the built-in table.
+    pub fn command_signature(&self, name: &str) -> Option<&'static CommandSignature> {
+        if self.is_redefined(name) {
+            None
+        } else {
+            builtin_command_signature(name)
+        }
+    }
 }
 
 const fn argument(required: bool, kind: ArgKind, domain: ArgumentDomain) -> ArgSpec {
@@ -103,6 +145,13 @@ pub fn match_arg_slot(arguments: &[ArgSpec], slot: &mut usize, kind: ArgKind) ->
 ///
 /// Unowned, unmatched, over-attached, and unknown-command groups are unknown.
 pub fn argument_domain(group: &SyntaxNode) -> ArgumentDomain {
+    let root = group.ancestors().last().unwrap_or_else(|| group.clone());
+    let scope = SignatureScope::from_root(&root);
+    argument_domain_with_scope(group, &scope)
+}
+
+/// Return an attached math argument's domain using a precomputed document scope.
+pub fn argument_domain_with_scope(group: &SyntaxNode, scope: &SignatureScope) -> ArgumentDomain {
     match group.kind() {
         SyntaxKind::MATH_GROUP | SyntaxKind::MATH_OPTIONAL => {}
         _ => return ArgumentDomain::Unknown,
@@ -116,7 +165,7 @@ pub fn argument_domain(group: &SyntaxNode) -> ArgumentDomain {
     let Some(name) = command_name(&owner) else {
         return ArgumentDomain::Unknown;
     };
-    let Some(signature) = builtin_command_signature(&name) else {
+    let Some(signature) = scope.command_signature(&name) else {
         return ArgumentDomain::Unknown;
     };
 
@@ -134,6 +183,87 @@ pub fn argument_domain(group: &SyntaxNode) -> ArgumentDomain {
         }
     }
     ArgumentDomain::Unknown
+}
+
+const DEFINITION_COMMANDS: &[&str] = &[
+    "newcommand",
+    "renewcommand",
+    "providecommand",
+    "DeclareRobustCommand",
+    "def",
+    "edef",
+    "gdef",
+    "xdef",
+    "NewDocumentCommand",
+    "RenewDocumentCommand",
+    "ProvideDocumentCommand",
+    "DeclareDocumentCommand",
+];
+
+fn collect_definition_targets(text: &str, targets: &mut HashSet<String>) {
+    let bytes = text.as_bytes();
+    let mut line_start = 0;
+    while line_start < bytes.len() {
+        let mut cursor = line_start;
+        while matches!(bytes.get(cursor), Some(b' ' | b'\t')) {
+            cursor += 1;
+        }
+        if let Some((head, after_head)) = control_word(text, cursor)
+            && DEFINITION_COMMANDS.contains(&head)
+            && let Some(target) = definition_target(text, after_head)
+        {
+            targets.insert(target.to_owned());
+        }
+        line_start = text[line_start..]
+            .find('\n')
+            .map_or(bytes.len(), |offset| line_start + offset + 1);
+    }
+}
+
+fn definition_target(text: &str, mut cursor: usize) -> Option<&str> {
+    cursor = skip_tex_trivia(text, cursor);
+    if text.as_bytes().get(cursor) == Some(&b'*') {
+        cursor = skip_tex_trivia(text, cursor + 1);
+    }
+    if text.as_bytes().get(cursor) != Some(&b'{') {
+        return control_word(text, cursor).map(|(name, _)| name);
+    }
+
+    cursor = skip_tex_trivia(text, cursor + 1);
+    let (name, after_name) = control_word(text, cursor)?;
+    cursor = skip_tex_trivia(text, after_name);
+    (text.as_bytes().get(cursor) == Some(&b'}')).then_some(name)
+}
+
+fn control_word(text: &str, cursor: usize) -> Option<(&str, usize)> {
+    let bytes = text.as_bytes();
+    if bytes.get(cursor) != Some(&b'\\') {
+        return None;
+    }
+    let start = cursor + 1;
+    let mut end = start;
+    while bytes
+        .get(end)
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || matches!(byte, b'@' | b'_' | b':'))
+    {
+        end += 1;
+    }
+    (end > start).then(|| (&text[start..end], end))
+}
+
+fn skip_tex_trivia(text: &str, mut cursor: usize) -> usize {
+    let bytes = text.as_bytes();
+    loop {
+        while bytes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+            cursor += 1;
+        }
+        if bytes.get(cursor) != Some(&b'%') {
+            return cursor;
+        }
+        cursor = text[cursor..]
+            .find('\n')
+            .map_or(bytes.len(), |offset| cursor + offset + 1);
+    }
 }
 
 fn command_name(command: &SyntaxNode) -> Option<String> {

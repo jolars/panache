@@ -8,9 +8,10 @@ use badness_parser::semantic::{
 use badness_parser::syntax::SyntaxKind as BadnessKind;
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::semantic::math::{
-    ArgKind, ArgumentDomain, argument_domain, builtin_command_signature,
+    ArgKind, ArgumentDomain, SignatureScope, argument_domain, builtin_command_signature,
 };
 use panache_parser::syntax::{SyntaxKind, SyntaxNode};
+use panache_parser::{ParserOptions, parse};
 
 fn badness_domains(body: &str) -> Vec<BadnessDomain> {
     let parsed = parse_badness(&format!("${body}$"));
@@ -28,6 +29,40 @@ fn badness_domains(body: &str) -> Vec<BadnessDomain> {
 
 fn panache_domains(body: &str) -> Vec<ArgumentDomain> {
     let root = SyntaxNode::new_root(parse_math_content(body, MathParseOptions::default()));
+    root.descendants()
+        .filter(|node| {
+            matches!(
+                node.kind(),
+                SyntaxKind::MATH_GROUP | SyntaxKind::MATH_OPTIONAL
+            )
+        })
+        .filter(|node| {
+            node.parent()
+                .is_some_and(|parent| parent.kind() == SyntaxKind::MATH_COMMAND)
+        })
+        .map(|group| argument_domain(&group))
+        .collect()
+}
+
+fn badness_document_domains(source: &str) -> Vec<BadnessDomain> {
+    let parsed = parse_badness(source);
+    parsed
+        .syntax()
+        .descendants()
+        .filter(|node| matches!(node.kind(), BadnessKind::GROUP | BadnessKind::OPTIONAL))
+        .filter(|node| {
+            node.parent()
+                .is_some_and(|parent| parent.kind() == BadnessKind::COMMAND)
+                && node
+                    .ancestors()
+                    .any(|ancestor| ancestor.kind() == BadnessKind::MATH)
+        })
+        .map(|group| badness_argument_domain(&group))
+        .collect()
+}
+
+fn panache_document_domains(source: &str) -> Vec<ArgumentDomain> {
+    let root = parse(source, Some(ParserOptions::default()));
     root.descendants()
         .filter(|node| {
             matches!(
@@ -118,4 +153,52 @@ fn attached_argument_domains_match_badness() {
             .collect::<Vec<_>>();
         assert_eq!(panache, badness, "{body}");
     }
+}
+
+#[test]
+fn document_redefinitions_shadow_builtin_domains() {
+    for source in [
+        "\\renewcommand{\\frac}[2]{#1/#2}\n\n$\\frac{a}{b}$\n",
+        "\\renewcommand\\frac[2]{#1/#2}\n\n$\\frac{a}{b}$\n",
+        "\\def\\frac#1#2{#1/#2}\n\n$\\frac{a}{b}$\n",
+        "\\RenewDocumentCommand{\\frac}{mm}{#1/#2}\n\n$\\frac{a}{b}$\n",
+        "$\\frac{a}{b}$\n\n\\renewcommand{\\frac}[2]{#1/#2}\n",
+    ] {
+        let panache = panache_document_domains(source);
+        let badness = badness_document_domains(source)
+            .into_iter()
+            .map(|domain| match domain {
+                BadnessDomain::Unknown => ArgumentDomain::Unknown,
+                BadnessDomain::Math => ArgumentDomain::Math,
+                BadnessDomain::Text => ArgumentDomain::Text,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(panache, badness, "{source}");
+        assert_eq!(panache, vec![ArgumentDomain::Unknown; 2], "{source}");
+    }
+}
+
+#[test]
+fn definition_overlay_ignores_comments_and_malformed_targets() {
+    let source = "% \\renewcommand{\\frac}[2]{#1/#2}\n\n$\\frac{a}{b}$\n";
+    let root = parse(source, Some(ParserOptions::default()));
+    let scope = SignatureScope::from_root(&root);
+    assert!(!scope.is_redefined("frac"));
+    assert_eq!(
+        panache_document_domains(source),
+        vec![ArgumentDomain::Math; 2],
+    );
+
+    let source = "\\renewcommand{frac}[2]{#1/#2}\n\n$\\frac{a}{b}$\n";
+    let root = parse(source, Some(ParserOptions::default()));
+    assert!(!SignatureScope::from_root(&root).is_redefined("frac"));
+}
+
+#[test]
+fn blockquoted_raw_tex_redefinitions_are_visible() {
+    let source = "> \\renewcommand{\\frac}[2]{#1/#2}\n>\n> $\\frac{a}{b}$\n";
+    assert_eq!(
+        panache_document_domains(source),
+        vec![ArgumentDomain::Unknown; 2],
+    );
 }

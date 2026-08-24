@@ -70,26 +70,29 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Built-in signature/domain semantics—first slice.** Added Panache-owned
-semantic types and conservative positional lookup without changing the CST.
+**Document signature overlays.** Made argument-domain lookup redefinition-aware
+without inferring macro replacement semantics.
 
-- `semantic::math` now owns `ArgKind`, `ArgumentDomain`, `ArgSpec`, command
-  signatures, optional-slot matching, and attached-argument domain lookup.
-- The initial curated table covers Badness's math-domain built-ins plus
-  `\text`, `\mbox`, and `\intertext`; unknown commands and unmatched or
-  over-attached groups remain `Unknown`.
-- A dev-only differential suite pins both signature data and realized group
-  domains against `badness-parser =0.4.0`.
+- `SignatureScope` scans `TEX_BLOCK` and `LATEX_COMMAND` nodes for the LaTeX2e,
+  primitive `\def`, and xparse command-definition families.
+- Any recognized document definition shadows the built-in signature and makes
+  every attached argument domain `Unknown`; no replacement-body meaning is
+  guessed. Callers may precompute and reuse the scope.
+- Differential tests match Badness for braced/unbraced, primitive, xparse, and
+  definition-after-use cases; host coverage includes blockquoted raw TeX.
+- Explicit configuration remains a later part of the declaration-model task.
 
 ### Suggested next sub-targets
-1. Add document-provided signature overlays so redefinitions shadow built-ins.
-2. Port Badness's math-atom info and Unicode-scalar iterator.
+1. Port Badness's math-atom info and Unicode-scalar iterator.
+2. Add explicit configured command signatures.
 3. Move formatter-local operator interpretation onto the shared semantic API.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Built-in signature/domain semantics.** Added native signature types,
+  positional lookup, and a Badness differential suite.
 - **Badness `\left`/`\right` parity.** Added nested delimiter bodies and
   same-scope recovery; mandatory structural parity reached 82/82.
 - **Environment hierarchy + recovery.** Added begin/name/body/end nodes,
