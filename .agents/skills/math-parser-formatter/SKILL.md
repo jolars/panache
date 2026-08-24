@@ -19,39 +19,45 @@ and design decisions live in this skill and `RECAP.md`.
   accessors in `crates/panache-parser/src/syntax/{math,inlines}.rs`.
 - Formatter (future phases): a new `crates/panache-formatter/src/formatter/math/`
   mirroring `formatter/yaml/`, gated behind an experimental option.
-- Goal: parse math *content* into a lossless structural CST (Phase 1 done;
-  operator atoms now tokenized) and reformat it **semantics-safely**. *In scope*:
-  align `&` columns, indent environment bodies, normalize `\\`, collapse spaces
-  (done); **operator-precedence-aware spacing** (`a+b` → `a + b`, class-based);
-  and **semantic line-breaking + indenting of long display math** (wrap at the
-  lowest-precedence operators, indent continuations). *Out of scope*: macro
-  rewriting, `\frac`/`\dfrac` canonicalization, and anything that needs macro
-  expansion.
+- Goal: make Panache's math-content CST structurally isomorphic to Badness's and
+  reproduce Badness's math formatting style, while retaining a wholly native
+  production parser, semantic model, CST, and formatter. The sole intentional
+  style extension is alignment of trailing `\\` markers in alignment-capable
+  environments. *Out of scope*: macro rewriting, `\frac`/`\dfrac`
+  canonicalization, and anything that needs macro expansion.
 - **There is no pandoc oracle for math *formatting*** — pandoc passes math
-  content through untouched. Use an external dev-only oracle (latexindent /
-  KaTeX parser) for cross-validation, à la `pretty_yaml` for YAML.
+  content through untouched. Use exact, pinned `badness-parser` and
+  `badness-formatter` development dependencies as the structural and output
+  oracles. Retain independent MathML and TeX/PDF checks for meaning preservation.
 
 ## Locked-in design decisions (do not relitigate)
 
 - **Parser is unconditional + lossless**; the experimental gate lives on the
   **formatter** side (default off = emit math verbatim, today's behavior). The
   gate is a formatter-config option, NOT a Pandoc `Extensions` flag.
-- **texlab, not KaTeX**, is the parser model (lossless, error-tolerant vs.
-  lossy, throwing).
+- **Badness is the parser model.** Match its lossless, error-tolerant CST and
+  recovery through the pinned development-only oracle; do not substitute a
+  lossy or throwing math parser.
 - **Diagnostics ride a side-channel** (`MathParseReport`), to be surfaced via
   linter + LSP — not the CST.
-- **Bookdown equation labels** (`(\#eq:label)`) are parsed into a
-  `MATH_EQUATION_LABEL` token, gated on `bookdown_equation_references`.
+- **Host-only constructs stay outside TeX math where possible.** Markdown
+  delimiters, Bookdown equation labels (`(\#eq:label)`), Pandoc attributes, and
+  container prefixes belong to the host layer. Existing embedded label tokens
+  are migration residue, not the target CST.
 - **`MATH_SPACE`/`MATH_NEWLINE` stay distinct** from host `WHITESPACE`/`NEWLINE`
   so `math_content_text()` can strip container prefixes the block machinery
   interleaves into `MATH_CONTENT` (blockquote `>` etc.).
-- **Operators are tokenized but never classified in the CST.** `+ - * = < >`
-  emit a neutral `MATH_OPERATOR` token (one per char); bin/rel/precedence is
-  *interpretation* (contextual unary minus, `\mathbin`, macro-dependent) — the
-  analog of YAML scalar cooking. It lives in a **shared formatter/LSP module**
-  keyed on operator text + command name (class + break-priority), never
-  `MATH_BIN_OP`/`MATH_REL_OP` kinds. That module is the gateway to both
-  precedence-aware spacing and semantic line-breaking.
+- **The math CST follows Badness's lexical grain.** Ordinary characters live in
+  a Badness-equivalent `MATH_WORD` run; `MATH_OPERATOR`, `MATH_OPEN`,
+  `MATH_CLOSE`, and `MATH_PUNCT` are migration residue from the old formatter.
+  A Panache-owned semantic atom iterator slices Unicode scalars and derives
+  operator class, delimiter role, unary coercion, and break priority exactly as
+  Badness does.
+- **Badness is test-only.** Production code must not depend on Badness, retain a
+  Badness CST, delegate formatting, or project between runtime trees. Test-only
+  projectors may mechanically rename kinds, remove wrapper offsets, and discard
+  documented host trivia; they must never parse, infer attachment, or repair a
+  tree.
 
 Follow the math-parser, parser, and formatter invariants in the repository's
 root `AGENTS.md`.
@@ -63,8 +69,10 @@ root `AGENTS.md`.
 - **Phase 1 — TeX tokenizer + structural CST (parser).** *DONE*. Lossless
   `MATH_CONTENT` CST, diagnostics side-channel, bookdown labels,
   accessors/projector/indexers.
-- **Phase 1b — operator atoms (parser).** *DONE* (`feat(parser): tokenize math
-  operators into MATH_OPERATOR`). Neutral `MATH_OPERATOR` token, no class.
+- **Phase 1b — operator atoms (parser).** *LEGACY; TO BE REPLACED*. The old
+  formatter introduced `MATH_OPERATOR` and related fine-grained tokens. The
+  Badness-compatible CST returns ordinary characters to `MATH_WORD` and exposes
+  atoms through the semantic layer.
 - **Phase 2 — formatter experimental gate + inline math.** *DONE*. Gate is
   `[experimental] format-math` (default false), mirrored onto
   `Config::experimental_format_math`, schema regenerated. Off → verbatim; on →
@@ -74,19 +82,20 @@ root `AGENTS.md`.
   `has_unescaped_single_dollar_in_content()`.
 - **Phase 4 — dev-oracle cross-validation + idempotency corpus.** *DONE*.
   Tier-1 corpus props + Tier-2 `pulldown-latex` MathML invariance oracle.
-- **Phase 5 — operator interpretation module + precedence-aware spacing.**
-  *DONE*. `formatter/math/operators.rs` (`cooking.rs` analog, `pub` for LSP):
+- **Phase 5 — legacy operator interpretation + precedence-aware spacing.**
+  *DONE ON THE OLD PATH; TO BE REPLACED*. `formatter/math/operators.rs`:
   classify char operators + curated command table → class; TeX Bin→Ord coercion;
   gap-based re-spacer (`a+b`→`a + b`, unary `-x`/`f(-x)` tight, `x=-y`→`x = -y`).
   Char operators only; **command-operator spacing + Tier 3 → Phase 5b**;
   break-priority column → Phase 6.
-- **Phase 5b — command-operator spacing + Tier 3.** *DONE*. Re-spaced
+- **Phase 5b — legacy command-operator spacing + Tier 3.** *DONE ON THE OLD
+  PATH; TO BE REPLACED*. Re-spaced
   `\leq`/`\cdot` (command-terminating space handled, never `TightOp`); landed the
   dev-only vendored symbol→atom-class fixture (`tests/fixtures/math_symbol_classes/`)
   cross-checked against `pulldown-latex` Events. `\lim`/`\asymp` divergences
   recorded, not corrected.
-- **Phase 6 — semantic line-breaking + indenting.** Wrap long display math at
-  lowest-precedence operators, indent continuations (uses Phase 5 priorities).
+- **Phase 6 — legacy semantic line-breaking + indenting.** *DONE IN PART ON THE
+  OLD PATH; TO BE REPLACED BY BADNESS-PARITY LOWERING.*
   - *Commit 1 DONE*: parser tokenizes delimiters/punctuation (`( [` →
     `MATH_OPEN`, `) ]` → `MATH_CLOSE`, `, ;` → `MATH_PUNCT`; `| . /` stay text);
     formatter's `text_tail_class` replaced by kind-keyed `operators::delimiter_class`.
@@ -112,9 +121,10 @@ root `AGENTS.md`.
   `configuration.qmd`); consider flipping the gate per flavor (separate
   decision).
 - **Surface math diagnostics via linter/LSP** — *DONE* (promoted Warning→Error).
-- **Optional structural cooking (parser, orthogonal to operators):** script
-  attachment, known-command argument grouping — legit future CST work if a
-  formatting phase needs the structure.
+- **Current redesign — Badness parity.** Add pinned dev-only oracles and minimal
+  projectors; align the lexical and structural CST; port the signature and math
+  semantics; then replace the legacy renderer with Badness-parity typed lowering
+  and layout. See `TODO.md` for the authoritative sequence.
 
 ## Session workflow
 
@@ -127,6 +137,8 @@ root `AGENTS.md`.
    - `cargo fmt -- --check`
    - For parser CST snapshot changes: review each diff (byte ranges must still
      reconstruct the input losslessly).
+   - Run the focused Badness parser and formatter parity suites for every
+     migrated slice.
    - Flag-off regression: existing formatter goldens stay byte-identical.
 5. Rewrite `RECAP.md`'s Latest-session entry; add a one-line Earlier-sessions
    note.

@@ -21,18 +21,25 @@ still-relevant trap into Persistent traps. Keep it short.
   `MATH_SPACE` is load-bearing (collides with blockquote-prefix `WHITESPACE`
   otherwise); `MATH_NEWLINE` is kept for symmetry.
 - **Parser is unconditional; the experimental gate is formatter-side only.**
-- **Panache owns its complete math stack.** `../badness` may inform design and
-  regression cases, but Panache must not depend on its crates, retain or project
-  a Badness CST, share a math crate with it, or delegate formatting to it.
-- **No pandoc oracle for math formatting** — pandoc passes math through. Lean on
-  golden tests + idempotency/losslessness, plus a dev-only latexindent/KaTeX
-  oracle (Phase 4).
+- **Panache owns its complete production math stack.** Runtime code must not
+  depend on Badness, retain a Badness CST, share a math crate, delegate
+  formatting, or project between runtime trees. Exact, pinned Badness crates are
+  permitted as development-only parser and formatter oracles.
+- **Badness defines the target math CST and formatting style.** Panache's math
+  subtree is structurally isomorphic after mechanical `MATH_*` renaming and
+  removal of host-only trivia. Formatter output matches Badness byte-for-byte,
+  except that Panache aligns trailing `\\` markers in alignment-capable
+  environments.
+- **Test projectors are deliberately weak.** They may rename kinds, adjust
+  wrapper offsets, and discard documented host trivia, but never infer command
+  arguments, attach scripts, repair recovery, or otherwise parse TeX.
 - **Background revert trap**: a process (suspected pre-commit `git stash`)
   reverted tracked edits once mid-session; untracked files survived. Re-apply if
   source edits vanish.
-- **Operator class/precedence is NOT a CST concern — settled, do not
-  relitigate.** The parser emits a *neutral* `MATH_OPERATOR` token (one per char,
-  `+ - * = < >`); it does NOT tag bin/rel or build a precedence tree. Rationale:
+- **Operator class/precedence is NOT a CST concern.** The target parser emits a
+  Badness-equivalent `MATH_WORD` run, not the old `MATH_OPERATOR`, `MATH_OPEN`,
+  `MATH_CLOSE`, or `MATH_PUNCT` grain. A semantic atom iterator slices Unicode
+  scalars and classifies them. Rationale:
   TeX assigns atom class contextually during mlist→hlist (Appendix G coerces a
   Bin atom after Bin/Rel/Open/Punct to Ord — that *is* unary minus), it's
   override-able (`\mathbin`) and macro-dependent, and there is no
@@ -42,30 +49,17 @@ still-relevant trap into Persistent traps. Keep it short.
   formatting phase needs class+precedence, build a **shared `math` interpretation
   module** (operator table keyed on operator text *and* command name → class +
   break-priority) consumed by formatter + LSP — never `MATH_BIN_OP`/`MATH_REL_OP`
-  kinds. (Structural cooking that *would* be legit future parser work: script
-  attachment, known-command argument grouping — orthogonal to operators.)
-  **That module now exists** (Phase 5):
-  `crates/panache-formatter/src/formatter/math/operators.rs`, `pub` for LSP
-  reuse; break-priority column landed (Phase 6 commit 2:
-  `operators::break_priority`, Rel > Bin > 0).
-- **Splitting a `MATH_OPERATOR` run: rel chars merge, sign chars split.** A run
-  of adjacent operator chars is NOT one atom. Adjacent relation chars (`= < >`)
-  merge (`<=`), but each sign char (`+ - *`) is its own atom so it can be unary —
-  `=-` is `=` then unary `-` (`x = -y`), not a composite `=-` (`x =- y`). See
-  `operators::split_operator_atoms`.
+  kinds. The existing formatter-local `operators.rs` and fine-grained tokens are
+  migration residue; replace them with the Panache-owned Badness-parity semantic
+  model.
 - **CST grain vs interpretation — the line to hold.** A *fact* (unambiguous from
   the bytes, no macro escape) belongs in the CST grain; a *guess* (fallible
   without macro expansion, which we don't do) belongs in the interpretation
   layer (`operators.rs`), never the CST. Operator **class** (bin/rel/unary) is a
   guess — `\mathbin`/`\def`/`\mathcode` can override it — so it stays neutral in
-  the CST even though the parser *has* the same context the formatter does (no
-  information asymmetry; it's a principle, not a capability limit). Delimiters
-  and punctuation (`( ) [ ] , ;`) are the opposite: their category is
-  unambiguous at the character level, so they belong in the CST grain. **Done
-  (Phase 6 commit 1):** the parser tokenizes them into `MATH_OPEN`/`MATH_CLOSE`/
-  `MATH_PUNCT`, and the old `text_tail_class` (which re-lexed a `MATH_TEXT` tail)
-  is gone — the formatter reads the token kind via `operators::delimiter_class`.
-  `| . /` stay `MATH_TEXT` (their class needs macro context).
+  the semantic layer even though the parser has the same local bytes. Match
+  Badness's lexical grain rather than encoding a partial character-class table
+  in Panache's token kinds.
 - **Scripts are native CST structure.** `MATH_SCRIPTED` owns one base atom and
   `MATH_SUBSCRIPT`/`MATH_SUPERSCRIPT` children. Unbraced text bases and
   arguments split at Unicode-scalar boundaries; comments and blank lines stop
@@ -76,42 +70,37 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Native script CST—first roadmap slice.** Added Panache-owned
-`MATH_SCRIPTED`, `MATH_SUBSCRIPT`, and `MATH_SUPERSCRIPT` nodes during the
-existing single pass, using Rowan checkpoints rather than a repair pass.
+**Badness-parity roadmap revision.** Rewrote `TODO.md` so Badness is the
+normative parser and formatter oracle, while Panache retains independent native
+production code.
 
-- TeX one-token attachment is explicit: ordinary runs split before the final
-  Unicode scalar, while commands, groups, environments, and
-  `MATH_DELIMITED` nodes can serve as structural bases or arguments. Spaces and
-  one physical newline remain lossless inside the attachment; comments and
-  blank lines stop it. Missing arguments stay structured, and stray markers
-  remain bare tokens; no new diagnostic was introduced.
-- Added `MathScripted`, `MathSubscript`, and `MathSuperscript` typed wrappers.
-  Their accessors ignore injected host prefixes, preserving direct host ranges
-  for linter and LSP consumers.
-- Formatter flattening now carries script boundaries: marker/argument gaps are
-  tight, then the base atom's semantic class is restored. Scripted `=`,
-  `\gets`, and `:=` remain relation/assignment break sites, and star-modifier
-  adjacency does not cross a script.
-- Added focused parser and formatter goldens, updated 11 affected parser
-  snapshots, and passed workspace check/test/Clippy/fmt plus the math corpus
-  idempotency/losslessness gate.
+- The target math CST is structurally isomorphic to Badness after mechanical
+  `MATH_*` renaming and host-trivia removal. The old fine-grained operator and
+  delimiter tokens are no longer protected behavior.
+- Exact, pinned `badness-parser` and `badness-formatter` development dependencies
+  will drive test-only structural projectors and byte-for-byte formatter parity.
+- Existing Panache formatting is not allowlisted. The only deliberate style
+  extension is alignment of trailing `\\` markers in alignment-capable
+  environments.
+- The first native script slice remains useful but incomplete until scripts bind
+  to complete Badness-equivalent command atoms.
 
 ### Suggested next sub-targets
-1. Specify and implement one bounded native command-call/argument shape,
-   beginning with signature-proven built-ins and unknown-macro whitespace
-   preservation.
-2. Design the Panache-owned signature/domain model before recursing into
-   command arguments in the formatter.
-3. Decide missing/duplicate-script diagnostics separately; do not infer them
-   merely from the richer CST.
+1. Add the pinned dev-only Badness dependencies, canonical structural projector,
+   and formatter wrapper/extractor.
+2. Generate the initial differential report and lock the one-to-one kind map.
+3. Migrate the lexical grain and command-call structure before extending the
+   formatter further.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
-- **Native Panache math-stack roadmap.** Recorded the no-Badness-dependency
-  parser/CST, formatter, integration, and validation plan in `TODO.md`.
+- **Native script CST—first roadmap slice.** Added scripted/subscript/superscript
+  nodes, typed wrappers, Unicode-scalar attachment, and temporary legacy-renderer
+  support; full parity still depends on Badness-equivalent command atoms.
+- **Earlier native math-stack roadmap.** Recorded the first independent-stack
+  plan in `TODO.md`; the Badness-parity roadmap now supersedes it.
 - **Composable embedded math environments.** Added the math-local Wadler-style
   document model, structured mixed-environment layout, and focused idempotency
   and MathML coverage; unsupported shapes remain verbatim.
