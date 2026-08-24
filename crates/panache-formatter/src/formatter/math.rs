@@ -25,7 +25,9 @@
 
 use crate::config::MathDelimiterStyle;
 use crate::formatter::Formatter;
-use crate::syntax::{DisplayMath, SyntaxKind, SyntaxNode, math_diagnostics};
+use crate::syntax::{
+    DisplayMath, MathSubscript, MathSuperscript, SyntaxKind, SyntaxNode, math_diagnostics,
+};
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -243,7 +245,23 @@ pub fn format_math(input: &str, opts: &MathFormatOptions) -> Option<String> {
     if !math_diagnostics(&tree).is_empty() {
         return None;
     }
+    if has_dangling_script(&tree) {
+        return None;
+    }
     Some(render::render(&tree, opts))
+}
+
+/// A script marker with no argument (`x^` at the end of the content, or with
+/// the argument cut off by a comment, blank line, or structural boundary)
+/// cannot be reflowed safely: collapsing the boundary trivia would let the
+/// next atom re-attach as the argument on the following pass, changing both
+/// the parse and the bytes. Such content is malformed TeX anyway, so it takes
+/// the verbatim path like other malformed math.
+fn has_dangling_script(tree: &SyntaxNode) -> bool {
+    tree.descendants().any(|node| {
+        MathSubscript::cast(node.clone()).is_some_and(|script| script.argument().is_none())
+            || MathSuperscript::cast(node).is_some_and(|script| script.argument().is_none())
+    })
 }
 
 fn has_unescaped_single_dollar(content: &str) -> bool {
@@ -534,6 +552,91 @@ mod tests {
         for case in ["a=_ib", r"a\gets_ib", "a:=_ib"] {
             assert_idempotent(case, MathContext::Inline);
         }
+    }
+
+    #[test]
+    fn ordinary_colon_before_a_scripted_definition_survives() {
+        assert_eq!(fmt("a::=_ib", MathContext::Inline), "a: :=_i b");
+        assert_eq!(fmt("a::=b", MathContext::Inline), "a: := b");
+        for case in ["a::=_ib", "a::=b"] {
+            assert_idempotent(case, MathContext::Inline);
+        }
+    }
+
+    #[test]
+    fn scripted_composite_relations_stay_fused() {
+        assert_eq!(fmt("x<=_iy", MathContext::Inline), "x <=_i y");
+        assert_eq!(fmt("x>=_iy", MathContext::Inline), "x >=_i y");
+        assert_eq!(fmt("a==_kb", MathContext::Inline), "a ==_k b");
+        for case in ["x<=_iy", "x>=_iy", "a==_kb"] {
+            assert_idempotent(case, MathContext::Inline);
+        }
+    }
+
+    #[test]
+    fn text_mode_script_argument_keeps_its_group_spaces() {
+        assert_eq!(
+            fmt(r"x_\text{ max }", MathContext::Inline),
+            r"x_\text{ max }"
+        );
+        assert_eq!(
+            fmt(r"x^\mbox{ a b }", MathContext::Inline),
+            r"x^\mbox{ a b }"
+        );
+        assert_eq!(fmt(r"\text{ a }^2", MathContext::Inline), r"\text{ a }^2");
+        for case in [r"x_\text{ max }", r"x^\mbox{ a b }", r"\text{ a }^2"] {
+            assert_idempotent(case, MathContext::Inline);
+        }
+    }
+
+    #[test]
+    fn dangling_script_marker_bails_to_verbatim() {
+        assert_eq!(format_math("x^", &opts(MathContext::Inline)), None);
+        assert_eq!(format_math("x^\n\n2", &opts(MathContext::Display)), None);
+        assert_eq!(
+            format_math(
+                "\\begin{align}\nx^\n\n2\n\\end{align}",
+                &opts(MathContext::Display)
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn overwidth_row_break_keeps_equation_labels_intact() {
+        let o = MathFormatOptions {
+            line_width: 30,
+            bookdown_equation_labels: true,
+            ..opts(MathContext::Display)
+        };
+        let input = "yyyy = aaaaaaaaaa + bbbbbbbbbb + cccccccccc (\\#eq:my-label)";
+        let once = fmt_with(input, &o);
+        assert!(once.contains("(\\#eq:my-label)"), "got: {once}");
+        assert_eq!(fmt_with(&once, &o), once);
+    }
+
+    #[test]
+    fn scripted_environment_keeps_environment_layout() {
+        let input = "\\begin{pmatrix}a \\\\ b\\end{pmatrix}^T";
+        let expected = "\\begin{pmatrix}\n  a \\\\\n  b\n\\end{pmatrix}^T";
+        assert_eq!(fmt(input, MathContext::Display), expected);
+        assert_idempotent(input, MathContext::Display);
+    }
+
+    #[test]
+    fn scripted_closing_delimiter_keeps_delimited_layout() {
+        let input = "(\\begin{bmatrix}1 \\\\ 2\\end{bmatrix})^2";
+        let expected = "(\n  \\begin{bmatrix}\n    1 \\\\\n    2\n  \\end{bmatrix}\n)^2";
+        assert_eq!(fmt(input, MathContext::Display), expected);
+        assert_idempotent(input, MathContext::Display);
+    }
+
+    #[test]
+    fn scripted_relation_after_environment_is_spaced() {
+        let input = "\\begin{pmatrix}a \\\\ b\\end{pmatrix}=_ic";
+        let once = fmt(input, MathContext::Display);
+        assert!(once.contains("\\end{pmatrix} =_i c"), "got: {once}");
+        assert_idempotent(input, MathContext::Display);
     }
 
     #[test]

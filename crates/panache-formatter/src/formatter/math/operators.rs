@@ -13,6 +13,8 @@
 //! spacing and line-breaking. The command table supplies the corresponding
 //! view for known control words.
 
+use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind};
+
 /// TeX atom classes (the subset the formatter's spacing pass needs; see The
 /// TeXbook Appendix G).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,19 +78,31 @@ impl<'a> Iterator for WordAtoms<'a> {
             (1 + relation_prefix_len(tail), AtomClass::Rel)
         } else {
             let first = self.rest.chars().next().expect("non-empty word");
-            match first {
-                '=' | '<' | '>' => (relation_prefix_len(self.rest), AtomClass::Rel),
-                '+' | '-' | '*' => (first.len_utf8(), AtomClass::Bin),
-                '(' | '[' => (first.len_utf8(), AtomClass::Open),
-                ')' | ']' => (first.len_utf8(), AtomClass::Close),
-                ',' | ';' => (first.len_utf8(), AtomClass::Punct),
-                ':' => (first.len_utf8(), AtomClass::Ord),
-                _ => (ordinary_prefix_len(self.rest), AtomClass::Ord),
+            match semantic_char_class(first) {
+                Some(AtomClass::Rel) => (relation_prefix_len(self.rest), AtomClass::Rel),
+                Some(class) => (first.len_utf8(), class),
+                None => (ordinary_prefix_len(self.rest), AtomClass::Ord),
             }
         };
         let (text, rest) = self.rest.split_at(len);
         self.rest = rest;
         Some(WordAtom::new(text, class))
+    }
+}
+
+/// The single source of truth for which characters end an ordinary run and
+/// which atom class each contributes. `None` means the character is part of an
+/// ordinary run. A `:` is semantic (it is an atom of its own, and may start a
+/// `:=` definition) but ordinary-classed on its own.
+fn semantic_char_class(c: char) -> Option<AtomClass> {
+    match c {
+        '=' | '<' | '>' => Some(AtomClass::Rel),
+        '+' | '-' | '*' => Some(AtomClass::Bin),
+        '(' | '[' => Some(AtomClass::Open),
+        ')' | ']' => Some(AtomClass::Close),
+        ',' | ';' => Some(AtomClass::Punct),
+        ':' => Some(AtomClass::Ord),
+        _ => None,
     }
 }
 
@@ -101,16 +115,50 @@ fn relation_prefix_len(text: &str) -> usize {
 fn ordinary_prefix_len(text: &str) -> usize {
     text.char_indices()
         .skip(1)
-        .find_map(|(offset, ch)| {
-            let starts_definition = ch == ':' && text[offset..].starts_with(":=");
-            (starts_definition
-                || matches!(
-                    ch,
-                    '+' | '-' | '*' | '=' | '<' | '>' | '(' | '[' | ')' | ']' | ',' | ';' | ':'
-                ))
-            .then_some(offset)
-        })
+        .find_map(|(offset, ch)| semantic_char_class(ch).is_some().then_some(offset))
         .unwrap_or(text.len())
+}
+
+/// Whether `text` is one maximal relation run (`=`, `<`, `>` characters only)
+/// — the shape a relation head has after the parser's script split severed it
+/// from its final scalar (`x<` + scripted `=`).
+pub fn is_relation_run(text: &str) -> bool {
+    !text.is_empty() && text.chars().all(|c| matches!(c, '=' | '<' | '>'))
+}
+
+/// The base atom of a `MATH_SCRIPTED` element, or `None` for anything else.
+pub fn scripted_base(element: &SyntaxElement) -> Option<SyntaxElement> {
+    element
+        .as_node()
+        .and_then(|node| MathScripted::cast(node.clone()))
+        .and_then(|scripted| scripted.base())
+}
+
+/// Atom class of a scripted base *as one operand*, shared by inline spacing
+/// and line-break candidate scans so the two can never disagree. Token bases
+/// resolve through [`word_atoms`] / [`command_class`]; structured bases
+/// (groups, environments, `\left…\right`) behave like a closed operand on
+/// their left, hence [`AtomClass::Close`] — callers must not treat that as a
+/// delimiter-depth change.
+pub fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
+    match base.kind() {
+        SyntaxKind::MATH_WORD => base
+            .as_token()
+            .and_then(|token| word_atoms(token.text()).next())
+            .map(|atom| atom.class),
+        SyntaxKind::MATH_COMMAND => base.as_token().map(|token| {
+            let name = token.text().strip_prefix('\\').unwrap_or(token.text());
+            command_class(name).unwrap_or(AtomClass::Ord)
+        }),
+        SyntaxKind::MATH_GROUP | SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_DELIMITED => {
+            Some(AtomClass::Close)
+        }
+        SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {
+            Some(AtomClass::Open)
+        }
+        SyntaxKind::MATH_LINE_BREAK => None,
+        _ => Some(AtomClass::Ord),
+    }
 }
 
 /// Class of a command operator, keyed on its name **without** the leading

@@ -85,7 +85,7 @@
 
 use super::operators::{self, AtomClass};
 use super::render;
-use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode};
+use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 
 struct Break {
@@ -172,32 +172,36 @@ fn semantic_token(element: &SyntaxElement) -> Option<crate::syntax::SyntaxToken>
     if let Some(token) = element.as_token() {
         return Some(token.clone());
     }
-    element
-        .as_node()
-        .and_then(|node| MathScripted::cast(node.clone()))
-        .and_then(|scripted| scripted.base())
-        .and_then(|base| base.into_token())
+    operators::scripted_base(element).and_then(|base| base.into_token())
 }
 
 /// The column continuation relations hang under, given the leading relation's
 /// kind: under the first relation for an equality/comparison chain
 /// ([`relation_column`]), but under the assignment's right-hand side for an
 /// assignment-led chain (or a relationless head) ([`rhs_start_column`]).
-pub(super) fn continuation_anchor(elems: &[SyntaxElement]) -> usize {
-    let normalized = normalized_elements(elems);
-    match first_top_level_relation(&normalized) {
-        Some(_) if !first_relation_is_assignment(&normalized) => {
-            relation_column_normalized(&normalized)
+pub(super) fn continuation_anchor(elems: &[SyntaxElement], parse_opts: MathParseOptions) -> usize {
+    continuation_anchor_normalized(&normalized_elements(elems, parse_opts))
+}
+
+/// [`continuation_anchor`] on an already-normalized row, so a caller that has
+/// normalized once does not pay a second render + re-parse round trip.
+fn continuation_anchor_normalized(normalized: &[SyntaxElement]) -> usize {
+    match first_top_level_relation(normalized) {
+        Some(_) if !first_relation_is_assignment(normalized) => {
+            relation_column_normalized(normalized)
         }
-        _ => rhs_start_column(&normalized),
+        _ => rhs_start_column(normalized),
     }
 }
 
 /// True when the row's first non-layout-whitespace element is a top-level
 /// relation operator (e.g. a continuation line `= b`). Used to detect a
 /// relation chain spread across `\\` hard breaks.
-pub(super) fn begins_with_top_level_relation(elems: &[SyntaxElement]) -> bool {
-    let normalized = normalized_elements(elems);
+pub(super) fn begins_with_top_level_relation(
+    elems: &[SyntaxElement],
+    parse_opts: MathParseOptions,
+) -> bool {
+    let normalized = normalized_elements(elems, parse_opts);
     match spaced_operator_breaks(&normalized).first() {
         Some(b) => {
             b.class == AtomClass::Rel
@@ -220,13 +224,17 @@ pub(super) fn begins_with_top_level_relation(elems: &[SyntaxElement]) -> bool {
 /// Both offsets are pure functions of the row's content; the block's
 /// `math-indent` shifts the whole row right (applied by the render layer) but
 /// never changes these internal alignment columns.
-pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<String> {
+pub(super) fn break_free_row(
+    elems: &[SyntaxElement],
+    line_width: usize,
+    parse_opts: MathParseOptions,
+) -> Vec<String> {
     let single = render::render_inline(elems).trim().to_string();
     if single.chars().count() <= line_width {
         return vec![single];
     }
 
-    let normalized = normalized_elements_from_text(&single);
+    let normalized = normalized_elements_from_text(&single, parse_opts);
     let elems = normalized.as_slice();
     let breaks = spaced_operator_breaks(elems);
     let rels: Vec<usize> = breaks
@@ -239,7 +247,7 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
         return break_binary_segment(elems, 0, line_width);
     }
 
-    let rel_indent = continuation_anchor(elems);
+    let rel_indent = continuation_anchor_normalized(elems);
 
     if rels.len() == 1 {
         return break_binary_segment(elems, 0, line_width);
@@ -259,12 +267,19 @@ pub(super) fn break_free_row(elems: &[SyntaxElement], line_width: usize) -> Vec<
     out
 }
 
-fn normalized_elements(elems: &[SyntaxElement]) -> Vec<SyntaxElement> {
-    normalized_elements_from_text(render::render_inline(elems).trim())
+fn normalized_elements(
+    elems: &[SyntaxElement],
+    parse_opts: MathParseOptions,
+) -> Vec<SyntaxElement> {
+    normalized_elements_from_text(render::render_inline(elems).trim(), parse_opts)
 }
 
-fn normalized_elements_from_text(text: &str) -> Vec<SyntaxElement> {
-    SyntaxNode::new_root(parse_math_content(text, MathParseOptions::default()))
+/// Re-parse rendered text with the *caller's* parse options — the re-parse
+/// must reproduce the host's token shape (e.g. `MATH_EQUATION_LABEL` when
+/// bookdown labels are on), or label interiors would be re-spaced as
+/// operators.
+fn normalized_elements_from_text(text: &str, parse_opts: MathParseOptions) -> Vec<SyntaxElement> {
+    SyntaxNode::new_root(parse_math_content(text, parse_opts))
         .children_with_tokens()
         .collect()
 }
@@ -327,8 +342,11 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
         let el = &elems[i];
         match el.kind() {
             SyntaxKind::MATH_WORD
-                if el.as_token().is_some_and(|token| token.text() == ":")
-                    && elems.get(i + 1).is_some_and(scripted_equals_base) =>
+                if el.as_token().is_some_and(|token| {
+                    elems
+                        .get(i + 1)
+                        .is_some_and(|next| severed_relation_pair(token.text(), next))
+                }) =>
             {
                 if depth == 0 {
                     out.push(Break {
@@ -378,11 +396,7 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                 i += 1;
             }
             SyntaxKind::MATH_SCRIPTED => {
-                let Some(base) = el
-                    .as_node()
-                    .and_then(|node| MathScripted::cast(node.clone()))
-                    .and_then(|scripted| scripted.base())
-                else {
+                let Some(base) = operators::scripted_base(el) else {
                     prev = Some(AtomClass::Ord);
                     star_modifier_pending = false;
                     i += 1;
@@ -396,7 +410,7 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                 let raw_class = if is_star_modifier {
                     Some(AtomClass::Ord)
                 } else {
-                    scripted_base_class(&base)
+                    operators::scripted_base_class(&base)
                 };
                 let class = raw_class.map(|raw| operators::coerce(raw, prev));
                 if base.kind() == SyntaxKind::MATH_WORD {
@@ -459,38 +473,23 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
     out
 }
 
-fn scripted_equals_base(element: &SyntaxElement) -> bool {
-    element
-        .as_node()
-        .and_then(|node| MathScripted::cast(node.clone()))
-        .and_then(|scripted| scripted.base())
+/// Whether the whole token `head` is a relation head the parser's script
+/// split severed from its final scalar, with `next` carrying that scalar as a
+/// scripted relation base: a definition colon before a scripted `=`
+/// (`: ` + `=_i`), or a relation run before a scripted relation scalar
+/// (`<` + `=_i`). The pair is one break candidate, never two.
+fn severed_relation_pair(head: &str, next: &SyntaxElement) -> bool {
+    let Some(base_text) = operators::scripted_base(next)
         .and_then(|base| base.into_token())
-        .is_some_and(|token| {
-            token.kind() == SyntaxKind::MATH_WORD
-                && operators::word_atoms(token.text())
-                    .next()
-                    .is_some_and(|atom| atom.class == AtomClass::Rel && atom.text.starts_with('='))
-        })
-}
-
-fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
-    match base.kind() {
-        SyntaxKind::MATH_WORD => base
-            .as_token()
-            .and_then(|token| operators::word_atoms(token.text()).next())
-            .map(|atom| atom.class),
-        SyntaxKind::MATH_COMMAND => base.as_token().map(|token| {
-            let name = token.text().strip_prefix('\\').unwrap_or(token.text());
-            operators::command_class(name).unwrap_or(AtomClass::Ord)
-        }),
-        SyntaxKind::MATH_GROUP | SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_DELIMITED => {
-            Some(AtomClass::Close)
-        }
-        SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {
-            Some(AtomClass::Open)
-        }
-        SyntaxKind::MATH_LINE_BREAK => None,
-        _ => Some(AtomClass::Ord),
+        .filter(|token| token.kind() == SyntaxKind::MATH_WORD)
+        .map(|token| token.text().to_string())
+    else {
+        return false;
+    };
+    if head == ":" {
+        base_text.starts_with('=')
+    } else {
+        operators::is_relation_run(head) && base_text.starts_with(['=', '<', '>'])
     }
 }
 
@@ -508,7 +507,7 @@ mod tests {
     /// Alignment geometry for a logical row (no base block indent — that is
     /// applied by the render layer, not the breaker).
     fn lines(content: &str, width: usize) -> Vec<String> {
-        break_free_row(&elems(content), width)
+        break_free_row(&elems(content), width, MathParseOptions::default())
     }
 
     fn rel_indices(content: &str) -> Vec<usize> {
@@ -596,6 +595,17 @@ mod tests {
         assert_eq!(
             lines("aaaa =_i bbbb =_j cccc", 15),
             vec!["aaaa =_i bbbb", "     =_j cccc"],
+        );
+    }
+
+    #[test]
+    fn scripted_composite_relation_is_one_break_candidate() {
+        // `<=_i` normalizes to a `<` word plus a scripted `=` base; the pair
+        // must count as one relation, not two adjacent break sites.
+        assert_eq!(rel_indices("aaaa <=_i bbbb <=_j cccc").len(), 2);
+        assert_eq!(
+            lines("aaaa <=_i bbbb <=_j cccc", 16),
+            vec!["aaaa <=_i bbbb", "     <=_j cccc"],
         );
     }
 
