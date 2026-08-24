@@ -70,28 +70,28 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Badness `\left`/`\right` parity.** Replaced the flat paired-delimiter shape
-while retaining the legacy formatter and linter behavior.
+**Built-in signature/domain semantics—first slice.** Added Panache-owned
+semantic types and conservative positional lookup without changing the CST.
 
-- `MATH_DELIMITED` now owns direct control/delimiter tokens around a nested
-  `MATH_CONTENT`; bracket delimiters retain their lexical bracket kinds and the
-  typed wrapper exposes both delimiters and the body.
-- A same-scope lookahead gate handles nested pairs and group, environment, and
-  paragraph boundaries. Unpaired `\left` remains a command, with the existing
-  diagnostic derived from that loose token.
-- Mandatory parser parity is 82/82 after adding nested, trivia, stray,
-  unclosed, and group-boundary regressions. The shared corpus has no remaining
-  structural divergences.
+- `semantic::math` now owns `ArgKind`, `ArgumentDomain`, `ArgSpec`, command
+  signatures, optional-slot matching, and attached-argument domain lookup.
+- The initial curated table covers Badness's math-domain built-ins plus
+  `\text`, `\mbox`, and `\intertext`; unknown commands and unmatched or
+  over-attached groups remain `Unknown`.
+- A dev-only differential suite pins both signature data and realized group
+  domains against `badness-parser =0.4.0`.
 
 ### Suggested next sub-targets
-1. Lock the complete kind map before starting signature/domain semantics.
-2. Port the first bounded signature/domain semantic slice.
-3. Keep expanding malformed and macro-dependent parser coverage.
+1. Add document-provided signature overlays so redefinitions shadow built-ins.
+2. Port Badness's math-atom info and Unicode-scalar iterator.
+3. Move formatter-local operator interpretation onto the shared semantic API.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Badness `\left`/`\right` parity.** Added nested delimiter bodies and
+  same-scope recovery; mandatory structural parity reached 82/82.
 - **Environment hierarchy + recovery.** Added begin/name/body/end nodes,
   matching-closer unwinding, typed accessors, and formatter compatibility;
   parity reached 73/77.

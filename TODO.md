@@ -279,7 +279,9 @@ the test projector.
 - [ ] Port the Badness signature, argument-domain, and math-atom models into
   Panache-owned modules. Keep operator class, delimiter role, unary
   coercion, and break priority out of the CST, and expose the same semantic
-  results to the formatter, linter, and language server.
+  results to the formatter, linter, and language server. (The first
+  signature/domain slice now covers built-in math commands and conservative
+  positional matching; document overlays and math atoms remain.)
 - [ ] Model document-provided command declarations conservatively, including
   definitions in relevant raw TeX and explicit configuration. Match Badness
   when the same context is available; otherwise fall back conservatively. A
