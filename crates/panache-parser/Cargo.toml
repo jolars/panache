@@ -7,6 +7,7 @@ readme = "README.md"
 include = [
     "/src/**/*",
     "/build.rs",
+    "/data/**/*",
     "/README.md",
     "/CHANGELOG.md",
 ]
@@ -27,6 +28,7 @@ serde_json = "1.0.150"
 schemars = { version = "1.2.1", optional = true }
 log = { version = "0.4.31", features = ["release_max_level_debug"] }
 memchr = "2.8.3"
+phf = "0.14.0"
 smallvec = "1.15.2"
 unicode-width = "0.2.2"
 
@@ -34,6 +36,11 @@ unicode-width = "0.2.2"
 default = []
 serde = ["dep:serde"]
 schema = ["serde", "dep:schemars"]
+
+[build-dependencies]
+phf_codegen = "0.14.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
 
 [dev-dependencies]
 badness-parser = "=0.4.0"

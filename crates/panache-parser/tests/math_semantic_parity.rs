@@ -16,6 +16,7 @@ use panache_parser::semantic::math::{
 };
 use panache_parser::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::{ParserOptions, parse};
+use serde_json::Value;
 
 fn badness_domains(body: &str) -> Vec<BadnessDomain> {
     let parsed = parse_badness(&format!("${body}$"));
@@ -227,6 +228,74 @@ fn delimiter_from_badness(role: BadnessDelimiterRole) -> DelimiterRole {
         BadnessDelimiterRole::Close => DelimiterRole::Close,
         BadnessDelimiterRole::Fence => DelimiterRole::Fence,
     }
+}
+
+fn assert_atom_info_matches_badness(
+    label: &str,
+    panache: panache_parser::semantic::math::MathAtomInfo,
+    badness: badness_parser::semantic::MathAtomInfo,
+) {
+    assert_eq!(panache.class, class_from_badness(badness.class), "{label}",);
+    assert_eq!(
+        panache.delimiter,
+        badness.delimiter.map(delimiter_from_badness),
+        "{label}",
+    );
+}
+
+#[test]
+fn generated_unicode_math_baseline_matches_badness_exhaustively() {
+    let fixture: Value = serde_json::from_str(include_str!("../data/math_symbols.json"))
+        .expect("math_symbols.json must be valid JSON");
+    let symbols = fixture["symbols"]
+        .as_array()
+        .expect("math_symbols.json must contain a symbol array");
+    assert_eq!(symbols.len(), 2_448);
+
+    let mut characters = std::collections::BTreeSet::new();
+    for symbol in symbols {
+        let fields = symbol
+            .as_array()
+            .expect("each math symbol must be a four-field array");
+        let codepoint = fields[0].as_str().expect("code point must be a string");
+        let name = fields[1].as_str().expect("command must be a string");
+        let character = char::from_u32(
+            u32::from_str_radix(codepoint, 16).expect("code point must be hexadecimal"),
+        )
+        .expect("code point must be a Unicode scalar");
+
+        assert_atom_info_matches_badness(
+            &format!("\\{name}"),
+            math_command_info(name),
+            badness_command_info(name),
+        );
+        characters.insert(character);
+    }
+
+    for character in characters {
+        assert_atom_info_matches_badness(
+            &character.to_string(),
+            math_char_info(character),
+            badness_char_info(character),
+        );
+    }
+}
+
+#[test]
+fn generated_unicode_math_baseline_covers_representative_shapes() {
+    assert_eq!(math_command_info("nleq").class, MathClass::Rel);
+    assert_eq!(math_char_info('≤').class, MathClass::Rel);
+    assert_eq!(math_char_info(',').class, MathClass::Punct);
+    assert_eq!(math_command_info("vert").class, MathClass::Fence);
+    assert_eq!(
+        math_command_info("vert").delimiter,
+        Some(DelimiterRole::Fence),
+    );
+    assert_eq!(math_char_info('𞻰').class, MathClass::Op);
+    assert_eq!(math_char_info('√').class, MathClass::Ord);
+    assert_eq!(math_char_info('√').delimiter, None);
+    assert_eq!(math_char_info('🦀'), Default::default());
+    assert_eq!(math_command_info("not-a-real-command"), Default::default());
 }
 
 #[test]

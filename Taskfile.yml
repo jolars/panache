@@ -144,6 +144,16 @@ tasks:
     cmds:
       - ./crates/panache-parser/scripts/update-myst-spec-fixtures.sh v0.0.5
 
+  math-symbols:check:
+    desc: Check generated math-symbol data against pinned unicode-math v0.8r
+    cmds:
+      - python3 scripts/gen_math_symbols.py
+
+  math-symbols:sync:
+    desc: Regenerate math-symbol data from pinned unicode-math v0.8r
+    cmds:
+      - python3 scripts/gen_math_symbols.py --write
+
   coverage:
     desc: Generate code coverage report
     cmds:

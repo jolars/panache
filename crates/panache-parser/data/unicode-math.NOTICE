@@ -1,0 +1,19 @@
+unicode-math symbol data
+
+crates/panache-parser/data/math_symbols.json is a normalized extract of
+unicode-math-table.tex from unicode-math v0.8r at revision
+936812ed7407cd2b2f06bf4c97f12275a6b2e781:
+
+  https://github.com/latex3/unicode-math
+
+The extract retains Unicode code points, primary command names, and math classes.
+Panache maps classes onto its smaller semantic class family and supplies separate
+curated overrides in crates/panache-parser/src/semantic/math.rs.
+
+The upstream work is distributed under the LaTeX Project Public License, version
+1.3c or later. The full license is packaged as unicode-math.LICENSE.
+
+Copyright 2006-2019 Will Robertson, LPPL maintainer
+Copyright 2010-2017 Philipp Stephani
+Copyright 2011-2017 Joseph Wright
+Copyright 2012-2015 Khaled Hosny

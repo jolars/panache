@@ -246,7 +246,7 @@ formatter-off output byte-identical.
 
 1. **Finish the shared semantic model.**
 
-   - [ ] Generate a Panache-owned Unicode math atom table from the source pinned
+   - [x] Generate a Panache-owned Unicode math atom table from the source pinned
      by the Badness oracle. Add a reproducible generation command and
      exhaustive lookup-parity tests; unknown scalars must remain
      conservative.

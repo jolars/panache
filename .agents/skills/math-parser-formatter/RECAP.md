@@ -70,27 +70,30 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Native math atoms—first semantic slice.** Ported the Badness-shaped atom API
-and iterator without introducing a runtime Badness dependency.
+**Generated Unicode math baseline.** Added Panache-owned, zero-parse runtime
+lookups without introducing a runtime Badness dependency.
 
-- Added `MathClass`, `DelimiterRole`, `MathAtomInfo`, and source-ranged
-  `MathAtom`, plus the public `math_atoms()` Unicode-scalar iterator.
-- Commands, scripted bases, groups, optionals, delimited bodies, and
-  environments now expose Badness-equivalent structural atom semantics.
-- Ported Badness's curated character/command overrides and named-operator set;
-  the generated unicode-math baseline remains deliberately separate.
-- Differential tests cover curated lookup parity, multibyte ranges, commands,
-  scripted delimiter inheritance, and structural `Inner` atoms.
+- Vendored the normalized unicode-math v0.8r table at the Badness-pinned
+  revision, together with its LPPL notice and license.
+- Added a reproducible sync/check script and build-time command PHF plus sorted
+  character table; curated Panache overrides retain precedence.
+- Exhaustive differential coverage matches Badness for all 2,448 commands and
+  2,437 unique Unicode scalars, including non-BMP and duplicate-code-point
+  cases.
 
 ### Suggested next sub-targets
-1. Vendor and generate the pinned unicode-math atom lookup baseline.
-2. Add contextual Bin-to-Ord coercion and break-priority semantics.
-3. Add explicit configured command signatures.
+
+1. Add contextual Bin-to-Ord coercion and break-priority semantics.
+2. Add explicit configured command signatures.
+3. Lock conservative formatting for unknown and redefined arguments.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Native math atoms—first semantic slice.** Added the Badness-shaped atom API,
+  curated lookup tier, Unicode-scalar iterator, structural atoms, and
+  scripted-base inheritance.
 - **Document signature overlays.** Raw-TeX definitions now shadow built-in
   argument domains without inferring replacement semantics.
 - **Built-in signature/domain semantics.** Added native signature types,

@@ -54,6 +54,10 @@ const fn atom_info(class: MathClass, delimiter: Option<DelimiterRole>) -> MathAt
     MathAtomInfo { class, delimiter }
 }
 
+type MathCommandMap = phf::Map<&'static str, MathAtomInfo>;
+
+include!(concat!(env!("OUT_DIR"), "/math_symbols.rs"));
+
 /// LaTeX and amsmath's named, upright function operators.
 pub const NAMED_MATH_OPERATORS: &[&str] = &[
     "arccos", "arcsin", "arctan", "arg", "cos", "cosh", "cot", "coth", "csc", "deg", "det", "dim",
@@ -63,20 +67,27 @@ pub const NAMED_MATH_OPERATORS: &[&str] = &[
 
 /// Classify a control-sequence name without its leading backslash.
 ///
-/// This initial table contains Badness's curated overrides. Unknown commands
-/// conservatively behave as ordinary atoms; the generated unicode-math
-/// baseline will extend this lookup in a separate migration slice.
+/// Panache's curated overrides take precedence over the generated unicode-math
+/// baseline. Unknown commands conservatively behave as ordinary atoms.
 pub fn math_command_info(name: &str) -> MathAtomInfo {
-    curated_command_info(name).unwrap_or_default()
+    curated_command_info(name)
+        .or_else(|| UNICODE_MATH_COMMANDS.get(name).copied())
+        .unwrap_or_default()
 }
 
 /// Classify a literal Unicode scalar.
 ///
-/// This initial table contains Badness's curated overrides. Unknown characters
-/// conservatively behave as ordinary atoms; the generated unicode-math
-/// baseline will extend this lookup in a separate migration slice.
+/// Panache's curated overrides take precedence over the generated unicode-math
+/// baseline. Unknown characters conservatively behave as ordinary atoms.
 pub fn math_char_info(character: char) -> MathAtomInfo {
-    curated_char_info(character).unwrap_or_default()
+    curated_char_info(character)
+        .or_else(|| {
+            UNICODE_MATH_CHARS
+                .binary_search_by_key(&character, |(candidate, _)| *candidate)
+                .ok()
+                .map(|index| UNICODE_MATH_CHARS[index].1)
+        })
+        .unwrap_or_default()
 }
 
 /// Virtual atoms for one CST element. A coalesced `MATH_WORD` yields one atom
