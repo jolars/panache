@@ -5,7 +5,6 @@
 //! can be interleaved into `MATH_CONTENT`. They do not parse TeX, infer command
 //! arguments, attach scripts, or repair either tree.
 
-use std::ffi::OsStr;
 use std::fmt::Write as _;
 use std::fs;
 use std::ops::Range;
@@ -118,25 +117,9 @@ fn corpus_root() -> PathBuf {
     manifest_path("../panache-formatter/tests/fixtures/math_corpus")
 }
 
-fn discover_cases(root: &Path) -> Vec<PathBuf> {
-    fn walk(dir: &Path, cases: &mut Vec<PathBuf>) {
-        for entry in fs::read_dir(dir)
-            .unwrap_or_else(|error| panic!("failed to read {}: {error}", dir.display()))
-        {
-            let path = entry.expect("failed to read corpus entry").path();
-            if path.is_dir() {
-                walk(&path, cases);
-            } else if path.extension() == Some(OsStr::new("tex")) {
-                cases.push(path);
-            }
-        }
-    }
-
-    let mut cases = Vec::new();
-    walk(root, &mut cases);
-    cases.sort();
-    cases
-}
+#[path = "../../panache-formatter/tests/common/math_corpus.rs"]
+mod math_corpus;
+use math_corpus::discover_cases;
 
 fn read_passing() -> Vec<String> {
     let path = manifest_path(PASSING_REL);

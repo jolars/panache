@@ -31,39 +31,21 @@
 //! skipped fraction exceeds [`MAX_SKIP_FRACTION`]**, so silent oracle-coverage
 //! erosion stays visible.
 
-use std::ffi::OsStr;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use panache_formatter::formatter::math::{MathContext, MathFormatOptions, format_math};
 use pulldown_latex::config::RenderConfig;
 use pulldown_latex::{Parser, Storage, push_mathml};
 
+#[path = "common/math_corpus.rs"]
+mod math_corpus;
+use math_corpus::discover_cases;
+
 const MAX_SKIP_FRACTION: f64 = 0.40;
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/math_corpus")
-}
-
-fn discover_cases(root: &Path) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    walk(root, &mut out);
-    out.sort();
-    out
-}
-
-fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            walk(&path, out);
-        } else if path.extension() == Some(OsStr::new("tex")) {
-            out.push(path);
-        }
-    }
 }
 
 fn context_for(id: &str) -> MathContext {
