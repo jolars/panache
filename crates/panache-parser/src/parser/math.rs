@@ -139,31 +139,50 @@ impl MathParser<'_> {
     /// which keeps script attachment in this single pass. An ordinary-text run
     /// is split before its final Unicode scalar when a script follows because
     /// TeX attaches an unbraced script to one token, not to the whole run.
+    ///
+    /// The word length is computed once here and shared between the split and
+    /// the emission — the word scan (and, with bookdown labels on, its per-`(`
+    /// label probe) is the lexer's hot path.
     fn parse_scripted_atom(&mut self, ctx: Ctx) {
-        self.split_word_prefix_before_script();
-
-        let checkpoint = self.builder.checkpoint();
-        self.parse_atom();
-
-        if self.script_marker_after_layout(self.pos).is_none() {
+        let word_len = self.word_len();
+        if word_len > 0 {
+            let Some(marker_pos) = self.script_marker_after_layout(self.pos + word_len) else {
+                self.bump_bytes(word_len, SyntaxKind::MATH_WORD);
+                return;
+            };
+            let text = &self.input[self.pos..self.pos + word_len];
+            let (last_offset, _) = text.char_indices().next_back().expect("non-empty word");
+            if last_offset > 0 {
+                self.bump_bytes(last_offset, SyntaxKind::MATH_WORD);
+            }
+            let checkpoint = self.builder.checkpoint();
+            self.bump_bytes(word_len - last_offset, SyntaxKind::MATH_WORD);
+            self.attach_scripts(checkpoint, ctx, marker_pos);
             return;
         }
 
+        let checkpoint = self.builder.checkpoint();
+        self.parse_atom();
+        if let Some(marker_pos) = self.script_marker_after_layout(self.pos) {
+            self.attach_scripts(checkpoint, ctx, marker_pos);
+        }
+    }
+
+    /// Wrap the just-emitted atom at `checkpoint` in a `MATH_SCRIPTED` node
+    /// and attach every following script. `marker_pos` is the already-scanned
+    /// position of the first marker, so the lookahead is not repeated.
+    fn attach_scripts(&mut self, checkpoint: rowan::Checkpoint, ctx: Ctx, first_marker: usize) {
         self.builder
             .start_node_at(checkpoint, SyntaxKind::MATH_SCRIPTED.into());
-        while let Some(marker_pos) = self.script_marker_after_layout(self.pos) {
+        let mut marker_pos = first_marker;
+        loop {
             self.parse_layout_until(marker_pos);
-            let script_kind = match self.peek_char() {
-                Some('^') => SyntaxKind::MATH_SUPERSCRIPT,
-                Some('_') => SyntaxKind::MATH_SUBSCRIPT,
+            let (script_kind, marker_kind) = match self.peek_char() {
+                Some('^') => (SyntaxKind::MATH_SUPERSCRIPT, SyntaxKind::MATH_CARET),
+                Some('_') => (SyntaxKind::MATH_SUBSCRIPT, SyntaxKind::MATH_UNDERSCORE),
                 _ => unreachable!("script lookahead must end at a script marker"),
             };
             self.builder.start_node(script_kind.into());
-            let marker_kind = match self.peek_char() {
-                Some('^') => SyntaxKind::MATH_CARET,
-                Some('_') => SyntaxKind::MATH_UNDERSCORE,
-                _ => unreachable!("script parser must be at a script marker"),
-            };
             self.bump_bytes(1, marker_kind);
 
             let argument_pos = self.layout_end_before_boundary(self.pos);
@@ -172,34 +191,27 @@ impl MathParser<'_> {
                 self.parse_script_argument();
             }
             self.builder.finish_node();
+
+            match self.script_marker_after_layout(self.pos) {
+                Some(next) => marker_pos = next,
+                None => break,
+            }
         }
         self.builder.finish_node();
-    }
-
-    /// Emit all but the final Unicode scalar in an ordinary-text run when the
-    /// run is followed by a script. The final scalar is then parsed as the base.
-    fn split_word_prefix_before_script(&mut self) {
-        let len = self.word_len();
-        if len == 0 || self.script_marker_after_layout(self.pos + len).is_none() {
-            return;
-        }
-
-        let text = &self.input[self.pos..self.pos + len];
-        let Some((last_offset, _)) = text.char_indices().next_back() else {
-            return;
-        };
-        if last_offset > 0 {
-            self.bump_bytes(last_offset, SyntaxKind::MATH_WORD);
-        }
     }
 
     /// Parse one atom without considering scripts that follow it.
     fn parse_atom(&mut self) {
         match self.peek_char() {
-            Some('\\') if self.peek_control_word() == Some("begin") => self.parse_environment(),
-            Some('\\') if self.peek_control_word() == Some("left") => self.parse_delimited(),
-            Some('\\') if self.peek_control_word().is_some() => self.parse_control_word(),
-            Some('\\') => self.parse_control_symbol(),
+            Some('\\') => match self.peek_control_word() {
+                Some("begin") => self.parse_environment(),
+                Some("left") => self.parse_delimited(),
+                Some(word) => {
+                    let len = 1 + word.len();
+                    self.bump_bytes(len, SyntaxKind::MATH_COMMAND);
+                }
+                None => self.parse_control_symbol(),
+            },
             Some('{') => self.parse_group(),
             Some('(') if self.opts.bookdown_equation_labels => match self.equation_label_len() {
                 Some(len) => self.bump_bytes(len, SyntaxKind::MATH_EQUATION_LABEL),
