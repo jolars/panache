@@ -448,7 +448,7 @@ fn flush_free_rows(
         let last = physical.len() - 1;
         for (i, content) in physical.into_iter().enumerate() {
             let content = if i == last {
-                with_break(content, row.has_break)
+                with_break(content, row.break_text.as_deref())
             } else {
                 content
             };
@@ -461,9 +461,9 @@ fn relation_chain_alignment(rows: &[Row], parse_opts: MathParseOptions) -> Vec<u
     let mut extra = vec![0usize; rows.len()];
     let mut i = 0;
     while i < rows.len() {
-        if rows[i].has_break && !rows[i].is_blank() {
+        if rows[i].break_text.is_some() && !rows[i].is_blank() {
             let mut k = i;
-            while rows[k].has_break
+            while rows[k].break_text.is_some()
                 && k + 1 < rows.len()
                 && !rows[k + 1].is_blank()
                 && linebreak::begins_with_top_level_relation(&rows[k + 1].elems, parse_opts)
@@ -552,7 +552,10 @@ enum BodyItem {
     /// A nested environment rendered on its own line(s), already indented.
     Block(Vec<String>),
     /// A normal table row: trimmed cells split on top-level `&`.
-    Row { cells: Vec<String>, has_break: bool },
+    Row {
+        cells: Vec<String>,
+        break_text: Option<String>,
+    },
 }
 
 fn render_body_lines(
@@ -576,7 +579,7 @@ fn render_body_lines(
                 .collect();
             items.push(BodyItem::Row {
                 cells,
-                has_break: row.has_break,
+                break_text: row.break_text,
             });
         }
     }
@@ -586,9 +589,12 @@ fn render_body_lines(
     for item in items {
         match item {
             BodyItem::Block(lines) => out.extend(lines),
-            BodyItem::Row { cells, has_break } => {
-                let line = join_cells(&cells, &widths, has_break);
-                out.push(format!("{indent}{}", with_break(line, has_break)));
+            BodyItem::Row { cells, break_text } => {
+                let line = join_cells(&cells, &widths, break_text.is_some());
+                out.push(format!(
+                    "{indent}{}",
+                    with_break(line, break_text.as_deref())
+                ));
             }
         }
     }
@@ -652,29 +658,29 @@ fn pad_right(s: &str, width: usize) -> String {
     }
 }
 
-fn with_break(line: String, has_break: bool) -> String {
-    if !has_break {
+fn with_break(line: String, break_text: Option<&str>) -> String {
+    let Some(break_text) = break_text else {
         return line;
-    }
+    };
     if line.is_empty() {
-        r"\\".to_string()
+        break_text.to_string()
     } else {
-        format!(r"{line} \\")
+        format!(r"{line} {break_text}")
     }
 }
 
 struct Row {
     elems: Vec<SyntaxElement>,
-    has_break: bool,
+    break_text: Option<String>,
 }
 
 impl Row {
     fn is_blank(&self) -> bool {
-        !self.has_break && self.elems.iter().all(is_layout_whitespace)
+        self.break_text.is_none() && self.elems.iter().all(is_layout_whitespace)
     }
 
     fn single_environment(&self) -> Option<SyntaxNode> {
-        if self.has_break {
+        if self.break_text.is_some() {
             return None;
         }
         let mut content = self.elems.iter().filter(|el| !is_layout_whitespace(el));
@@ -713,14 +719,14 @@ fn split_logical_rows(elems: &[SyntaxElement]) -> Vec<Row> {
             SyntaxKind::MATH_LINE_BREAK => {
                 rows.push(Row {
                     elems: std::mem::take(&mut cur),
-                    has_break: true,
+                    break_text: Some(el.to_string()),
                 });
                 cur_has_comment = false;
             }
             SyntaxKind::MATH_NEWLINE if cur_has_comment => {
                 rows.push(Row {
                     elems: std::mem::take(&mut cur),
-                    has_break: false,
+                    break_text: None,
                 });
                 cur_has_comment = false;
             }
@@ -735,7 +741,7 @@ fn split_logical_rows(elems: &[SyntaxElement]) -> Vec<Row> {
     if !cur.is_empty() {
         rows.push(Row {
             elems: cur,
-            has_break: false,
+            break_text: None,
         });
     }
     rows
@@ -749,13 +755,13 @@ fn split_rows(elems: &[SyntaxElement]) -> Vec<Row> {
             SyntaxKind::MATH_LINE_BREAK => {
                 rows.push(Row {
                     elems: std::mem::take(&mut cur),
-                    has_break: true,
+                    break_text: Some(el.to_string()),
                 });
             }
             SyntaxKind::MATH_NEWLINE => {
                 rows.push(Row {
                     elems: std::mem::take(&mut cur),
-                    has_break: false,
+                    break_text: None,
                 });
             }
             _ => cur.push(el.clone()),
@@ -764,7 +770,7 @@ fn split_rows(elems: &[SyntaxElement]) -> Vec<Row> {
     if !cur.is_empty() {
         rows.push(Row {
             elems: cur,
-            has_break: false,
+            break_text: None,
         });
     }
     rows
@@ -812,6 +818,9 @@ pub(super) fn render_inline_seeded(elems: &[SyntaxElement], seed: Option<AtomCla
 
 enum FlatToken {
     Token(SyntaxKind, String),
+    /// A starred-variant marker whose command-node ownership proves that it is
+    /// a modifier rather than a binary operator.
+    CommandStar(String),
     ScriptStart,
     ScriptEnd,
 }
@@ -820,6 +829,7 @@ impl FlatToken {
     fn token(&self) -> Option<(SyntaxKind, &str)> {
         match self {
             Self::Token(kind, text) => Some((*kind, text)),
+            Self::CommandStar(text) => Some((SyntaxKind::MATH_WORD, text)),
             Self::ScriptStart | Self::ScriptEnd => None,
         }
     }
@@ -847,6 +857,7 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
             ));
         }
         NodeOrToken::Node(node) => {
+            let is_command = node.kind() == SyntaxKind::MATH_COMMAND;
             let is_script = matches!(
                 node.kind(),
                 SyntaxKind::MATH_SUBSCRIPT | SyntaxKind::MATH_SUPERSCRIPT
@@ -855,7 +866,15 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                 out.push(FlatToken::ScriptStart);
             }
             for child in node.children_with_tokens() {
-                flatten_element(&child, out);
+                if is_command
+                    && child.as_token().is_some_and(|token| {
+                        token.kind() == SyntaxKind::MATH_WORD && token.text() == "*"
+                    })
+                {
+                    out.push(FlatToken::CommandStar("*".to_string()));
+                } else {
+                    flatten_element(&child, out);
+                }
             }
             if is_script {
                 out.push(FlatToken::ScriptEnd);
@@ -933,8 +952,9 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 i += 1;
                 continue;
             }
-            FlatToken::Token(_, _) => {}
+            FlatToken::Token(_, _) | FlatToken::CommandStar(_) => {}
         }
+        let command_star = matches!(toks[i], FlatToken::CommandStar(_));
         let (kind, text) = toks[i]
             .token()
             .expect("script boundaries are handled before math tokens");
@@ -960,7 +980,8 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                         }
                         None => (atom.text, atom.class),
                     };
-                    let is_modifier = first && atom.text == "*" && star_modifier_pending;
+                    let is_modifier =
+                        first && atom.text == "*" && (star_modifier_pending || command_star);
                     let class = if is_modifier {
                         AtomClass::Ord
                     } else {
@@ -1042,6 +1063,24 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 star_modifier_pending = false;
                 i += 1;
             }
+            SyntaxKind::MATH_BRACKET_OPEN => {
+                emit_atom(&mut out, prev_demand, Demand::TightOp, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::TightOp;
+                prev_class = Some(AtomClass::Open);
+                prev_sig_is_text_cmd = false;
+                star_modifier_pending = false;
+                i += 1;
+            }
+            SyntaxKind::MATH_BRACKET_CLOSE => {
+                emit_atom(&mut out, prev_demand, Demand::TightOp, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::Plain;
+                prev_class = Some(AtomClass::Close);
+                prev_sig_is_text_cmd = false;
+                star_modifier_pending = false;
+                i += 1;
+            }
             SyntaxKind::MATH_GROUP_CLOSE => {
                 let is_text = group_stack.pop().unwrap_or(false);
                 let cur = if is_text {
@@ -1100,6 +1139,8 @@ fn atom_prev_class(kind: SyntaxKind, _text: &str) -> Option<AtomClass> {
         SyntaxKind::MATH_WORD => AtomClass::Ord,
         SyntaxKind::MATH_GROUP_OPEN => AtomClass::Open,
         SyntaxKind::MATH_GROUP_CLOSE => AtomClass::Close,
+        SyntaxKind::MATH_BRACKET_OPEN => AtomClass::Open,
+        SyntaxKind::MATH_BRACKET_CLOSE => AtomClass::Close,
         SyntaxKind::MATH_CARET | SyntaxKind::MATH_UNDERSCORE | SyntaxKind::MATH_ALIGN => {
             AtomClass::Open
         }

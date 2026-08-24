@@ -88,6 +88,7 @@ pub enum SyntaxKind {
     MATH_CONTENT, // wrapper node for parsed TeX math content (subtree root)
 
     MATH_GROUP,          // { ... } brace group (node)
+    MATH_OPTIONAL,       // [ ... ] optional argument (node)
     MATH_ENVIRONMENT,    // \begin{env} ... \end{env} (node)
     MATH_DELIMITED,      // \left<d> ... \right<d> paired delimiters (node)
     MATH_SCRIPTED,       // base atom with one or more sub/superscripts (node)
@@ -95,7 +96,9 @@ pub enum SyntaxKind {
     MATH_SUPERSCRIPT,    // ^ plus its optional one-atom argument (node)
     MATH_GROUP_OPEN,     // {
     MATH_GROUP_CLOSE,    // }
-    MATH_COMMAND,        // control word plus its attached argument groups (node)
+    MATH_BRACKET_OPEN,   // [
+    MATH_BRACKET_CLOSE,  // ]
+    MATH_COMMAND,        // control word plus attached groups/optionals (node)
     MATH_CONTROL_WORD,   // \foo control word
     MATH_CONTROL_SYMBOL, // \% single-character control sequence
     MATH_LINE_BREAK,     // \\ row terminator (node wrapping its control symbol)

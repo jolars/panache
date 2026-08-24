@@ -257,10 +257,13 @@ the test projector.
   greedily attached brace groups — arity-blind like Badness, crossing trivia
   but never a blank line; control symbols are bare `MATH_CONTROL_SYMBOL`
   tokens, and `\\` is a `MATH_LINE_BREAK` node wrapping its control symbol.)
-- [ ] Attach optional `[…]` arguments as nodes with Badness's tight-bracket
+- [x] Attach optional `[…]` arguments as nodes with Badness's tight-bracket
   gate, including the `\big`-family bracket ban and the star/optional tail
   of `\\`. The star-variant `*` before a brace argument already folds into
-  the command node.
+  the command node. (`MATH_OPTIONAL` now owns distinct bracket tokens;
+  command optionals must be tight and structurally closed, nested command
+  arguments are accounted for, and `MATH_LINE_BREAK` owns its tight
+  `*`/optional modifiers.)
 - [x] Bring the native scripted nodes into full oracle parity. The initial
   `MATH_SCRIPTED`/subscript/superscript structure and Unicode-scalar
   splitting have landed, but scripts must bind to complete

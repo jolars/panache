@@ -1,8 +1,8 @@
 Badness math parser parity report
 Oracle: badness-parser =0.4.0
 Corpus: ../panache-formatter/tests/fixtures/math_corpus
-Passing: 50 / 68
-Divergent: 18 / 68
+Passing: 56 / 74
+Divergent: 18 / 74
 
 Regenerate with:
   cargo test -p panache-parser --test math_badness_parity math_badness_full_report -- --ignored --nocapture
@@ -11,16 +11,22 @@ Regenerate with:
 commands/argument_after_comment.tex
 commands/argument_after_newline.tex
 commands/argument_after_space.tex
+commands/big_delimiter_bracket.tex
+commands/nested_optional.tex
+commands/optional_argument.tex
+commands/optional_tight_gate.tex
 commands/script_command_argument.tex
 commands/script_on_arguments.tex
 commands/script_on_frac.tex
 commands/single_token_commands.tex
 commands/single_token_numeral.tex
+commands/star_optional.tex
 commands/star_variant.tex
 comments/comment_line.tex
 comments/trailing_comment.tex
 display/fraction_block.tex
 display/integral.tex
+display/line_break_modifiers.tex
 display/long_chain.tex
 display/single_equation.tex
 display/sum_over_n.tex

@@ -1,0 +1,153 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..208
+  HEADING@0..26
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..25
+      TEXT@2..25 "Math optional arguments"
+    NEWLINE@25..26 "\n"
+  BLANK_LINE@26..27
+    BLANK_LINE@26..27 "\n"
+  PARAGRAPH@27..115
+    TEXT@27..37 "Commands: "
+    INLINE_MATH@37..50
+      INLINE_MATH_MARKER@37..38 "$"
+      MATH_CONTENT@38..49
+        MATH_COMMAND@38..49
+          MATH_CONTROL_WORD@38..43 "\\sqrt"
+          MATH_OPTIONAL@43..46
+            MATH_BRACKET_OPEN@43..44 "["
+            MATH_WORD@44..45 "3"
+            MATH_BRACKET_CLOSE@45..46 "]"
+          MATH_GROUP@46..49
+            MATH_GROUP_OPEN@46..47 "{"
+            MATH_WORD@47..48 "x"
+            MATH_GROUP_CLOSE@48..49 "}"
+      INLINE_MATH_MARKER@49..50 "$"
+    TEXT@50..52 ", "
+    INLINE_MATH@52..66
+      INLINE_MATH_MARKER@52..53 "$"
+      MATH_CONTENT@53..65
+        MATH_COMMAND@53..58
+          MATH_CONTROL_WORD@53..58 "\\sqrt"
+        MATH_SPACE@58..59 " "
+        MATH_BRACKET_OPEN@59..60 "["
+        MATH_WORD@60..61 "3"
+        MATH_BRACKET_CLOSE@61..62 "]"
+        MATH_GROUP@62..65
+          MATH_GROUP_OPEN@62..63 "{"
+          MATH_WORD@63..64 "x"
+          MATH_GROUP_CLOSE@64..65 "}"
+      INLINE_MATH_MARKER@65..66 "$"
+    TEXT@66..68 ", "
+    INLINE_MATH@68..94
+      INLINE_MATH_MARKER@68..69 "$"
+      MATH_CONTENT@69..93
+        MATH_COMMAND@69..93
+          MATH_CONTROL_WORD@69..79 "\\inferrule"
+          MATH_WORD@79..80 "*"
+          MATH_OPTIONAL@80..87
+            MATH_BRACKET_OPEN@80..81 "["
+            MATH_WORD@81..86 "right"
+            MATH_BRACKET_CLOSE@86..87 "]"
+          MATH_GROUP@87..90
+            MATH_GROUP_OPEN@87..88 "{"
+            MATH_WORD@88..89 "A"
+            MATH_GROUP_CLOSE@89..90 "}"
+          MATH_GROUP@90..93
+            MATH_GROUP_OPEN@90..91 "{"
+            MATH_WORD@91..92 "B"
+            MATH_GROUP_CLOSE@92..93 "}"
+      INLINE_MATH_MARKER@93..94 "$"
+    TEXT@94..100 ", and "
+    INLINE_MATH@100..113
+      INLINE_MATH_MARKER@100..101 "$"
+      MATH_CONTENT@101..112
+        MATH_COMMAND@101..105
+          MATH_CONTROL_WORD@101..105 "\\Big"
+        MATH_BRACKET_OPEN@105..106 "["
+        MATH_WORD@106..107 "x"
+        MATH_COMMAND@107..111
+          MATH_CONTROL_WORD@107..111 "\\Big"
+        MATH_BRACKET_CLOSE@111..112 "]"
+      INLINE_MATH_MARKER@112..113 "$"
+    TEXT@113..114 "."
+    NEWLINE@114..115 "\n"
+  BLANK_LINE@115..116
+    BLANK_LINE@115..116 "\n"
+  PARAGRAPH@116..129
+    TEXT@116..128 "Line breaks:"
+    NEWLINE@128..129 "\n"
+  BLANK_LINE@129..130
+    BLANK_LINE@129..130 "\n"
+  BLOCK_QUOTE@130..167
+    BLOCK_QUOTE_MARKER@130..131 ">"
+    WHITESPACE@131..132 " "
+    PARAGRAPH@132..167
+      DISPLAY_MATH@132..166
+        DISPLAY_MATH_MARKER@132..134 "$$"
+        MATH_CONTENT@134..162
+          MATH_NEWLINE@134..135 "\n"
+          LINE_PREFIX@135..136 ">"
+          LINE_PREFIX@136..137 " "
+          MATH_WORD@137..138 "a"
+          MATH_SPACE@138..139 " "
+          MATH_ALIGN@139..140 "&"
+          MATH_WORD@140..141 "="
+          MATH_SPACE@141..142 " "
+          MATH_WORD@142..143 "b"
+          MATH_SPACE@143..144 " "
+          MATH_LINE_BREAK@144..152
+            MATH_CONTROL_SYMBOL@144..146 "\\\\"
+            MATH_WORD@146..147 "*"
+            MATH_OPTIONAL@147..152
+              MATH_BRACKET_OPEN@147..148 "["
+              MATH_WORD@148..151 "2ex"
+              MATH_BRACKET_CLOSE@151..152 "]"
+          MATH_NEWLINE@152..153 "\n"
+          LINE_PREFIX@153..154 ">"
+          LINE_PREFIX@154..155 " "
+          MATH_WORD@155..156 "c"
+          MATH_SPACE@156..157 " "
+          MATH_ALIGN@157..158 "&"
+          MATH_WORD@158..159 "="
+          MATH_SPACE@159..160 " "
+          MATH_WORD@160..161 "d"
+          MATH_NEWLINE@161..162 "\n"
+        LINE_PREFIX@162..163 ">"
+        LINE_PREFIX@163..164 " "
+        DISPLAY_MATH_MARKER@164..166 "$$"
+      NEWLINE@166..167 "\n"
+  BLANK_LINE@167..168
+    BLANK_LINE@167..168 "\n"
+  PARAGRAPH@168..208
+    TEXT@168..178 "Recovery: "
+    INLINE_MATH@178..190
+      INLINE_MATH_MARKER@178..179 "$"
+      MATH_CONTENT@179..189
+        MATH_COMMAND@179..184
+          MATH_CONTROL_WORD@179..184 "\\sqrt"
+        MATH_BRACKET_OPEN@184..185 "["
+        MATH_WORD@185..186 "3"
+        MATH_GROUP@186..189
+          MATH_GROUP_OPEN@186..187 "{"
+          MATH_WORD@187..188 "x"
+          MATH_GROUP_CLOSE@188..189 "}"
+      INLINE_MATH_MARKER@189..190 "$"
+    TEXT@190..195 " and "
+    INLINE_MATH@195..206
+      INLINE_MATH_MARKER@195..196 "$"
+      MATH_CONTENT@196..205
+        MATH_COMMAND@196..201
+          MATH_CONTROL_WORD@196..201 "\\sqrt"
+        MATH_BRACKET_OPEN@201..202 "["
+        MATH_WORD@202..203 "x"
+        MATH_GROUP_CLOSE@203..204 "}"
+        MATH_WORD@204..205 "y"
+      INLINE_MATH_MARKER@205..206 "$"
+    TEXT@206..207 "."
+    NEWLINE@207..208 "\n"

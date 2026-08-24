@@ -87,6 +87,7 @@ const BADNESS_MATH_KIND_MAP: &[(BadnessKind, &str)] = &[
 const PANACHE_MATH_KIND_MAP: &[(PanacheKind, &str)] = &[
     (PanacheKind::MATH_CONTENT, "MATH"),
     (PanacheKind::MATH_GROUP, "GROUP"),
+    (PanacheKind::MATH_OPTIONAL, "OPTIONAL"),
     (PanacheKind::MATH_ENVIRONMENT, "ENVIRONMENT"),
     (PanacheKind::MATH_DELIMITED, "LEFT_RIGHT"),
     (PanacheKind::MATH_SCRIPTED, "SCRIPTED"),
@@ -94,6 +95,8 @@ const PANACHE_MATH_KIND_MAP: &[(PanacheKind, &str)] = &[
     (PanacheKind::MATH_SUPERSCRIPT, "SUPERSCRIPT"),
     (PanacheKind::MATH_GROUP_OPEN, "GROUP_OPEN"),
     (PanacheKind::MATH_GROUP_CLOSE, "GROUP_CLOSE"),
+    (PanacheKind::MATH_BRACKET_OPEN, "BRACKET_OPEN"),
+    (PanacheKind::MATH_BRACKET_CLOSE, "BRACKET_CLOSE"),
     (PanacheKind::MATH_COMMAND, "COMMAND"),
     (PanacheKind::MATH_CONTROL_WORD, "CONTROL_WORD"),
     (PanacheKind::MATH_CONTROL_SYMBOL, "CONTROL_SYMBOL"),

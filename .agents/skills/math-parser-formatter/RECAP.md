@@ -70,30 +70,33 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Badness lexical word grain.** Replaced `MATH_TEXT`, `MATH_OPERATOR`,
-`MATH_OPEN`, `MATH_CLOSE`, and `MATH_PUNCT` with maximal Badness-equivalent
-`MATH_WORD` runs.
+**Badness optional-argument parity.** Added native optional nodes and line-break
+modifiers on top of the command-owned CST.
 
-- Added a Unicode-safe semantic word-atom iterator for operators, delimiters,
-  punctuation, and `:=`; spacing and line-breaking consume that interpretation
-  instead of CST kinds.
-- The experimental formatter retains its existing output, including compact
-  operators, scripted assignments, delimiter depth, and mixed embedded
-  environments. Thirty parser snapshots changed only in the intended math-word
-  token grain while remaining lossless.
-- Mandatory parser parity grew from 4/58 to 19/58. The reproducible report now
-  records 39 command/environment/structural divergences.
+- `MATH_OPTIONAL` owns distinct bracket tokens. Commands attach only tight,
+  structurally closed optionals, account for nested command arguments, and ban
+  attachment for the exact `\big`/`\Big` families.
+- `MATH_LINE_BREAK` owns directly abutting lone `*` and `[length]` modifiers;
+  the legacy formatter keeps those modifiers attached through row layout and
+  uses command-node ownership to preserve arbitrary starred variants.
+- Mandatory parser parity is 56/74. All six new oracle cases pass; the same 18
+  environment and `\left`/`\right` cases remain divergent.
 
 ### Suggested next sub-targets
-1. Split control words/symbols and give commands Badness-equivalent argument
-   ownership, then grow the mandatory parity corpus.
-2. Bring scripted command bases into parity once commands own their arguments.
-3. Add malformed/host-boundary cases before declaring the whole kind map locked.
+1. Match Badness's environment `BEGIN`/body/`END` hierarchy and recovery.
+2. Bring `\left`/`\right` structure and recovery into parity.
+3. Lock the complete kind map before starting signature/domain semantics.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Command ownership + scripted bases.** Commands now own their brace groups,
+  control symbols stay bare, line breaks are nodes, and scripts bind to complete
+  command atoms; mandatory parity reached 50/68.
+- **Badness lexical word grain.** Replaced formatter-oriented token kinds with
+  `MATH_WORD` runs and moved character classes into the semantic iterator;
+  mandatory parity reached 19/58.
 - **One-to-one kind map + script-marker parity.** Locked injective oracle maps,
   split caret/underscore tokens, and retained an honest 4/58 baseline.
 - **Badness parser oracle—first parity slice.** Added pinned parser projectors,

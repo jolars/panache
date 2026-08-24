@@ -367,6 +367,15 @@ mod tests {
     }
 
     #[test]
+    fn inline_keeps_optional_arguments_tight() {
+        assert_eq!(fmt(r"\sqrt[3]{x}", MathContext::Inline), r"\sqrt[3]{x}");
+        assert_eq!(
+            fmt(r"\inferrule*[right]{A}{B}", MathContext::Inline),
+            r"\inferrule*[right]{A}{B}"
+        );
+    }
+
+    #[test]
     fn malformed_math_bails() {
         let input = "\\frac{1}{2";
         assert_eq!(format_math(input, &opts(MathContext::Inline)), None);
@@ -743,6 +752,13 @@ mod tests {
             &fmt(input, MathContext::EnvironmentBody),
             MathContext::EnvironmentBody,
         );
+    }
+
+    #[test]
+    fn line_break_modifiers_stay_attached() {
+        let input = "a \\\\*[2ex]\nb";
+        assert_eq!(fmt(input, MathContext::Display), input);
+        assert_idempotent(input, MathContext::Display);
     }
 
     #[test]

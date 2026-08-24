@@ -37,6 +37,8 @@ fn is_math_content_token(kind: SyntaxKind) -> bool {
             | SyntaxKind::MATH_CONTROL_SYMBOL
             | SyntaxKind::MATH_GROUP_OPEN
             | SyntaxKind::MATH_GROUP_CLOSE
+            | SyntaxKind::MATH_BRACKET_OPEN
+            | SyntaxKind::MATH_BRACKET_CLOSE
             | SyntaxKind::MATH_ALIGN
             | SyntaxKind::MATH_CARET
             | SyntaxKind::MATH_UNDERSCORE
@@ -264,8 +266,8 @@ impl MathSuperscript {
     }
 }
 
-/// A control word together with the argument groups it owns
-/// (`\frac{a}{b}`, or a bare `\alpha` with none).
+/// A control word together with the brace and optional arguments it owns
+/// (`\sqrt[3]{x}`, or a bare `\alpha` with none).
 pub struct MathCommand(SyntaxNode);
 
 impl AstNode for MathCommand {
@@ -296,9 +298,58 @@ impl MathCommand {
             .map(|token| token.text().trim_start_matches('\\').to_string())
     }
 
-    /// The attached argument groups, in source order.
+    /// The attached brace-group arguments, in source order.
+    ///
+    /// Retained as an alias for [`Self::groups`]. Optional arguments are
+    /// available through [`Self::optionals`].
     pub fn arguments(&self) -> impl Iterator<Item = MathGroup> + '_ {
+        self.groups()
+    }
+
+    /// The attached brace-group arguments, in source order.
+    pub fn groups(&self) -> impl Iterator<Item = MathGroup> + '_ {
         self.0.children().filter_map(MathGroup::cast)
+    }
+
+    /// The attached optional arguments, in source order.
+    pub fn optionals(&self) -> impl Iterator<Item = MathOptional> + '_ {
+        self.0.children().filter_map(MathOptional::cast)
+    }
+}
+
+/// A `[ ... ]` optional argument.
+pub struct MathOptional(SyntaxNode);
+
+impl AstNode for MathOptional {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_OPTIONAL
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathOptional {
+    /// The opening `[` token.
+    pub fn open_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_BRACKET_OPEN)
+    }
+
+    /// The closing `]` token, absent when recovery reaches a boundary first.
+    pub fn close_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_BRACKET_CLOSE)
+    }
+
+    /// Whether the optional carries a matching `]`.
+    pub fn is_closed(&self) -> bool {
+        self.close_token().is_some()
     }
 }
 
@@ -709,6 +760,31 @@ mod tests {
             .expect("superscript");
 
         assert!(superscript.argument().is_none());
+    }
+
+    #[test]
+    fn typed_command_wrappers_separate_groups_and_optionals() {
+        let node = SyntaxNode::new_root(parse_math_content(
+            r"\sqrt[3]{x}",
+            MathParseOptions::default(),
+        ));
+        let command = node
+            .children()
+            .find_map(MathCommand::cast)
+            .expect("command");
+
+        assert_eq!(command.groups().count(), 1);
+        assert_eq!(command.arguments().count(), 1);
+        let optional = command.optionals().next().expect("optional");
+        assert_eq!(
+            optional.open_token().as_ref().map(SyntaxToken::text),
+            Some("[")
+        );
+        assert_eq!(
+            optional.close_token().as_ref().map(SyntaxToken::text),
+            Some("]")
+        );
+        assert!(optional.is_closed());
     }
 
     #[test]

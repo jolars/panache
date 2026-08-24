@@ -10,7 +10,8 @@
 //! macro language, so we only capture structure that a formatter can safely act
 //! on — brace groups, `\begin`/`\end` environments, control sequences,
 //! alignment tabs (`&`), line breaks (`\\`), sub/superscript markers, comments,
-//! and whitespace. Everything else is an ordinary-atom run ([`MATH_WORD`]).
+//! optional arguments, brackets, comments, and whitespace. Everything else is
+//! an ordinary-atom run ([`MATH_WORD`]).
 //!
 //! The **CST is lossless and never fails** (`node.text() == content` for every
 //! input; worst case is a single `MATH_WORD` atom). Structural problems
@@ -59,6 +60,9 @@ enum Ctx {
     Top,
     /// Inside a `{ ... }` brace group; stops at the matching `}`.
     Group,
+    /// Inside a `[ ... ]` optional argument; stops at `]` or a recovery
+    /// boundary that cannot belong to the optional.
+    Optional,
     /// Inside a `\begin{env} ... \end{env}` body; stops at `\end`.
     Env,
     /// Inside a `\left<d> ... \right<d>` body; stops at `\right`.
@@ -100,12 +104,17 @@ impl MathParser<'_> {
         while let Some(c) = self.peek_char() {
             match c {
                 '}' if ctx == Ctx::Group => break,
+                '}' if ctx == Ctx::Optional => break,
                 '}' => self.bump_bytes(1, SyntaxKind::MATH_GROUP_CLOSE),
+                ']' if ctx == Ctx::Optional => break,
+                '[' => self.parse_scripted_atom(ctx),
+                ']' => self.parse_scripted_atom(ctx),
                 '\\' => {
                     if self.rest().starts_with("\\\\") {
                         self.parse_line_break();
                     } else if let Some(word) = self.peek_control_word() {
                         match word {
+                            "begin" | "end" if ctx == Ctx::Optional => break,
                             "end" if ctx == Ctx::Env => break,
                             "right" if ctx == Ctx::LeftRight => break,
                             _ => self.parse_scripted_atom(ctx),
@@ -214,6 +223,8 @@ impl MathParser<'_> {
                 None => self.parse_control_symbol(),
             },
             Some('{') => self.parse_group(),
+            Some('[') => self.bump_bytes(1, SyntaxKind::MATH_BRACKET_OPEN),
+            Some(']') => self.bump_bytes(1, SyntaxKind::MATH_BRACKET_CLOSE),
             Some('(') if self.opts.bookdown_equation_labels => match self.equation_label_len() {
                 Some(len) => self.bump_bytes(len, SyntaxKind::MATH_EQUATION_LABEL),
                 None => self.parse_word(),
@@ -359,22 +370,35 @@ impl MathParser<'_> {
     /// Parse a control word as a `MATH_COMMAND` node owning its arguments.
     ///
     /// Argument attachment is arity-blind, matching Badness: every trailing
-    /// `{…}` group is attached, no matter the command. Signatures decide only
+    /// `{…}` group and tight, closed `[…]` optional is attached, no matter the
+    /// command. Signatures decide only
     /// how an argument body is *interpreted*, never how many groups attach, so
     /// unknown commands behave exactly like known zero-argument ones.
     fn parse_command(&mut self) {
+        let brackets_forbidden = is_big_delimiter_command(self.peek_control_word());
         self.builder.start_node(SyntaxKind::MATH_COMMAND.into());
         self.parse_control_word();
         if self.pos < self.input.len()
             && self.rest().starts_with('*')
-            && self.argument_start_after_trivia(self.pos + 1).is_some()
+            && self.word_len() == 1
+            && self.argument_opener_after_trivia(self.pos + 1).is_some()
         {
             // A star variant folds into the command only when it directly
             // abuts and an argument follows (`\operatorname*{…}`); a bare
             // `\pi*r` keeps its `*` outside as ordinary content.
             self.bump_bytes(1, SyntaxKind::MATH_WORD);
         }
-        while let Some(argument) = self.argument_start_after_trivia(self.pos) {
+        loop {
+            if !brackets_forbidden
+                && self.peek_char() == Some('[')
+                && self.optional_close_from(self.pos).is_some()
+            {
+                self.parse_optional();
+                continue;
+            }
+            let Some((argument, '{')) = self.argument_opener_after_trivia(self.pos) else {
+                break;
+            };
             self.parse_attachment_trivia_until(argument);
             self.parse_group();
         }
@@ -385,7 +409,7 @@ impl MathParser<'_> {
     /// newlines, and comments, but never across a blank line (two newlines with
     /// nothing but layout between them — a comment occupies its line and resets
     /// the newline run without forgiving an earlier blank).
-    fn argument_start_after_trivia(&self, mut pos: usize) -> Option<usize> {
+    fn argument_opener_after_trivia(&self, mut pos: usize) -> Option<(usize, char)> {
         let mut newline_run = 0usize;
         let mut saw_blank_line = false;
         loop {
@@ -406,10 +430,157 @@ impl MathParser<'_> {
                     pos += rest.find(['\n', '\r']).unwrap_or(rest.len());
                     newline_run = 0;
                 }
-                Some('{') if !saw_blank_line => return Some(pos),
+                Some(opener @ ('{' | '[')) if !saw_blank_line => return Some((pos, opener)),
                 _ => return None,
             }
         }
+    }
+
+    /// Find the `]` that would close an optional beginning at `open` without
+    /// crossing a math/recovery boundary. Braces are opaque, and optionals
+    /// tightly attached to nested commands or line breaks claim their own
+    /// closing bracket first.
+    fn optional_close_from(&self, open: usize) -> Option<usize> {
+        debug_assert!(self.input[open..].starts_with('['));
+        let mut pos = open + 1;
+        let mut brace_depth = 0usize;
+        let mut newline_run = 0usize;
+
+        while pos < self.input.len() {
+            let rest = &self.input[pos..];
+            let c = rest.chars().next()?;
+            match c {
+                '{' => {
+                    brace_depth += 1;
+                    newline_run = 0;
+                    pos += 1;
+                }
+                '}' if brace_depth > 0 => {
+                    brace_depth -= 1;
+                    newline_run = 0;
+                    pos += 1;
+                }
+                '}' => return None,
+                ']' if brace_depth == 0 => return Some(pos),
+                '%' => {
+                    pos += rest.find(['\n', '\r']).unwrap_or(rest.len());
+                }
+                '\n' | '\r' if brace_depth == 0 => {
+                    pos += if c == '\r' && rest.starts_with("\r\n") {
+                        2
+                    } else {
+                        1
+                    };
+                    newline_run += 1;
+                    if newline_run >= 2 {
+                        return None;
+                    }
+                }
+                ' ' | '\t' if brace_depth == 0 => pos += 1,
+                '\\' => {
+                    newline_run = 0;
+                    if rest.starts_with("\\\\") {
+                        pos += 2;
+                        if self.input[pos..].starts_with('*') && self.word_len_at(pos) == 1 {
+                            pos += 1;
+                        }
+                        if self.input[pos..].starts_with('[') {
+                            pos = self.optional_close_from(pos)? + 1;
+                        }
+                        continue;
+                    }
+
+                    let Some(after) = rest.strip_prefix('\\') else {
+                        unreachable!()
+                    };
+                    let word_len = after
+                        .bytes()
+                        .take_while(|b| b.is_ascii_alphabetic() || *b == b'@')
+                        .count();
+                    if word_len == 0 {
+                        pos += 1 + after.chars().next().map(char::len_utf8).unwrap_or(0);
+                        continue;
+                    }
+                    let name = &after[..word_len];
+                    if brace_depth == 0 && matches!(name, "begin" | "end") {
+                        return None;
+                    }
+                    pos += 1 + word_len;
+                    if brace_depth > 0 {
+                        continue;
+                    }
+                    pos = self.command_tail_end(pos, is_big_delimiter_command(Some(name)))?;
+                }
+                _ => {
+                    newline_run = 0;
+                    pos += c.len_utf8();
+                }
+            }
+        }
+        None
+    }
+
+    /// Scan the arguments greedily owned by a nested command while deciding
+    /// which `]` closes an enclosing optional. This mirrors `parse_command`
+    /// without emitting or interpreting argument contents.
+    fn command_tail_end(&self, mut pos: usize, brackets_forbidden: bool) -> Option<usize> {
+        if self.input[pos..].starts_with('*')
+            && self.word_len_at(pos) == 1
+            && self.argument_opener_after_trivia(pos + 1).is_some()
+        {
+            pos += 1;
+        }
+        loop {
+            if !brackets_forbidden && self.input[pos..].starts_with('[') {
+                pos = self.optional_close_from(pos)? + 1;
+                continue;
+            }
+            let Some((open, '{')) = self.argument_opener_after_trivia(pos) else {
+                break;
+            };
+            pos = self.group_end_from(open)?;
+        }
+        Some(pos)
+    }
+
+    /// Return the byte after a balanced brace group, treating control symbols
+    /// and comments as opaque so escaped braces do not affect nesting.
+    fn group_end_from(&self, open: usize) -> Option<usize> {
+        debug_assert!(self.input[open..].starts_with('{'));
+        let mut pos = open + 1;
+        let mut depth = 1usize;
+        while pos < self.input.len() {
+            let rest = &self.input[pos..];
+            let c = rest.chars().next()?;
+            match c {
+                '{' => {
+                    depth += 1;
+                    pos += 1;
+                }
+                '}' => {
+                    depth -= 1;
+                    pos += 1;
+                    if depth == 0 {
+                        return Some(pos);
+                    }
+                }
+                '%' => pos += rest.find(['\n', '\r']).unwrap_or(rest.len()),
+                '\\' => {
+                    let after = &rest[1..];
+                    let word_len = after
+                        .bytes()
+                        .take_while(|b| b.is_ascii_alphabetic() || *b == b'@')
+                        .count();
+                    pos += if word_len > 0 {
+                        1 + word_len
+                    } else {
+                        1 + after.chars().next().map(char::len_utf8).unwrap_or(0)
+                    };
+                }
+                _ => pos += c.len_utf8(),
+            }
+        }
+        None
     }
 
     /// Emit the trivia between a command and an attached argument inside the
@@ -436,6 +607,22 @@ impl MathParser<'_> {
     fn parse_line_break(&mut self) {
         self.builder.start_node(SyntaxKind::MATH_LINE_BREAK.into());
         self.bump_bytes(2, SyntaxKind::MATH_CONTROL_SYMBOL);
+        if self.peek_char() == Some('*') && self.word_len() == 1 {
+            self.bump_bytes(1, SyntaxKind::MATH_WORD);
+        }
+        if self.peek_char() == Some('[') {
+            self.parse_optional();
+        }
+        self.builder.finish_node();
+    }
+
+    fn parse_optional(&mut self) {
+        self.builder.start_node(SyntaxKind::MATH_OPTIONAL.into());
+        self.bump_bytes(1, SyntaxKind::MATH_BRACKET_OPEN);
+        self.parse_elements(Ctx::Optional);
+        if self.peek_char() == Some(']') {
+            self.bump_bytes(1, SyntaxKind::MATH_BRACKET_CLOSE);
+        }
         self.builder.finish_node();
     }
 
@@ -474,32 +661,41 @@ impl MathParser<'_> {
     }
 
     fn word_len(&self) -> usize {
-        self.rest()
+        self.word_len_at(self.pos)
+    }
+
+    fn word_len_at(&self, pos: usize) -> usize {
+        self.input[pos..]
             .char_indices()
             .find_map(|(offset, c)| {
                 let structural = is_structural(c);
                 let host_label = self.opts.bookdown_equation_labels
                     && c == '('
-                    && self.equation_label_len_at(offset).is_some();
+                    && try_parse_bookdown_equation_definition(&self.input[pos + offset..])
+                        .is_some();
                 (structural || host_label).then_some(offset)
             })
-            .unwrap_or_else(|| self.rest().len())
+            .unwrap_or_else(|| self.input[pos..].len())
     }
 
     fn equation_label_len(&self) -> Option<usize> {
         try_parse_bookdown_equation_definition(self.rest()).map(|(len, _)| len)
-    }
-
-    fn equation_label_len_at(&self, offset: usize) -> Option<usize> {
-        try_parse_bookdown_equation_definition(&self.rest()[offset..]).map(|(len, _)| len)
     }
 }
 
 fn is_structural(c: char) -> bool {
     matches!(
         c,
-        '\\' | '{' | '}' | '&' | '^' | '_' | '%' | ' ' | '\t' | '\n' | '\r'
+        '\\' | '{' | '}' | '[' | ']' | '&' | '^' | '_' | '%' | ' ' | '\t' | '\n' | '\r'
     )
+}
+
+fn is_big_delimiter_command(name: Option<&str>) -> bool {
+    let Some(name) = name else { return false };
+    ["bigg", "Bigg", "big", "Big"].iter().any(|prefix| {
+        name.strip_prefix(prefix)
+            .is_some_and(|suffix| matches!(suffix, "" | "l" | "m" | "r"))
+    })
 }
 
 #[cfg(test)]
@@ -547,7 +743,7 @@ mod tests {
 
     #[test]
     fn badness_word_grain_keeps_semantic_characters_lexically_neutral() {
-        for content in ["P(X", "M(t)", "i=1", "a+b", "[a,b);"] {
+        for content in ["P(X", "M(t)", "i=1", "a+b"] {
             assert_eq!(
                 token_kinds(content),
                 vec![SyntaxKind::MATH_WORD],
@@ -558,8 +754,11 @@ mod tests {
     }
 
     #[test]
-    fn delimiters_and_punctuation_remain_in_word_runs() {
-        assert_eq!(token_kinds("[a,b);"), vec![SyntaxKind::MATH_WORD]);
+    fn brackets_have_badness_lexical_grain_while_punctuation_stays_in_words() {
+        assert_eq!(
+            token_kinds("[a,b);"),
+            vec![SyntaxKind::MATH_BRACKET_OPEN, SyntaxKind::MATH_WORD]
+        );
         assert_lossless("[a,b);");
         assert_eq!(token_kinds("a|b.c/d"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("a|b.c/d");
@@ -708,6 +907,89 @@ mod tests {
     }
 
     #[test]
+    fn commands_own_tight_optional_arguments_in_source_order() {
+        let tree = node(r"\sqrt[3]{x}");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\sqrt[3]{x}");
+        assert_eq!(
+            command
+                .children_with_tokens()
+                .map(|el| el.kind())
+                .collect::<Vec<_>>(),
+            vec![
+                SyntaxKind::MATH_CONTROL_WORD,
+                SyntaxKind::MATH_OPTIONAL,
+                SyntaxKind::MATH_GROUP,
+            ]
+        );
+        let optional = command
+            .children()
+            .find(|child| child.kind() == SyntaxKind::MATH_OPTIONAL)
+            .expect("optional argument");
+        assert_eq!(
+            optional
+                .children_with_tokens()
+                .map(|el| el.kind())
+                .collect::<Vec<_>>(),
+            vec![
+                SyntaxKind::MATH_BRACKET_OPEN,
+                SyntaxKind::MATH_WORD,
+                SyntaxKind::MATH_BRACKET_CLOSE,
+            ]
+        );
+        assert_lossless(r"\sqrt[3]{x}");
+    }
+
+    #[test]
+    fn optional_arguments_are_tight_closed_and_not_big_delimiters() {
+        for content in [r"\sqrt [3]{x}", r"\sqrt[3{x}", r"\Big[x\Big]"] {
+            let command = node(content).children().next().expect("command node");
+            assert!(
+                command
+                    .children()
+                    .all(|child| child.kind() != SyntaxKind::MATH_OPTIONAL),
+                "must not attach: {content:?}"
+            );
+            assert_lossless(content);
+        }
+
+        let tree = node(r"\sqrt[n]{x}");
+        assert!(
+            tree.children()
+                .next()
+                .expect("command node")
+                .children()
+                .any(|child| child.kind() == SyntaxKind::MATH_OPTIONAL)
+        );
+    }
+
+    #[test]
+    fn optional_gate_accounts_for_nested_command_arguments() {
+        let attached = node(r"\outer[\inner{x}[y] z]");
+        let outer = attached.children().next().expect("outer command");
+        assert_eq!(outer.text().to_string(), r"\outer[\inner{x}[y] z]");
+        assert_lossless(r"\outer[\inner{x}[y] z]");
+
+        let unclosed = node(r"\outer[\inner*[x]");
+        let outer = unclosed.children().next().expect("outer command");
+        assert!(
+            outer
+                .children()
+                .all(|child| child.kind() != SyntaxKind::MATH_OPTIONAL),
+            "the nested optional's `]` must not close the outer optional"
+        );
+        assert_lossless(r"\outer[\inner*[x]");
+    }
+
+    #[test]
+    fn star_variants_fold_before_optional_arguments() {
+        let tree = node(r"\inferrule*[right]{A}{B}");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\inferrule*[right]{A}{B}");
+        assert_lossless(r"\inferrule*[right]{A}{B}");
+    }
+
+    #[test]
     fn line_break_is_a_node_wrapping_its_control_symbol() {
         let tree = node(r"a \\ b");
         let line_break = tree
@@ -722,6 +1004,29 @@ mod tests {
             vec![SyntaxKind::MATH_CONTROL_SYMBOL]
         );
         assert_lossless(r"a \\ b");
+    }
+
+    #[test]
+    fn line_break_owns_only_tight_star_and_optional_modifiers() {
+        for (content, expected) in [
+            (r"\\*", r"\\*"),
+            (r"\\[2ex]", r"\\[2ex]"),
+            (r"\\*[2ex]", r"\\*[2ex]"),
+            (r"\\*foo", r"\\"),
+            (r"\\ [2ex]", r"\\"),
+        ] {
+            let tree = node(content);
+            let line_break = tree
+                .children()
+                .find(|child| child.kind() == SyntaxKind::MATH_LINE_BREAK)
+                .expect("line break node");
+            assert_eq!(
+                line_break.text().to_string(),
+                expected,
+                "shape: {content:?}"
+            );
+            assert_lossless(content);
+        }
     }
 
     #[test]
