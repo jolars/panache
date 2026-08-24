@@ -112,14 +112,15 @@ DOCUMENT@0..183
     INLINE_MATH@165..182
       INLINE_MATH_MARKER@165..166 "$"
       MATH_CONTENT@166..181
-        MATH_COMMAND@166..171 "\\frac"
-        MATH_GROUP@171..176
-          MATH_GROUP_OPEN@171..172 "{"
-          MATH_WORD@172..175 "a+b"
-          MATH_GROUP_CLOSE@175..176 "}"
-        MATH_GROUP@176..181
-          MATH_GROUP_OPEN@176..177 "{"
-          MATH_WORD@177..180 "c-d"
-          MATH_GROUP_CLOSE@180..181 "}"
+        MATH_COMMAND@166..181
+          MATH_CONTROL_WORD@166..171 "\\frac"
+          MATH_GROUP@171..176
+            MATH_GROUP_OPEN@171..172 "{"
+            MATH_WORD@172..175 "a+b"
+            MATH_GROUP_CLOSE@175..176 "}"
+          MATH_GROUP@176..181
+            MATH_GROUP_OPEN@176..177 "{"
+            MATH_WORD@177..180 "c-d"
+            MATH_GROUP_CLOSE@180..181 "}"
       INLINE_MATH_MARKER@181..182 "$"
     NEWLINE@182..183 "\n"

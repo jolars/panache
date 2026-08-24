@@ -19,39 +19,46 @@ DOCUMENT@0..591
       DISPLAY_MATH_MARKER@143..145 "$$"
       MATH_CONTENT@145..376
         MATH_NEWLINE@145..146 "\n"
-        MATH_COMMAND@146..151 "\\frac"
-        MATH_GROUP@151..171
-          MATH_GROUP_OPEN@151..152 "{"
-          MATH_COMMAND@152..160 "\\partial"
-          MATH_SPACE@160..161 " "
-          MATH_COMMAND@161..168 "\\mathrm"
-          MATH_SPACE@168..169 " "
-          MATH_WORD@169..170 "C"
-          MATH_GROUP_CLOSE@170..171 "}"
-        MATH_GROUP@171..193
-          MATH_GROUP_OPEN@171..172 "{"
-          MATH_SPACE@172..173 " "
-          MATH_COMMAND@173..181 "\\partial"
-          MATH_SPACE@181..182 " "
-          MATH_COMMAND@182..189 "\\mathrm"
-          MATH_SPACE@189..190 " "
-          MATH_WORD@190..191 "t"
-          MATH_SPACE@191..192 " "
-          MATH_GROUP_CLOSE@192..193 "}"
+        MATH_COMMAND@146..193
+          MATH_CONTROL_WORD@146..151 "\\frac"
+          MATH_GROUP@151..171
+            MATH_GROUP_OPEN@151..152 "{"
+            MATH_COMMAND@152..160
+              MATH_CONTROL_WORD@152..160 "\\partial"
+            MATH_SPACE@160..161 " "
+            MATH_COMMAND@161..168
+              MATH_CONTROL_WORD@161..168 "\\mathrm"
+            MATH_SPACE@168..169 " "
+            MATH_WORD@169..170 "C"
+            MATH_GROUP_CLOSE@170..171 "}"
+          MATH_GROUP@171..193
+            MATH_GROUP_OPEN@171..172 "{"
+            MATH_SPACE@172..173 " "
+            MATH_COMMAND@173..181
+              MATH_CONTROL_WORD@173..181 "\\partial"
+            MATH_SPACE@181..182 " "
+            MATH_COMMAND@182..189
+              MATH_CONTROL_WORD@182..189 "\\mathrm"
+            MATH_SPACE@189..190 " "
+            MATH_WORD@190..191 "t"
+            MATH_SPACE@191..192 " "
+            MATH_GROUP_CLOSE@192..193 "}"
         MATH_SPACE@193..194 " "
         MATH_WORD@194..195 "+"
         MATH_SPACE@195..196 " "
-        MATH_COMMAND@196..201 "\\frac"
-        MATH_GROUP@201..204
-          MATH_GROUP_OPEN@201..202 "{"
-          MATH_WORD@202..203 "1"
-          MATH_GROUP_CLOSE@203..204 "}"
-        MATH_GROUP@204..207
-          MATH_GROUP_OPEN@204..205 "{"
-          MATH_WORD@205..206 "2"
-          MATH_GROUP_CLOSE@206..207 "}"
+        MATH_COMMAND@196..207
+          MATH_CONTROL_WORD@196..201 "\\frac"
+          MATH_GROUP@201..204
+            MATH_GROUP_OPEN@201..202 "{"
+            MATH_WORD@202..203 "1"
+            MATH_GROUP_CLOSE@203..204 "}"
+          MATH_GROUP@204..207
+            MATH_GROUP_OPEN@204..205 "{"
+            MATH_WORD@205..206 "2"
+            MATH_GROUP_CLOSE@206..207 "}"
         MATH_SCRIPTED@207..217
-          MATH_COMMAND@207..213 "\\sigma"
+          MATH_COMMAND@207..213
+            MATH_CONTROL_WORD@207..213 "\\sigma"
           MATH_SUPERSCRIPT@213..217
             MATH_CARET@213..214 "^"
             MATH_GROUP@214..217
@@ -59,7 +66,8 @@ DOCUMENT@0..591
               MATH_WORD@215..216 "2"
               MATH_GROUP_CLOSE@216..217 "}"
         MATH_SPACE@217..218 " "
-        MATH_COMMAND@218..225 "\\mathrm"
+        MATH_COMMAND@218..225
+          MATH_CONTROL_WORD@218..225 "\\mathrm"
         MATH_SPACE@225..226 " "
         MATH_SCRIPTED@226..231
           MATH_WORD@226..227 "S"
@@ -70,72 +78,86 @@ DOCUMENT@0..591
               MATH_WORD@229..230 "2"
               MATH_GROUP_CLOSE@230..231 "}"
         MATH_NEWLINE@231..232 "\n"
-        MATH_COMMAND@232..237 "\\frac"
-        MATH_GROUP@237..261
-          MATH_GROUP_OPEN@237..238 "{"
-          MATH_SCRIPTED@238..250
-            MATH_COMMAND@238..246 "\\partial"
-            MATH_SUPERSCRIPT@246..250
-              MATH_CARET@246..247 "^"
-              MATH_GROUP@247..250
-                MATH_GROUP_OPEN@247..248 "{"
-                MATH_WORD@248..249 "2"
-                MATH_GROUP_CLOSE@249..250 "}"
-          MATH_SPACE@250..251 " "
-          MATH_COMMAND@251..258 "\\mathrm"
-          MATH_SPACE@258..259 " "
-          MATH_WORD@259..260 "C"
-          MATH_GROUP_CLOSE@260..261 "}"
-        MATH_GROUP@261..283
-          MATH_GROUP_OPEN@261..262 "{"
-          MATH_COMMAND@262..270 "\\partial"
-          MATH_SPACE@270..271 " "
-          MATH_COMMAND@271..278 "\\mathrm"
-          MATH_SPACE@278..279 " "
-          MATH_SCRIPTED@279..282
-            MATH_WORD@279..280 "S"
-            MATH_SUPERSCRIPT@280..282
-              MATH_CARET@280..281 "^"
-              MATH_WORD@281..282 "2"
-          MATH_GROUP_CLOSE@282..283 "}"
+        MATH_COMMAND@232..283
+          MATH_CONTROL_WORD@232..237 "\\frac"
+          MATH_GROUP@237..261
+            MATH_GROUP_OPEN@237..238 "{"
+            MATH_SCRIPTED@238..250
+              MATH_COMMAND@238..246
+                MATH_CONTROL_WORD@238..246 "\\partial"
+              MATH_SUPERSCRIPT@246..250
+                MATH_CARET@246..247 "^"
+                MATH_GROUP@247..250
+                  MATH_GROUP_OPEN@247..248 "{"
+                  MATH_WORD@248..249 "2"
+                  MATH_GROUP_CLOSE@249..250 "}"
+            MATH_SPACE@250..251 " "
+            MATH_COMMAND@251..258
+              MATH_CONTROL_WORD@251..258 "\\mathrm"
+            MATH_SPACE@258..259 " "
+            MATH_WORD@259..260 "C"
+            MATH_GROUP_CLOSE@260..261 "}"
+          MATH_GROUP@261..283
+            MATH_GROUP_OPEN@261..262 "{"
+            MATH_COMMAND@262..270
+              MATH_CONTROL_WORD@262..270 "\\partial"
+            MATH_SPACE@270..271 " "
+            MATH_COMMAND@271..278
+              MATH_CONTROL_WORD@271..278 "\\mathrm"
+            MATH_SPACE@278..279 " "
+            MATH_SCRIPTED@279..282
+              MATH_WORD@279..280 "S"
+              MATH_SUPERSCRIPT@280..282
+                MATH_CARET@280..281 "^"
+                MATH_WORD@281..282 "2"
+            MATH_GROUP_CLOSE@282..283 "}"
         MATH_NEWLINE@283..284 "\n"
         MATH_SPACE@284..285 " "
         MATH_WORD@285..286 "+"
         MATH_SPACE@286..287 " "
-        MATH_COMMAND@287..294 "\\mathrm"
+        MATH_COMMAND@287..294
+          MATH_CONTROL_WORD@287..294 "\\mathrm"
         MATH_SPACE@294..295 " "
         MATH_WORD@295..296 "r"
         MATH_SPACE@296..297 " "
-        MATH_COMMAND@297..304 "\\mathrm"
+        MATH_COMMAND@297..304
+          MATH_CONTROL_WORD@297..304 "\\mathrm"
         MATH_SPACE@304..305 " "
         MATH_WORD@305..306 "S"
         MATH_SPACE@306..307 " "
-        MATH_COMMAND@307..312 "\\frac"
-        MATH_GROUP@312..332
-          MATH_GROUP_OPEN@312..313 "{"
-          MATH_COMMAND@313..321 "\\partial"
-          MATH_SPACE@321..322 " "
-          MATH_COMMAND@322..329 "\\mathrm"
-          MATH_SPACE@329..330 " "
-          MATH_WORD@330..331 "C"
-          MATH_GROUP_CLOSE@331..332 "}"
-        MATH_GROUP@332..352
-          MATH_GROUP_OPEN@332..333 "{"
-          MATH_COMMAND@333..341 "\\partial"
-          MATH_SPACE@341..342 " "
-          MATH_COMMAND@342..349 "\\mathrm"
-          MATH_SPACE@349..350 " "
-          MATH_WORD@350..351 "S"
-          MATH_GROUP_CLOSE@351..352 "}"
+        MATH_COMMAND@307..352
+          MATH_CONTROL_WORD@307..312 "\\frac"
+          MATH_GROUP@312..332
+            MATH_GROUP_OPEN@312..313 "{"
+            MATH_COMMAND@313..321
+              MATH_CONTROL_WORD@313..321 "\\partial"
+            MATH_SPACE@321..322 " "
+            MATH_COMMAND@322..329
+              MATH_CONTROL_WORD@322..329 "\\mathrm"
+            MATH_SPACE@329..330 " "
+            MATH_WORD@330..331 "C"
+            MATH_GROUP_CLOSE@331..332 "}"
+          MATH_GROUP@332..352
+            MATH_GROUP_OPEN@332..333 "{"
+            MATH_COMMAND@333..341
+              MATH_CONTROL_WORD@333..341 "\\partial"
+            MATH_SPACE@341..342 " "
+            MATH_COMMAND@342..349
+              MATH_CONTROL_WORD@342..349 "\\mathrm"
+            MATH_SPACE@349..350 " "
+            MATH_WORD@350..351 "S"
+            MATH_GROUP_CLOSE@351..352 "}"
         MATH_SPACE@352..353 " "
         MATH_WORD@353..354 "="
         MATH_NEWLINE@354..355 "\n"
         MATH_SPACE@355..356 " "
-        MATH_COMMAND@356..363 "\\mathrm"
+        MATH_COMMAND@356..363
+          MATH_CONTROL_WORD@356..363 "\\mathrm"
         MATH_SPACE@363..364 " "
         MATH_WORD@364..365 "r"
         MATH_SPACE@365..366 " "
-        MATH_COMMAND@366..373 "\\mathrm"
+        MATH_COMMAND@366..373
+          MATH_CONTROL_WORD@366..373 "\\mathrm"
         MATH_SPACE@373..374 " "
         MATH_WORD@374..375 "C"
         MATH_NEWLINE@375..376 "\n"

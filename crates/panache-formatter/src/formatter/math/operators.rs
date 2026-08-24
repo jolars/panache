@@ -13,7 +13,8 @@
 //! spacing and line-breaking. The command table supplies the corresponding
 //! view for known control words.
 
-use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind};
+use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxToken};
+use rowan::NodeOrToken;
 
 /// TeX atom classes (the subset the formatter's spacing pass needs; see The
 /// TeXbook Appendix G).
@@ -134,6 +135,26 @@ pub fn scripted_base(element: &SyntaxElement) -> Option<SyntaxElement> {
         .and_then(|scripted| scripted.base())
 }
 
+/// The control-sequence token naming a command element: a bare control token
+/// itself, or the head control word of a `MATH_COMMAND` node.
+pub fn command_name_token(element: &SyntaxElement) -> Option<SyntaxToken> {
+    match element {
+        NodeOrToken::Token(token)
+            if matches!(
+                token.kind(),
+                SyntaxKind::MATH_CONTROL_WORD | SyntaxKind::MATH_CONTROL_SYMBOL
+            ) =>
+        {
+            Some(token.clone())
+        }
+        NodeOrToken::Node(node) if node.kind() == SyntaxKind::MATH_COMMAND => node
+            .children_with_tokens()
+            .filter_map(|child| child.into_token())
+            .find(|token| token.kind() == SyntaxKind::MATH_CONTROL_WORD),
+        _ => None,
+    }
+}
+
 /// Atom class of a scripted base *as one operand*, shared by inline spacing
 /// and line-break candidate scans so the two can never disagree. Token bases
 /// resolve through [`word_atoms`] / [`command_class`]; structured bases
@@ -146,10 +167,12 @@ pub fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
             .as_token()
             .and_then(|token| word_atoms(token.text()).next())
             .map(|atom| atom.class),
-        SyntaxKind::MATH_COMMAND => base.as_token().map(|token| {
-            let name = token.text().strip_prefix('\\').unwrap_or(token.text());
-            command_class(name).unwrap_or(AtomClass::Ord)
-        }),
+        SyntaxKind::MATH_COMMAND | SyntaxKind::MATH_CONTROL_SYMBOL => {
+            command_name_token(base).map(|token| {
+                let name = token.text().strip_prefix('\\').unwrap_or(token.text());
+                command_class(name).unwrap_or(AtomClass::Ord)
+            })
+        }
         SyntaxKind::MATH_GROUP | SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_DELIMITED => {
             Some(AtomClass::Close)
         }

@@ -103,7 +103,7 @@ impl MathParser<'_> {
                 '}' => self.bump_bytes(1, SyntaxKind::MATH_GROUP_CLOSE),
                 '\\' => {
                     if self.rest().starts_with("\\\\") {
-                        self.bump_bytes(2, SyntaxKind::MATH_LINE_BREAK);
+                        self.parse_line_break();
                     } else if let Some(word) = self.peek_control_word() {
                         match word {
                             "end" if ctx == Ctx::Env => break,
@@ -206,10 +206,11 @@ impl MathParser<'_> {
             Some('\\') => match self.peek_control_word() {
                 Some("begin") => self.parse_environment(),
                 Some("left") => self.parse_delimited(),
-                Some(word) => {
-                    let len = 1 + word.len();
-                    self.bump_bytes(len, SyntaxKind::MATH_COMMAND);
-                }
+                // Stray `\end`/`\right` stay bare tokens (Badness leaves them
+                // loose for the enclosing level too); matched ones are consumed
+                // by their environment/delimited parsers before reaching here.
+                Some("end" | "right") => self.parse_control_word(),
+                Some(_) => self.parse_command(),
                 None => self.parse_control_symbol(),
             },
             Some('{') => self.parse_group(),
@@ -355,15 +356,98 @@ impl MathParser<'_> {
         }
     }
 
+    /// Parse a control word as a `MATH_COMMAND` node owning its arguments.
+    ///
+    /// Argument attachment is arity-blind, matching Badness: every trailing
+    /// `{…}` group is attached, no matter the command. Signatures decide only
+    /// how an argument body is *interpreted*, never how many groups attach, so
+    /// unknown commands behave exactly like known zero-argument ones.
+    fn parse_command(&mut self) {
+        self.builder.start_node(SyntaxKind::MATH_COMMAND.into());
+        self.parse_control_word();
+        if self.pos < self.input.len()
+            && self.rest().starts_with('*')
+            && self.argument_start_after_trivia(self.pos + 1).is_some()
+        {
+            // A star variant folds into the command only when it directly
+            // abuts and an argument follows (`\operatorname*{…}`); a bare
+            // `\pi*r` keeps its `*` outside as ordinary content.
+            self.bump_bytes(1, SyntaxKind::MATH_WORD);
+        }
+        while let Some(argument) = self.argument_start_after_trivia(self.pos) {
+            self.parse_attachment_trivia_until(argument);
+            self.parse_group();
+        }
+        self.builder.finish_node();
+    }
+
+    /// Find the start of a directly attachable `{…}` argument: past spaces,
+    /// newlines, and comments, but never across a blank line (two newlines with
+    /// nothing but layout between them — a comment occupies its line and resets
+    /// the newline run without forgiving an earlier blank).
+    fn argument_start_after_trivia(&self, mut pos: usize) -> Option<usize> {
+        let mut newline_run = 0usize;
+        let mut saw_blank_line = false;
+        loop {
+            let rest = &self.input[pos..];
+            match rest.chars().next() {
+                Some(' ' | '\t') => pos += 1,
+                Some('\n') => {
+                    pos += 1;
+                    newline_run += 1;
+                    saw_blank_line |= newline_run >= 2;
+                }
+                Some('\r') => {
+                    pos += if rest.starts_with("\r\n") { 2 } else { 1 };
+                    newline_run += 1;
+                    saw_blank_line |= newline_run >= 2;
+                }
+                Some('%') => {
+                    pos += rest.find(['\n', '\r']).unwrap_or(rest.len());
+                    newline_run = 0;
+                }
+                Some('{') if !saw_blank_line => return Some(pos),
+                _ => return None,
+            }
+        }
+    }
+
+    /// Emit the trivia between a command and an attached argument inside the
+    /// command node.
+    fn parse_attachment_trivia_until(&mut self, end: usize) {
+        while self.pos < end {
+            match self.peek_char() {
+                Some(' ' | '\t') => self.parse_spaces(),
+                Some('\n') => self.bump_bytes(1, SyntaxKind::MATH_NEWLINE),
+                Some('\r') => {
+                    let len = if self.rest().starts_with("\r\n") {
+                        2
+                    } else {
+                        1
+                    };
+                    self.bump_bytes(len, SyntaxKind::MATH_NEWLINE);
+                }
+                Some('%') => self.parse_comment(),
+                _ => unreachable!("attachment lookahead may only skip trivia"),
+            }
+        }
+    }
+
+    fn parse_line_break(&mut self) {
+        self.builder.start_node(SyntaxKind::MATH_LINE_BREAK.into());
+        self.bump_bytes(2, SyntaxKind::MATH_CONTROL_SYMBOL);
+        self.builder.finish_node();
+    }
+
     fn parse_control_word(&mut self) {
         let word_len = self.peek_control_word().map(str::len).unwrap_or(0);
-        self.bump_bytes(1 + word_len, SyntaxKind::MATH_COMMAND);
+        self.bump_bytes(1 + word_len, SyntaxKind::MATH_CONTROL_WORD);
     }
 
     fn parse_control_symbol(&mut self) {
         let after = &self.input[self.pos + 1..];
         let len = 1 + after.chars().next().map(char::len_utf8).unwrap_or(0);
-        self.bump_bytes(len, SyntaxKind::MATH_COMMAND);
+        self.bump_bytes(len, SyntaxKind::MATH_CONTROL_SYMBOL);
     }
 
     fn parse_comment(&mut self) {
@@ -479,7 +563,10 @@ mod tests {
         assert_lossless("[a,b);");
         assert_eq!(token_kinds("a|b.c/d"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("a|b.c/d");
-        assert_eq!(token_kinds(r"\(\)\[\]"), vec![SyntaxKind::MATH_COMMAND; 4]);
+        assert_eq!(
+            token_kinds(r"\(\)\[\]"),
+            vec![SyntaxKind::MATH_CONTROL_SYMBOL; 4]
+        );
         assert_lossless(r"\(\)\[\]");
     }
 
@@ -502,7 +589,7 @@ mod tests {
         assert_eq!(token_kinds("a<=b"), vec![SyntaxKind::MATH_WORD]);
         assert_eq!(token_kinds("-x"), vec![SyntaxKind::MATH_WORD]);
         assert_lossless("-x");
-        assert_eq!(token_kinds(r"\<"), vec![SyntaxKind::MATH_COMMAND]);
+        assert_eq!(token_kinds(r"\<"), vec![SyntaxKind::MATH_CONTROL_SYMBOL]);
         assert_lossless(r"\<");
     }
 
@@ -517,11 +604,124 @@ mod tests {
     fn control_word_and_symbol() {
         assert_eq!(
             token_kinds(r"\alpha\,"),
-            vec![SyntaxKind::MATH_COMMAND, SyntaxKind::MATH_COMMAND]
+            vec![
+                SyntaxKind::MATH_CONTROL_WORD,
+                SyntaxKind::MATH_CONTROL_SYMBOL
+            ]
         );
         assert_lossless(r"\alpha\,");
-        assert_eq!(token_kinds(r"\&\%\{\}"), vec![SyntaxKind::MATH_COMMAND; 4]);
+        assert_eq!(
+            token_kinds(r"\&\%\{\}"),
+            vec![SyntaxKind::MATH_CONTROL_SYMBOL; 4]
+        );
         assert_lossless(r"\&\%\{\}");
+    }
+
+    /// A control word is always a `MATH_COMMAND` node wrapping its
+    /// `MATH_CONTROL_WORD` token — even with zero arguments — while control
+    /// symbols stay bare tokens, matching Badness's lexical model.
+    #[test]
+    fn control_words_wrap_in_command_nodes_and_symbols_stay_bare() {
+        let tree = node(r"\alpha\,");
+        let kinds: Vec<_> = tree.children_with_tokens().map(|el| el.kind()).collect();
+        assert_eq!(
+            kinds,
+            vec![SyntaxKind::MATH_COMMAND, SyntaxKind::MATH_CONTROL_SYMBOL]
+        );
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\alpha");
+    }
+
+    /// Argument attachment is arity-blind: every trailing brace group belongs
+    /// to the command, known or unknown, and single-token "arguments" do not.
+    #[test]
+    fn commands_own_their_trailing_brace_groups() {
+        let tree = node(r"\frac{\partial f}{\partial x} = 2x");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.kind(), SyntaxKind::MATH_COMMAND);
+        assert_eq!(command.text().to_string(), r"\frac{\partial f}{\partial x}");
+        assert_eq!(
+            command
+                .children()
+                .filter(|child| child.kind() == SyntaxKind::MATH_GROUP)
+                .count(),
+            2
+        );
+        assert_lossless(r"\frac{\partial f}{\partial x} = 2x");
+
+        let unknown = node(r"\unknowncmd{a}{b}");
+        let command = unknown.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\unknowncmd{a}{b}");
+    }
+
+    #[test]
+    fn single_token_arguments_stay_outside_the_command() {
+        let tree = node(r"\frac12");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\frac");
+        assert_lossless(r"\frac12");
+
+        let commands: Vec<String> = node(r"\frac\alpha\beta")
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::MATH_COMMAND)
+            .map(|child| child.text().to_string())
+            .collect();
+        assert_eq!(commands, vec![r"\frac", r"\alpha", r"\beta"]);
+        assert_lossless(r"\frac\alpha\beta");
+    }
+
+    /// Attachment crosses spaces, newlines, and comments (which ride inside
+    /// the command node), but never a blank line (which stays outside).
+    #[test]
+    fn argument_attachment_crosses_trivia_but_not_blank_lines() {
+        for content in ["\\frac {1}{2}", "\\frac\n{1}{2}", "\\frac% c\n{1}{2}"] {
+            let tree = node(content);
+            let command = tree.children().next().expect("command node");
+            assert_eq!(command.text().to_string(), content, "attach: {content:?}");
+            assert_lossless(content);
+        }
+
+        let tree = node("\\alpha\n\n{a}");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\alpha");
+        assert!(
+            tree.children()
+                .any(|child| child.kind() == SyntaxKind::MATH_GROUP),
+            "the group stays a sibling across a blank line"
+        );
+        assert_lossless("\\alpha\n\n{a}");
+    }
+
+    /// A star variant folds into the command only when it directly abuts and
+    /// an argument follows; `\pi*r` keeps its `*` as ordinary content.
+    #[test]
+    fn star_variants_fold_into_the_command_only_before_arguments() {
+        let tree = node(r"\operatorname*{min}");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\operatorname*{min}");
+        assert_lossless(r"\operatorname*{min}");
+
+        let tree = node(r"\pi*r");
+        let command = tree.children().next().expect("command node");
+        assert_eq!(command.text().to_string(), r"\pi");
+        assert_lossless(r"\pi*r");
+    }
+
+    #[test]
+    fn line_break_is_a_node_wrapping_its_control_symbol() {
+        let tree = node(r"a \\ b");
+        let line_break = tree
+            .children()
+            .find(|child| child.kind() == SyntaxKind::MATH_LINE_BREAK)
+            .expect("line break node");
+        assert_eq!(
+            line_break
+                .children_with_tokens()
+                .map(|el| el.kind())
+                .collect::<Vec<_>>(),
+            vec![SyntaxKind::MATH_CONTROL_SYMBOL]
+        );
+        assert_lossless(r"a \\ b");
     }
 
     #[test]
@@ -548,14 +748,14 @@ mod tests {
         assert_eq!(
             token_kinds(r"x &= 1 \\"),
             vec![
-                SyntaxKind::MATH_WORD,       // x
-                SyntaxKind::MATH_SPACE,      // ' '
-                SyntaxKind::MATH_ALIGN,      // &
-                SyntaxKind::MATH_WORD,       // =
-                SyntaxKind::MATH_SPACE,      // ' '
-                SyntaxKind::MATH_WORD,       // 1
-                SyntaxKind::MATH_SPACE,      // ' '
-                SyntaxKind::MATH_LINE_BREAK, // \\
+                SyntaxKind::MATH_WORD,           // x
+                SyntaxKind::MATH_SPACE,          // ' '
+                SyntaxKind::MATH_ALIGN,          // &
+                SyntaxKind::MATH_WORD,           // =
+                SyntaxKind::MATH_SPACE,          // ' '
+                SyntaxKind::MATH_WORD,           // 1
+                SyntaxKind::MATH_SPACE,          // ' '
+                SyntaxKind::MATH_CONTROL_SYMBOL, // \\ (inside MATH_LINE_BREAK)
             ]
         );
         assert_lossless(r"x &= 1 \\");
@@ -639,6 +839,29 @@ mod tests {
         assert_lossless("αβ_γ");
     }
 
+    /// Scripts bind to the complete command atom, arguments included, because
+    /// the base's extent is only known after greedy attachment (`\mathbb{R}^n`
+    /// scripts the whole `\mathbb{R}`, not the trailing group).
+    #[test]
+    fn scripts_bind_to_the_command_with_its_arguments() {
+        for (content, base) in [
+            (r"\mathbb{R}^n", r"\mathbb{R}"),
+            (r"\frac{a}{b}^2", r"\frac{a}{b}"),
+        ] {
+            let scripted = node(content)
+                .children()
+                .find(|child| child.kind() == SyntaxKind::MATH_SCRIPTED)
+                .unwrap_or_else(|| panic!("scripted atom: {content:?}"));
+            let first = scripted
+                .children_with_tokens()
+                .next()
+                .expect("scripted base");
+            assert_eq!(first.kind(), SyntaxKind::MATH_COMMAND, "base: {content:?}");
+            assert_eq!(first.to_string(), base, "base extent: {content:?}");
+            assert_lossless(content);
+        }
+    }
+
     #[test]
     fn script_attachment_skips_layout_trivia_but_not_comments_or_blank_lines() {
         let attached = node("x \n ^ 2");
@@ -689,7 +912,7 @@ mod tests {
         assert_eq!(env.text().to_string(), content);
         let commands = env
             .children_with_tokens()
-            .filter(|el| el.kind() == SyntaxKind::MATH_COMMAND)
+            .filter(|el| el.kind() == SyntaxKind::MATH_CONTROL_WORD)
             .count();
         assert_eq!(commands, 2);
         assert_lossless(content);
@@ -737,7 +960,7 @@ mod tests {
     fn trailing_backslash() {
         assert_eq!(
             token_kinds("a\\"),
-            vec![SyntaxKind::MATH_WORD, SyntaxKind::MATH_COMMAND]
+            vec![SyntaxKind::MATH_WORD, SyntaxKind::MATH_CONTROL_SYMBOL]
         );
         assert_lossless("a\\");
     }
@@ -774,7 +997,7 @@ mod tests {
         let commands: Vec<String> = delim
             .children_with_tokens()
             .filter_map(|el| el.into_token())
-            .filter(|t| t.kind() == SyntaxKind::MATH_COMMAND)
+            .filter(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD)
             .map(|t| t.text().to_string())
             .collect();
         assert_eq!(commands, vec![r"\left", r"\right"]);
@@ -786,11 +1009,11 @@ mod tests {
         assert_eq!(
             token_kinds(r"\left(x\right)"),
             vec![
-                SyntaxKind::MATH_COMMAND, // \left
-                SyntaxKind::MATH_WORD,    // (
-                SyntaxKind::MATH_WORD,    // x
-                SyntaxKind::MATH_COMMAND, // \right
-                SyntaxKind::MATH_WORD,    // )
+                SyntaxKind::MATH_CONTROL_WORD, // \left
+                SyntaxKind::MATH_WORD,         // (
+                SyntaxKind::MATH_WORD,         // x
+                SyntaxKind::MATH_CONTROL_WORD, // \right
+                SyntaxKind::MATH_WORD,         // )
             ]
         );
     }

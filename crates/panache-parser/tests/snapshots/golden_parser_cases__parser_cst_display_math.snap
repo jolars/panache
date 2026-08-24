@@ -58,15 +58,16 @@ DOCUMENT@0..292
       DISPLAY_MATH_MARKER@177..179 "$$"
       MATH_CONTENT@179..196
         MATH_NEWLINE@179..180 "\n"
-        MATH_COMMAND@180..185 "\\frac"
-        MATH_GROUP@185..188
-          MATH_GROUP_OPEN@185..186 "{"
-          MATH_WORD@186..187 "a"
-          MATH_GROUP_CLOSE@187..188 "}"
-        MATH_GROUP@188..191
-          MATH_GROUP_OPEN@188..189 "{"
-          MATH_WORD@189..190 "b"
-          MATH_GROUP_CLOSE@190..191 "}"
+        MATH_COMMAND@180..191
+          MATH_CONTROL_WORD@180..185 "\\frac"
+          MATH_GROUP@185..188
+            MATH_GROUP_OPEN@185..186 "{"
+            MATH_WORD@186..187 "a"
+            MATH_GROUP_CLOSE@187..188 "}"
+          MATH_GROUP@188..191
+            MATH_GROUP_OPEN@188..189 "{"
+            MATH_WORD@189..190 "b"
+            MATH_GROUP_CLOSE@190..191 "}"
         MATH_SPACE@191..192 " "
         MATH_WORD@192..193 "="
         MATH_SPACE@193..194 " "

@@ -154,7 +154,7 @@ fn first_relation_is_assignment(elems: &[SyntaxElement]) -> bool {
         return false;
     };
     match tok.kind() {
-        SyntaxKind::MATH_COMMAND => {
+        SyntaxKind::MATH_CONTROL_WORD => {
             let name = tok.text().strip_prefix('\\').unwrap_or(tok.text());
             matches!(name, "gets" | "leftarrow" | "mapsto" | "coloneqq")
         }
@@ -172,7 +172,14 @@ fn semantic_token(element: &SyntaxElement) -> Option<crate::syntax::SyntaxToken>
     if let Some(token) = element.as_token() {
         return Some(token.clone());
     }
-    operators::scripted_base(element).and_then(|base| base.into_token())
+    if let Some(token) = operators::command_name_token(element) {
+        return Some(token);
+    }
+    let base = operators::scripted_base(element)?;
+    match &base {
+        rowan::NodeOrToken::Token(token) => Some(token.clone()),
+        rowan::NodeOrToken::Node(_) => operators::command_name_token(&base),
+    }
 }
 
 /// The column continuation relations hang under, given the leading relation's
@@ -441,9 +448,8 @@ fn spaced_operator_breaks(elems: &[SyntaxElement]) -> Vec<Break> {
                 star_modifier_pending = false;
                 i += 1;
             }
-            SyntaxKind::MATH_COMMAND => {
-                let text = el
-                    .as_token()
+            SyntaxKind::MATH_COMMAND | SyntaxKind::MATH_CONTROL_SYMBOL => {
+                let text = operators::command_name_token(el)
                     .map(|t| t.text().to_string())
                     .unwrap_or_default();
                 let name = text.strip_prefix('\\').unwrap_or(&text);

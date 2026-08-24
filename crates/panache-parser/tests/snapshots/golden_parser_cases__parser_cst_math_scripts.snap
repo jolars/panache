@@ -63,7 +63,8 @@ DOCUMENT@0..171
       INLINE_MATH_MARKER@80..81 "$"
       MATH_CONTENT@81..89
         MATH_SCRIPTED@81..89
-          MATH_COMMAND@81..87 "\\alpha"
+          MATH_COMMAND@81..87
+            MATH_CONTROL_WORD@81..87 "\\alpha"
           MATH_SUBSCRIPT@87..89
             MATH_UNDERSCORE@87..88 "_"
             MATH_WORD@88..89 "i"
@@ -87,10 +88,10 @@ DOCUMENT@0..171
       MATH_CONTENT@107..123
         MATH_SCRIPTED@107..123
           MATH_DELIMITED@107..121
-            MATH_COMMAND@107..112 "\\left"
+            MATH_CONTROL_WORD@107..112 "\\left"
             MATH_WORD@112..113 "("
             MATH_WORD@113..114 "x"
-            MATH_COMMAND@114..120 "\\right"
+            MATH_CONTROL_WORD@114..120 "\\right"
             MATH_WORD@120..121 ")"
           MATH_SUBSCRIPT@121..123
             MATH_UNDERSCORE@121..122 "_"

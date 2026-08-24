@@ -14,17 +14,19 @@ DOCUMENT@0..74
       MATH_CONTENT@10..47
         MATH_NEWLINE@10..11 "\n"
         MATH_ENVIRONMENT@11..46
-          MATH_COMMAND@11..17 "\\begin"
+          MATH_CONTROL_WORD@11..17 "\\begin"
           MATH_GROUP@17..26
             MATH_GROUP_OPEN@17..18 "{"
             MATH_WORD@18..25 "bmatrix"
             MATH_GROUP_CLOSE@25..26 "}"
           MATH_WORD@26..27 "1"
-          MATH_LINE_BREAK@27..29 "\\\\"
+          MATH_LINE_BREAK@27..29
+            MATH_CONTROL_SYMBOL@27..29 "\\\\"
           MATH_WORD@29..30 "1"
-          MATH_LINE_BREAK@30..32 "\\\\"
+          MATH_LINE_BREAK@30..32
+            MATH_CONTROL_SYMBOL@30..32 "\\\\"
           MATH_WORD@32..33 "0"
-          MATH_COMMAND@33..37 "\\end"
+          MATH_CONTROL_WORD@33..37 "\\end"
           MATH_GROUP@37..46
             MATH_GROUP_OPEN@37..38 "{"
             MATH_WORD@38..45 "bmatrix"

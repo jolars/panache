@@ -91,15 +91,18 @@ DOCUMENT@0..244
       DISPLAY_MATH_MARKER@214..216 "\\["
       MATH_CONTENT@216..241
         MATH_SPACE@216..217 " "
-        MATH_COMMAND@217..223 "\\alpha"
+        MATH_COMMAND@217..223
+          MATH_CONTROL_WORD@217..223 "\\alpha"
         MATH_SPACE@223..224 " "
         MATH_WORD@224..225 "+"
         MATH_SPACE@225..226 " "
-        MATH_COMMAND@226..231 "\\beta"
+        MATH_COMMAND@226..231
+          MATH_CONTROL_WORD@226..231 "\\beta"
         MATH_SPACE@231..232 " "
         MATH_WORD@232..233 "="
         MATH_SPACE@233..234 " "
-        MATH_COMMAND@234..240 "\\gamma"
+        MATH_COMMAND@234..240
+          MATH_CONTROL_WORD@234..240 "\\gamma"
         MATH_NEWLINE@240..241 "\n"
       DISPLAY_MATH_MARKER@241..243 "\\]"
     NEWLINE@243..244 "\n"

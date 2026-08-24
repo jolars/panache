@@ -250,13 +250,22 @@ the test projector.
   math-prefixed equivalents such as `MATH_WORD`, `MATH_CONTROL_WORD`, and
   `MATH_CONTROL_SYMBOL` only where Panache needs namespacing; expose
   character classes through a semantic atom iterator rather than CST kinds.
-- [ ] Replace bare command tokens followed by unrelated groups with native
+- [x] Replace bare command tokens followed by unrelated groups with native
   Panache command nodes whose argument ownership matches Badness exactly.
   Preserve every source byte and recover without hard failure.
-- [ ] Bring the native scripted nodes into full oracle parity. The initial
+  (`MATH_COMMAND` is now a node owning its `MATH_CONTROL_WORD` head and its
+  greedily attached brace groups — arity-blind like Badness, crossing trivia
+  but never a blank line; control symbols are bare `MATH_CONTROL_SYMBOL`
+  tokens, and `\\` is a `MATH_LINE_BREAK` node wrapping its control symbol.)
+- [ ] Attach optional `[…]` arguments as nodes with Badness's tight-bracket
+  gate, including the `\big`-family bracket ban and the star/optional tail
+  of `\\`. The star-variant `*` before a brace argument already folds into
+  the command node.
+- [x] Bring the native scripted nodes into full oracle parity. The initial
   `MATH_SCRIPTED`/subscript/superscript structure and Unicode-scalar
   splitting have landed, but scripts must bind to complete
   Badness-equivalent atoms, especially command calls with their arguments.
+  (Scripts now wrap the complete command node, arguments included.)
 - [ ] Match Badness's environment and `\left`/`\right` structure and recovery in
   the existing single pass. Keep the Markdown host's decision about which
   raw environments count as math outside this grammar.

@@ -19,23 +19,24 @@ DOCUMENT@0..610
         MATH_SPACE@187..189 "  "
         MATH_WORD@189..190 "f"
         MATH_DELIMITED@190..204
-          MATH_COMMAND@190..195 "\\left"
+          MATH_CONTROL_WORD@190..195 "\\left"
           MATH_WORD@195..196 "("
           MATH_WORD@196..197 "k"
-          MATH_COMMAND@197..203 "\\right"
+          MATH_CONTROL_WORD@197..203 "\\right"
           MATH_WORD@203..204 ")"
         MATH_SPACE@204..205 " "
         MATH_WORD@205..206 "="
         MATH_SPACE@206..207 " "
-        MATH_COMMAND@207..213 "\\binom"
-        MATH_GROUP@213..216
-          MATH_GROUP_OPEN@213..214 "{"
-          MATH_WORD@214..215 "n"
-          MATH_GROUP_CLOSE@215..216 "}"
-        MATH_GROUP@216..219
-          MATH_GROUP_OPEN@216..217 "{"
-          MATH_WORD@217..218 "k"
-          MATH_GROUP_CLOSE@218..219 "}"
+        MATH_COMMAND@207..219
+          MATH_CONTROL_WORD@207..213 "\\binom"
+          MATH_GROUP@213..216
+            MATH_GROUP_OPEN@213..214 "{"
+            MATH_WORD@214..215 "n"
+            MATH_GROUP_CLOSE@215..216 "}"
+          MATH_GROUP@216..219
+            MATH_GROUP_OPEN@216..217 "{"
+            MATH_WORD@217..218 "k"
+            MATH_GROUP_CLOSE@218..219 "}"
         MATH_SPACE@219..220 " "
         MATH_SCRIPTED@220..223
           MATH_WORD@220..221 "p"
@@ -44,10 +45,10 @@ DOCUMENT@0..610
             MATH_WORD@222..223 "k"
         MATH_SCRIPTED@223..245
           MATH_DELIMITED@223..239
-            MATH_COMMAND@223..228 "\\left"
+            MATH_CONTROL_WORD@223..228 "\\left"
             MATH_WORD@228..229 "("
             MATH_WORD@229..232 "1-p"
-            MATH_COMMAND@232..238 "\\right"
+            MATH_CONTROL_WORD@232..238 "\\right"
             MATH_WORD@238..239 ")"
           MATH_SUPERSCRIPT@239..245
             MATH_CARET@239..240 "^"

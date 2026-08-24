@@ -220,7 +220,13 @@ fn enclosing_delimiters(elems: &[SyntaxElement], environments: &[usize]) -> Opti
 fn element_atom_token(element: &SyntaxElement) -> Option<SyntaxToken> {
     match element {
         NodeOrToken::Token(token) => Some(token.clone()),
-        NodeOrToken::Node(_) => operators::scripted_base(element)?.into_token(),
+        NodeOrToken::Node(_) => operators::command_name_token(element).or_else(|| {
+            let base = operators::scripted_base(element)?;
+            match base {
+                NodeOrToken::Token(token) => Some(token),
+                NodeOrToken::Node(_) => operators::command_name_token(&base),
+            }
+        }),
     }
 }
 
@@ -363,21 +369,15 @@ fn contains_unsafe_mixed_trivia(element: &SyntaxElement) -> bool {
 }
 
 fn has_comment_or_line_break(element: &SyntaxElement) -> bool {
-    if matches!(
-        element.kind(),
-        SyntaxKind::MATH_COMMENT | SyntaxKind::MATH_LINE_BREAK
-    ) {
+    fn is_marker(kind: SyntaxKind) -> bool {
+        matches!(kind, SyntaxKind::MATH_COMMENT | SyntaxKind::MATH_LINE_BREAK)
+    }
+    if is_marker(element.kind()) {
         return true;
     }
     element.as_node().is_some_and(|node| {
         node.descendants_with_tokens()
-            .filter_map(|descendant| descendant.into_token())
-            .any(|token| {
-                matches!(
-                    token.kind(),
-                    SyntaxKind::MATH_COMMENT | SyntaxKind::MATH_LINE_BREAK
-                )
-            })
+            .any(|descendant| is_marker(descendant.kind()))
     })
 }
 
@@ -408,7 +408,10 @@ fn needs_space_after_environment(after: &[SyntaxElement]) -> bool {
         };
         return operators::is_spaced(operators::coerce(first.class, Some(AtomClass::Close)));
     }
-    if token.kind() == SyntaxKind::MATH_COMMAND {
+    if matches!(
+        token.kind(),
+        SyntaxKind::MATH_CONTROL_WORD | SyntaxKind::MATH_CONTROL_SYMBOL
+    ) {
         let name = token.text().strip_prefix('\\').unwrap_or(token.text());
         return operators::command_class(name)
             .map(|class| operators::is_spaced(operators::coerce(class, Some(AtomClass::Close))))
@@ -513,7 +516,7 @@ impl EnvParts {
         let children: Vec<SyntaxElement> = env.children_with_tokens().collect();
         let is_cmd = |el: &SyntaxElement, text: &str| {
             el.as_token()
-                .is_some_and(|t| t.kind() == SyntaxKind::MATH_COMMAND && t.text() == text)
+                .is_some_and(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD && t.text() == text)
         };
         let begin_idx = children.iter().position(|c| is_cmd(c, r"\begin"))?;
         let end_idx = children.iter().position(|c| is_cmd(c, r"\end"))?;
@@ -835,6 +838,14 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
         NodeOrToken::Token(token) => {
             out.push(FlatToken::Token(token.kind(), token.text().to_string()))
         }
+        // A line break flattens to one composite token so the spacing pass
+        // sees the same `\\` atom it did when the parser emitted it flat.
+        NodeOrToken::Node(node) if node.kind() == SyntaxKind::MATH_LINE_BREAK => {
+            out.push(FlatToken::Token(
+                SyntaxKind::MATH_LINE_BREAK,
+                node.text().to_string(),
+            ));
+        }
         NodeOrToken::Node(node) => {
             let is_script = matches!(
                 node.kind(),
@@ -974,7 +985,7 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
             }
-            SyntaxKind::MATH_COMMAND => {
+            SyntaxKind::MATH_CONTROL_WORD | SyntaxKind::MATH_CONTROL_SYMBOL => {
                 let name = text.strip_prefix('\\').unwrap_or(text);
                 let demand = match operators::command_class(name) {
                     Some(raw) => {

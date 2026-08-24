@@ -33,13 +33,13 @@ fn is_math_content_token(kind: SyntaxKind) -> bool {
         SyntaxKind::MATH_WORD
             | SyntaxKind::MATH_SPACE
             | SyntaxKind::MATH_NEWLINE
-            | SyntaxKind::MATH_COMMAND
+            | SyntaxKind::MATH_CONTROL_WORD
+            | SyntaxKind::MATH_CONTROL_SYMBOL
             | SyntaxKind::MATH_GROUP_OPEN
             | SyntaxKind::MATH_GROUP_CLOSE
             | SyntaxKind::MATH_ALIGN
             | SyntaxKind::MATH_CARET
             | SyntaxKind::MATH_UNDERSCORE
-            | SyntaxKind::MATH_LINE_BREAK
             | SyntaxKind::MATH_COMMENT
             | SyntaxKind::MATH_EQUATION_LABEL
     )
@@ -264,6 +264,44 @@ impl MathSuperscript {
     }
 }
 
+/// A control word together with the argument groups it owns
+/// (`\frac{a}{b}`, or a bare `\alpha` with none).
+pub struct MathCommand(SyntaxNode);
+
+impl AstNode for MathCommand {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_COMMAND
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathCommand {
+    /// The `\name` control-word token.
+    pub fn name_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_CONTROL_WORD)
+    }
+
+    /// The command name without its leading backslash.
+    pub fn name(&self) -> Option<String> {
+        self.name_token()
+            .map(|token| token.text().trim_start_matches('\\').to_string())
+    }
+
+    /// The attached argument groups, in source order.
+    pub fn arguments(&self) -> impl Iterator<Item = MathGroup> + '_ {
+        self.0.children().filter_map(MathGroup::cast)
+    }
+}
+
 /// A `{ ... }` brace group.
 pub struct MathGroup(SyntaxNode);
 
@@ -445,7 +483,7 @@ pub fn math_diagnostics(content: &SyntaxNode) -> Vec<MathDiagnostic> {
                         range: token.text_range(),
                     });
                 }
-                SyntaxKind::MATH_COMMAND
+                SyntaxKind::MATH_CONTROL_WORD
                     if node.kind() != SyntaxKind::MATH_ENVIRONMENT && token.text() == r"\end" =>
                 {
                     out.push(MathDiagnostic {
@@ -453,7 +491,7 @@ pub fn math_diagnostics(content: &SyntaxNode) -> Vec<MathDiagnostic> {
                         range: token.text_range(),
                     });
                 }
-                SyntaxKind::MATH_COMMAND
+                SyntaxKind::MATH_CONTROL_WORD
                     if node.kind() != SyntaxKind::MATH_DELIMITED && token.text() == r"\right" =>
                 {
                     out.push(MathDiagnostic {
@@ -527,7 +565,7 @@ fn token_child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
 fn command_child(node: &SyntaxNode, text: &str) -> Option<SyntaxToken> {
     node.children_with_tokens()
         .filter_map(|c| c.into_token())
-        .find(|t| t.kind() == SyntaxKind::MATH_COMMAND && t.text() == text)
+        .find(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD && t.text() == text)
 }
 
 fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
@@ -546,7 +584,7 @@ fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
 
 fn is_command(el: &SyntaxElement, text: &str) -> bool {
     el.as_token()
-        .is_some_and(|t| t.kind() == SyntaxKind::MATH_COMMAND && t.text() == text)
+        .is_some_and(|t| t.kind() == SyntaxKind::MATH_CONTROL_WORD && t.text() == text)
 }
 
 fn group_name_after(children: &[SyntaxElement], idx: usize) -> Option<String> {

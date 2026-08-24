@@ -248,7 +248,30 @@ pub fn format_math(input: &str, opts: &MathFormatOptions) -> Option<String> {
     if has_dangling_script(&tree) {
         return None;
     }
+    if has_nested_comment(&tree) {
+        return None;
+    }
     Some(render::render(&tree, opts))
+}
+
+/// A comment nested inside a single-line construct (a command's argument run,
+/// a brace group, a scripted atom) cannot be reflowed: rendering the construct
+/// on one line would turn the comment's terminating newline into a space and
+/// silently absorb the rest of the construct into the comment. Line-aware
+/// contexts — the top level and environment bodies — split rows at the
+/// comment's newline instead, so only deeper comments force the verbatim path.
+fn has_nested_comment(tree: &SyntaxNode) -> bool {
+    tree.descendants_with_tokens()
+        .filter_map(|element| element.into_token())
+        .filter(|token| token.kind() == SyntaxKind::MATH_COMMENT)
+        .any(|token| {
+            token.parent_ancestors().any(|node| {
+                !matches!(
+                    node.kind(),
+                    SyntaxKind::MATH_CONTENT | SyntaxKind::MATH_ENVIRONMENT
+                )
+            })
+        })
 }
 
 /// A script marker with no argument (`x^` at the end of the content, or with
@@ -427,9 +450,11 @@ mod tests {
 
     #[test]
     fn nested_comment_before_environment_stays_verbatim() {
+        // A group-nested comment forces the `None` fallback (the caller emits
+        // the content verbatim): reflowing would absorb the group remainder
+        // into the comment.
         let input = "f({% reason\nx}+\\begin{bmatrix}1 \\\\ 2\\end{bmatrix})";
-        assert_eq!(fmt(input, MathContext::Display), input);
-        assert_idempotent(input, MathContext::Display);
+        assert_eq!(format_math(input, &opts(MathContext::Display)), None);
     }
 
     #[test]
@@ -467,9 +492,10 @@ mod tests {
 
     #[test]
     fn comment_inside_embedded_environment_stays_verbatim() {
+        // The comment sits inside a group within the environment row, so the
+        // `None` fallback applies (the caller emits the content verbatim).
         let input = "f(\\begin{bmatrix}{% reason\nx} \\\\ 2\\end{bmatrix})";
-        assert_eq!(fmt(input, MathContext::Display), input);
-        assert_idempotent(input, MathContext::Display);
+        assert_eq!(format_math(input, &opts(MathContext::Display)), None);
     }
 
     #[test]
