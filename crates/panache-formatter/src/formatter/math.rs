@@ -695,7 +695,7 @@ mod tests {
         assert_eq!(fmt("f(-x)", MathContext::Inline), "f(-x)");
         assert_eq!(fmt("f( - x)", MathContext::Inline), "f( - x)");
         assert_eq!(fmt("x = - y", MathContext::Inline), "x = - y");
-        assert_eq!(fmt("e^{- t}", MathContext::Inline), "e^{-t}");
+        assert_eq!(fmt("e^{- t}", MathContext::Inline), "e^{- t}");
         assert_eq!(fmt("a - -b", MathContext::Inline), "a - -b");
         assert_eq!(fmt("a--b", MathContext::Inline), "a - -b");
         for case in [

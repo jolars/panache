@@ -74,28 +74,33 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Bare-command lowering.** Extended the Panache-owned inline lowering slice
-through control words without attached arguments.
+**Script lowering.** Extended the Panache-owned inline lowering slice through
+scripts whose bases and arguments are already supported.
 
-- Lowered known symbols, named operators, binary and relation commands, and
-  unknown bare commands through the shared semantic atom stream.
-- Kept document-redefined commands, commands missing required signature
-  arguments, and command-adjacent `:=` parser seams on the legacy path,
-  preventing stale or split semantics from affecting their spacing.
-- Added byte-exact Badness parity for representative ordinary, operator,
-  relation, named-operator, and unknown commands.
+- Added normal and compact-script spacing modes over the shared semantic atom
+  stream, including control-word boundaries, delimiter edges, slash symmetry,
+  and recursive signature-proven arguments.
+- Lowered word, group, command, and nested-script bases and arguments; kept
+  comments, missing arguments, text-domain arguments, and unsupported bases on
+  the legacy path.
+- Added byte-exact Badness parity for representative migrated scripts. Scripted
+  composite-relation seams such as `:=_i` and `<=_i` remain on the legacy path:
+  Badness 0.5 splits them as `: =_i` and `< =_i`, which would regress Panache's
+  established output.
 
 ### Suggested next sub-targets
 
-1. Lower scripts whose bases and arguments are already supported; keep script
-   comments, malformed attachment, and unsupported bases on the legacy path.
-2. Lower closed paired delimiters whose bodies are already supported, retaining
+1. Lower closed paired delimiters whose bodies are already supported, retaining
    recovery shapes and unsupported bodies on the legacy path.
+2. Expand paired-delimiter parity through nested scripts only after the plain
+   closed-delimiter slice passes byte-for-byte.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Bare-command lowering.** Lowered known and unknown control words without
+  attached arguments while preserving redefinitions and incomplete signatures.
 - **Signature-proven command lowering.** Lowered complete math-domain command
   signatures recursively while preserving unsupported argument contracts.
 - **Ordinary-group typed lowering.** Recursively lowered closed standalone

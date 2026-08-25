@@ -508,6 +508,29 @@ fn bare_command_migration_slice_matches_badness() {
 }
 
 #[test]
+fn script_migration_slice_matches_badness() {
+    for body in [
+        "x^2",
+        "x _ i ^ { a+b }",
+        r"\alpha_i+\beta^2",
+        r"\frac{ a+b }{c}^2",
+        "{ a+b }^2",
+        "e^{x_i^2}",
+        r"\sum_{i=1}^{n} i",
+        r"x^\alpha+y_\beta",
+        r"x^{a\in A}",
+        r"x^{\alpha b}",
+        "x^{( a )}",
+        "x^{a/ b}",
+        r"x^{\frac{a+b}{c-d}}",
+        r"a\leq_i-b",
+        r"e^{- t}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

@@ -1,28 +1,34 @@
 //! Typed CST lowering for the Badness-parity math formatter.
 
 use panache_parser::semantic::math::{
-    ArgKind, ArgumentDomain, MathBreakPriority, SignatureScope, match_arg_slot,
-    semantic_math_atoms_in,
+    ArgKind, ArgumentDomain, DelimiterRole, MathBreakPriority, MathClass, SemanticMathAtom,
+    SignatureScope, match_arg_slot, math_atoms, semantic_math_atoms_in,
 };
 use rowan::TextRange;
 use rowan::ast::AstNode;
 
 use crate::syntax::{
-    MathArgument, MathCommand, MathContent, MathGroup, SyntaxElement, SyntaxKind, SyntaxToken,
+    MathArgument, MathCommand, MathContent, MathGroup, MathScript, MathScripted, SyntaxElement,
+    SyntaxKind, SyntaxToken,
 };
 
 use super::ir::Ir;
 
-/// Lower inline words, trivia, ordinary groups, and supported commands.
+/// Lower inline words, trivia, ordinary groups, supported commands, and scripts.
 ///
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
 pub(super) fn try_lower_inline(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
-    lower_elements(content.elements().collect(), scope)
+    lower_elements(content.elements().collect(), scope, Spacing::Normal)
 }
 
-fn lower_elements(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Option<Ir> {
+fn lower_elements(
+    elements: Vec<SyntaxElement>,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
     if has_split_definition_relation(&elements)
+        || has_scripted_composite_relation(&elements)
         || !elements
             .iter()
             .all(|element| is_supported_element(element, scope))
@@ -34,23 +40,31 @@ fn lower_elements(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Optio
     let mut previous_end = None;
 
     for atom in semantic_math_atoms_in(elements.iter().cloned()) {
-        let (document, slash) = atom_document(atom.range, &elements, scope)?;
+        let atom_document = atom_document(atom, &elements, scope, spacing)?;
         pieces.push(Piece {
             role: Role::from(atom.break_priority),
+            delimiter: atom.delimiter,
             authored_space_before: previous_end.is_some_and(|end| end < atom.range.start()),
-            slash,
-            document,
+            slash: atom_document.slash,
+            control_word_operator: atom_document.control_word_operator,
+            starts_control_word_letter: atom_document.starts_control_word_letter,
+            ends_control_word: atom_document.ends_control_word,
+            document: atom_document.document,
         });
         previous_end = Some(atom.range.end());
     }
 
     let base_gaps = (0..pieces.len())
-        .map(|index| gap_before(&pieces, index))
+        .map(|index| gap_before(&pieces, index, spacing))
         .collect::<Vec<_>>();
     let spaced_slashes = (0..pieces.len())
         .map(|index| {
             pieces[index].slash
-                && (base_gaps[index] || base_gaps.get(index + 1).copied().unwrap_or(false))
+                && (pieces[index].authored_space_before
+                    || pieces
+                        .get(index + 1)
+                        .is_some_and(|piece| piece.authored_space_before)
+                    || adjacent_operator(&pieces, index, spacing))
         })
         .collect::<Vec<_>>();
 
@@ -63,6 +77,39 @@ fn lower_elements(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Optio
     }
 
     Some(Ir::concat(documents))
+}
+
+fn has_scripted_composite_relation(elements: &[SyntaxElement]) -> bool {
+    // The legacy renderer fuses an adjacent relation head with the scalar that
+    // owns the script (`a:` + `=_i`, or `x<` + `=_i`). Keep those seams on the
+    // fallback until typed lowering can preserve the established spelling.
+    elements.windows(2).any(|pair| {
+        let [SyntaxElement::Token(head), SyntaxElement::Node(node)] = pair else {
+            return false;
+        };
+        if head.kind() != SyntaxKind::MATH_WORD
+            || head.text_range().end() != node.text_range().start()
+        {
+            return false;
+        }
+        let Some(base) = MathScripted::cast(node.clone())
+            .and_then(|scripted| scripted.base())
+            .and_then(SyntaxElement::into_token)
+            .filter(|base| base.kind() == SyntaxKind::MATH_WORD)
+        else {
+            return false;
+        };
+        let (Some(head), Some(base)) = (head.text().chars().last(), base.text().chars().next())
+        else {
+            return false;
+        };
+
+        match head {
+            ':' => base == '=',
+            '=' | '<' | '>' => matches!(base, '=' | '<' | '>'),
+            _ => false,
+        }
+    })
 }
 
 fn has_split_definition_relation(elements: &[SyntaxElement]) -> bool {
@@ -100,43 +147,119 @@ fn is_supported_element(element: &SyntaxElement, scope: &SignatureScope) -> bool
                         .all(|element| is_supported_element(&element, scope))
             }) || MathCommand::cast(node.clone())
                 .is_some_and(|command| command_is_supported(&command, scope))
+                || MathScripted::cast(node.clone())
+                    .is_some_and(|scripted| scripted_is_supported(&scripted, scope))
         }
     }
 }
 
 fn atom_document(
-    range: TextRange,
+    atom: SemanticMathAtom,
     elements: &[SyntaxElement],
     scope: &SignatureScope,
-) -> Option<(Ir, bool)> {
+    spacing: Spacing,
+) -> Option<AtomDocument> {
+    let range = atom.range;
     let element = elements.iter().find(|element| {
         element.text_range().start() <= range.start() && element.text_range().end() >= range.end()
     })?;
-    match element {
+    let (document, slash) = match element {
         SyntaxElement::Token(token) if token.kind() == SyntaxKind::MATH_WORD => {
             let text = token_slice(range, token)?;
             let slash = text == "/";
-            Some((Ir::verbatim(text), slash))
+            (Ir::verbatim(text), slash)
         }
         SyntaxElement::Node(node) => {
             if let Some(group) = MathGroup::cast(node.clone()) {
                 let open = group.open_token()?;
                 let close = group.close_token()?;
-                let body = lower_elements(group.body_elements().collect(), scope)?;
-                Some((
+                let body = lower_elements(group.body_elements().collect(), scope, spacing)?;
+                (
                     Ir::concat([Ir::verbatim(open.text()), body, Ir::verbatim(close.text())]),
                     false,
-                ))
+                )
+            } else if let Some(command) = MathCommand::cast(node.clone()) {
+                (lower_command(&command, scope, spacing)?, false)
             } else {
-                let command = MathCommand::cast(node.clone())?;
-                Some((lower_command(&command, scope)?, false))
+                let scripted = MathScripted::cast(node.clone())?;
+                (lower_scripted(&scripted, scope, spacing)?, false)
             }
         }
-        _ => None,
-    }
+        _ => return None,
+    };
+    let raw_class = math_atoms(element)
+        .find(|raw| raw.range.start() == range.start())
+        .map(|raw| raw.class)?;
+    Some(AtomDocument {
+        document,
+        slash,
+        control_word_operator: element_ends_control_word(element)
+            && matches!(raw_class, MathClass::Bin | MathClass::Rel),
+        starts_control_word_letter: element_starts_control_word_letter(element),
+        ends_control_word: element_ends_control_word(element),
+    })
 }
 
-fn lower_command(command: &MathCommand, scope: &SignatureScope) -> Option<Ir> {
+fn lower_scripted(scripted: &MathScripted, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
+    let base = scripted.base()?;
+    let scripts = scripted.scripts().collect::<Vec<_>>();
+    if scripts.is_empty() || !scripted_is_supported(scripted, scope) {
+        return None;
+    }
+
+    let mut documents = vec![lower_elements(vec![base], scope, spacing)?];
+    for script in scripts {
+        let marker = script.marker_token()?;
+        let argument = script.argument()?;
+        documents.push(Ir::verbatim(marker.text()));
+        documents.push(lower_elements(vec![argument], scope, Spacing::Script)?);
+    }
+    Some(Ir::concat(documents))
+}
+
+fn scripted_is_supported(scripted: &MathScripted, scope: &SignatureScope) -> bool {
+    let Some(base) = scripted.base() else {
+        return false;
+    };
+    if !is_supported_element(&base, scope) {
+        return false;
+    }
+
+    let base_range = base.text_range();
+    scripted.syntax().children_with_tokens().all(|element| {
+        element.text_range() == base_range
+            || is_layout_trivia(&element)
+            || element
+                .into_node()
+                .and_then(MathScript::cast)
+                .is_some_and(|script| script_is_supported(&script, scope))
+    })
+}
+
+fn script_is_supported(script: &MathScript, scope: &SignatureScope) -> bool {
+    let (Some(marker), Some(argument)) = (script.marker_token(), script.argument()) else {
+        return false;
+    };
+    if !is_supported_element(&argument, scope) {
+        return false;
+    }
+
+    let argument_range = argument.text_range();
+    script.syntax().children_with_tokens().all(|element| {
+        element.text_range() == marker.text_range()
+            || element.text_range() == argument_range
+            || is_layout_trivia(&element)
+    })
+}
+
+fn is_layout_trivia(element: &SyntaxElement) -> bool {
+    matches!(
+        element.kind(),
+        SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE
+    )
+}
+
+fn lower_command(command: &MathCommand, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
     let name = command.name_token()?;
     if is_supported_bare_command(command, scope) {
         return Some(Ir::verbatim(name.text()));
@@ -152,7 +275,7 @@ fn lower_command(command: &MathCommand, scope: &SignatureScope) -> Option<Ir> {
     for argument in arguments {
         let open = argument.open_token()?;
         let close = argument.close_token()?;
-        let body = lower_elements(argument.body_elements().collect(), scope)?;
+        let body = lower_elements(argument.body_elements().collect(), scope, spacing)?;
         if previous_end < argument.syntax().text_range().start() {
             documents.push(Ir::text(" "));
         }
@@ -239,17 +362,107 @@ fn matched_math_arguments(
 
 struct Piece {
     role: Role,
+    delimiter: Option<DelimiterRole>,
     authored_space_before: bool,
     slash: bool,
+    control_word_operator: bool,
+    starts_control_word_letter: bool,
+    ends_control_word: bool,
     document: Ir,
 }
 
-fn gap_before(pieces: &[Piece], index: usize) -> bool {
+struct AtomDocument {
+    document: Ir,
+    slash: bool,
+    control_word_operator: bool,
+    starts_control_word_letter: bool,
+    ends_control_word: bool,
+}
+
+fn gap_before(pieces: &[Piece], index: usize, spacing: Spacing) -> bool {
     let Some(previous) = index.checked_sub(1).and_then(|index| pieces.get(index)) else {
         return false;
     };
     let current = &pieces[index];
-    current.role != Role::Operand || previous.role != Role::Operand || current.authored_space_before
+    if previous.ends_control_word && current.starts_control_word_letter {
+        return true;
+    }
+
+    match spacing {
+        Spacing::Normal => {
+            current.role != Role::Operand
+                || previous.role != Role::Operand
+                || current.authored_space_before
+        }
+        Spacing::Script => {
+            current.control_word_operator
+                || previous.control_word_operator
+                || current.role == Role::Operand
+                    && previous.role == Role::Operand
+                    && current.authored_space_before
+                    && !touches_delimiter(previous, current)
+        }
+    }
+}
+
+fn adjacent_operator(pieces: &[Piece], index: usize, spacing: Spacing) -> bool {
+    let previous = index.checked_sub(1).and_then(|index| pieces.get(index));
+    let next = pieces.get(index + 1);
+    match spacing {
+        Spacing::Normal => previous
+            .into_iter()
+            .chain(next)
+            .any(|piece| piece.role != Role::Operand),
+        Spacing::Script => previous
+            .into_iter()
+            .chain(next)
+            .any(|piece| piece.control_word_operator),
+    }
+}
+
+fn touches_delimiter(previous: &Piece, current: &Piece) -> bool {
+    [previous.delimiter, current.delimiter]
+        .into_iter()
+        .any(|role| matches!(role, Some(DelimiterRole::Open | DelimiterRole::Close)))
+}
+
+fn element_starts_control_word_letter(element: &SyntaxElement) -> bool {
+    element_boundary_token(element, true)
+        .and_then(|token| token.text().chars().next())
+        .is_some_and(is_control_word_letter)
+}
+
+fn element_ends_control_word(element: &SyntaxElement) -> bool {
+    element_boundary_token(element, false)
+        .is_some_and(|token| token.kind() == SyntaxKind::MATH_CONTROL_WORD)
+}
+
+fn element_boundary_token(element: &SyntaxElement, first: bool) -> Option<SyntaxToken> {
+    match element {
+        SyntaxElement::Token(token) => Some(token.clone()),
+        SyntaxElement::Node(node) => {
+            let mut tokens = node
+                .descendants_with_tokens()
+                .filter_map(|element| element.into_token())
+                .filter(|token| {
+                    !matches!(
+                        token.kind(),
+                        SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE
+                    )
+                });
+            if first { tokens.next() } else { tokens.last() }
+        }
+    }
+}
+
+fn is_control_word_letter(character: char) -> bool {
+    character.is_alphabetic() || matches!(character, '@' | '_' | ':')
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Spacing {
+    Normal,
+    Script,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -367,6 +580,51 @@ mod tests {
     }
 
     #[test]
+    fn lowers_supported_scripts_through_the_semantic_stream() {
+        let cases = [
+            ("x^2", "x^2"),
+            ("x _ i ^ { a+b }", "x_i^{a+b}"),
+            (r"\alpha_i+\beta^2", r"\alpha_i + \beta^2"),
+            (r"\frac{ a+b }{c}^2", r"\frac{a + b}{c}^2"),
+            ("{ a+b }^2", "{a + b}^2"),
+            ("e^{x_i^2}", "e^{x_i^2}"),
+            (r"\sum_{i=1}^{n} i", r"\sum_{i=1}^{n} i"),
+            (r"x^\alpha+y_\beta", r"x^\alpha + y_\beta"),
+            (r"x^{a\in A}", r"x^{a \in A}"),
+            (r"x^{\alpha b}", r"x^{\alpha b}"),
+            ("x^{( a )}", "x^{(a)}"),
+            ("x^{a/ b}", "x^{a / b}"),
+            (r"x^{\frac{a+b}{c-d}}", r"x^{\frac{a+b}{c-d}}"),
+            (r"a\leq_i-b", r"a \leq_i -b"),
+            (r"e^{- t}", r"e^{- t}"),
+            (r"a: =_ib", r"a: =_i b"),
+            (r"x< =_iy", r"x < =_i y"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_and_unsupported_scripts() {
+        for input in [
+            "x^",
+            "% base comment\nx^2",
+            "x^% argument comment\n2",
+            r"\text{ a+b }^2",
+            r"\left(x\right)^2",
+            r"a:=_ib",
+            r"a::=_ib",
+            r"x<=_iy",
+            r"x>=_iy",
+            r"a==_kb",
+        ] {
+            assert_eq!(lower(input), None, "{input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_redefined_and_incomplete_bare_commands() {
         for input in [r"\frac", r"\sqrt", r"\text", r"\mu:=\nu"] {
             assert_eq!(lower(input), None, "{input:?}");
@@ -395,7 +653,6 @@ mod tests {
     #[test]
     fn rejects_every_unsupported_shape_category() {
         let cases = [
-            "x^2",
             "% comment\nx",
             r"a\\b",
             "a&b",
