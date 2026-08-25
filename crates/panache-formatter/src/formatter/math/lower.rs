@@ -254,15 +254,12 @@ fn delimited_is_supported(delimited: &MathDelimited, scope: &SignatureScope) -> 
         .all(|element| {
             structural_ranges.contains(&element.text_range()) || is_layout_trivia(&element)
         })
-        // Nested pairs and scripts get their own parity slice. Keeping them on
-        // the fallback here makes this first shell migration independently
-        // reviewable and preserves every recovery shape verbatim.
-        && !body.syntax().descendants().any(|node| {
-            matches!(
-                node.kind(),
-                SyntaxKind::MATH_DELIMITED | SyntaxKind::MATH_SCRIPTED
-            )
-        })
+        // Nested pairs retain their own parity slice; supported scripts recurse
+        // through the same typed lowering used at the top level.
+        && !body
+            .syntax()
+            .descendants()
+            .any(|node| node.kind() == SyntaxKind::MATH_DELIMITED)
         && body
             .elements()
             .all(|element| is_supported_element(&element, scope))
@@ -289,12 +286,6 @@ fn scripted_is_supported(scripted: &MathScripted, scope: &SignatureScope) -> boo
     let Some(base) = scripted.base() else {
         return false;
     };
-    if matches!(
-        &base,
-        SyntaxElement::Node(node) if MathDelimited::cast(node.clone()).is_some()
-    ) {
-        return false;
-    }
     if !is_supported_element(&base, scope) {
         return false;
     }
@@ -704,13 +695,47 @@ mod tests {
     }
 
     #[test]
+    fn lowers_supported_scripts_inside_paired_delimiters() {
+        let cases = [
+            (
+                r"\left( x _ i + y ^ { a+b } \right)",
+                r"\left( x_i + y^{a+b} \right)",
+            ),
+            (
+                r"\left[ \frac{ a+b }{c}^2 \right]",
+                r"\left[ \frac{a + b}{c}^2 \right]",
+            ),
+            (r"x ^ { \left( a+b \right) }", r"x^{\left( a+b \right)}"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_scripted_paired_delimiter_bases() {
+        let cases = [
+            (r"\left( x \right) ^ 2", r"\left( x \right)^2"),
+            (
+                r"a + \left[ b+c \right] _ { i+j }",
+                r"a + \left[ b + c \right]_{i+j}",
+            ),
+            (r"\left. x_i \right| _ 0 ^ 1", r"\left. x_i \right|_0^1"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_malformed_and_unsupported_scripts() {
         for input in [
             "x^",
             "% base comment\nx^2",
             "x^% argument comment\n2",
             r"\text{ a+b }^2",
-            r"\left(x\right)^2",
             r"a:=_ib",
             r"a::=_ib",
             r"x<=_iy",
@@ -727,7 +752,6 @@ mod tests {
             r"\left( x",
             r"\left( x \right",
             "\\left % keep\n( x \\right)",
-            r"\left( x_i \right)",
             r"\left[ \left( x \right) \right]",
         ] {
             assert_eq!(lower(input), None, "{input:?}");

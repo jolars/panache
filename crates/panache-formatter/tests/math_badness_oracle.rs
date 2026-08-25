@@ -546,6 +546,20 @@ fn paired_delimiter_migration_slice_matches_badness() {
 }
 
 #[test]
+fn paired_delimiter_script_migration_slice_matches_badness() {
+    for body in [
+        r"\left( x _ i + y ^ { a+b } \right)",
+        r"\left[ \frac{ a+b }{c}^2 \right]",
+        r"x ^ { \left( a+b \right) }",
+        r"\left( x \right) ^ 2",
+        r"a + \left[ b+c \right] _ { i+j }",
+        r"\left. x_i \right| _ 0 ^ 1",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

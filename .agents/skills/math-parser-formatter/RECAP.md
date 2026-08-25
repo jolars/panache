@@ -74,32 +74,31 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Plain paired-delimiter lowering.** Extended the Panache-owned inline lowering
-slice through closed `\left…\right` nodes whose bodies already use the plain
-typed path.
+**Paired-delimiter script lowering.** Extended the Panache-owned inline lowering
+slice across the script/delimiter seam.
 
-- Lowered character, control-word, null, asymmetric, unusual-token, and empty
-  delimiter pairs through the shared semantic atom stream and math document IR.
-- Matched Badness's shell policy byte-for-byte: delimiter-command trivia is
-  removed, nonempty bodies receive one inner space on each side, and empty
-  bodies stay tight. The IR retains the opening-width alignment needed by later
-  multiline lowering.
-- Kept unclosed/missing delimiter recovery, shell comments, nested pairs,
-  scripts inside pairs, and scripted delimiter bases on the legacy path.
-- Added focused lowering regressions and mandatory byte-exact Badness parity;
-  the full workspace check, test, Clippy, and rustfmt gates pass.
+- Lowered supported scripts inside closed `\left…\right` bodies, including a
+  paired delimiter reached from compact script-argument spacing.
+- Allowed a supported paired delimiter to serve as a scripted atom's base,
+  preserving shell spacing while attaching sub- and superscripts tightly.
+- Kept unclosed/missing delimiter recovery, shell comments, nested pairs, and
+  unsupported script shapes on the legacy path.
+- Added focused routing regressions and mandatory byte-exact Badness parity in
+  normal and compact-script contexts; the full workspace gates pass.
 
 ### Suggested next sub-targets
 
-1. Expand paired-delimiter parity through supported scripts in delimiter bodies
-   and through scripted paired-delimiter bases.
-2. Lower recursively nested paired delimiters once the script/delimiter seams
-   pass byte-for-byte in normal and compact-script spacing modes.
+1. Lower recursively nested paired delimiters through the typed path in normal
+   and compact-script spacing modes.
+2. Keep recovery, delimiter-shell comments, and unsupported descendants on the
+   legacy path while nested closed pairs migrate.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Plain paired-delimiter lowering.** Lowered closed, non-nested pairs with
+  supported plain bodies while preserving recovery and recursive shapes.
 - **Script lowering and assignment alignment.** Lowered supported scripts
   through compact semantic spacing and aligned repeated assignment relations.
 - **Bare-command lowering.** Lowered known and unknown control words without
