@@ -475,6 +475,13 @@ fn flat_inline_edge_cases_match_badness() {
 }
 
 #[test]
+fn ordinary_group_migration_slice_matches_badness() {
+    for body in ["{ a+b }", "a+{b-c}", "a {- b}", "{{ α<=β }}", "{   }"] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

@@ -38,7 +38,7 @@ fn render_inline_content(
     opts: &MathFormatOptions,
 ) -> String {
     MathContent::cast(tree.clone())
-        .and_then(|content| lower::try_lower_flat_inline(&content))
+        .and_then(|content| lower::try_lower_inline(&content))
         .map(|document| Printer::new(opts.line_width, INDENT.len()).print_flat(&document))
         .unwrap_or_else(|| render_inline(elements, &opts.signature_scope))
         .trim()

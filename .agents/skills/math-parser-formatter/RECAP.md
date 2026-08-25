@@ -74,29 +74,32 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Flat-inline typed lowering.** Routed inline bodies containing only
-`MATH_WORD`, `MATH_SPACE`, and `MATH_NEWLINE` through the Panache-owned document
-IR and flat printer; every unsupported CST shape still uses the legacy path.
+**Ordinary-group typed lowering.** Extended the Panache-owned inline lowering
+slice to recursively format standalone `MATH_GROUP` bodies while each group
+remains one operand in its parent sequence.
 
-- Used the shared semantic atom stream for contextual binary/relation spacing,
-  exact token-relative source slices for Unicode-safe emission, and symmetric
-  spacing around authored loose slashes.
-- Promoted the selected eight corpus cases to mandatory Badness byte parity and
-  added edge parity for unary trivia, definition colons, and slashes. The
-  94-case baseline report, corpus properties, and MathML cross-validation remain
-  unchanged.
+- Added `semantic_math_atoms_in` so recursive consumers can reuse the shared
+  contextual sequencer over group bodies without treating their braces as math
+  atoms or duplicating semantic policy.
+- Added byte-exact Badness parity for nested, empty, Unicode, unary, binary, and
+  relation-bearing groups. Unclosed groups and all other unsupported CST shapes
+  still use the legacy path.
 
 ### Suggested next sub-targets
 
-1. Lower ordinary brace groups recursively through the shared math sequencer.
-2. Extend recursive lowering only to signature-proven math arguments; keep
+1. Extend recursive lowering only to signature-proven math arguments; keep
    text-domain, unknown, redefined, over-attached, and malformed arguments
    verbatim.
+2. Lower the corresponding command shell only for that signature-proven slice;
+   leave other commands on the legacy path.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Flat-inline typed lowering.** Routed word/trivia-only inline bodies through
+  the shared semantic atoms and Panache document IR with mandatory Badness
+  parity for the selected corpus and edge cases.
 - **Math document IR and printer.** Added the Badness-style document algebra
   and width-aware printer, then migrated mixed-environment layout without
   changing formatter output.

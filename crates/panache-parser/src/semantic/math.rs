@@ -185,10 +185,20 @@ impl Iterator for MathAtoms<'_> {
 /// or relation, or after a genuine opening delimiter, matching Badness's math
 /// sequencer.
 pub fn semantic_math_atoms(content: &SyntaxNode) -> SemanticMathAtoms {
+    semantic_math_atoms_in(content.children_with_tokens())
+}
+
+/// Source-ordered semantic atoms for an explicitly selected math-element list.
+///
+/// This is the same sequencer as [`semantic_math_atoms`], but lets consumers
+/// exclude structural delimiters when recursively interpreting a group body.
+pub fn semantic_math_atoms_in(
+    elements: impl IntoIterator<Item = SyntaxElement>,
+) -> SemanticMathAtoms {
     let mut interpreted = Vec::new();
     let mut previous_role = MathRole::Relation;
     let mut previous_opener = false;
-    for element in content.children_with_tokens() {
+    for element in elements {
         if !is_semantic_math_element(&element) {
             continue;
         }
