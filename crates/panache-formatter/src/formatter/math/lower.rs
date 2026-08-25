@@ -19,14 +19,33 @@ use super::ir::Ir;
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
 pub(super) fn try_lower_inline(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
-    let elements = content.elements().collect::<Vec<_>>();
+    lower_body(content.elements().collect(), scope, Spacing::Normal)
+}
+
+/// Lower a bracketed body, routing comment-bearing bodies through hard lines.
+fn lower_body(
+    elements: Vec<SyntaxElement>,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
     if elements
         .iter()
         .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
     {
-        lower_edge_comments(elements, scope, Spacing::Normal)
+        lower_edge_comments(elements, scope, spacing)
     } else {
-        lower_elements(elements, scope, Spacing::Normal)
+        lower_elements(elements, scope, spacing)
+    }
+}
+
+/// Badness indents a comment-broken body by one column per bracket level,
+/// including the closing delimiter after a trailing comment. Applying the
+/// hanging indent only to broken bodies keeps every flat body byte-identical.
+fn hanging(width: usize, body: Ir) -> Ir {
+    if body.contains_forced_break() {
+        Ir::align(width, body)
+    } else {
+        body
     }
 }
 
@@ -241,9 +260,12 @@ fn is_supported_element(element: &SyntaxElement, scope: &SignatureScope) -> bool
         SyntaxElement::Node(node) => {
             MathGroup::cast(node.clone()).is_some_and(|group| {
                 group.is_closed()
-                    && group
-                        .body_elements()
-                        .all(|element| is_supported_element(&element, scope))
+                    && group.body_elements().all(|element| {
+                        // A comment is not a semantic atom; `lower_body` decides
+                        // whether this body's comments are safe to break at.
+                        element.kind() == SyntaxKind::MATH_COMMENT
+                            || is_supported_element(&element, scope)
+                    })
             }) || MathCommand::cast(node.clone())
                 .is_some_and(|command| command_is_supported(&command, scope))
                 || MathDelimited::cast(node.clone())
@@ -274,9 +296,13 @@ fn atom_document(
             if let Some(group) = MathGroup::cast(node.clone()) {
                 let open = group.open_token()?;
                 let close = group.close_token()?;
-                let body = lower_elements(group.body_elements().collect(), scope, spacing)?;
+                let body = lower_body(group.body_elements().collect(), scope, spacing)?;
                 (
-                    Ir::concat([Ir::verbatim(open.text()), body, Ir::verbatim(close.text())]),
+                    Ir::concat([
+                        Ir::verbatim(open.text()),
+                        hanging(1, body),
+                        Ir::verbatim(close.text()),
+                    ]),
                     false,
                 )
             } else if let Some(command) = MathCommand::cast(node.clone()) {
@@ -430,18 +456,7 @@ fn lower_command(command: &MathCommand, scope: &SignatureScope, spacing: Spacing
         let open = argument.open_token()?;
         let close = argument.close_token()?;
         let elements = argument.body_elements().collect::<Vec<_>>();
-        let body = if elements
-            .iter()
-            .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
-        {
-            // Badness gives a broken argument body a one-column hanging
-            // indent, including the closing delimiter after a trailing
-            // comment. The alignment scope preserves that layout without
-            // making comments part of the semantic atom stream.
-            Ir::align(1, lower_edge_comments(elements, scope, spacing)?)
-        } else {
-            lower_elements(elements, scope, spacing)?
-        };
+        let body = hanging(1, lower_body(elements, scope, spacing)?);
         if previous_end < argument.syntax().text_range().start() {
             documents.push(Ir::text(" "));
         }
@@ -881,6 +896,58 @@ mod tests {
             ("% leading comment\nx = 1\n", "% leading comment\nx = 1"),
             ("% base comment\nx^2", "% base comment\nx^2"),
             ("a + b % this is a comment\n", "a + b % this is a comment\n"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_edge_comments_in_ordinary_groups() {
+        let cases = [
+            ("{a+b % inner\n}", "{a + b % inner\n }"),
+            ("{% inner\n a+b}", "{% inner\n a + b}"),
+            ("{a % inner\n+b}", "{a % inner\n + b}"),
+            ("{ % only\n }", "{% only\n }"),
+            ("{{a % inner\n}}", "{{a % inner\n  }}"),
+            ("{a+b % inner\n} + c", "{a + b % inner\n } + c"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_edge_comments_in_bracketed_bodies_one_column_per_level() {
+        let cases = [
+            ("\\frac{{a % inner\n}}{c}", "\\frac{{a % inner\n  }}{c}"),
+            ("\\sqrt[{a % inner\n}]{b}", "\\sqrt[{a % inner\n  }]{b}"),
+            ("{\\frac{a % inner\n}{b}}", "{\\frac{a % inner\n  }{b}}"),
+            (
+                "\\left( {a % inner\n} \\right)",
+                "\\left( {a % inner\n        } \\right)",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_edge_comments_in_supported_script_arguments() {
+        let cases = [
+            ("x^{a % inner\n+b}", "x^{a % inner\n +b}"),
+            ("x^{% inner\n a}", "x^{% inner\n a}"),
+            ("x^{a+b % inner\n}", "x^{a+b % inner\n }"),
+            ("x_{a % inner\n}^2", "x_{a % inner\n }^2"),
+            ("x^{{a % inner\n}}", "x^{{a % inner\n  }}"),
+            (
+                "x^{a % inner\n}_{b % other\n}",
+                "x^{a % inner\n }_{b % other\n }",
+            ),
         ];
 
         for (input, expected) in cases {

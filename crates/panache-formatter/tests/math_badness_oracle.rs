@@ -633,6 +633,64 @@ fn mid_expression_comment_migration_slice_matches_badness() {
 }
 
 #[test]
+fn bracketed_body_comment_migration_slice_matches_badness() {
+    for body in [
+        "{a+b % inner\n}",
+        "{% inner\n a+b}",
+        "{a % inner\n+b}",
+        "{ % only\n }",
+        "{{a % inner\n}}",
+        "{a+b % inner\n} + c",
+        "\\frac{{a % inner\n}}{c}",
+        "\\sqrt[{a % inner\n}]{b}",
+        "\\left( {a % inner\n} \\right)",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
+fn script_argument_comment_migration_slice_matches_badness() {
+    for body in [
+        "x^{a % inner\n+b}",
+        "x^{% inner\n a}",
+        "x^{a+b % inner\n}",
+        "x_{a % inner\n}^2",
+        "x^{{a % inner\n}}",
+        "x^{a % inner\n}_{b % other\n}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+/// The hanging indent this slice emits re-enters the parser as `MATH_SPACE` on
+/// the next pass, so guard the round trip explicitly.
+#[test]
+fn bracketed_body_comment_lowering_is_idempotent() {
+    for body in [
+        "{a+b % inner\n}",
+        "{% inner\n a+b}",
+        "{a % inner\n+b}",
+        "{ % only\n }",
+        "{{a % inner\n}}",
+        "{a+b % inner\n} + c",
+        "\\frac{{a % inner\n}}{c}",
+        "\\sqrt[{a % inner\n}]{b}",
+        "\\left( {a % inner\n} \\right)",
+        "x^{a % inner\n+b}",
+        "x^{% inner\n a}",
+        "x^{a+b % inner\n}",
+        "x_{a % inner\n}^2",
+        "x^{{a % inner\n}}",
+        "x^{a % inner\n}_{b % other\n}",
+    ] {
+        let once = panache_body(body, OracleContext::Inline).expect("first pass");
+        let twice = panache_body(&once, OracleContext::Inline).expect("second pass");
+        assert_eq!(once, twice, "not idempotent: {body:?}");
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

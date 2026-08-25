@@ -36,8 +36,11 @@ Returned unchanged, never reflowed:
    comment retains the newline that terminates it. Safe mid-expression comments
    retain the preceding atom's semantic context across their hard newline, so a
    following sign remains binary or unary as authored. The same rule applies in
-   signature-proven math arguments. Comments in ordinary groups and scripts
-   remain on the conservative formatter path.
+   signature-proven math arguments, ordinary groups, and braced script
+   arguments. Every bracket level enclosing a comment-broken body adds one
+   column of hanging indentation, which also positions the closing delimiter
+   after a trailing comment; a `\left`/`\right` pair contributes its opening
+   width plus one column instead.
 
 2. **Display free rows.** Non-environment display content (`$$...$$`) is laid
    out one row per line. Rows split on a top-level `\\` (hard break, kept) or a

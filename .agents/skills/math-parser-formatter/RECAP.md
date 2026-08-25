@@ -80,28 +80,35 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Mid-expression comment semantics.** Extended typed comment lowering through
-safe mid-expression comments at top level and in signature-proven math
-arguments.
+**Bracketed-body comment lowering.** Extended typed comment lowering into
+ordinary groups and braced script arguments, unifying the hanging-indent rule
+across every bracket level.
 
-- Sequenced the complete expression before partitioning lowered atoms around
-  comments, preserving operand, binary, and relation context across hard lines.
-- Added focused unit and byte-exact Badness parity coverage, including a nested
-  `\frac` argument, and promoted the existing argument case to inline parity.
-- Added three shared-corpus cases and regenerated the 100-case baseline; inline
-  parity increased from 65 to 69 cases.
+- Routed content, group, and argument bodies through one `lower_body` dispatch
+  and replaced the argument-only alignment with a shared `hanging` helper that
+  indents any comment-broken body by one column per bracket level.
+- Groups now accept `MATH_COMMENT` body elements; lowerability still comes from
+  `lower_body`, so unsafe comments keep the conservative fallback.
+- Added focused unit coverage, byte-exact Badness parity for group, nested,
+  bracket-argument, `\left`/`\right`, and script-argument shapes, and an
+  explicit idempotency guard for the re-parsed hanging indent.
+- Added five shared-corpus cases and regenerated the 105-case baseline; inline
+  parity increased from 69 to 74 cases.
 
 ### Suggested next sub-targets
 
-1. Recursively lower edge comments in ordinary groups and supported scripts,
-   retaining the same aligned-closing rule.
-2. Lower authored breaks after the comment slice reaches the same controlled
-   contexts beyond inline math.
+1. Lower comments that sit directly in a `\left`/`\right` body, which still
+   fall back because a bare comment is not a supported body element.
+2. Lower authored `\\` breaks, then extend the comment slice beyond inline
+   math into the display and environment contexts.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Mid-expression comment semantics.** Carried operand, binary, and relation
+  context across safe mid-expression comments at top level and in proven math
+  arguments.
 - **Signature-argument edge comments.** Lowered leading and trailing comments
   in proven math arguments with Badness-style hanging indentation.
 - **Top-level edge-comment lowering.** Lowered leading and trailing inline
