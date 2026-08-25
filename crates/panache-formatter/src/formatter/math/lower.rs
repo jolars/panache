@@ -8,8 +8,8 @@ use rowan::TextRange;
 use rowan::ast::AstNode;
 
 use crate::syntax::{
-    MathArgument, MathCommand, MathContent, MathGroup, MathScript, MathScripted, SyntaxElement,
-    SyntaxKind, SyntaxToken,
+    MathArgument, MathCommand, MathContent, MathDelimited, MathGroup, MathScript, MathScripted,
+    SyntaxElement, SyntaxKind, SyntaxToken,
 };
 
 use super::ir::Ir;
@@ -147,6 +147,8 @@ fn is_supported_element(element: &SyntaxElement, scope: &SignatureScope) -> bool
                         .all(|element| is_supported_element(&element, scope))
             }) || MathCommand::cast(node.clone())
                 .is_some_and(|command| command_is_supported(&command, scope))
+                || MathDelimited::cast(node.clone())
+                    .is_some_and(|delimited| delimited_is_supported(&delimited, scope))
                 || MathScripted::cast(node.clone())
                     .is_some_and(|scripted| scripted_is_supported(&scripted, scope))
         }
@@ -180,6 +182,8 @@ fn atom_document(
                 )
             } else if let Some(command) = MathCommand::cast(node.clone()) {
                 (lower_command(&command, scope, spacing)?, false)
+            } else if let Some(delimited) = MathDelimited::cast(node.clone()) {
+                (lower_delimited(&delimited, scope, spacing)?, false)
             } else {
                 let scripted = MathScripted::cast(node.clone())?;
                 (lower_scripted(&scripted, scope, spacing)?, false)
@@ -198,6 +202,70 @@ fn atom_document(
         starts_control_word_letter: element_starts_control_word_letter(element),
         ends_control_word: element_ends_control_word(element),
     })
+}
+
+fn lower_delimited(
+    delimited: &MathDelimited,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
+    if !delimited_is_supported(delimited, scope) {
+        return None;
+    }
+
+    let left = delimited.left_token()?;
+    let open = delimited.opening_delimiter()?;
+    let body = delimited.body()?;
+    let right = delimited.right_token()?;
+    let close = delimited.closing_delimiter()?;
+    let mut documents = vec![Ir::verbatim(left.text()), Ir::verbatim(open.text())];
+    if !body.text().trim().is_empty() {
+        let inner = lower_elements(body.elements().collect(), scope, spacing)?;
+        let opening_width = left.text().chars().count() + open.text().chars().count();
+        documents.push(Ir::align(
+            opening_width + 1,
+            Ir::concat([Ir::text(" "), inner, Ir::text(" ")]),
+        ));
+    }
+    documents.extend([Ir::verbatim(right.text()), Ir::verbatim(close.text())]);
+    Some(Ir::concat(documents))
+}
+
+fn delimited_is_supported(delimited: &MathDelimited, scope: &SignatureScope) -> bool {
+    let (Some(left), Some(open), Some(body), Some(right), Some(close)) = (
+        delimited.left_token(),
+        delimited.opening_delimiter(),
+        delimited.body(),
+        delimited.right_token(),
+        delimited.closing_delimiter(),
+    ) else {
+        return false;
+    };
+    let structural_ranges = [
+        left.text_range(),
+        open.text_range(),
+        body.syntax().text_range(),
+        right.text_range(),
+        close.text_range(),
+    ];
+    delimited
+        .syntax()
+        .children_with_tokens()
+        .all(|element| {
+            structural_ranges.contains(&element.text_range()) || is_layout_trivia(&element)
+        })
+        // Nested pairs and scripts get their own parity slice. Keeping them on
+        // the fallback here makes this first shell migration independently
+        // reviewable and preserves every recovery shape verbatim.
+        && !body.syntax().descendants().any(|node| {
+            matches!(
+                node.kind(),
+                SyntaxKind::MATH_DELIMITED | SyntaxKind::MATH_SCRIPTED
+            )
+        })
+        && body
+            .elements()
+            .all(|element| is_supported_element(&element, scope))
 }
 
 fn lower_scripted(scripted: &MathScripted, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
@@ -221,6 +289,12 @@ fn scripted_is_supported(scripted: &MathScripted, scope: &SignatureScope) -> boo
     let Some(base) = scripted.base() else {
         return false;
     };
+    if matches!(
+        &base,
+        SyntaxElement::Node(node) if MathDelimited::cast(node.clone()).is_some()
+    ) {
+        return false;
+    }
     if !is_supported_element(&base, scope) {
         return false;
     }
@@ -293,7 +367,8 @@ fn is_supported_bare_command(command: &MathCommand, scope: &SignatureScope) -> b
     let Some(name) = command.name() else {
         return false;
     };
-    if scope.is_redefined(&name)
+    if matches!(name.as_str(), "left" | "right")
+        || scope.is_redefined(&name)
         || command
             .syntax()
             .children_with_tokens()
@@ -607,6 +682,28 @@ mod tests {
     }
 
     #[test]
+    fn lowers_closed_paired_delimiters_with_supported_plain_bodies() {
+        let cases = [
+            (r"\left (  a+b  \right )", r"\left( a + b \right)"),
+            (
+                r"x+\left[ \frac{ a+b }{c} \right]",
+                r"x + \left[ \frac{a + b}{c} \right]",
+            ),
+            (r"\left.   \alpha   \right|", r"\left. \alpha \right|"),
+            (
+                r"\left\langle x \right\rangle",
+                r"\left\langle x \right\rangle",
+            ),
+            (r"\left(   \right)", r"\left(\right)"),
+            (r"\left x \right)", r"\leftx\right)"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_malformed_and_unsupported_scripts() {
         for input in [
             "x^",
@@ -619,6 +716,19 @@ mod tests {
             r"x<=_iy",
             r"x>=_iy",
             r"a==_kb",
+        ] {
+            assert_eq!(lower(input), None, "{input:?}");
+        }
+    }
+
+    #[test]
+    fn defers_paired_delimiter_recovery_and_nested_shapes() {
+        for input in [
+            r"\left( x",
+            r"\left( x \right",
+            "\\left % keep\n( x \\right)",
+            r"\left( x_i \right)",
+            r"\left[ \left( x \right) \right]",
         ] {
             assert_eq!(lower(input), None, "{input:?}");
         }
@@ -656,7 +766,6 @@ mod tests {
             "% comment\nx",
             r"a\\b",
             "a&b",
-            r"\left(x\right)",
             r"\begin{matrix}x\end{matrix}",
         ];
 

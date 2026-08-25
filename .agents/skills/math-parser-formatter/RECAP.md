@@ -74,35 +74,34 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Script lowering.** Extended the Panache-owned inline lowering slice through
-scripts whose bases and arguments are already supported.
+**Plain paired-delimiter lowering.** Extended the Panache-owned inline lowering
+slice through closed `\left…\right` nodes whose bodies already use the plain
+typed path.
 
-- Added normal and compact-script spacing modes over the shared semantic atom
-  stream, including control-word boundaries, delimiter edges, slash symmetry,
-  and recursive signature-proven arguments.
-- Lowered word, group, command, and nested-script bases and arguments; kept
-  comments, missing arguments, text-domain arguments, and unsupported bases on
-  the legacy path.
-- Added byte-exact Badness parity for representative migrated scripts. Scripted
-  composite-relation seams such as `:=_i` and `<=_i` remain on the legacy path:
-  Badness 0.5 splits them as `: =_i` and `< =_i`, which would regress Panache's
-  established output.
-- Refined assignment-led relation chains: repeated assignments align their
-  operators, while equality and comparison continuations still align under the
-  first assignment's right-hand side. The rule applies to automatic wrapping
-  and explicit `\\` rows.
+- Lowered character, control-word, null, asymmetric, unusual-token, and empty
+  delimiter pairs through the shared semantic atom stream and math document IR.
+- Matched Badness's shell policy byte-for-byte: delimiter-command trivia is
+  removed, nonempty bodies receive one inner space on each side, and empty
+  bodies stay tight. The IR retains the opening-width alignment needed by later
+  multiline lowering.
+- Kept unclosed/missing delimiter recovery, shell comments, nested pairs,
+  scripts inside pairs, and scripted delimiter bases on the legacy path.
+- Added focused lowering regressions and mandatory byte-exact Badness parity;
+  the full workspace check, test, Clippy, and rustfmt gates pass.
 
 ### Suggested next sub-targets
 
-1. Lower closed paired delimiters whose bodies are already supported, retaining
-   recovery shapes and unsupported bodies on the legacy path.
-2. Expand paired-delimiter parity through nested scripts only after the plain
-   closed-delimiter slice passes byte-for-byte.
+1. Expand paired-delimiter parity through supported scripts in delimiter bodies
+   and through scripted paired-delimiter bases.
+2. Lower recursively nested paired delimiters once the script/delimiter seams
+   pass byte-for-byte in normal and compact-script spacing modes.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Script lowering and assignment alignment.** Lowered supported scripts
+  through compact semantic spacing and aligned repeated assignment relations.
 - **Bare-command lowering.** Lowered known and unknown control words without
   attached arguments while preserving redefinitions and incomplete signatures.
 - **Signature-proven command lowering.** Lowered complete math-domain command
