@@ -217,6 +217,7 @@ golden_test_cases!(
     bracket_display_math_pandoc,
     bracketed_spans,
     bookdown,
+    bookdown_math_labels_host,
     chunk_options_complex,
     code_blocks_executable,
     code_blocks_executable_with_classes,

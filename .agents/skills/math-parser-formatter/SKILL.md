@@ -42,8 +42,8 @@ and design decisions live in this skill and `RECAP.md`.
   linter + LSP — not the CST.
 - **Host-only constructs stay outside TeX math where possible.** Markdown
   delimiters, Bookdown equation labels (`(\#eq:label)`), Pandoc attributes, and
-  container prefixes belong to the host layer. Existing embedded label tokens
-  are migration residue, not the target CST.
+  container prefixes belong to the host layer. Equation labels are host tokens
+  between ordered `MATH_CONTENT` segments, never children of those segments.
 - **`MATH_SPACE`/`MATH_NEWLINE` stay distinct** from host `WHITESPACE`/`NEWLINE`
   so `math_content_text()` can strip container prefixes the block machinery
   interleaves into `MATH_CONTENT` (blockquote `>` etc.).
@@ -67,7 +67,7 @@ root `AGENTS.md`.
 - **Phase 0 — scaffolding.** SyntaxKinds, this skill + rule, corpus. *Skill/rule
   DONE; representative TeX corpus still TODO.*
 - **Phase 1 — TeX tokenizer + structural CST (parser).** *DONE*. Lossless
-  `MATH_CONTENT` CST, diagnostics side-channel, bookdown labels,
+  `MATH_CONTENT` CST, diagnostics side-channel, host-owned Bookdown labels,
   accessors/projector/indexers.
 - **Phase 1b — operator atoms (parser).** *LEGACY; TO BE REPLACED*. The old
   formatter introduced `MATH_OPERATOR` and related fine-grained tokens. The

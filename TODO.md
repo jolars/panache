@@ -266,7 +266,7 @@ formatter-off output byte-identical.
 
 2. **Finish the host/CST boundary before lowering it.**
 
-   - [ ] Move Bookdown equation labels out of `MATH_CONTENT` while retaining
+   - [x] Move Bookdown equation labels out of `MATH_CONTENT` while retaining
      their original source ranges and cross-reference behavior. Add parser
      and formatter regressions for inline/display math, blockquotes, lists,
      raw math environments, delimiter extensions, and unavoidable host

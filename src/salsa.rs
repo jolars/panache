@@ -1502,9 +1502,8 @@ fn collect_block_local_symbols(
                 collect_bookdown_declarations_from_text_token(&token, index, extensions);
                 collect_example_label_usages_from_text_token(&token, index);
             }
-            // Bookdown equation labels `(\#eq:label)` inside math are parsed
-            // into a dedicated token; its text is exactly one declaration, so
-            // the same scanner registers it (with full + value ranges).
+            // Host-owned Bookdown equation-label tokens contain exactly one
+            // declaration, so the same scanner registers full and value ranges.
             SyntaxKind::MATH_EQUATION_LABEL => {
                 collect_bookdown_declarations_from_text_token(&token, index, extensions);
             }
@@ -1927,9 +1926,9 @@ fn collect_bookdown_definitions(
     collect_equation_definitions: bool,
 ) {
     // Prose bookdown declarations / text references live in `TEXT` tokens.
-    // Bookdown *equation* labels `(\#eq:label)` inside math are parsed into a
-    // dedicated `MATH_EQUATION_LABEL` token (gated on the same extension), so
-    // we read them straight off the CST rather than re-scanning math text.
+    // Bookdown equation labels are host-owned `MATH_EQUATION_LABEL` siblings of
+    // TeX content (gated on the same extension), so read them straight off the
+    // CST rather than re-scanning math text.
     for element in tree.descendants_with_tokens() {
         db.unwind_if_revision_cancelled();
         let Some(token) = element.into_token() else {

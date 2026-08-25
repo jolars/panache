@@ -1,0 +1,6 @@
+flavor = "rmarkdown"
+
+[extensions]
+tex-math-gfm = true
+tex-math-single-backslash = true
+tex-math-double-backslash = true

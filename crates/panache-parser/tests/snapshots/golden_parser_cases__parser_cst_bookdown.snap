@@ -14,7 +14,7 @@ DOCUMENT@0..610
     NEWLINE@169..170 "\n"
     DISPLAY_MATH@170..277
       DISPLAY_MATH_MARKER@170..186 "\\begin{equation}"
-      MATH_CONTENT@186..261
+      MATH_CONTENT@186..248
         MATH_NEWLINE@186..187 "\n"
         MATH_SPACE@187..189 "  "
         MATH_WORD@189..190 "f"
@@ -60,7 +60,8 @@ DOCUMENT@0..610
               MATH_GROUP_CLOSE@244..245 "}"
         MATH_NEWLINE@245..246 "\n"
         MATH_SPACE@246..248 "  "
-        MATH_EQUATION_LABEL@248..260 "(\\#eq:binom)"
+      MATH_EQUATION_LABEL@248..260 "(\\#eq:binom)"
+      MATH_CONTENT@260..261
         MATH_NEWLINE@260..261 "\n"
       DISPLAY_MATH_MARKER@261..277 "\\end{equation} \n"
     TEXT@277..308 "We can refer to it as ..."

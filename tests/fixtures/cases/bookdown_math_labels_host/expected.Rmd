@@ -1,0 +1,22 @@
+Inline: $a + b (\#eq:inline)$ and \(c + d (\#eq:paren)\).
+
+GFM inline: $`e + f (\#eq:gfm)`$.
+
+$$
+  g + h (\#eq:display)
+$$
+
+- A list equation:
+
+  \[
+    i + j (\#eq:list)
+  \]
+
+> \begin{align}
+>   k + l (\#eq:quote) \\
+>   m + n
+> \end{align}
+
+\\[
+  o + p (\#eq:double)
+\\]

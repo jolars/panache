@@ -398,10 +398,8 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 matches!(t, NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::DISPLAY_MATH_MARKER)
             });
 
-            let content = node
-                .children()
-                .find(|n| n.kind() == SyntaxKind::MATH_CONTENT)
-                .map(|n| n.text().to_string())
+            let content = InlineMath::cast(node.clone())
+                .map(|math| math.content())
                 .unwrap_or_default();
 
             let original_marker = node
@@ -452,18 +450,14 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 
             if is_display_math {
                 let opts = MathFormatOptions::from_config(config, MathContext::Display);
-                let clean = InlineMath::cast(node.clone())
-                    .map(|m| m.content())
-                    .unwrap_or_else(|| content.clone());
+                let clean = content.clone();
                 match math::format_math(&clean, &opts) {
                     Some(body) => format!("{}\n{}\n{}", open, body, close),
                     None => format!("{}\n{}\n{}", open, content.trim(), close),
                 }
             } else {
                 let opts = MathFormatOptions::from_config(config, MathContext::Inline);
-                let clean = InlineMath::cast(node.clone())
-                    .map(|m| m.content())
-                    .unwrap_or_else(|| content.clone());
+                let clean = content.clone();
                 match math::format_math(&clean, &opts) {
                     Some(body) => format!("{}{}{}", open, body, close),
                     None => format!("{}{}{}", open, collapse_internal_newlines(&content), close),

@@ -17,6 +17,17 @@ fn preserves_inline_math_whitespace() {
 }
 
 #[test]
+fn preserves_host_bookdown_label_when_math_formatting_is_disabled() {
+    let input = "Math: $x   +   y (\\#eq:sum)$\n";
+    let mut config = Config::default();
+    config.parser_extensions.bookdown_equation_references = true;
+
+    let output = format(input, Some(config), None);
+
+    similar_asserts::assert_eq!(output, input);
+}
+
+#[test]
 fn text_reference_paragraph_is_not_wrapped() {
     let input = "(ref:foo) A scatterplot of the data `cars` using **base** R graphics.\n";
     let mut config = Config::default();

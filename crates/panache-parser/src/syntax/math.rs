@@ -4,8 +4,8 @@ use rowan::TextRange;
 
 use super::{AstNode, PanacheLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 
-/// Reconstruct the raw math content of a math node from its `MATH_CONTENT`
-/// subtree, keeping only the math tokens.
+/// Reconstruct the raw math content from its ordered TeX segments and host
+/// equation labels, keeping only source bytes that belong to the math span.
 ///
 /// Container machinery (blockquotes, list continuations, …) interleaves host
 /// prefix tokens (`LINE_PREFIX`, `NEWLINE`) into the subtree on continuation
@@ -13,14 +13,7 @@ use super::{AstNode, PanacheLanguage, SyntaxElement, SyntaxKind, SyntaxNode, Syn
 /// they are excluded here — otherwise e.g. a blockquote `>` would leak into
 /// the content and re-accumulate on every format pass.
 pub fn math_content_text(math: &SyntaxNode) -> String {
-    let Some(content) = math
-        .children()
-        .find(|node| node.kind() == SyntaxKind::MATH_CONTENT)
-    else {
-        return String::new();
-    };
-    content
-        .descendants_with_tokens()
+    math.descendants_with_tokens()
         .filter_map(|el| el.into_token())
         .filter(|tok| is_math_content_token(tok.kind()))
         .map(|tok| tok.text().to_string())
@@ -87,8 +80,8 @@ impl DisplayMath {
             .map(|token| token.text().to_string())
     }
 
-    /// The raw math content between the delimiters, reconstructed from the
-    /// `MATH_CONTENT` subtree (excluding host container prefixes — see
+    /// The raw content between the delimiters, reconstructed from ordered TeX
+    /// segments and host labels (excluding container prefixes—see
     /// [`math_content_text`]).
     pub fn content(&self) -> String {
         math_content_text(&self.0)

@@ -43,7 +43,7 @@ impl InlineMath {
     }
 
     /// The raw math content between the delimiters, reconstructed from the
-    /// `MATH_CONTENT` subtree (excluding host container prefixes — see
+    /// ordered TeX segments and host labels (excluding container prefixes—see
     /// [`super::math::math_content_text`]).
     pub fn content(&self) -> String {
         super::math::math_content_text(&self.0)

@@ -32,9 +32,9 @@ use rowan::{GreenNode, GreenNodeBuilder};
 /// constructs layered on top of TeX by a Markdown flavor live here.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct MathParseOptions {
-    /// Recognize bookdown equation labels `(\#eq:label)` as a single
-    /// [`SyntaxKind::MATH_EQUATION_LABEL`] token (gated on the
-    /// `bookdown_equation_references` extension).
+    /// Recognize Bookdown equation labels `(\#eq:label)` during standalone
+    /// math parsing. Host embedding instead emits these labels beside its
+    /// `MATH_CONTENT` segments.
     pub bookdown_equation_labels: bool,
 }
 

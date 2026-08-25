@@ -26,7 +26,8 @@
 use crate::config::MathDelimiterStyle;
 use crate::formatter::Formatter;
 use crate::syntax::{
-    DisplayMath, MathSubscript, MathSuperscript, SyntaxKind, SyntaxNode, math_diagnostics,
+    DisplayMath, InlineMath, MathSubscript, MathSuperscript, SyntaxKind, SyntaxNode,
+    math_diagnostics,
 };
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::semantic::math::SignatureScope;
@@ -47,14 +48,8 @@ impl Formatter {
         let is_display_math = node.children_with_tokens().any(|child| {
             matches!(child, NodeOrToken::Token(token) if token.kind() == SyntaxKind::DISPLAY_MATH_MARKER)
         });
-        let content = node
-            .children_with_tokens()
-            .find_map(|child| match child {
-                NodeOrToken::Token(token) if token.kind() == SyntaxKind::TEXT => {
-                    Some(token.text().to_string())
-                }
-                _ => None,
-            })
+        let content = InlineMath::cast(node.clone())
+            .map(|math| math.content())
             .unwrap_or_default();
         let marker = node
             .children_with_tokens()

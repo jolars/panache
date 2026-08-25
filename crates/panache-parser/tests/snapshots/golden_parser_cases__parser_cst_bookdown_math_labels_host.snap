@@ -1,0 +1,121 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..248
+  PARAGRAPH@0..54
+    TEXT@0..8 "Inline: "
+    INLINE_MATH@8..27
+      INLINE_MATH_MARKER@8..9 "$"
+      MATH_CONTENT@9..13
+        MATH_WORD@9..12 "a+b"
+        MATH_SPACE@12..13 " "
+      MATH_EQUATION_LABEL@13..26 "(\\#eq:inline)"
+      MATH_CONTENT@26..26
+      INLINE_MATH_MARKER@26..27 "$"
+    TEXT@27..32 " and "
+    INLINE_MATH@32..52
+      INLINE_MATH_MARKER@32..34 "\\("
+      MATH_CONTENT@34..38
+        MATH_WORD@34..37 "c+d"
+        MATH_SPACE@37..38 " "
+      MATH_EQUATION_LABEL@38..50 "(\\#eq:paren)"
+      MATH_CONTENT@50..50
+      INLINE_MATH_MARKER@50..52 "\\)"
+    TEXT@52..53 "."
+    NEWLINE@53..54 "\n"
+  BLANK_LINE@54..55
+    BLANK_LINE@54..55 "\n"
+  PARAGRAPH@55..87
+    TEXT@55..67 "GFM inline: "
+    INLINE_MATH@67..85
+      INLINE_MATH_MARKER@67..69 "$`"
+      MATH_CONTENT@69..73
+        MATH_WORD@69..72 "e+f"
+        MATH_SPACE@72..73 " "
+      MATH_EQUATION_LABEL@73..83 "(\\#eq:gfm)"
+      MATH_CONTENT@83..83
+      INLINE_MATH_MARKER@83..85 "`$"
+    TEXT@85..86 "."
+    NEWLINE@86..87 "\n"
+  BLANK_LINE@87..88
+    BLANK_LINE@87..88 "\n"
+  PARAGRAPH@88..113
+    DISPLAY_MATH@88..112
+      DISPLAY_MATH_MARKER@88..90 "$$"
+      MATH_CONTENT@90..95
+        MATH_NEWLINE@90..91 "\n"
+        MATH_WORD@91..94 "g+h"
+        MATH_SPACE@94..95 " "
+      MATH_EQUATION_LABEL@95..109 "(\\#eq:display)"
+      MATH_CONTENT@109..110
+        MATH_NEWLINE@109..110 "\n"
+      DISPLAY_MATH_MARKER@110..112 "$$"
+    NEWLINE@112..113 "\n"
+  BLANK_LINE@113..114
+    BLANK_LINE@113..114 "\n"
+  LIST@114..162
+    LIST_ITEM@114..162
+      LIST_MARKER@114..115 "-"
+      WHITESPACE@115..116 " "
+      PLAIN@116..133
+        TEXT@116..132 "A list equation:"
+        NEWLINE@132..133 "\n"
+      BLANK_LINE@133..134
+        BLANK_LINE@133..134 "\n"
+      PLAIN@134..162
+        TEXT@134..136 "  "
+        DISPLAY_MATH@136..161
+          DISPLAY_MATH_MARKER@136..138 "\\["
+          MATH_CONTENT@138..145
+            MATH_NEWLINE@138..139 "\n"
+            LINE_PREFIX@139..141 "  "
+            MATH_WORD@141..144 "i+j"
+            MATH_SPACE@144..145 " "
+          MATH_EQUATION_LABEL@145..156 "(\\#eq:list)"
+          MATH_CONTENT@156..157
+            MATH_NEWLINE@156..157 "\n"
+          LINE_PREFIX@157..159 "  "
+          DISPLAY_MATH_MARKER@159..161 "\\]"
+        NEWLINE@161..162 "\n"
+  BLANK_LINE@162..163
+    BLANK_LINE@162..163 "\n"
+  BLOCK_QUOTE@163..221
+    BLOCK_QUOTE_MARKER@163..164 ">"
+    WHITESPACE@164..165 " "
+    PARAGRAPH@165..221
+      DISPLAY_MATH@165..221
+        DISPLAY_MATH_MARKER@165..178 "\\begin{align}"
+        MATH_CONTENT@178..185
+          MATH_NEWLINE@178..179 "\n"
+          LINE_PREFIX@179..180 ">"
+          LINE_PREFIX@180..181 " "
+          MATH_WORD@181..184 "k+l"
+          MATH_SPACE@184..185 " "
+        MATH_EQUATION_LABEL@185..197 "(\\#eq:quote)"
+        MATH_CONTENT@197..207
+          MATH_SPACE@197..198 " "
+          MATH_LINE_BREAK@198..200
+            MATH_CONTROL_SYMBOL@198..200 "\\\\"
+          MATH_NEWLINE@200..201 "\n"
+          LINE_PREFIX@201..202 ">"
+          LINE_PREFIX@202..203 " "
+          MATH_WORD@203..206 "m+n"
+          MATH_NEWLINE@206..207 "\n"
+        LINE_PREFIX@207..208 ">"
+        LINE_PREFIX@208..209 " "
+        DISPLAY_MATH_MARKER@209..221 "\\end{align}\n"
+  BLANK_LINE@221..222
+    BLANK_LINE@221..222 "\n"
+  PARAGRAPH@222..248
+    DISPLAY_MATH@222..247
+      DISPLAY_MATH_MARKER@222..225 "\\\\["
+      MATH_CONTENT@225..230
+        MATH_NEWLINE@225..226 "\n"
+        MATH_WORD@226..229 "o+p"
+        MATH_SPACE@229..230 " "
+      MATH_EQUATION_LABEL@230..243 "(\\#eq:double)"
+      MATH_CONTENT@243..244
+        MATH_NEWLINE@243..244 "\n"
+      DISPLAY_MATH_MARKER@244..247 "\\\\]"
+    NEWLINE@247..248 "\n"

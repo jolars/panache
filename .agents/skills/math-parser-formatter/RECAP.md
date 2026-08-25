@@ -74,25 +74,29 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Conservative argument-contract regressions.** Locked the formatter boundary
-between recursively formatted and opaque command arguments.
+**Host-owned Bookdown equation labels.** Moved `MATH_EQUATION_LABEL` tokens
+beside ordered `MATH_CONTENT` segments while preserving host-aligned ranges and
+cross-reference indexing.
 
-- Added byte-exact Badness parity cases in inline, display, and environment
-  contexts for math, text, unknown-command, and over-attached arguments.
-- Added formatter regressions for configured unknown domains, over-attached
-  groups, malformed arguments, and idempotency.
-- Confirmed that raw-TeX redefinitions retain their existing opaque path.
+- Reconstructed math text across all TeX segments and intervening host labels,
+  mechanically excluding injected blockquote and list prefixes.
+- Added parser and formatter coverage for inline/display math, raw math
+  environments, blockquotes, lists, GFM/backslash delimiters, gate-on
+  formatting, and gate-off byte preservation.
+- Retained label source ranges and existing linter/LSP cross-reference behavior.
 
 ### Suggested next sub-targets
 
-1. Move Bookdown equation labels out of `MATH_CONTENT`.
-2. Complete typed math CST accessors needed by the new lowering.
-3. Establish the formatter migration baseline across all shared-corpus contexts.
+1. Complete typed math CST accessors needed by the new lowering.
+2. Establish the formatter migration baseline across all shared-corpus contexts.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Conservative argument-contract regressions.** Locked recursive formatting
+  to signature-proven math arguments and preserved opaque arguments
+  byte-for-byte.
 - **Configured command signatures.** Added typed configuration, semantic-scope
   merging, raw-definition shadowing, schema/docs, and focused formatter tests.
 - **Contextual semantic atom stream.** Added host-ranged atoms, contextual
