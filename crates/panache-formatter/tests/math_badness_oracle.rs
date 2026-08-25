@@ -482,6 +482,19 @@ fn ordinary_group_migration_slice_matches_badness() {
 }
 
 #[test]
+fn signature_proven_command_migration_slice_matches_badness() {
+    for body in [
+        r"\frac{ a+b }{ c-d }",
+        r"\sqrt{ a+b }",
+        r"\sqrt[ a+b ]{ c-d }",
+        r"\frac { a+b } { c-d }",
+        r"x+\frac{{ a+b }}{c}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

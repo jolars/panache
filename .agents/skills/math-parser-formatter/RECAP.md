@@ -74,29 +74,32 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Ordinary-group typed lowering.** Extended the Panache-owned inline lowering
-slice to recursively format standalone `MATH_GROUP` bodies while each group
-remains one operand in its parent sequence.
+**Signature-proven command lowering.** Extended the Panache-owned inline
+lowering slice through complete, closed command signatures whose attached
+arguments are all math-domain.
 
-- Added `semantic_math_atoms_in` so recursive consumers can reuse the shared
-  contextual sequencer over group bodies without treating their braces as math
-  atoms or duplicating semantic policy.
-- Added byte-exact Badness parity for nested, empty, Unicode, unary, binary, and
-  relation-bearing groups. Unclosed groups and all other unsupported CST shapes
-  still use the legacy path.
+- Lowered the matching command shell and recursively lowered brace and optional
+  argument bodies through the shared semantic atom stream.
+- Preserved authored attachment gaps as one space, matching Badness; comments,
+  text-domain and unknown commands, redefinitions, missing and over-attached
+  arguments, and malformed groups remain on the legacy path.
+- Added byte-exact Badness parity for `\frac`, `\sqrt`, optional arguments,
+  nested groups, and authored attachment trivia. Marked the first formatter-
+  replacement checklist item complete.
 
 ### Suggested next sub-targets
 
-1. Extend recursive lowering only to signature-proven math arguments; keep
-   text-domain, unknown, redefined, over-attached, and malformed arguments
-   verbatim.
-2. Lower the corresponding command shell only for that signature-proven slice;
-   leave other commands on the legacy path.
+1. Lower a bounded bare-command slice through the shared semantic atom stream,
+   with byte-exact Badness parity and redefinition-aware fallbacks.
+2. Lower scripts whose bases and arguments are already supported; keep script
+   comments, malformed attachment, and unsupported bases on the legacy path.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Ordinary-group typed lowering.** Recursively lowered closed standalone
+  groups while preserving each group as one operand in its parent sequence.
 - **Flat-inline typed lowering.** Routed word/trivia-only inline bodies through
   the shared semantic atoms and Panache document IR with mandatory Badness
   parity for the selected corpus and edge cases.

@@ -291,7 +291,7 @@ formatter-off output byte-identical.
 
 4. **Replace the legacy formatter in bounded parity slices.**
 
-   - [ ] Complete the Panache-owned Badness-style document IR and printer, then
+   - [x] Complete the Panache-owned Badness-style document IR and printer, then
      lower words, trivia, groups, and signature-proven arguments into it.
      Leave unsupported shapes on the existing conservative fallback.
    - [ ] Lower commands, scripts, and paired delimiters through the shared
