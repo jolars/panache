@@ -320,10 +320,8 @@ formatter-off output byte-identical.
    - [ ] Run the workspace checks, compare parser/formatter performance, and
      review WASM size before accepting the replacement.
    - [ ] Document the resulting math style and supported semantic/configuration
-     model. Keep `format-math` experimental and off by default until the
-     native parser, semantic model, formatter, diagnostics, and
-     language-server paths are migrated; decide whether to graduate the gate
-     as a separate change.
+     model. Turn `format-math` into a stable gate and deprecate the
+     experimental setting.
 
 ## Parser
 
