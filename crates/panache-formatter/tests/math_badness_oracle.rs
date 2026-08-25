@@ -523,6 +523,17 @@ fn signature_proven_command_migration_slice_matches_badness() {
 }
 
 #[test]
+fn signature_proven_command_comment_migration_slice_matches_badness() {
+    for body in [
+        "\\frac{% numerator\n a+b}{c}",
+        "\\frac{a+b % numerator\n}{c}",
+        "\\sqrt[% index\n n+1]{x}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn bare_command_migration_slice_matches_badness() {
     for body in [
         r"\alpha+\beta",

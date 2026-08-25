@@ -1,11 +1,11 @@
 Badness math formatter parity baseline
 Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
-Cases: 94
-Context runs: 282
-Parity: 62 / 282
-Controlled wrapper rejection: 15 / 282
-Divergent: 205 / 282
+Cases: 97
+Context runs: 291
+Parity: 65 / 291
+Controlled wrapper rejection: 15 / 291
+Divergent: 211 / 291
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,9 +15,9 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 62, rejected 5, divergent 27
-display: parity 0, rejected 5, divergent 89
-environment: parity 0, rejected 5, divergent 89
+inline: parity 65, rejected 5, divergent 27
+display: parity 0, rejected 5, divergent 92
+environment: parity 0, rejected 5, divergent 92
 
 === First-slice parity candidates ===
 display/authored_newline.tex [inline]
@@ -44,7 +44,10 @@ commands/star_optional.tex [inline]
 commands/star_variant.tex [inline]
 commands/text_argument_whitespace.tex [inline]
 commands/unknown_argument_whitespace.tex [inline]
+comments/argument_leading.tex [inline]
+comments/argument_trailing.tex [inline]
 comments/comment_line.tex [inline]
+comments/optional_argument_leading.tex [inline]
 comments/trailing_comment.tex [inline]
 display/authored_newline.tex [inline]
 display/fraction_block.tex [inline]
@@ -357,6 +360,26 @@ Input: "\\unknown { a   +   b }\n"
 Badness: "  \\unknown { a   +   b }\n"
 Panache: "  \\unknown { a   +   b }"
 
+--- comments/argument_leading.tex [display] ---
+Input: "\\frac{% numerator\n a+b}{c}\n"
+Badness: "  \\frac{% numerator\n   a + b}{c}\n"
+Panache: <declined>
+
+--- comments/argument_leading.tex [environment] ---
+Input: "\\frac{% numerator\n a+b}{c}\n"
+Badness: "  \\frac{% numerator\n   a + b}{c}\n"
+Panache: <declined>
+
+--- comments/argument_trailing.tex [display] ---
+Input: "\\frac{a+b % numerator\n}{c}\n"
+Badness: "  \\frac{a + b % numerator\n   }{c}\n"
+Panache: <declined>
+
+--- comments/argument_trailing.tex [environment] ---
+Input: "\\frac{a+b % numerator\n}{c}\n"
+Badness: "  \\frac{a + b % numerator\n   }{c}\n"
+Panache: <declined>
+
 --- comments/comment_line.tex [display] ---
 Input: "% leading comment\nx = 1\n"
 Badness: "  % leading comment\n  x = 1\n"
@@ -380,6 +403,16 @@ Panache: <declined>
 --- comments/inside_math_argument.tex [environment] ---
 Input: "\\frac{a % keep this comment\n+ b}{c}\n"
 Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
+Panache: <declined>
+
+--- comments/optional_argument_leading.tex [display] ---
+Input: "\\sqrt[% index\n n+1]{x}\n"
+Badness: "  \\sqrt[% index\n   n + 1]{x}\n"
+Panache: <declined>
+
+--- comments/optional_argument_leading.tex [environment] ---
+Input: "\\sqrt[% index\n n+1]{x}\n"
+Badness: "  \\sqrt[% index\n   n + 1]{x}\n"
 Panache: <declined>
 
 --- comments/trailing_comment.tex [display] ---

@@ -26,7 +26,7 @@
 use crate::config::MathDelimiterStyle;
 use crate::formatter::Formatter;
 use crate::syntax::{
-    DisplayMath, InlineMath, MathSubscript, MathSuperscript, SyntaxKind, SyntaxNode,
+    DisplayMath, InlineMath, MathContent, MathSubscript, MathSuperscript, SyntaxKind, SyntaxNode,
     math_diagnostics,
 };
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
@@ -249,18 +249,16 @@ pub fn format_math(input: &str, opts: &MathFormatOptions) -> Option<String> {
     if has_dangling_script(&tree) {
         return None;
     }
-    if has_nested_comment(&tree) {
+    if has_nested_comment(&tree) && !can_lower_nested_comments(&tree, opts) {
         return None;
     }
     Some(render::render(&tree, opts))
 }
 
-/// A comment nested inside a single-line construct (a command's argument run,
-/// a brace group, a scripted atom) cannot be reflowed: rendering the construct
-/// on one line would turn the comment's terminating newline into a space and
-/// silently absorb the rest of the construct into the comment. Line-aware
-/// contexts — the top level and environment bodies — split rows at the
-/// comment's newline instead, so only deeper comments force the verbatim path.
+/// Whether a comment occurs inside a construct that historically rendered on
+/// one line. Such comments require either typed hard-line lowering or verbatim
+/// fallback; collapsing their terminating newline would absorb the remainder
+/// of the construct into the comment.
 fn has_nested_comment(tree: &SyntaxNode) -> bool {
     tree.descendants_with_tokens()
         .filter_map(|element| element.into_token())
@@ -273,6 +271,13 @@ fn has_nested_comment(tree: &SyntaxNode) -> bool {
                 )
             })
         })
+}
+
+fn can_lower_nested_comments(tree: &SyntaxNode, opts: &MathFormatOptions) -> bool {
+    opts.context == MathContext::Inline
+        && MathContent::cast(tree.clone())
+            .and_then(|content| lower::try_lower_inline(&content, &opts.signature_scope))
+            .is_some()
 }
 
 /// A script marker with no argument (`x^` at the end of the content, or with
@@ -375,6 +380,23 @@ mod tests {
             fmt(r"\inferrule*[right]{A}{B}", MathContext::Inline),
             r"\inferrule*[right]{A}{B}"
         );
+    }
+
+    #[test]
+    fn inline_formats_edge_comments_in_math_command_arguments() {
+        for (input, expected) in [
+            (
+                "\\frac{% numerator\n a+b}{c}",
+                "\\frac{% numerator\n a + b}{c}",
+            ),
+            (
+                "\\frac{a+b % numerator\n}{c}",
+                "\\frac{a + b % numerator\n }{c}",
+            ),
+        ] {
+            assert_eq!(fmt(input, MathContext::Inline), expected);
+            assert_idempotent(input, MathContext::Inline);
+        }
     }
 
     #[test]

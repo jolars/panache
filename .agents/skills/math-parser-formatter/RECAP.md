@@ -80,29 +80,31 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Top-level edge-comment lowering.** Began the next formatter migration stage
-with a conservative inline-comment slice.
+**Signature-argument edge comments.** Extended typed command lowering through
+comments at the edges of signature-proven math arguments.
 
-- Lowered leading top-level comment lines and same-line trailing comments,
-  preserving the hard newline each `%` comment requires.
-- Kept mid-expression, own-line trailing, and nested comments on the legacy
-  path until role carryover and aligned group closing migrate.
-- Regenerated the formatter baseline, added focused byte-exact oracle parity,
-  and passed the full workspace gates.
-- Restored Panache's documented `:=` formatting where the typed Badness-parity
-  path had split it, and recorded the broader oracle defect with a regression.
+- Lowered leading and same-line trailing comments in required and optional
+  math-domain arguments while preserving each comment's hard newline.
+- Matched Badness's one-column hanging indent for continuation content and a
+  closing delimiter after a trailing comment.
+- Narrowed the nested-comment guard only when the inline typed lowering proves
+  the complete shape safe; unsupported nested comments still bail to verbatim.
+- Added three shared-corpus cases, regenerated the 97-case baseline, and pinned
+  byte-exact inline parity plus idempotency.
 
 ### Suggested next sub-targets
 
-1. Lower comments inside signature-proven math arguments, aligning continuation
-   content and keeping closing delimiters out of the comment line.
-2. Carry semantic operator context across safe mid-expression comments before
+1. Carry semantic operator context across safe mid-expression comments before
    admitting them to the typed path.
+2. Recursively lower edge comments in ordinary groups and supported scripts,
+   retaining the same aligned-closing rule.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Top-level edge-comment lowering.** Lowered leading and trailing inline
+  comments through hard-line IR while preserving unsupported comment fallback.
 - **Nested paired-delimiter lowering.** Recursively lowered closed pairs in
   normal and compact script spacing while preserving recovery fallback.
 - **Paired-delimiter script lowering.** Lowered supported scripts inside closed

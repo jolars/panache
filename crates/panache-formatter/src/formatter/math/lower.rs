@@ -24,13 +24,17 @@ pub(super) fn try_lower_inline(content: &MathContent, scope: &SignatureScope) ->
         .iter()
         .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
     {
-        lower_edge_comments(elements, scope)
+        lower_edge_comments(elements, scope, Spacing::Normal)
     } else {
         lower_elements(elements, scope, Spacing::Normal)
     }
 }
 
-fn lower_edge_comments(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Option<Ir> {
+fn lower_edge_comments(
+    elements: Vec<SyntaxElement>,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
     // A comment between semantic atoms needs the preceding role carried across
     // its hard break. Keep that context-sensitive case on the legacy path.
     let first_content = elements.iter().position(|element| {
@@ -57,7 +61,7 @@ fn lower_edge_comments(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> 
         let has_content = semantic_math_atoms_in(segment.iter().cloned())
             .next()
             .is_some();
-        documents.push(lower_elements(segment.to_vec(), scope, Spacing::Normal)?);
+        documents.push(lower_elements(segment.to_vec(), scope, spacing)?);
         if has_content {
             let trailing_trivia = segment
                 .iter()
@@ -81,7 +85,7 @@ fn lower_edge_comments(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> 
     documents.push(lower_elements(
         elements[segment_start..].to_vec(),
         scope,
-        Spacing::Normal,
+        spacing,
     )?);
     Some(Ir::concat(documents))
 }
@@ -406,7 +410,19 @@ fn lower_command(command: &MathCommand, scope: &SignatureScope, spacing: Spacing
     for argument in arguments {
         let open = argument.open_token()?;
         let close = argument.close_token()?;
-        let body = lower_elements(argument.body_elements().collect(), scope, spacing)?;
+        let elements = argument.body_elements().collect::<Vec<_>>();
+        let body = if elements
+            .iter()
+            .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
+        {
+            // Badness gives a broken argument body a one-column hanging
+            // indent, including the closing delimiter after a trailing
+            // comment. The alignment scope preserves that layout without
+            // making comments part of the semantic atom stream.
+            Ir::align(1, lower_edge_comments(elements, scope, spacing)?)
+        } else {
+            lower_elements(elements, scope, spacing)?
+        };
         if previous_end < argument.syntax().text_range().start() {
             documents.push(Ir::text(" "));
         }
@@ -689,6 +705,25 @@ mod tests {
             (r"\sqrt[ a+b ]{ c-d }", r"\sqrt[a + b]{c - d}"),
             (r"\frac { a+b } { c-d }", r"\frac {a + b} {c - d}"),
             (r"x+\frac{{ a+b }}{c}", r"x + \frac{{a + b}}{c}"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_edge_comments_in_signature_proven_math_arguments() {
+        let cases = [
+            (
+                "\\frac{% numerator\n a+b}{c}",
+                "\\frac{% numerator\n a + b}{c}",
+            ),
+            (
+                "\\frac{a+b % numerator\n}{c}",
+                "\\frac{a + b % numerator\n }{c}",
+            ),
+            ("\\sqrt[% index\n n+1]{x}", "\\sqrt[% index\n n + 1]{x}"),
         ];
 
         for (input, expected) in cases {
