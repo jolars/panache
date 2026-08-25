@@ -29,6 +29,7 @@ use crate::syntax::{
     DisplayMath, MathSubscript, MathSuperscript, SyntaxKind, SyntaxNode, math_diagnostics,
 };
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
+use panache_parser::semantic::math::SignatureScope;
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
 
@@ -187,7 +188,7 @@ pub enum MathContext {
 
 /// Inputs for [`format_math`], derived from the host [`Config`](crate::Config)
 /// at each call site.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct MathFormatOptions {
     /// Master gate. False ⇒ [`format_math`] returns its input verbatim, so a
     /// mis-wired call site can never change bytes.
@@ -205,6 +206,8 @@ pub struct MathFormatOptions {
     pub bookdown_equation_labels: bool,
     /// Inline vs display vs bare-environment layout.
     pub context: MathContext,
+    /// Configured signatures with raw document definitions layered above them.
+    pub signature_scope: SignatureScope,
 }
 
 impl MathFormatOptions {
@@ -216,6 +219,7 @@ impl MathFormatOptions {
             line_width: config.line_width,
             bookdown_equation_labels: config.parser_extensions.bookdown_equation_references,
             context,
+            signature_scope: config.math_signature_scope.clone(),
         }
     }
 }
@@ -323,6 +327,7 @@ mod tests {
             line_width: 80,
             bookdown_equation_labels: false,
             context,
+            signature_scope: SignatureScope::default(),
         }
     }
 

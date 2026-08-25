@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
 
-use panache_formatter::config::FormatterExtensions;
+use panache_formatter::config::{FormatterExtensions, MathArgumentConfig};
 use panache_parser::{Extensions, Flavor, PandocCompat, ParserOptions};
 
 use super::formatter_presets;
@@ -299,6 +299,8 @@ pub struct StyleConfig {
     pub math_delimiter_style: MathDelimiterStyle,
     /// Math indentation (spaces)
     pub math_indent: usize,
+    /// Explicit positional signatures for TeX math commands.
+    pub math_signatures: std::collections::BTreeMap<String, Vec<MathArgumentConfig>>,
     /// Indentation (columns) for top-level pipe, simple, and multiline tables.
     /// Accepts 0--3; grid tables stay flush at column 0 regardless.
     #[serde(deserialize_with = "deserialize_table_indent")]
@@ -329,6 +331,7 @@ impl Default for StyleConfig {
             blank_lines: BlankLines::Collapse,
             math_delimiter_style: MathDelimiterStyle::default(),
             math_indent: 2,
+            math_signatures: std::collections::BTreeMap::new(),
             table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
@@ -714,7 +717,7 @@ fn resolve_language_formatters(
 
 impl RawConfig {
     /// Finalize into Config, applying flavor-based defaults where needed
-    fn finalize(self) -> Config {
+    fn finalize(self) -> Result<Config, String> {
         let compat = self.compat.unwrap_or_default();
 
         if self.pandoc_compat.is_some() {
@@ -731,6 +734,16 @@ impl RawConfig {
         // every other setting takes its default.
         let had_format_section = self.format_section.is_some();
         let style = self.format_section.unwrap_or_default();
+        for name in style.math_signatures.keys() {
+            if name.is_empty() {
+                return Err("math signature command names must not be empty".to_string());
+            }
+            if name.starts_with('\\') {
+                return Err(format!(
+                    "math signature command `{name}` must be written without a leading backslash"
+                ));
+            }
+        }
         let blank_lines = if had_format_section {
             style.blank_lines
         } else {
@@ -761,7 +774,7 @@ impl RawConfig {
             .or(self.line_ending)
             .or(Some(LineEnding::Auto));
 
-        Config {
+        Ok(Config {
             extensions: super::resolve_extensions_for_flavor(self.extensions.as_ref(), self.flavor),
             formatter_extensions: super::resolve_formatter_extensions_for_flavor(
                 self.extensions.as_ref(),
@@ -775,6 +788,7 @@ impl RawConfig {
             horizontal_rule_style: style.horizontal_rule_style,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
+            math_signatures: style.math_signatures,
             table_indent: style.table_indent,
             tab_stops: style.tab_stops,
             tab_width: style.tab_width,
@@ -801,7 +815,7 @@ impl RawConfig {
             flavor_overrides: self.flavor_overrides,
             experimental: self.experimental.unwrap_or_default(),
             crossref_prefixes: self.crossref_prefixes,
-        }
+        })
     }
 }
 
@@ -894,6 +908,8 @@ pub struct Config {
     pub line_ending: Option<LineEnding>,
     pub line_width: usize,
     pub math_indent: usize,
+    /// Explicit positional signatures for TeX math commands.
+    pub math_signatures: std::collections::BTreeMap<String, Vec<MathArgumentConfig>>,
     pub math_delimiter_style: MathDelimiterStyle,
     /// Indentation (columns) for top-level pipe, simple, and multiline tables.
     pub table_indent: usize,
@@ -939,7 +955,9 @@ impl<'de> Deserialize<'de> for Config {
     where
         D: Deserializer<'de>,
     {
-        RawConfig::deserialize(deserializer).map(|raw| raw.finalize())
+        RawConfig::deserialize(deserializer)?
+            .finalize()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -967,6 +985,7 @@ impl Default for Config {
             line_ending: Some(LineEnding::Auto),
             line_width: 80,
             math_indent: 2,
+            math_signatures: std::collections::BTreeMap::new(),
             math_delimiter_style: MathDelimiterStyle::default(),
             table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,

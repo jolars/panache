@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+use panache_parser::semantic::math::SignatureScope;
+use panache_parser::semantic::math::{ArgKind, ArgumentDomain};
+
 pub use panache_parser::Dialect;
 pub use panache_parser::Extensions;
 pub use panache_parser::Extensions as ParserExtensions;
@@ -48,6 +51,21 @@ pub struct FormatterConfig {
     pub cmd: String,
     pub args: Vec<String>,
     pub stdin: bool,
+}
+
+/// One positional argument in a configured TeX math-command signature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(deny_unknown_fields, rename_all = "kebab-case")
+)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct MathArgumentConfig {
+    /// Delimiter shape. Brackets are optional; braces are required.
+    pub kind: ArgKind,
+    /// Whether consumers may interpret the argument as math, text, or neither.
+    pub domain: ArgumentDomain,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -199,6 +217,11 @@ pub struct Config {
     pub line_width: usize,
     pub math_indent: usize,
     pub math_delimiter_style: MathDelimiterStyle,
+    /// Explicit positional signatures for TeX commands, keyed without `\\`.
+    pub math_signatures: std::collections::BTreeMap<String, Vec<MathArgumentConfig>>,
+    /// Effective configured-plus-document signature scope for this format run.
+    #[doc(hidden)]
+    pub math_signature_scope: SignatureScope,
     /// Indentation (in columns) applied to top-level pipe, simple, and
     /// multiline tables. Grid tables ignore this and stay flush at column 0,
     /// since Pandoc only recognizes a grid table whose border starts at column
@@ -243,6 +266,8 @@ impl Default for Config {
             line_width: 80,
             math_indent: 2,
             math_delimiter_style: MathDelimiterStyle::default(),
+            math_signatures: std::collections::BTreeMap::new(),
+            math_signature_scope: SignatureScope::default(),
             table_indent: DEFAULT_TABLE_INDENT,
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,

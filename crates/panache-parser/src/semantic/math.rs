@@ -5,7 +5,8 @@
 //! commands whose arguments establish math or text domains, while a document
 //! overlay suppresses those facts for names redefined in raw TeX.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 use rowan::{TextRange, TextSize};
 
@@ -396,6 +397,9 @@ fn curated_command_info(name: &str) -> Option<MathAtomInfo> {
 
 /// The delimiter shape of an attached command argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ArgKind {
     Brace,
     Bracket,
@@ -403,6 +407,9 @@ pub enum ArgKind {
 
 /// The TeX domain a command argument is known to establish.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ArgumentDomain {
     #[default]
     Unknown,
@@ -419,9 +426,9 @@ pub struct ArgSpec {
 }
 
 /// The semantic argument signature of a built-in command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandSignature {
-    pub arguments: &'static [ArgSpec],
+    pub arguments: Vec<ArgSpec>,
 }
 
 /// Document-provided command definitions layered over built-in signatures.
@@ -431,22 +438,38 @@ pub struct CommandSignature {
 /// the replacement command's meaning.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SignatureScope {
+    configured_commands: HashMap<String, CommandSignature>,
     redefined_commands: HashSet<String>,
 }
 
 impl SignatureScope {
     /// Collect command definitions from raw TeX nodes in a parsed document.
     pub fn from_root(root: &SyntaxNode) -> Self {
-        let mut scope = Self::default();
+        Self::from_root_with_configured(root, std::iter::empty())
+    }
+
+    /// Layer configured command signatures under raw document definitions.
+    pub fn from_root_with_configured(
+        root: &SyntaxNode,
+        configured: impl IntoIterator<Item = (String, CommandSignature)>,
+    ) -> Self {
+        let mut scope = Self {
+            configured_commands: configured.into_iter().collect(),
+            redefined_commands: HashSet::new(),
+        };
+        scope.collect_redefinitions(root);
+        scope
+    }
+
+    fn collect_redefinitions(&mut self, root: &SyntaxNode) {
         for node in root.descendants().filter(|node| {
             matches!(
                 node.kind(),
                 SyntaxKind::TEX_BLOCK | SyntaxKind::LATEX_COMMAND
             )
         }) {
-            collect_definition_targets(&node.text().to_string(), &mut scope.redefined_commands);
+            collect_definition_targets(&node.text().to_string(), &mut self.redefined_commands);
         }
-        scope
     }
 
     /// Whether a document definition shadows the built-in command name.
@@ -455,11 +478,13 @@ impl SignatureScope {
     }
 
     /// Resolve a command against the document overlay, then the built-in table.
-    pub fn command_signature(&self, name: &str) -> Option<&'static CommandSignature> {
+    pub fn command_signature(&self, name: &str) -> Option<&CommandSignature> {
         if self.is_redefined(name) {
             None
         } else {
-            builtin_command_signature(name)
+            self.configured_commands
+                .get(name)
+                .or_else(|| builtin_command_signature(name))
         }
     }
 }
@@ -476,18 +501,19 @@ const REQUIRED_MATH: ArgSpec = argument(true, ArgKind::Brace, ArgumentDomain::Ma
 const OPTIONAL_MATH: ArgSpec = argument(false, ArgKind::Bracket, ArgumentDomain::Math);
 const REQUIRED_TEXT: ArgSpec = argument(true, ArgKind::Brace, ArgumentDomain::Text);
 
-const ONE_MATH: CommandSignature = CommandSignature {
-    arguments: &[REQUIRED_MATH],
-};
-const TWO_MATH: CommandSignature = CommandSignature {
-    arguments: &[REQUIRED_MATH, REQUIRED_MATH],
-};
-const OPTIONAL_AND_REQUIRED_MATH: CommandSignature = CommandSignature {
-    arguments: &[OPTIONAL_MATH, REQUIRED_MATH],
-};
-const ONE_TEXT: CommandSignature = CommandSignature {
-    arguments: &[REQUIRED_TEXT],
-};
+static ONE_MATH: LazyLock<CommandSignature> = LazyLock::new(|| CommandSignature {
+    arguments: vec![REQUIRED_MATH],
+});
+static TWO_MATH: LazyLock<CommandSignature> = LazyLock::new(|| CommandSignature {
+    arguments: vec![REQUIRED_MATH, REQUIRED_MATH],
+});
+static OPTIONAL_AND_REQUIRED_MATH: LazyLock<CommandSignature> =
+    LazyLock::new(|| CommandSignature {
+        arguments: vec![OPTIONAL_MATH, REQUIRED_MATH],
+    });
+static ONE_TEXT: LazyLock<CommandSignature> = LazyLock::new(|| CommandSignature {
+    arguments: vec![REQUIRED_TEXT],
+});
 
 /// Return the curated signature for a built-in command in the initial
 /// math-domain slice.
@@ -561,7 +587,7 @@ pub fn argument_domain_with_scope(group: &SyntaxNode, scope: &SignatureScope) ->
             SyntaxKind::MATH_OPTIONAL => ArgKind::Bracket,
             _ => continue,
         };
-        let domain = match_arg_slot(signature.arguments, &mut slot, candidate_kind)
+        let domain = match_arg_slot(&signature.arguments, &mut slot, candidate_kind)
             .map_or(ArgumentDomain::Unknown, |argument| argument.domain);
         if candidate == *group {
             return domain;
@@ -671,7 +697,7 @@ mod tests {
         let mut slot = 0;
         assert_eq!(
             match_arg_slot(
-                OPTIONAL_AND_REQUIRED_MATH.arguments,
+                &OPTIONAL_AND_REQUIRED_MATH.arguments,
                 &mut slot,
                 ArgKind::Brace,
             ),
@@ -681,7 +707,7 @@ mod tests {
 
         let mut slot = 0;
         assert_eq!(
-            match_arg_slot(TWO_MATH.arguments, &mut slot, ArgKind::Bracket),
+            match_arg_slot(&TWO_MATH.arguments, &mut slot, ArgKind::Bracket),
             None,
         );
         assert_eq!(slot, 0);

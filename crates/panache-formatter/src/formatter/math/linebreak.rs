@@ -87,6 +87,7 @@ use super::operators::{self, AtomClass};
 use super::render;
 use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
+use panache_parser::semantic::math::SignatureScope;
 
 struct Break {
     /// Element index of the atom's first token (where a break lands before it).
@@ -113,17 +114,17 @@ fn first_top_level_relation(elems: &[SyntaxElement]) -> Option<Break> {
 /// top-level relation, the anchor is the full rendered width + 1 (where an `&`
 /// would sit), used only for a relation-led continuation whose head row lacks a
 /// relation; an empty row yields 0.
-fn rhs_start_column(elems: &[SyntaxElement]) -> usize {
+fn rhs_start_column(elems: &[SyntaxElement], scope: &SignatureScope) -> usize {
     match first_top_level_relation(elems) {
         Some(b) => {
-            render::render_inline(&elems[..b.end])
+            render::render_inline(&elems[..b.end], scope)
                 .trim()
                 .chars()
                 .count()
                 + 1
         }
         None => {
-            let w = render::render_inline(elems).trim().chars().count();
+            let w = render::render_inline(elems, scope).trim().chars().count();
             if w == 0 { 0 } else { w + 1 }
         }
     }
@@ -133,10 +134,10 @@ fn rhs_start_column(elems: &[SyntaxElement]) -> usize {
 /// rendered width of everything before it, plus one for the separating space.
 /// This aligns continuation relations *under the first relation* — the classic
 /// chain layout for an equality/comparison chain (`x = a = b` ⇒ the `=` stack).
-fn relation_column_normalized(elems: &[SyntaxElement]) -> usize {
+fn relation_column_normalized(elems: &[SyntaxElement], scope: &SignatureScope) -> usize {
     match first_top_level_relation(elems) {
         Some(b) => {
-            let w = render::render_inline(&elems[..b.index])
+            let w = render::render_inline(&elems[..b.index], scope)
                 .trim()
                 .chars()
                 .count();
@@ -186,18 +187,22 @@ fn semantic_token(element: &SyntaxElement) -> Option<crate::syntax::SyntaxToken>
 /// kind: under the first relation for an equality/comparison chain
 /// ([`relation_column`]), but under the assignment's right-hand side for an
 /// assignment-led chain (or a relationless head) ([`rhs_start_column`]).
-pub(super) fn continuation_anchor(elems: &[SyntaxElement], parse_opts: MathParseOptions) -> usize {
-    continuation_anchor_normalized(&normalized_elements(elems, parse_opts))
+pub(super) fn continuation_anchor(
+    elems: &[SyntaxElement],
+    parse_opts: MathParseOptions,
+    scope: &SignatureScope,
+) -> usize {
+    continuation_anchor_normalized(&normalized_elements(elems, parse_opts, scope), scope)
 }
 
 /// [`continuation_anchor`] on an already-normalized row, so a caller that has
 /// normalized once does not pay a second render + re-parse round trip.
-fn continuation_anchor_normalized(normalized: &[SyntaxElement]) -> usize {
+fn continuation_anchor_normalized(normalized: &[SyntaxElement], scope: &SignatureScope) -> usize {
     match first_top_level_relation(normalized) {
         Some(_) if !first_relation_is_assignment(normalized) => {
-            relation_column_normalized(normalized)
+            relation_column_normalized(normalized, scope)
         }
-        _ => rhs_start_column(normalized),
+        _ => rhs_start_column(normalized, scope),
     }
 }
 
@@ -207,8 +212,9 @@ fn continuation_anchor_normalized(normalized: &[SyntaxElement]) -> usize {
 pub(super) fn begins_with_top_level_relation(
     elems: &[SyntaxElement],
     parse_opts: MathParseOptions,
+    scope: &SignatureScope,
 ) -> bool {
-    let normalized = normalized_elements(elems, parse_opts);
+    let normalized = normalized_elements(elems, parse_opts, scope);
     match spaced_operator_breaks(&normalized).first() {
         Some(b) => {
             b.class == AtomClass::Rel
@@ -235,8 +241,9 @@ pub(super) fn break_free_row(
     elems: &[SyntaxElement],
     line_width: usize,
     parse_opts: MathParseOptions,
+    scope: &SignatureScope,
 ) -> Vec<String> {
-    let single = render::render_inline(elems).trim().to_string();
+    let single = render::render_inline(elems, scope).trim().to_string();
     if single.chars().count() <= line_width {
         return vec![single];
     }
@@ -251,13 +258,13 @@ pub(super) fn break_free_row(
         .collect();
 
     if rels.is_empty() {
-        return break_binary_segment(elems, 0, line_width);
+        return break_binary_segment(elems, 0, line_width, scope);
     }
 
-    let rel_indent = continuation_anchor_normalized(elems);
+    let rel_indent = continuation_anchor_normalized(elems, scope);
 
     if rels.len() == 1 {
-        return break_binary_segment(elems, 0, line_width);
+        return break_binary_segment(elems, 0, line_width, scope);
     }
 
     let bounds: Vec<usize> = std::iter::once(0)
@@ -269,7 +276,7 @@ pub(super) fn break_free_row(
     for w in 0..bounds.len() - 1 {
         let seg = &elems[bounds[w]..bounds[w + 1]];
         let seg_indent = if w == 0 { 0 } else { rel_indent };
-        out.extend(break_binary_segment(seg, seg_indent, line_width));
+        out.extend(break_binary_segment(seg, seg_indent, line_width, scope));
     }
     out
 }
@@ -277,8 +284,9 @@ pub(super) fn break_free_row(
 fn normalized_elements(
     elems: &[SyntaxElement],
     parse_opts: MathParseOptions,
+    scope: &SignatureScope,
 ) -> Vec<SyntaxElement> {
-    normalized_elements_from_text(render::render_inline(elems).trim(), parse_opts)
+    normalized_elements_from_text(render::render_inline(elems, scope).trim(), parse_opts)
 }
 
 /// Re-parse rendered text with the *caller's* parse options — the re-parse
@@ -300,8 +308,9 @@ fn break_binary_segment(
     seg: &[SyntaxElement],
     base_indent: usize,
     line_width: usize,
+    scope: &SignatureScope,
 ) -> Vec<String> {
-    let single = render::render_inline(seg).trim().to_string();
+    let single = render::render_inline(seg, scope).trim().to_string();
     let base_pad = " ".repeat(base_indent);
     if base_indent + single.chars().count() <= line_width {
         return vec![format!("{base_pad}{single}")];
@@ -318,20 +327,26 @@ fn break_binary_segment(
 
     let rhs_offset = match first_top_level_relation(seg) {
         Some(b) if bins[0] > b.index => {
-            render::render_inline(&seg[..b.end]).trim().chars().count() + 1
+            render::render_inline(&seg[..b.end], scope)
+                .trim()
+                .chars()
+                .count()
+                + 1
         }
         _ => 0,
     };
     let bin_pad = " ".repeat(base_indent + rhs_offset);
     let mut out: Vec<String> = Vec::new();
-    let head = render::render_inline(&seg[..bins[0]]).trim().to_string();
+    let head = render::render_inline(&seg[..bins[0]], scope)
+        .trim()
+        .to_string();
     if !head.is_empty() {
         out.push(format!("{base_pad}{head}"));
     }
     for w in 0..bins.len() {
         let start = bins[w];
         let end = bins.get(w + 1).copied().unwrap_or(seg.len());
-        let cont = render::render_inline_seeded(&seg[start..end], Some(AtomClass::Close))
+        let cont = render::render_inline_seeded(&seg[start..end], Some(AtomClass::Close), scope)
             .trim()
             .to_string();
         out.push(format!("{bin_pad}{cont}"));
@@ -513,7 +528,12 @@ mod tests {
     /// Alignment geometry for a logical row (no base block indent — that is
     /// applied by the render layer, not the breaker).
     fn lines(content: &str, width: usize) -> Vec<String> {
-        break_free_row(&elems(content), width, MathParseOptions::default())
+        break_free_row(
+            &elems(content),
+            width,
+            MathParseOptions::default(),
+            &SignatureScope::default(),
+        )
     }
 
     fn rel_indices(content: &str) -> Vec<usize> {

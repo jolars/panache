@@ -11,9 +11,9 @@ use badness_parser::semantic::{
 use badness_parser::syntax::SyntaxKind as BadnessKind;
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::semantic::math::{
-    ArgKind, ArgumentDomain, DelimiterRole, MathBreakPriority, MathClass, SignatureScope,
-    argument_domain, builtin_command_signature, math_atoms, math_char_info, math_command_info,
-    semantic_math_atoms,
+    ArgKind, ArgSpec, ArgumentDomain, CommandSignature, DelimiterRole, MathBreakPriority,
+    MathClass, SignatureScope, argument_domain, argument_domain_with_scope,
+    builtin_command_signature, math_atoms, math_char_info, math_command_info, semantic_math_atoms,
 };
 use panache_parser::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::{ParserOptions, parse};
@@ -206,6 +206,103 @@ fn blockquoted_raw_tex_redefinitions_are_visible() {
     assert_eq!(
         panache_document_domains(source),
         vec![ArgumentDomain::Unknown; 2],
+    );
+}
+
+#[test]
+fn configured_signatures_override_builtins_and_add_commands() {
+    let root = parse(
+        "$\\frac{ a }{ b }$ and $\\custom[ label ]{ x + y }$\n",
+        Some(ParserOptions::default()),
+    );
+    let scope = SignatureScope::from_root_with_configured(
+        &root,
+        [
+            (
+                "frac".to_string(),
+                CommandSignature {
+                    arguments: vec![ArgSpec {
+                        required: true,
+                        kind: ArgKind::Brace,
+                        domain: ArgumentDomain::Text,
+                    }],
+                },
+            ),
+            (
+                "custom".to_string(),
+                CommandSignature {
+                    arguments: vec![
+                        ArgSpec {
+                            required: false,
+                            kind: ArgKind::Bracket,
+                            domain: ArgumentDomain::Unknown,
+                        },
+                        ArgSpec {
+                            required: true,
+                            kind: ArgKind::Brace,
+                            domain: ArgumentDomain::Math,
+                        },
+                    ],
+                },
+            ),
+        ],
+    );
+    let domains = root
+        .descendants()
+        .filter(|node| {
+            matches!(
+                node.kind(),
+                SyntaxKind::MATH_GROUP | SyntaxKind::MATH_OPTIONAL
+            ) && node
+                .parent()
+                .is_some_and(|parent| parent.kind() == SyntaxKind::MATH_COMMAND)
+        })
+        .map(|group| argument_domain_with_scope(&group, &scope))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        domains,
+        vec![
+            ArgumentDomain::Text,
+            ArgumentDomain::Unknown,
+            ArgumentDomain::Unknown,
+            ArgumentDomain::Math,
+        ]
+    );
+}
+
+#[test]
+fn raw_tex_redefinitions_shadow_configured_signatures() {
+    let root = parse(
+        "\\newcommand{\\custom}[1]{#1}\n\n$\\custom{ a + b }$\n",
+        Some(ParserOptions::default()),
+    );
+    let scope = SignatureScope::from_root_with_configured(
+        &root,
+        [(
+            "custom".to_string(),
+            CommandSignature {
+                arguments: vec![ArgSpec {
+                    required: true,
+                    kind: ArgKind::Brace,
+                    domain: ArgumentDomain::Math,
+                }],
+            },
+        )],
+    );
+    let group = root
+        .descendants()
+        .find(|node| {
+            node.kind() == SyntaxKind::MATH_GROUP
+                && node
+                    .parent()
+                    .is_some_and(|parent| parent.kind() == SyntaxKind::MATH_COMMAND)
+        })
+        .expect("configured command argument");
+
+    assert_eq!(
+        argument_domain_with_scope(&group, &scope),
+        ArgumentDomain::Unknown
     );
 }
 

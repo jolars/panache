@@ -63,6 +63,7 @@ fn format_opts(context: MathContext) -> MathFormatOptions {
         line_width: 80,
         bookdown_equation_labels: false,
         context,
+        signature_scope: Default::default(),
     }
 }
 

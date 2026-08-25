@@ -79,6 +79,7 @@ fn panache_body(body: &str, context: OracleContext) -> Result<String, String> {
             line_width: 80,
             bookdown_equation_labels: false,
             context: context.panache_context(),
+            signature_scope: Default::default(),
         },
     )
     .ok_or_else(|| format!("Panache declined {context:?} body"))

@@ -1,6 +1,7 @@
 use panache_formatter::config::{Extensions, Flavor};
 use panache_formatter::format;
 use panache_formatter::{Config, ConfigBuilder};
+use panache_parser::semantic::math::{ArgKind, ArgumentDomain};
 
 fn math_config(format_math: bool) -> Config {
     let flavor = Flavor::Quarto;
@@ -413,6 +414,59 @@ fn experimental_format_math_preserves_text_group_interiors() {
     assert!(output.contains("$\\text{a {b} c}$"), "got: {output}");
     let twice = format(&output, Some(math_config(true)), None);
     similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
+fn configured_math_signature_controls_argument_recursion() {
+    let mut cfg = math_config(true);
+    cfg.math_signatures.insert(
+        "custom".to_string(),
+        vec![
+            panache_formatter::MathArgumentConfig {
+                kind: ArgKind::Bracket,
+                domain: ArgumentDomain::Text,
+            },
+            panache_formatter::MathArgumentConfig {
+                kind: ArgKind::Brace,
+                domain: ArgumentDomain::Math,
+            },
+        ],
+    );
+    let input = "Inline $\\custom[ label + value ]{ a   +   b }$ end.\n";
+    let expected = "Inline $\\custom[ label + value ]{a + b}$ end.\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    similar_asserts::assert_eq!(format(&output, Some(cfg), None), output);
+}
+
+#[test]
+fn configured_math_signature_is_inert_when_gate_is_off() {
+    let mut cfg = math_config(false);
+    cfg.math_signatures.insert(
+        "custom".to_string(),
+        vec![panache_formatter::MathArgumentConfig {
+            kind: ArgKind::Brace,
+            domain: ArgumentDomain::Math,
+        }],
+    );
+    let input = "Inline $\\custom{ a   +   b }$ end.\n";
+    similar_asserts::assert_eq!(format(input, Some(cfg), None), input);
+}
+
+#[test]
+fn raw_definition_shadows_configured_math_signature() {
+    let mut cfg = math_config(true);
+    cfg.math_signatures.insert(
+        "custom".to_string(),
+        vec![panache_formatter::MathArgumentConfig {
+            kind: ArgKind::Brace,
+            domain: ArgumentDomain::Math,
+        }],
+    );
+    let input = "\\newcommand{\\custom}[1]{#1}\n\nInline $\\custom{ a   +   b }$ end.\n";
+    let output = format(input, Some(cfg.clone()), None);
+    assert!(output.contains("$\\custom{ a   +   b }$"), "got: {output}");
+    similar_asserts::assert_eq!(format(&output, Some(cfg), None), output);
 }
 
 #[test]

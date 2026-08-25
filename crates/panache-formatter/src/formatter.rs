@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::syntax::{SyntaxNode, YamlFrontmatterRegion};
+use panache_parser::semantic::math::{ArgSpec, CommandSignature, SignatureScope};
 
 mod blockquotes;
 mod blocks;
@@ -68,7 +69,25 @@ pub fn format_tree_with_formatted_code(
     #[cfg(target_arch = "wasm32")]
     let formatted_yaml: Option<(String, String)> = None;
 
-    let mut output = Formatter::new(config.clone(), formatted_code, range).format(tree);
+    let configured = config.math_signatures.iter().map(|(name, arguments)| {
+        (
+            name.clone(),
+            CommandSignature {
+                arguments: arguments
+                    .iter()
+                    .map(|argument| ArgSpec {
+                        required: argument.kind == panache_parser::semantic::math::ArgKind::Brace,
+                        kind: argument.kind,
+                        domain: argument.domain,
+                    })
+                    .collect(),
+            },
+        )
+    });
+    let mut effective_config = config.clone();
+    effective_config.math_signature_scope =
+        SignatureScope::from_root_with_configured(tree, configured);
+    let mut output = Formatter::new(effective_config, formatted_code, range).format(tree);
 
     if let Some((original_yaml, formatted_yaml)) = formatted_yaml {
         log::debug!(

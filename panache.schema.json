@@ -1,5 +1,22 @@
 {
   "$defs": {
+    "ArgKind": {
+      "description": "The delimiter shape of an attached command argument.",
+      "enum": [
+        "brace",
+        "bracket"
+      ],
+      "type": "string"
+    },
+    "ArgumentDomain": {
+      "description": "The TeX domain a command argument is known to establish.",
+      "enum": [
+        "unknown",
+        "math",
+        "text"
+      ],
+      "type": "string"
+    },
     "BlankLines": {
       "oneOf": [
         {
@@ -189,6 +206,25 @@
       },
       "type": "object"
     },
+    "MathArgumentConfig": {
+      "additionalProperties": false,
+      "description": "One positional argument in a configured TeX math-command signature.",
+      "properties": {
+        "domain": {
+          "$ref": "#/$defs/ArgumentDomain",
+          "description": "Whether consumers may interpret the argument as math, text, or neither."
+        },
+        "kind": {
+          "$ref": "#/$defs/ArgKind",
+          "description": "Delimiter shape. Brackets are optional; braces are required."
+        }
+      },
+      "required": [
+        "kind",
+        "domain"
+      ],
+      "type": "object"
+    },
     "MathDelimiterStyle": {
       "description": "Style for formatting math delimiters",
       "oneOf": [
@@ -303,6 +339,17 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "math-signatures": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/MathArgumentConfig"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "description": "Explicit positional signatures for TeX math commands.",
+          "type": "object"
         },
         "no-break-abbreviations": {
           "anyOf": [

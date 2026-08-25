@@ -227,19 +227,13 @@ Returned unchanged, never reflowed:
      `{a} _ b` → `{a}_b`. The marker still presents an opening class, so a
      directly following `+`/`-` coerces to unary (`x^{-1}` keeps its minus
      tight).
-   - **Math-mode brace groups** have their *leading and trailing* interior
-     whitespace trimmed (`{ 00 }` → `{00}`, `{-1 }` → `{-1}`), since math mode
-     ignores it. The space *before* `{` and *after* `}` (between atoms) is left
-     alone (`{x} y` stays `{x} y`), and inter-atom spaces inside the group keep
-     the Rule 1/6 collapse, not removal. **Text-mode groups are exempt:** the
-     argument of a text-switching command (`\text`, `\mbox`, the `\text*` family ---
-     see `operators::is_text_mode_command`) keeps its interior spaces verbatim
-     (`\text{ a }` survives), and the exemption nests, so a group inside a text
-     argument (`\text{a {b} c}`) is also preserved. Whether a group is text mode
-     is tracked with a brace-mode stack in `render::space_operators`. Math-mode
-     font commands (`\mathrm`, `\mathbf`) are **not** text mode --- spaces are
-     already insignificant inside them --- so their interiors are trimmed like
-     any other math group.
+   - **Signature-proven math arguments** recurse through the normal math spacing
+     path, so their leading and trailing interior whitespace is trimmed
+     (`\frac{ 1 }{ 2 }` → `\frac{1}{2}`). Text-domain, unknown, unmatched, and
+     redefined-command arguments are emitted as one opaque byte string. This
+     preserves `\text{ a }`, custom text macros, and any argument whose
+     whitespace semantics Panache cannot prove. Configured signatures replace
+     built-ins; raw-TeX definitions shadow both.
 
 ## Idempotency
 

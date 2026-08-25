@@ -254,7 +254,7 @@ formatter-off output byte-identical.
      contextual Bin-to-Ord coercion and break priorities. Cover unary signs,
      relations, delimiters, punctuation, commands, groups, and scripted-base
      inheritance with differential tests.
-   - [ ] Add explicit configured command signatures. Define the configuration
+   - [x] Add explicit configured command signatures. Define the configuration
      shape for positional brace/bracket arguments and math/text/unknown
      domains, merge it into `SignatureScope`, regenerate the schema, and
      document the setting. Raw-TeX redefinitions must shadow both configured

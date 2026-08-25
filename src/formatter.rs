@@ -93,6 +93,8 @@ fn to_formatter_config(config: &Config) -> panache_formatter::Config {
         line_ending,
         line_width: config.line_width,
         math_indent: config.math_indent,
+        math_signatures: config.math_signatures.clone(),
+        math_signature_scope: Default::default(),
         math_delimiter_style,
         table_indent: config.table_indent,
         tab_stops,

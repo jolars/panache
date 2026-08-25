@@ -590,6 +590,32 @@ Math delimiter styles:
 The `math-indent` field specifies indentation (in spaces) for display math
 blocks. Default is 2; set it to 0 to keep content flush against the left margin.
 
+### Math Command Signatures {#math-command-signatures}
+
+Panache formats a command argument recursively only when the command's signature
+proves that the argument contains math. Add signatures for project or package
+commands under `[format.math-signatures]`; command names omit the leading
+backslash, and arguments appear in source order:
+
+```toml
+[format.math-signatures]
+custom = [
+  { kind = "bracket", domain = "unknown" },
+  { kind = "brace", domain = "math" },
+]
+textual = [{ kind = "brace", domain = "text" }]
+```
+
+`kind` is `bracket` for an optional `[…]` argument or `brace` for a required
+`{…}` argument. `domain` is `math`, `text`, or `unknown`; text and unknown
+arguments are preserved byte-for-byte. A configured signature replaces the
+complete built-in signature for that command. A `\newcommand`, `\def`, or other
+recognized raw-TeX definition in the document shadows both configured and
+built-in signatures because Panache does not expand replacement bodies.
+
+The setting is stable, but it changes output only while the experimental
+[`format-math`](#format-math) formatter is enabled.
+
 ### Table Indentation
 
 The `table-indent` field sets how many columns top-level pipe, simple, and

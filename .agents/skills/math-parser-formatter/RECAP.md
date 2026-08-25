@@ -74,26 +74,29 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Contextual semantic atom stream.** Added the parser-owned interpretation that
-formatter and LSP consumers can share without changing the CST.
+**Configured command signatures.** Added a stable, typed
+`[format.math-signatures]` surface and wired it through semantic scope and math
+lowering.
 
-- Added host-ranged semantic atoms with contextual Bin-to-Ord coercion and
-  `None < Binary < Relation` break priorities.
-- Kept structural nodes indivisible, inherited scripted-base metadata, and
-  coalesced relation scalars only within one lexical word.
-- Added focused Badness differentials, blockquote host-range coverage, and a
-  narrow-width formatter-oracle regression for relation/binary/unary breaks.
+- Configured positional brace/bracket domains replace built-in signatures;
+  raw-TeX definitions still shadow both tiers.
+- Proven math arguments recurse, while text and unknown arguments take an
+  opaque byte-preserving path.
+- Added config/schema/docs coverage, focused formatter regressions, and
+  gate-off/idempotency checks.
 
 ### Suggested next sub-targets
 
-1. Add explicit configured command signatures.
-2. Lock conservative formatting for unknown and redefined arguments.
-3. Move Bookdown equation labels out of `MATH_CONTENT`.
+1. Lock conservative formatting for unknown and redefined arguments.
+2. Move Bookdown equation labels out of `MATH_CONTENT`.
+3. Complete typed math CST accessors needed by the new lowering.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Contextual semantic atom stream.** Added host-ranged atoms, contextual
+  Bin-to-Ord coercion, break priorities, and focused Badness differentials.
 - **Generated Unicode math baseline.** Added reproducible Panache-owned command
   and scalar tables with exhaustive Badness lookup parity.
 - **Native math atoms—first semantic slice.** Added the Badness-shaped atom API,

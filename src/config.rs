@@ -15,6 +15,7 @@ pub use formatter_presets::formatter_preset_names;
 pub use formatter_presets::formatter_preset_supported_languages;
 pub use formatter_presets::formatter_presets_for_language;
 pub use formatter_presets::get_formatter_preset;
+pub use panache_formatter::MathArgumentConfig;
 pub use panache_formatter::config::FormatterExtensions;
 pub use panache_parser::Extensions;
 pub use panache_parser::Flavor;
@@ -1499,6 +1500,31 @@ mod tests {
     }
 
     #[test]
+    fn extend_merges_math_signatures_by_command() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            tmp.path().join("base.toml"),
+            "[format.math-signatures]\nbase = [{ kind = \"brace\", domain = \"math\" }]\nshared = [{ kind = \"brace\", domain = \"text\" }]\n",
+        )
+        .unwrap();
+        let child = tmp.path().join("panache.toml");
+        std::fs::write(
+            &child,
+            "extend = \"base.toml\"\n[format.math-signatures]\nchild = [{ kind = \"brace\", domain = \"unknown\" }]\nshared = [{ kind = \"bracket\", domain = \"math\" }]\n",
+        )
+        .unwrap();
+
+        let (cfg, _src) = load(Some(&child), tmp.path(), None, None).expect("load");
+        assert!(cfg.math_signatures.contains_key("base"));
+        assert!(cfg.math_signatures.contains_key("child"));
+        assert_eq!(
+            cfg.math_signatures["shared"][0].kind,
+            panache_parser::semantic::math::ArgKind::Bracket,
+            "the child replaces one command's complete positional signature"
+        );
+    }
+
+    #[test]
     fn extend_inherits_base_extensions_and_merges_with_flavor() {
         // Guards the `apply_flavor` refactor: extensions contributed by a base
         // must survive and still merge onto flavor defaults.
@@ -2060,6 +2086,56 @@ mod tests {
         let cfg = parse_config_str(toml, Path::new("panache.toml"))
             .expect("[experimental] format-math must parse");
         assert!(cfg.experimental.format_math, "opt-in must enable the gate");
+    }
+
+    #[test]
+    fn math_signatures_parse_positional_argument_domains() {
+        let toml = r#"
+[format.math-signatures]
+custom = [
+  { kind = "bracket", domain = "unknown" },
+  { kind = "brace", domain = "math" },
+]
+textual = [{ kind = "brace", domain = "text" }]
+"#;
+        let cfg = parse_config_str(toml, Path::new("panache.toml"))
+            .expect("typed math signatures must parse");
+        let custom = &cfg.math_signatures["custom"];
+        assert_eq!(custom.len(), 2);
+        assert_eq!(
+            custom[0].kind,
+            panache_parser::semantic::math::ArgKind::Bracket
+        );
+        assert_eq!(
+            custom[0].domain,
+            panache_parser::semantic::math::ArgumentDomain::Unknown
+        );
+        assert_eq!(
+            custom[1].kind,
+            panache_parser::semantic::math::ArgKind::Brace
+        );
+        assert_eq!(
+            custom[1].domain,
+            panache_parser::semantic::math::ArgumentDomain::Math
+        );
+        assert_eq!(
+            cfg.math_signatures["textual"][0].domain,
+            panache_parser::semantic::math::ArgumentDomain::Text
+        );
+    }
+
+    #[test]
+    fn math_signature_command_names_reject_a_leading_backslash() {
+        let toml = r#"
+[format.math-signatures]
+"\\custom" = [{ kind = "brace", domain = "math" }]
+"#;
+        let err = parse_config_str(toml, Path::new("panache.toml"))
+            .expect_err("command names include no leading backslash");
+        assert!(
+            err.to_string().contains("without a leading backslash"),
+            "got: {err}"
+        );
     }
 
     #[test]

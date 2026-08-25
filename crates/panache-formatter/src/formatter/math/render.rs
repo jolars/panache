@@ -16,6 +16,7 @@ use crate::syntax::{
     AstNode, MathEnvironment, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken,
 };
 use panache_parser::parser::math::MathParseOptions;
+use panache_parser::semantic::math::{ArgKind, ArgumentDomain, SignatureScope, match_arg_slot};
 
 const INDENT: &str = "  ";
 
@@ -23,7 +24,9 @@ const INDENT: &str = "  ";
 pub(super) fn render(tree: &SyntaxNode, opts: &MathFormatOptions) -> String {
     let top: Vec<SyntaxElement> = tree.children_with_tokens().collect();
     match opts.context {
-        MathContext::Inline => render_inline(&top).trim().to_string(),
+        MathContext::Inline => render_inline(&top, &opts.signature_scope)
+            .trim()
+            .to_string(),
         MathContext::Display => render_display(&top, opts),
         MathContext::EnvironmentBody => render_body_lines(&top, 1, opts).join("\n"),
     }
@@ -54,6 +57,7 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
                 &flat_indent,
                 opts.line_width,
                 parse_opts,
+                &opts.signature_scope,
                 &mut lines,
             );
             pending.clear();
@@ -69,6 +73,7 @@ fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
         &flat_indent,
         opts.line_width,
         parse_opts,
+        &opts.signature_scope,
         &mut lines,
     );
     lines.join("\n")
@@ -160,10 +165,16 @@ fn render_mixed_delimited_display(
     }
 
     let (open, close) = enclosing_delimiters(elems, &environments)?;
-    let prefix = render_inline(&elems[..=open]).trim().to_string();
-    let suffix = render_inline_seeded(&elems[close..], Some(AtomClass::Close))
+    let prefix = render_inline(&elems[..=open], &opts.signature_scope)
         .trim()
         .to_string();
+    let suffix = render_inline_seeded(
+        &elems[close..],
+        Some(AtomClass::Close),
+        &opts.signature_scope,
+    )
+    .trim()
+    .to_string();
     let body = delimited_body_doc(&elems[open + 1..close], opts)?;
     let doc = Doc::group(Doc::concat([
         Doc::text(prefix),
@@ -327,11 +338,15 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
         .filter_map(|(index, element)| environment_block(element).is_some().then_some(index))
         .collect();
     match environment_indices.as_slice() {
-        [] => Some(Doc::text(render_inline(segment).trim().to_string())),
+        [] => Some(Doc::text(
+            render_inline(segment, &opts.signature_scope)
+                .trim()
+                .to_string(),
+        )),
         [environment_index] => {
             let before = &segment[..*environment_index];
             let after = &segment[*environment_index + 1..];
-            let prefix = render_before_operand(before);
+            let prefix = render_before_operand(before, &opts.signature_scope);
             let prefix_width = prefix.chars().count();
             let (environment, scripts) = environment_block(&segment[*environment_index])?;
             let environment_doc = Doc::join(
@@ -340,16 +355,20 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
                     .into_iter()
                     .map(Doc::text),
             );
-            let mut suffix = render_inline_seeded(after, Some(AtomClass::Close))
-                .trim()
-                .to_string();
+            let mut suffix =
+                render_inline_seeded(after, Some(AtomClass::Close), &opts.signature_scope)
+                    .trim()
+                    .to_string();
             if !suffix.is_empty() && needs_space_after_environment(after) {
                 suffix.insert(0, ' ');
             }
             if !scripts.is_empty() {
                 // Scripts attach to the environment itself, so they glue
                 // directly onto the `\end{...}` line before any other suffix.
-                suffix = format!("{}{suffix}", render_inline(&scripts).trim());
+                suffix = format!(
+                    "{}{suffix}",
+                    render_inline(&scripts, &opts.signature_scope).trim()
+                );
             }
             Some(Doc::concat([
                 Doc::text(prefix),
@@ -383,10 +402,10 @@ fn has_comment_or_line_break(element: &SyntaxElement) -> bool {
     })
 }
 
-fn render_before_operand(before: &[SyntaxElement]) -> String {
-    let mut tokens = flatten_tokens(before);
+fn render_before_operand(before: &[SyntaxElement], scope: &SignatureScope) -> String {
+    let mut tokens = flatten_tokens(before, scope);
     tokens.push(FlatToken::Token(SyntaxKind::MATH_WORD, "X".to_string()));
-    let rendered = collapse_spaces(&space_operators(&tokens, None));
+    let rendered = space_operators(&tokens, None);
     rendered
         .strip_suffix('X')
         .expect("synthetic trailing operand must survive spacing")
@@ -435,10 +454,11 @@ fn flush_free_rows(
     indent: &str,
     line_width: usize,
     parse_opts: MathParseOptions,
+    scope: &SignatureScope,
     lines: &mut Vec<String>,
 ) {
     let rows = split_logical_rows(elems);
-    let extra = relation_chain_alignment(&rows, parse_opts);
+    let extra = relation_chain_alignment(&rows, parse_opts, scope);
     for (idx, row) in rows.iter().enumerate() {
         if row.is_blank() {
             continue;
@@ -446,7 +466,7 @@ fn flush_free_rows(
         let ei = extra[idx];
         let pad = " ".repeat(ei);
         let budget = line_width.saturating_sub(indent.chars().count() + ei);
-        let physical = linebreak::break_free_row(&row.elems, budget, parse_opts);
+        let physical = linebreak::break_free_row(&row.elems, budget, parse_opts, scope);
         let last = physical.len() - 1;
         for (i, content) in physical.into_iter().enumerate() {
             let content = if i == last {
@@ -459,7 +479,11 @@ fn flush_free_rows(
     }
 }
 
-fn relation_chain_alignment(rows: &[Row], parse_opts: MathParseOptions) -> Vec<usize> {
+fn relation_chain_alignment(
+    rows: &[Row],
+    parse_opts: MathParseOptions,
+    scope: &SignatureScope,
+) -> Vec<usize> {
     let mut extra = vec![0usize; rows.len()];
     let mut i = 0;
     while i < rows.len() {
@@ -468,12 +492,12 @@ fn relation_chain_alignment(rows: &[Row], parse_opts: MathParseOptions) -> Vec<u
             while rows[k].break_text.is_some()
                 && k + 1 < rows.len()
                 && !rows[k + 1].is_blank()
-                && linebreak::begins_with_top_level_relation(&rows[k + 1].elems, parse_opts)
+                && linebreak::begins_with_top_level_relation(&rows[k + 1].elems, parse_opts, scope)
             {
                 k += 1;
             }
             if k > i && !rows[i..=k].iter().any(|r| has_top_level_align(&r.elems)) {
-                let col = linebreak::continuation_anchor(&rows[i].elems, parse_opts);
+                let col = linebreak::continuation_anchor(&rows[i].elems, parse_opts, scope);
                 for offset in extra.iter_mut().take(k + 1).skip(i + 1) {
                     *offset = col;
                 }
@@ -498,6 +522,7 @@ fn render_environment_lines(
     let Some(parts) = EnvParts::of(env) else {
         return vec![render_inline(
             &env.children_with_tokens().collect::<Vec<_>>(),
+            &opts.signature_scope,
         )];
     };
     let indent = INDENT.repeat(depth);
@@ -558,7 +583,11 @@ fn render_body_lines(
         } else {
             let cells = split_cells(&row.elems)
                 .iter()
-                .map(|cell| render_inline(cell).trim().to_string())
+                .map(|cell| {
+                    render_inline(cell, &opts.signature_scope)
+                        .trim()
+                        .to_string()
+                })
                 .collect();
             items.push(BodyItem::Row {
                 cells,
@@ -785,8 +814,8 @@ pub(super) fn is_layout_whitespace(el: &SyntaxElement) -> bool {
 /// `pub(super)` so the line-breaker ([`linebreak`]) can render each broken
 /// segment through the same single-line path, guaranteeing the segments re-space
 /// exactly as the unbroken row would.
-pub(super) fn render_inline(elems: &[SyntaxElement]) -> String {
-    render_inline_seeded(elems, None)
+pub(super) fn render_inline(elems: &[SyntaxElement], scope: &SignatureScope) -> String {
+    render_inline_seeded(elems, None, scope)
 }
 
 /// Like [`render_inline`] but seeds the preceding-atom class. The line-breaker
@@ -794,9 +823,13 @@ pub(super) fn render_inline(elems: &[SyntaxElement]) -> String {
 /// in isolation the `+`/`-` would coerce to a unary sign (`+b`), but seeding a
 /// closing-operand class keeps it binary (`+ b`). `None` reproduces
 /// [`render_inline`] exactly.
-pub(super) fn render_inline_seeded(elems: &[SyntaxElement], seed: Option<AtomClass>) -> String {
-    let toks = flatten_tokens(elems);
-    collapse_spaces(&space_operators(&toks, seed))
+pub(super) fn render_inline_seeded(
+    elems: &[SyntaxElement],
+    seed: Option<AtomClass>,
+    scope: &SignatureScope,
+) -> String {
+    let toks = flatten_tokens(elems, scope);
+    space_operators(&toks, seed)
 }
 
 enum FlatToken {
@@ -807,6 +840,8 @@ enum FlatToken {
     /// A starred-variant marker whose command-node ownership proves that it is
     /// a modifier rather than a binary operator.
     CommandStar(String),
+    /// An argument whose domain is not proven math; preserve every interior byte.
+    Opaque(String),
     ScriptStart,
     ScriptEnd,
 }
@@ -816,20 +851,20 @@ impl FlatToken {
         match self {
             Self::Token(kind, text) => Some((*kind, text)),
             Self::CommandStar(text) => Some((SyntaxKind::MATH_WORD, text)),
-            Self::Delimiter(_, _) | Self::ScriptStart | Self::ScriptEnd => None,
+            Self::Delimiter(_, _) | Self::Opaque(_) | Self::ScriptStart | Self::ScriptEnd => None,
         }
     }
 }
 
-fn flatten_tokens(elems: &[SyntaxElement]) -> Vec<FlatToken> {
+fn flatten_tokens(elems: &[SyntaxElement], scope: &SignatureScope) -> Vec<FlatToken> {
     let mut out = Vec::new();
     for el in elems {
-        flatten_element(el, &mut out);
+        flatten_element(el, scope, &mut out);
     }
     out
 }
 
-fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
+fn flatten_element(element: &SyntaxElement, scope: &SignatureScope, out: &mut Vec<FlatToken>) {
     match element {
         NodeOrToken::Token(token) => {
             out.push(FlatToken::Token(token.kind(), token.text().to_string()))
@@ -842,6 +877,37 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                 node.text().to_string(),
             ));
         }
+        NodeOrToken::Node(node) if node.kind() == SyntaxKind::MATH_COMMAND => {
+            let name = operators::command_name_token(element)
+                .and_then(|token| token.text().strip_prefix('\\').map(str::to_owned));
+            let signature = name
+                .as_deref()
+                .and_then(|name| scope.command_signature(name));
+            let mut slot = 0usize;
+            for child in node.children_with_tokens() {
+                let group_kind = match child.kind() {
+                    SyntaxKind::MATH_GROUP => Some(ArgKind::Brace),
+                    SyntaxKind::MATH_OPTIONAL => Some(ArgKind::Bracket),
+                    _ => None,
+                };
+                if let Some(kind) = group_kind {
+                    let domain = signature
+                        .and_then(|signature| match_arg_slot(&signature.arguments, &mut slot, kind))
+                        .map_or(ArgumentDomain::Unknown, |argument| argument.domain);
+                    if domain == ArgumentDomain::Math {
+                        flatten_element(&child, scope, out);
+                    } else {
+                        out.push(FlatToken::Opaque(child.to_string()));
+                    }
+                } else if child.as_token().is_some_and(|token| {
+                    token.kind() == SyntaxKind::MATH_WORD && token.text() == "*"
+                }) {
+                    out.push(FlatToken::CommandStar("*".to_string()));
+                } else {
+                    flatten_element(&child, scope, out);
+                }
+            }
+        }
         NodeOrToken::Node(node) if node.kind() == SyntaxKind::MATH_DELIMITED => {
             let mut delimiter_role = None;
             for child in node.children_with_tokens() {
@@ -850,14 +916,14 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                         if token.kind() == SyntaxKind::MATH_CONTROL_WORD
                             && token.text() == r"\left" =>
                     {
-                        flatten_element(&child, out);
+                        flatten_element(&child, scope, out);
                         delimiter_role = Some(AtomClass::Open);
                     }
                     NodeOrToken::Token(token)
                         if token.kind() == SyntaxKind::MATH_CONTROL_WORD
                             && token.text() == r"\right" =>
                     {
-                        flatten_element(&child, out);
+                        flatten_element(&child, scope, out);
                         delimiter_role = Some(AtomClass::Close);
                     }
                     NodeOrToken::Token(token)
@@ -869,7 +935,7 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                                     | SyntaxKind::MATH_COMMENT
                             ) =>
                     {
-                        flatten_element(&child, out);
+                        flatten_element(&child, scope, out);
                     }
                     NodeOrToken::Token(token) if delimiter_role.is_some() => {
                         out.push(FlatToken::Delimiter(
@@ -879,9 +945,9 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                     }
                     NodeOrToken::Node(_) => {
                         delimiter_role = None;
-                        flatten_element(&child, out);
+                        flatten_element(&child, scope, out);
                     }
-                    _ => flatten_element(&child, out),
+                    _ => flatten_element(&child, scope, out),
                 }
             }
         }
@@ -902,7 +968,7 @@ fn flatten_element(element: &SyntaxElement, out: &mut Vec<FlatToken>) {
                 {
                     out.push(FlatToken::CommandStar("*".to_string()));
                 } else {
-                    flatten_element(&child, out);
+                    flatten_element(&child, scope, out);
                 }
             }
             if is_script {
@@ -986,6 +1052,16 @@ fn space_operators(toks: &[FlatToken], seed: Option<AtomClass>) -> String {
                 pending_space = false;
                 prev_demand = Demand::Plain;
                 prev_class = Some(*class);
+                prev_sig_is_text_cmd = false;
+                star_modifier_pending = false;
+                i += 1;
+                continue;
+            }
+            FlatToken::Opaque(text) => {
+                emit_atom(&mut out, prev_demand, Demand::Plain, pending_space, text);
+                pending_space = false;
+                prev_demand = Demand::Plain;
+                prev_class = Some(AtomClass::Close);
                 prev_sig_is_text_cmd = false;
                 star_modifier_pending = false;
                 i += 1;
@@ -1187,21 +1263,4 @@ fn atom_prev_class(kind: SyntaxKind, _text: &str) -> Option<AtomClass> {
         _ => AtomClass::Ord,
     };
     Some(class)
-}
-
-fn collapse_spaces(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut prev_space = false;
-    for ch in s.chars() {
-        if ch == ' ' {
-            if !prev_space {
-                out.push(' ');
-            }
-            prev_space = true;
-        } else {
-            out.push(ch);
-            prev_space = false;
-        }
-    }
-    out
 }
