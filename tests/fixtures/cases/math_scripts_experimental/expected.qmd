@@ -17,5 +17,5 @@ $$
 
 $$
   A :=_i bbbbbbbbbb
-         :=_j cccccccccc
+    :=_j cccccccccc
 $$

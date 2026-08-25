@@ -87,6 +87,10 @@ scripts whose bases and arguments are already supported.
   composite-relation seams such as `:=_i` and `<=_i` remain on the legacy path:
   Badness 0.5 splits them as `: =_i` and `< =_i`, which would regress Panache's
   established output.
+- Refined assignment-led relation chains: repeated assignments align their
+  operators, while equality and comparison continuations still align under the
+  first assignment's right-hand side. The rule applies to automatic wrapping
+  and explicit `\\` rows.
 
 ### Suggested next sub-targets
 

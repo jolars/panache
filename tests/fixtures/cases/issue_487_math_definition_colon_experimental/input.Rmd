@@ -6,8 +6,8 @@ $$
 a:=b
 $$
 
-A relation chain led by `:=` hangs its continuations under the assignment's
-right-hand side, and never splits the colon from its `=`.
+An assignment-led relation chain aligns repeated assignments under the first
+operator and other relations under its right-hand side; `:=` stays intact.
 
 \[
 \hat{\mu}_{\textrm{MC}}   := \frac{1}{N} \sum_{i=1}^N h(X_i)

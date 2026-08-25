@@ -158,18 +158,23 @@ Returned unchanged, never reflowed:
 
    **Assignment exception.** When the leading relation is an *assignment* arrow
    (`\gets`, `\leftarrow`, `\mapsto`, `\coloneqq`, or the composite `:=`), the
-   arrow defines its LHS rather than equating it, so it is **not** part of the
-   equality chain it introduces. The equality continuations then anchor under
-   the assignment's *right-hand side* (`linebreak::rhs_start_column`) instead of
-   under the arrow, so a wide arrow (`\gets` is 5 cols) does not drag them left.
-   The selector is `linebreak::continuation_anchor` /
-   `first_relation_is_assignment`. `\to` and `\rightarrow` are intentionally
-   *not* assignments (they are usually limits or mappings).
+   arrow defines its LHS rather than equating it, so it is **not** part of an
+   equality chain it introduces. An equality or comparison continuation anchors
+   under the assignment's *right-hand side* (`linebreak::rhs_start_column`)
+   instead of under the arrow, so a wide arrow (`\gets` is 5 cols) does not drag
+   it left. A repeated assignment, however, aligns its operator under the first
+   assignment operator. The continuation's relation kind selects the anchor via
+   `linebreak::continuation_anchor_for` and `relation_is_assignment`. `\to` and
+   `\rightarrow` are intentionally *not* assignments (they are usually limits or
+   mappings).
 
    ```
    \beta_0 \gets \beta_0 + \frac{4}{n} …
                  = \beta_0 - \frac{1}{L_0} …
                  = 1/4
+
+   A :=_i bbbbbbbbbb
+     :=_j cccccccccc
    ```
 
    This is **fully deterministic**: the layout is a pure function of the
@@ -197,14 +202,15 @@ Returned unchanged, never reflowed:
    - **`\\` relation chains align like an implicit `aligned`.** A genuine hard
      `\\` *does* split logical rows. When ≥ 2 such `\\`-joined rows form a
      relation chain --- the head ends in `\\` and every following row
-     `begins_with_top_level_relation` (a continuation like `= b`) --- the
-     continuations hang at the head's `continuation_anchor` (under the first
-     relation, or the assignment's RHS), exactly as the within-row relation
-     breaks do, so a `\\`-broken chain in bare `$$` reads like an `aligned` even
-     without one (`relation_chain_alignment`). This fires regardless of width
-     (the `\\` are forced breaks). A group containing a top-level `&` is left to
-     the existing free-row path (a bare `&` is not a column separator), and `\\`
-     rows that are not a relation chain stay flush at the bare `math-indent`.
+     `begins_with_top_level_relation` (a continuation like `= b`) --- each
+     continuation hangs at the corresponding anchor in the head row: an equality
+     or comparison under an assignment's RHS, but a repeated assignment under
+     its operator. This is exactly the within-row policy, so a `\\`-broken chain
+     in bare `$$` reads like an `aligned` even without one
+     (`relation_chain_alignment`). This fires regardless of width (the `\\` are
+     forced breaks). A group containing a top-level `&` is left to the existing
+     free-row path (a bare `&` is not a column separator), and `\\` rows that
+     are not a relation chain stay flush at the bare `math-indent`.
    - **Scope:** every over-width free row with a top-level relation **or**
      binary operator is broken. A **relation chain** (≥ 2 relations) splits at
      its relations, then nests binary terms inside each over-width segment (as

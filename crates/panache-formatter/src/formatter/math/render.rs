@@ -510,9 +510,13 @@ fn relation_chain_alignment(
                 k += 1;
             }
             if k > i && !rows[i..=k].iter().any(|r| has_top_level_align(&r.elems)) {
-                let col = linebreak::continuation_anchor(&rows[i].elems, parse_opts, scope);
-                for offset in extra.iter_mut().take(k + 1).skip(i + 1) {
-                    *offset = col;
+                for continuation in i + 1..=k {
+                    extra[continuation] = linebreak::continuation_anchor_for(
+                        &rows[i].elems,
+                        &rows[continuation].elems,
+                        parse_opts,
+                        scope,
+                    );
                 }
                 i = k + 1;
                 continue;

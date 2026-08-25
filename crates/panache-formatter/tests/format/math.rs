@@ -318,6 +318,17 @@ fn hardbreak_assignment_chain_anchors_under_rhs() {
 }
 
 #[test]
+fn hardbreak_repeated_assignments_align_the_operators() {
+    let cfg = math_config(true);
+    let input = "$$\nA :=_i a \\\\\n:=_j b \\\\\n= c\n$$\n";
+    let expected = "$$\n  A :=_i a \\\\\n    :=_j b \\\\\n         = c\n$$\n";
+    let output = format(input, Some(cfg.clone()), None);
+    similar_asserts::assert_eq!(output, expected);
+    let twice = format(&output, Some(cfg), None);
+    similar_asserts::assert_eq!(twice, output);
+}
+
+#[test]
 fn hardbreak_non_chain_stays_flush() {
     let cfg = math_config(true);
     let input = "$$\na \\\\\nb \\\\\nc\n$$\n";

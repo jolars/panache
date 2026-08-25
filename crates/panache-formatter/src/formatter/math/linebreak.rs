@@ -18,10 +18,11 @@
 //! ```
 //!
 //! The exception is an **assignment-led** chain (`\beta \gets X = Y = …`): the
-//! arrow *defines* its left-hand side rather than equating it, so the equality
-//! continuations anchor under the assignment's *right-hand side* X, not aligned
-//! with the arrow. [`continuation_anchor`] picks the column per the leading
-//! relation (via [`first_relation_is_assignment`]).
+//! arrow *defines* its left-hand side rather than equating it, so equality
+//! continuations anchor under the assignment's *right-hand side* X. Repeated
+//! assignments still align under the first assignment operator. The
+//! continuation's own relation kind therefore selects between those two
+//! anchors.
 //!
 //! A `:=` is such an assignment, and [`operators::word_atoms`] interprets it as
 //! one relation atom. When a script splits its lexical word after the colon,
@@ -70,10 +71,11 @@
 //! reaches inside to change how operators line up against their operands — so
 //! the equation's internal shape is identical at any `math-indent`.
 //!
-//! The same anchor aligns a relation chain split across `\\` hard breaks in a
-//! bare `$$` (an implicit `aligned`); that cross-row pass lives in
-//! [`super::render`]'s `relation_chain_alignment`, reusing [`continuation_anchor`]
-//! and [`begins_with_top_level_relation`].
+//! The same per-continuation anchor selection aligns a relation chain split
+//! across `\\` hard breaks in a bare `$$` (an implicit `aligned`); that
+//! cross-row pass lives in [`super::render`]'s `relation_chain_alignment`,
+//! reusing [`continuation_anchor_for`] and
+//! [`begins_with_top_level_relation`].
 //!
 //! ## Idempotency
 //!
@@ -147,11 +149,8 @@ fn relation_column_normalized(elems: &[SyntaxElement], scope: &SignatureScope) -
     }
 }
 
-fn first_relation_is_assignment(elems: &[SyntaxElement]) -> bool {
-    let Some(b) = first_top_level_relation(elems) else {
-        return false;
-    };
-    let Some(tok) = semantic_token(&elems[b.index]) else {
+fn relation_is_assignment(elems: &[SyntaxElement], relation: &Break) -> bool {
+    let Some(tok) = semantic_token(&elems[relation.index]) else {
         return false;
     };
     match tok.kind() {
@@ -183,26 +182,45 @@ fn semantic_token(element: &SyntaxElement) -> Option<crate::syntax::SyntaxToken>
     }
 }
 
-/// The column continuation relations hang under, given the leading relation's
-/// kind: under the first relation for an equality/comparison chain
-/// ([`relation_column`]), but under the assignment's right-hand side for an
-/// assignment-led chain (or a relationless head) ([`rhs_start_column`]).
-pub(super) fn continuation_anchor(
-    elems: &[SyntaxElement],
+/// The column one continuation relation hangs under.
+///
+/// Equality/comparison chains align their relations. For an assignment-led
+/// chain, another assignment aligns with the first assignment, while an
+/// ordinary relation continues under the assignment's right-hand side.
+pub(super) fn continuation_anchor_for(
+    head: &[SyntaxElement],
+    continuation: &[SyntaxElement],
     parse_opts: MathParseOptions,
     scope: &SignatureScope,
 ) -> usize {
-    continuation_anchor_normalized(&normalized_elements(elems, parse_opts, scope), scope)
+    let head = normalized_elements(head, parse_opts, scope);
+    let continuation = normalized_elements(continuation, parse_opts, scope);
+    let continuation_relation = first_top_level_relation(&continuation);
+    continuation_anchor_normalized(
+        &head,
+        continuation_relation
+            .as_ref()
+            .map(|relation| (continuation.as_slice(), relation)),
+        scope,
+    )
 }
 
-/// [`continuation_anchor`] on an already-normalized row, so a caller that has
-/// normalized once does not pay a second render + re-parse round trip.
-fn continuation_anchor_normalized(normalized: &[SyntaxElement], scope: &SignatureScope) -> usize {
-    match first_top_level_relation(normalized) {
-        Some(_) if !first_relation_is_assignment(normalized) => {
-            relation_column_normalized(normalized, scope)
+fn continuation_anchor_normalized(
+    head: &[SyntaxElement],
+    continuation: Option<(&[SyntaxElement], &Break)>,
+    scope: &SignatureScope,
+) -> usize {
+    match first_top_level_relation(head) {
+        Some(first) if !relation_is_assignment(head, &first) => {
+            relation_column_normalized(head, scope)
         }
-        _ => rhs_start_column(normalized, scope),
+        Some(_)
+            if continuation
+                .is_some_and(|(elements, relation)| relation_is_assignment(elements, relation)) =>
+        {
+            relation_column_normalized(head, scope)
+        }
+        _ => rhs_start_column(head, scope),
     }
 }
 
@@ -233,8 +251,9 @@ pub(super) fn begins_with_top_level_relation(
 /// Every *binary* continuation line sits **flush** under the first term of its
 /// operand sequence — under the segment's right-hand side, or under the chain's
 /// head term for a relationless chain. Relation continuations hang at
-/// [`continuation_anchor`] (under the first relation, or the assignment's RHS).
-/// Both offsets are pure functions of the row's content; the block's
+/// [`continuation_anchor_for`]: under the first relation, under an assignment's
+/// RHS for an ordinary relation, or under its operator for another assignment.
+/// These offsets are pure functions of the row's content; the block's
 /// `math-indent` shifts the whole row right (applied by the render layer) but
 /// never changes these internal alignment columns.
 pub(super) fn break_free_row(
@@ -251,31 +270,32 @@ pub(super) fn break_free_row(
     let normalized = normalized_elements_from_text(&single, parse_opts);
     let elems = normalized.as_slice();
     let breaks = spaced_operator_breaks(elems);
-    let rels: Vec<usize> = breaks
+    let rels: Vec<&Break> = breaks
         .iter()
         .filter(|b| b.class == AtomClass::Rel)
-        .map(|b| b.index)
         .collect();
 
     if rels.is_empty() {
         return break_binary_segment(elems, 0, line_width, scope);
     }
 
-    let rel_indent = continuation_anchor_normalized(elems, scope);
-
     if rels.len() == 1 {
         return break_binary_segment(elems, 0, line_width, scope);
     }
 
     let bounds: Vec<usize> = std::iter::once(0)
-        .chain(rels[1..].iter().copied())
+        .chain(rels[1..].iter().map(|relation| relation.index))
         .chain(std::iter::once(elems.len()))
         .collect();
 
     let mut out: Vec<String> = Vec::new();
     for w in 0..bounds.len() - 1 {
         let seg = &elems[bounds[w]..bounds[w + 1]];
-        let seg_indent = if w == 0 { 0 } else { rel_indent };
+        let seg_indent = if w == 0 {
+            0
+        } else {
+            continuation_anchor_normalized(elems, Some((elems, rels[w])), scope)
+        };
         out.extend(break_binary_segment(seg, seg_indent, line_width, scope));
     }
     out
@@ -568,7 +588,7 @@ mod tests {
     fn definition_colon_is_one_relation_atom() {
         assert_eq!(
             lines("A := bbbbbbbbbb := cccccccccc", 20),
-            vec!["A := bbbbbbbbbb", "     := cccccccccc"],
+            vec!["A := bbbbbbbbbb", "  := cccccccccc"],
         );
     }
 
@@ -576,7 +596,7 @@ mod tests {
     fn definition_colon_fused_into_a_text_run_still_pairs() {
         assert_eq!(
             lines("ab:=bbbbbbbbbb:=cccccccccc", 20),
-            vec!["ab := bbbbbbbbbb", "      := cccccccccc"],
+            vec!["ab := bbbbbbbbbb", "   := cccccccccc"],
         );
     }
 
@@ -636,14 +656,18 @@ mod tests {
     }
 
     #[test]
-    fn scripted_assignment_relations_keep_the_rhs_anchor() {
+    fn assignment_continuations_choose_the_semantic_anchor() {
         assert_eq!(
             lines("A \\gets_i bbbb =_j cccc", 18),
             vec!["A \\gets_i bbbb", "          =_j cccc"],
         );
         assert_eq!(
             lines("A :=_i bbbb :=_j cccc", 15),
-            vec!["A :=_i bbbb", "       :=_j cccc"],
+            vec!["A :=_i bbbb", "  :=_j cccc"],
+        );
+        assert_eq!(
+            lines("A :=_i bbbb =_j cccc", 15),
+            vec!["A :=_i bbbb", "       =_j cccc"],
         );
     }
 
