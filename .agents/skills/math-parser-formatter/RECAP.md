@@ -74,29 +74,31 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Paired-delimiter script lowering.** Extended the Panache-owned inline lowering
-slice across the script/delimiter seam.
+**Nested paired-delimiter lowering.** Extended the Panache-owned typed inline
+path recursively through closed `\left…\right` pairs.
 
-- Lowered supported scripts inside closed `\left…\right` bodies, including a
-  paired delimiter reached from compact script-argument spacing.
-- Allowed a supported paired delimiter to serve as a scripted atom's base,
-  preserving shell spacing while attaching sub- and superscripts tightly.
-- Kept unclosed/missing delimiter recovery, shell comments, nested pairs, and
-  unsupported script shapes on the legacy path.
-- Added focused routing regressions and mandatory byte-exact Badness parity in
-  normal and compact-script contexts; the full workspace gates pass.
+- Lowered recursively nested pairs in normal and compact script-argument
+  spacing modes, including a nested pair that serves as a scripted base.
+- Kept unclosed/missing delimiter recovery, delimiter-shell comments, and
+  unsupported descendants on the legacy path through the recursive eligibility
+  checks.
+- Added focused routing regressions and mandatory byte-exact Badness parity;
+  the complete typed-lowering and formatter-oracle suites pass.
 
 ### Suggested next sub-targets
 
-1. Lower recursively nested paired delimiters through the typed path in normal
-   and compact-script spacing modes.
-2. Keep recovery, delimiter-shell comments, and unsupported descendants on the
-   legacy path while nested closed pairs migrate.
+1. Inventory the remaining command/script/delimiter cases that still route to
+   the legacy renderer, separating intentional conservative fallback from
+   seams that belong in the typed path.
+2. Select one remaining seam with mandatory byte parity before removing its
+   corresponding flattened-token compatibility logic.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Paired-delimiter script lowering.** Lowered supported scripts inside closed
+  pairs and allowed a supported pair to serve as a scripted atom's base.
 - **Plain paired-delimiter lowering.** Lowered closed, non-nested pairs with
   supported plain bodies while preserving recovery and recursive shapes.
 - **Script lowering and assignment alignment.** Lowered supported scripts

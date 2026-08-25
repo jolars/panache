@@ -248,21 +248,11 @@ fn delimited_is_supported(delimited: &MathDelimited, scope: &SignatureScope) -> 
         right.text_range(),
         close.text_range(),
     ];
-    delimited
-        .syntax()
-        .children_with_tokens()
-        .all(|element| {
-            structural_ranges.contains(&element.text_range()) || is_layout_trivia(&element)
-        })
-        // Nested pairs retain their own parity slice; supported scripts recurse
-        // through the same typed lowering used at the top level.
-        && !body
-            .syntax()
-            .descendants()
-            .any(|node| node.kind() == SyntaxKind::MATH_DELIMITED)
-        && body
-            .elements()
-            .all(|element| is_supported_element(&element, scope))
+    delimited.syntax().children_with_tokens().all(|element| {
+        structural_ranges.contains(&element.text_range()) || is_layout_trivia(&element)
+    }) && body
+        .elements()
+        .all(|element| is_supported_element(&element, scope))
 }
 
 fn lower_scripted(scripted: &MathScripted, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
@@ -730,6 +720,28 @@ mod tests {
     }
 
     #[test]
+    fn lowers_nested_paired_delimiters_recursively() {
+        let cases = [
+            (
+                r"\left[ \left( a+b \right) + c \right]",
+                r"\left[ \left( a + b \right) + c \right]",
+            ),
+            (
+                r"x ^ { \left[ \left( a+b \right) \right] }",
+                r"x^{\left[ \left( a+b \right) \right]}",
+            ),
+            (
+                r"\left( \left[ x \right] ^ 2 \right) _ i",
+                r"\left( \left[ x \right]^2 \right)_i",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_malformed_and_unsupported_scripts() {
         for input in [
             "x^",
@@ -747,12 +759,11 @@ mod tests {
     }
 
     #[test]
-    fn defers_paired_delimiter_recovery_and_nested_shapes() {
+    fn defers_paired_delimiter_recovery_and_shell_comments() {
         for input in [
             r"\left( x",
             r"\left( x \right",
             "\\left % keep\n( x \\right)",
-            r"\left[ \left( x \right) \right]",
         ] {
             assert_eq!(lower(input), None, "{input:?}");
         }

@@ -560,6 +560,17 @@ fn paired_delimiter_script_migration_slice_matches_badness() {
 }
 
 #[test]
+fn nested_paired_delimiter_migration_slice_matches_badness() {
+    for body in [
+        r"\left[ \left( a+b \right) + c \right]",
+        r"x ^ { \left[ \left( a+b \right) \right] }",
+        r"\left( \left[ x \right] ^ 2 \right) _ i",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",
