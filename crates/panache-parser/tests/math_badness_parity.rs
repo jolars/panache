@@ -166,20 +166,33 @@ fn usize_range(range: rowan::TextRange) -> Range<usize> {
 }
 
 fn project_badness(body: &str) -> CanonicalElement {
+    try_project_badness(body)
+        .unwrap_or_else(|error| panic!("Badness could not project the wrapped body: {error}"))
+}
+
+fn try_project_badness(body: &str) -> Result<CanonicalElement, String> {
     let wrapped = format!("${body}$");
     let parsed = parse_badness(&wrapped);
-    assert_eq!(parsed.syntax().to_string(), wrapped, "Badness losslessness");
+    if parsed.syntax().to_string() != wrapped {
+        return Err("parser was not lossless".into());
+    }
     let inline = parsed
         .syntax()
         .descendants()
         .find(|node| node.kind() == BadnessKind::INLINE_MATH)
-        .unwrap_or_else(|| panic!("Badness did not recognize the wrapped body: {body:?}"));
+        .ok_or_else(|| "wrapper was not recognized as inline math".to_owned())?;
     let math = inline
         .children()
         .find(|node| node.kind() == BadnessKind::MATH)
-        .expect("Badness inline math has no direct MATH child");
-    assert_eq!(math.to_string(), body, "Badness wrapper changed the body");
-    project_badness_node(&math, body, 1)
+        .ok_or_else(|| "inline wrapper has no direct MATH child".to_owned())?;
+    if math.to_string() != body {
+        return Err(format!(
+            "wrapper retained {:?} instead of the complete body {:?}",
+            math.to_string(),
+            body
+        ));
+    }
+    Ok(project_badness_node(&math, body, 1))
 }
 
 fn project_badness_node(
@@ -328,6 +341,13 @@ fn canonical_kind_maps_are_explicit_and_one_to_one() {
 }
 
 #[test]
+fn malformed_wrapper_boundaries_are_reportable() {
+    let error = try_project_badness("\\begin{aligned}x\\end{matrix}\n")
+        .expect_err("the mismatched end changes Badness's inline wrapper boundary");
+    assert!(error.contains("instead of the complete body"), "{error}");
+}
+
+#[test]
 fn passing_corpus_has_structural_parity() {
     let root = corpus_root();
     let available = discover_cases(&root)
@@ -363,6 +383,7 @@ fn math_badness_full_report() {
     let root = corpus_root();
     let mut passing = Vec::new();
     let mut divergent = Vec::new();
+    let mut rejected = Vec::new();
 
     for path in discover_cases(&root) {
         let id = path
@@ -372,7 +393,14 @@ fn math_badness_full_report() {
             .replace('\\', "/");
         let body = fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("failed to read `{id}`: {error}"));
-        let (badness, panache) = projections(&body);
+        let badness = match try_project_badness(&body) {
+            Ok(badness) => badness,
+            Err(reason) => {
+                rejected.push((id, reason));
+                continue;
+            }
+        };
+        let panache = project_panache(&body);
         if badness == panache {
             passing.push(id);
         } else {
@@ -380,7 +408,7 @@ fn math_badness_full_report() {
         }
     }
 
-    let total = passing.len() + divergent.len();
+    let total = passing.len() + divergent.len() + rejected.len();
     let mut report = String::new();
     writeln!(report, "Badness math parser parity report").unwrap();
     writeln!(report, "Oracle: badness-parser =0.4.0").unwrap();
@@ -390,7 +418,8 @@ fn math_badness_full_report() {
     )
     .unwrap();
     writeln!(report, "Passing: {} / {total}", passing.len()).unwrap();
-    writeln!(report, "Divergent: {} / {total}\n", divergent.len()).unwrap();
+    writeln!(report, "Divergent: {} / {total}", divergent.len()).unwrap();
+    writeln!(report, "Oracle rejected: {} / {total}\n", rejected.len()).unwrap();
     writeln!(report, "Regenerate with:").unwrap();
     writeln!(
         report,
@@ -405,6 +434,11 @@ fn math_badness_full_report() {
     for (id, badness, panache) in divergent {
         writeln!(report, "\n--- {id} ---").unwrap();
         writeln!(report, "Badness:\n{badness}Panache:\n{panache}").unwrap();
+    }
+    writeln!(report, "\n=== Oracle wrapper rejections ===").unwrap();
+    for (id, reason) in rejected {
+        writeln!(report, "\n--- {id} ---").unwrap();
+        writeln!(report, "Reason: {reason:?}").unwrap();
     }
 
     let path = manifest_path(REPORT_REL);

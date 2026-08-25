@@ -3,7 +3,11 @@
 Bare TeX **math content** (no `$`/`$$` delimiters --- `format_math` consumes
 clean content). One construct family per subdirectory. Files are `*.tex`.
 
-Two harnesses walk this tree:
+A case may carry a same-stem `.preamble` containing raw document TeX that
+defines the signature scope for its math body. The preamble is not part of the
+body and is deliberately invisible to `.tex` discovery.
+
+Three harnesses walk this tree:
 
 - `tests/math_corpus_properties.rs` (**Tier 1**, always-on, no external dep):
   idempotency `format(format(x)) == format(x)`, parser losslessness
@@ -13,6 +17,8 @@ Two harnesses walk this tree:
   oracle): semantic-equivalence invariance --- the formatter must not change the
   rendered meaning, asserted on normalized MathML
   `render(x) == render(format(x))`.
+- `tests/math_badness_oracle.rs` runs every body in controlled inline, display,
+  and environment contexts and records byte-exact formatter parity.
 
 ## Context mapping
 

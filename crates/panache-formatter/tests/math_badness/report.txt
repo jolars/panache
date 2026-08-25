@@ -1,0 +1,1192 @@
+Badness math formatter parity baseline
+Oracle: badness-formatter =0.5.0
+Corpus: tests/fixtures/math_corpus
+Cases: 94
+Context runs: 282
+Parity: 56 / 282
+Controlled wrapper rejection: 15 / 282
+Divergent: 211 / 282
+
+Regenerate with:
+  cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
+
+Selected first migration slice:
+  Inline bodies containing only MATH_WORD, MATH_SPACE, and MATH_NEWLINE.
+  Every other shape remains on the conservative legacy fallback.
+
+=== Counts by context ===
+inline: parity 56, rejected 5, divergent 33
+display: parity 0, rejected 5, divergent 89
+environment: parity 0, rejected 5, divergent 89
+
+=== First-slice parity candidates ===
+display/authored_newline.tex [inline]
+inline/simple_equality.tex [inline]
+inline/sum_expression.tex [inline]
+operators/double_minus.tex [inline]
+operators/plus.tex [inline]
+operators/plus_tight.tex [inline]
+operators/relation_chain.tex [inline]
+operators/unary_minus.tex [inline]
+
+=== All parity candidates ===
+commands/argument_after_space.tex [inline]
+commands/nested_optional.tex [inline]
+commands/optional_argument.tex [inline]
+commands/over_attached_argument.tex [inline]
+commands/redefined_frac.tex [inline]
+commands/script_command_argument.tex [inline]
+commands/script_on_arguments.tex [inline]
+commands/script_on_frac.tex [inline]
+commands/single_token_commands.tex [inline]
+commands/single_token_numeral.tex [inline]
+commands/star_optional.tex [inline]
+commands/star_variant.tex [inline]
+commands/text_argument_whitespace.tex [inline]
+commands/unknown_argument_whitespace.tex [inline]
+display/authored_newline.tex [inline]
+display/fraction_block.tex [inline]
+display/integral.tex [inline]
+display/long_chain.tex [inline]
+display/single_equation.tex [inline]
+display/with_text.tex [inline]
+escapes/escaped_brace.tex [inline]
+escapes/escaped_dollar.tex [inline]
+groups/braced_group.tex [inline]
+groups/deep_nesting.tex [inline]
+groups/group_with_command.tex [inline]
+groups/left_right_asymmetric.tex [inline]
+groups/left_right_bracket.tex [inline]
+groups/left_right_nested.tex [inline]
+groups/left_right_null.tex [inline]
+groups/left_right_paren.tex [inline]
+groups/nested_braces.tex [inline]
+inline/binomial_frac.tex [inline]
+inline/greek_and_cdot.tex [inline]
+inline/mixed_scripts.tex [inline]
+inline/nested_frac.tex [inline]
+inline/simple_equality.tex [inline]
+inline/sqrt.tex [inline]
+inline/subscript.tex [inline]
+inline/sum_expression.tex [inline]
+inline/superscript.tex [inline]
+inline/whitespace_heavy.tex [inline]
+macro_dependent/custom_var.tex [inline]
+macro_dependent/expectation.tex [inline]
+macro_dependent/unknown_arguments.tex [inline]
+operators/cdot.tex [inline]
+operators/double_minus.tex [inline]
+operators/leq.tex [inline]
+operators/neq.tex [inline]
+operators/plus.tex [inline]
+operators/plus_tight.tex [inline]
+operators/relation_chain.tex [inline]
+operators/unary_minus.tex [inline]
+scripts/double_subscript.tex [inline]
+scripts/integral_bounds.tex [inline]
+scripts/nested_superscript.tex [inline]
+scripts/script_on_group.tex [inline]
+
+=== Controlled wrapper rejections ===
+
+--- environments/recovery/mismatched.tex [inline] ---
+Reason: "Badness rejected Inline wrapper: input contains 3 parser diagnostic(s); formatter only supports parseable input"
+
+--- environments/recovery/mismatched.tex [display] ---
+Reason: "Badness rejected Display wrapper: input contains 4 parser diagnostic(s); formatter only supports parseable input"
+
+--- environments/recovery/mismatched.tex [environment] ---
+Reason: "Badness rejected Environment wrapper: input contains 4 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/left_right_group_boundary.tex [inline] ---
+Reason: "Badness rejected Inline wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/left_right_group_boundary.tex [display] ---
+Reason: "Badness rejected Display wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/left_right_group_boundary.tex [environment] ---
+Reason: "Badness rejected Environment wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/left_right_stray.tex [inline] ---
+Reason: "Badness rejected Inline wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/left_right_stray.tex [display] ---
+Reason: "Badness rejected Display wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/left_right_stray.tex [environment] ---
+Reason: "Badness rejected Environment wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/unclosed.tex [inline] ---
+Reason: "Badness rejected Inline wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/unclosed.tex [display] ---
+Reason: "Badness rejected Display wrapper: input contains 2 parser diagnostic(s); formatter only supports parseable input"
+
+--- groups/unclosed.tex [environment] ---
+Reason: "Badness rejected Environment wrapper: input contains 2 parser diagnostic(s); formatter only supports parseable input"
+
+--- scripts/missing_argument.tex [inline] ---
+Reason: "Badness rejected Inline wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- scripts/missing_argument.tex [display] ---
+Reason: "Badness rejected Display wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+--- scripts/missing_argument.tex [environment] ---
+Reason: "Badness rejected Environment wrapper: input contains 1 parser diagnostic(s); formatter only supports parseable input"
+
+=== Divergences ===
+
+--- commands/argument_after_comment.tex [inline] ---
+Input: "\\frac % half\n{1}{2}\n"
+Badness: "\\frac % half\n{1}{2}"
+Panache: <declined>
+
+--- commands/argument_after_comment.tex [display] ---
+Input: "\\frac % half\n{1}{2}\n"
+Badness: "  \\frac % half\n{1}{2}\n"
+Panache: <declined>
+
+--- commands/argument_after_comment.tex [environment] ---
+Input: "\\frac % half\n{1}{2}\n"
+Badness: "  \\frac % half\n{1}{2}\n"
+Panache: <declined>
+
+--- commands/argument_after_newline.tex [inline] ---
+Input: "\\frac\n{1}{2}\n"
+Badness: "\\frac\n{1}{2}"
+Panache: "\\frac {1}{2}"
+
+--- commands/argument_after_newline.tex [display] ---
+Input: "\\frac\n{1}{2}\n"
+Badness: "  \\frac\n{1}{2}\n"
+Panache: "  \\frac {1}{2}"
+
+--- commands/argument_after_newline.tex [environment] ---
+Input: "\\frac\n{1}{2}\n"
+Badness: "  \\frac\n{1}{2}\n"
+Panache: "  \\frac {1}{2}"
+
+--- commands/argument_after_space.tex [display] ---
+Input: "x = \\frac {1}{2}\n"
+Badness: "  x = \\frac {1}{2}\n"
+Panache: "  x = \\frac {1}{2}"
+
+--- commands/argument_after_space.tex [environment] ---
+Input: "x = \\frac {1}{2}\n"
+Badness: "  x = \\frac {1}{2}\n"
+Panache: "  x = \\frac {1}{2}"
+
+--- commands/big_delimiter_bracket.tex [inline] ---
+Input: "\\Big[ x \\Big]\n"
+Badness: "\\Big[ x \\Big]"
+Panache: "\\Big[x \\Big]"
+
+--- commands/big_delimiter_bracket.tex [display] ---
+Input: "\\Big[ x \\Big]\n"
+Badness: "  \\Big[ x \\Big]\n"
+Panache: "  \\Big[x \\Big]"
+
+--- commands/big_delimiter_bracket.tex [environment] ---
+Input: "\\Big[ x \\Big]\n"
+Badness: "  \\Big[ x \\Big]\n"
+Panache: "  \\Big[x \\Big]"
+
+--- commands/math_argument_whitespace.tex [inline] ---
+Input: "\\frac % numerator\n{ a   +   b } { c   +   d }\n"
+Badness: "\\frac % numerator\n{a + b} {c + d}"
+Panache: <declined>
+
+--- commands/math_argument_whitespace.tex [display] ---
+Input: "\\frac % numerator\n{ a   +   b } { c   +   d }\n"
+Badness: "  \\frac % numerator\n{a + b} {c + d}\n"
+Panache: <declined>
+
+--- commands/math_argument_whitespace.tex [environment] ---
+Input: "\\frac % numerator\n{ a   +   b } { c   +   d }\n"
+Badness: "  \\frac % numerator\n{a + b} {c + d}\n"
+Panache: <declined>
+
+--- commands/nested_optional.tex [display] ---
+Input: "\\outer[\\inner{x}[y] z]\n"
+Badness: "  \\outer[\\inner{x}[y] z]\n"
+Panache: "  \\outer[\\inner{x}[y] z]"
+
+--- commands/nested_optional.tex [environment] ---
+Input: "\\outer[\\inner{x}[y] z]\n"
+Badness: "  \\outer[\\inner{x}[y] z]\n"
+Panache: "  \\outer[\\inner{x}[y] z]"
+
+--- commands/optional_argument.tex [display] ---
+Input: "\\sqrt[3]{x}\n"
+Badness: "  \\sqrt[3]{x}\n"
+Panache: "  \\sqrt[3]{x}"
+
+--- commands/optional_argument.tex [environment] ---
+Input: "\\sqrt[3]{x}\n"
+Badness: "  \\sqrt[3]{x}\n"
+Panache: "  \\sqrt[3]{x}"
+
+--- commands/optional_tight_gate.tex [inline] ---
+Input: "\\sqrt [3]{x}\n"
+Badness: "\\sqrt [3]{x}"
+Panache: "\\sqrt[3]{x}"
+
+--- commands/optional_tight_gate.tex [display] ---
+Input: "\\sqrt [3]{x}\n"
+Badness: "  \\sqrt [3]{x}\n"
+Panache: "  \\sqrt[3]{x}"
+
+--- commands/optional_tight_gate.tex [environment] ---
+Input: "\\sqrt [3]{x}\n"
+Badness: "  \\sqrt [3]{x}\n"
+Panache: "  \\sqrt[3]{x}"
+
+--- commands/over_attached_argument.tex [display] ---
+Input: "\\sqrt { a   +   b } { c   +   d }\n"
+Badness: "  \\sqrt {a + b} { c   +   d }\n"
+Panache: "  \\sqrt {a + b} { c   +   d }"
+
+--- commands/over_attached_argument.tex [environment] ---
+Input: "\\sqrt { a   +   b } { c   +   d }\n"
+Badness: "  \\sqrt {a + b} { c   +   d }\n"
+Panache: "  \\sqrt {a + b} { c   +   d }"
+
+--- commands/redefined_frac.tex [display] ---
+Input: "\\frac{ a   +   b }{ c   +   d }\n"
+Badness: "  \\frac{ a   +   b }{ c   +   d }\n"
+Panache: "  \\frac{ a   +   b }{ c   +   d }"
+
+--- commands/redefined_frac.tex [environment] ---
+Input: "\\frac{ a   +   b }{ c   +   d }\n"
+Badness: "  \\frac{ a   +   b }{ c   +   d }\n"
+Panache: "  \\frac{ a   +   b }{ c   +   d }"
+
+--- commands/script_command_argument.tex [display] ---
+Input: "x^\\alpha + y_\\beta\n"
+Badness: "  x^\\alpha + y_\\beta\n"
+Panache: "  x^\\alpha + y_\\beta"
+
+--- commands/script_command_argument.tex [environment] ---
+Input: "x^\\alpha + y_\\beta\n"
+Badness: "  x^\\alpha + y_\\beta\n"
+Panache: "  x^\\alpha + y_\\beta"
+
+--- commands/script_on_arguments.tex [display] ---
+Input: "\\mathbb{R}^n\n"
+Badness: "  \\mathbb{R}^n\n"
+Panache: "  \\mathbb{R}^n"
+
+--- commands/script_on_arguments.tex [environment] ---
+Input: "\\mathbb{R}^n\n"
+Badness: "  \\mathbb{R}^n\n"
+Panache: "  \\mathbb{R}^n"
+
+--- commands/script_on_frac.tex [display] ---
+Input: "\\frac{a}{b}^2\n"
+Badness: "  \\frac{a}{b}^2\n"
+Panache: "  \\frac{a}{b}^2"
+
+--- commands/script_on_frac.tex [environment] ---
+Input: "\\frac{a}{b}^2\n"
+Badness: "  \\frac{a}{b}^2\n"
+Panache: "  \\frac{a}{b}^2"
+
+--- commands/single_token_commands.tex [display] ---
+Input: "\\frac\\alpha\\beta\n"
+Badness: "  \\frac\\alpha\\beta\n"
+Panache: "  \\frac\\alpha\\beta"
+
+--- commands/single_token_commands.tex [environment] ---
+Input: "\\frac\\alpha\\beta\n"
+Badness: "  \\frac\\alpha\\beta\n"
+Panache: "  \\frac\\alpha\\beta"
+
+--- commands/single_token_numeral.tex [display] ---
+Input: "\\frac12\n"
+Badness: "  \\frac12\n"
+Panache: "  \\frac12"
+
+--- commands/single_token_numeral.tex [environment] ---
+Input: "\\frac12\n"
+Badness: "  \\frac12\n"
+Panache: "  \\frac12"
+
+--- commands/star_optional.tex [display] ---
+Input: "\\inferrule*[right]{A}{B}\n"
+Badness: "  \\inferrule*[right]{A}{B}\n"
+Panache: "  \\inferrule*[right]{A}{B}"
+
+--- commands/star_optional.tex [environment] ---
+Input: "\\inferrule*[right]{A}{B}\n"
+Badness: "  \\inferrule*[right]{A}{B}\n"
+Panache: "  \\inferrule*[right]{A}{B}"
+
+--- commands/star_variant.tex [display] ---
+Input: "\\operatorname*{min}_x f(x)\n"
+Badness: "  \\operatorname*{min}_x f(x)\n"
+Panache: "  \\operatorname*{min}_x f(x)"
+
+--- commands/star_variant.tex [environment] ---
+Input: "\\operatorname*{min}_x f(x)\n"
+Badness: "  \\operatorname*{min}_x f(x)\n"
+Panache: "  \\operatorname*{min}_x f(x)"
+
+--- commands/text_argument_whitespace.tex [display] ---
+Input: "\\text { a   +   b }\n"
+Badness: "  \\text { a   +   b }\n"
+Panache: "  \\text { a   +   b }"
+
+--- commands/text_argument_whitespace.tex [environment] ---
+Input: "\\text { a   +   b }\n"
+Badness: "  \\text { a   +   b }\n"
+Panache: "  \\text { a   +   b }"
+
+--- commands/unknown_argument_whitespace.tex [display] ---
+Input: "\\unknown { a   +   b }\n"
+Badness: "  \\unknown { a   +   b }\n"
+Panache: "  \\unknown { a   +   b }"
+
+--- commands/unknown_argument_whitespace.tex [environment] ---
+Input: "\\unknown { a   +   b }\n"
+Badness: "  \\unknown { a   +   b }\n"
+Panache: "  \\unknown { a   +   b }"
+
+--- comments/comment_line.tex [inline] ---
+Input: "% leading comment\nx = 1\n"
+Badness: "% leading comment\nx = 1"
+Panache: "% leading comment x = 1"
+
+--- comments/comment_line.tex [display] ---
+Input: "% leading comment\nx = 1\n"
+Badness: "  % leading comment\n  x = 1\n"
+Panache: "  % leading comment\n  x = 1"
+
+--- comments/comment_line.tex [environment] ---
+Input: "% leading comment\nx = 1\n"
+Badness: "  % leading comment\n  x = 1\n"
+Panache: "  % leading comment\n  x = 1"
+
+--- comments/inside_math_argument.tex [inline] ---
+Input: "\\frac{a % keep this comment\n+ b}{c}\n"
+Badness: "\\frac{a % keep this comment\n + b}{c}"
+Panache: <declined>
+
+--- comments/inside_math_argument.tex [display] ---
+Input: "\\frac{a % keep this comment\n+ b}{c}\n"
+Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
+Panache: <declined>
+
+--- comments/inside_math_argument.tex [environment] ---
+Input: "\\frac{a % keep this comment\n+ b}{c}\n"
+Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
+Panache: <declined>
+
+--- comments/trailing_comment.tex [inline] ---
+Input: "a + b % this is a comment\n"
+Badness: "a + b % this is a comment\n"
+Panache: "a + b % this is a comment"
+
+--- comments/trailing_comment.tex [display] ---
+Input: "a + b % this is a comment\n"
+Badness: "  a + b % this is a comment\n"
+Panache: "  a + b % this is a comment"
+
+--- comments/trailing_comment.tex [environment] ---
+Input: "a + b % this is a comment\n"
+Badness: "  a + b % this is a comment\n"
+Panache: "  a + b % this is a comment"
+
+--- display/authored_newline.tex [display] ---
+Input: "a + b\n= c + d\n"
+Badness: "  a + b = c + d\n"
+Panache: "  a + b = c + d"
+
+--- display/authored_newline.tex [environment] ---
+Input: "a + b\n= c + d\n"
+Badness: "  a + b = c + d\n"
+Panache: "  a + b\n  = c + d"
+
+--- display/fraction_block.tex [display] ---
+Input: "\\frac{\\partial f}{\\partial x} = 2x\n"
+Badness: "  \\frac{\\partial f}{\\partial x} = 2x\n"
+Panache: "  \\frac{\\partial f}{\\partial x} = 2x"
+
+--- display/fraction_block.tex [environment] ---
+Input: "\\frac{\\partial f}{\\partial x} = 2x\n"
+Badness: "  \\frac{\\partial f}{\\partial x} = 2x\n"
+Panache: "  \\frac{\\partial f}{\\partial x} = 2x"
+
+--- display/integral.tex [display] ---
+Input: "\\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}\n"
+Badness: "  \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}\n"
+Panache: "  \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}"
+
+--- display/integral.tex [environment] ---
+Input: "\\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}\n"
+Badness: "  \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}\n"
+Panache: "  \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}"
+
+--- display/line_break_comment.tex [inline] ---
+Input: "a \\\\ % first row\nb\n"
+Badness: "a \\\\\n% first row\nb"
+Panache: "a \\\\ % first row b"
+
+--- display/line_break_comment.tex [display] ---
+Input: "a \\\\ % first row\nb\n"
+Badness: "  a \\\\\n  % first row\n  b\n"
+Panache: "  a \\\\\n  % first row\n  b"
+
+--- display/line_break_comment.tex [environment] ---
+Input: "a \\\\ % first row\nb\n"
+Badness: "  a \\\\ % first row\n  b\n"
+Panache: "  a \\\\\n  % first row\n  b"
+
+--- display/line_break_modifiers.tex [inline] ---
+Input: "a \\\\*[2ex]\nb\n"
+Badness: "a \\\\*[2ex]\nb"
+Panache: "a \\\\*[2ex] b"
+
+--- display/line_break_modifiers.tex [display] ---
+Input: "a \\\\*[2ex]\nb\n"
+Badness: "  a \\\\*[2ex]\n  b\n"
+Panache: "  a \\\\*[2ex]\n  b"
+
+--- display/line_break_modifiers.tex [environment] ---
+Input: "a \\\\*[2ex]\nb\n"
+Badness: "  a \\\\*[2ex]\n  b\n"
+Panache: "  a \\\\*[2ex]\n  b"
+
+--- display/long_chain.tex [display] ---
+Input: "P(X > \\varepsilon) \\leq e^{-t \\varepsilon} M(t)\n"
+Badness: "  P(X > \\varepsilon) \\leq e^{-t \\varepsilon} M(t)\n"
+Panache: "  P(X > \\varepsilon) \\leq e^{-t \\varepsilon} M(t)"
+
+--- display/long_chain.tex [environment] ---
+Input: "P(X > \\varepsilon) \\leq e^{-t \\varepsilon} M(t)\n"
+Badness: "  P(X > \\varepsilon) \\leq e^{-t \\varepsilon} M(t)\n"
+Panache: "  P(X > \\varepsilon) \\leq e^{-t \\varepsilon} M(t)"
+
+--- display/single_equation.tex [display] ---
+Input: "E = mc^2\n"
+Badness: "  E = mc^2\n"
+Panache: "  E = mc^2"
+
+--- display/single_equation.tex [environment] ---
+Input: "E = mc^2\n"
+Badness: "  E = mc^2\n"
+Panache: "  E = mc^2"
+
+--- display/sum_over_n.tex [inline] ---
+Input: "\\sum_{i=1}^{N} x_i y_i\n"
+Badness: "\\sum_{i=1}^{N} x_i y_i"
+Panache: "\\sum_{i = 1}^{N} x_i y_i"
+
+--- display/sum_over_n.tex [display] ---
+Input: "\\sum_{i=1}^{N} x_i y_i\n"
+Badness: "  \\sum_{i=1}^{N} x_i y_i\n"
+Panache: "  \\sum_{i = 1}^{N} x_i y_i"
+
+--- display/sum_over_n.tex [environment] ---
+Input: "\\sum_{i=1}^{N} x_i y_i\n"
+Badness: "  \\sum_{i=1}^{N} x_i y_i\n"
+Panache: "  \\sum_{i = 1}^{N} x_i y_i"
+
+--- display/with_text.tex [display] ---
+Input: "x = y \\quad \\text{and} \\quad z = w\n"
+Badness: "  x = y \\quad \\text{and} \\quad z = w\n"
+Panache: "  x = y \\quad \\text{and} \\quad z = w"
+
+--- display/with_text.tex [environment] ---
+Input: "x = y \\quad \\text{and} \\quad z = w\n"
+Badness: "  x = y \\quad \\text{and} \\quad z = w\n"
+Panache: "  x = y \\quad \\text{and} \\quad z = w"
+
+--- environments/aligned/multi_ampersand.tex [inline] ---
+Input: "\\begin{aligned}\na &= 1 & b &= 2 \\\\\nc &= 3 & d &= 4\n\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  a & = 1 & b & = 2 \\\\\n  c & = 3 & d & = 4\n\\end{aligned}"
+Panache: "\\begin{aligned} a & = 1 & b & = 2 \\\\ c & = 3 & d & = 4 \\end{aligned}"
+
+--- environments/aligned/multi_ampersand.tex [display] ---
+Input: "\\begin{aligned}\na &= 1 & b &= 2 \\\\\nc &= 3 & d &= 4\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  a & = 1 & b & = 2 \\\\\n  c & = 3 & d & = 4\n\\end{aligned}"
+
+--- environments/aligned/multi_ampersand.tex [environment] ---
+Input: "\\begin{aligned}\na &= 1 & b &= 2 \\\\\nc &= 3 & d &= 4\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\n  \\end{aligned}"
+
+--- environments/aligned/ragged_columns.tex [inline] ---
+Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  \\alpha & = 1 \\\\\n  x      & = 22\n\\end{aligned}"
+Panache: "\\begin{aligned} \\alpha & = 1 \\\\ x & = 22 \\end{aligned}"
+
+--- environments/aligned/ragged_columns.tex [display] ---
+Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    \\alpha & = 1 \\\\\n    x      & = 22\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  \\alpha & = 1  \\\\\n  x      & = 22\n\\end{aligned}"
+
+--- environments/aligned/ragged_columns.tex [environment] ---
+Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    \\alpha & = 1 \\\\\n    x      & = 22\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    \\alpha & = 1  \\\\\n    x      & = 22\n  \\end{aligned}"
+
+--- environments/aligned/single_row.tex [inline] ---
+Input: "\\begin{aligned}\nx &= y + z\n\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  x & = y + z\n\\end{aligned}"
+Panache: "\\begin{aligned} x & = y + z \\end{aligned}"
+
+--- environments/aligned/single_row.tex [display] ---
+Input: "\\begin{aligned}\nx &= y + z\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  x & = y + z\n\\end{aligned}"
+
+--- environments/aligned/single_row.tex [environment] ---
+Input: "\\begin{aligned}\nx &= y + z\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}"
+
+--- environments/aligned/three_rows.tex [inline] ---
+Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  x & = 1 \\\\\n  y & = 22 \\\\\n  z & = 333\n\\end{aligned}"
+Panache: "\\begin{aligned} x & = 1 \\\\ y & = 22 \\\\ z & = 333 \\end{aligned}"
+
+--- environments/aligned/three_rows.tex [display] ---
+Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22 \\\\\n    z & = 333\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  x & = 1   \\\\\n  y & = 22  \\\\\n  z & = 333\n\\end{aligned}"
+
+--- environments/aligned/three_rows.tex [environment] ---
+Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22 \\\\\n    z & = 333\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    x & = 1   \\\\\n    y & = 22  \\\\\n    z & = 333\n  \\end{aligned}"
+
+--- environments/aligned/two_rows.tex [inline] ---
+Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  x & = 1 \\\\\n  y & = 22\n\\end{aligned}"
+Panache: "\\begin{aligned} x & = 1 \\\\ y & = 22 \\end{aligned}"
+
+--- environments/aligned/two_rows.tex [display] ---
+Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  x & = 1  \\\\\n  y & = 22\n\\end{aligned}"
+
+--- environments/aligned/two_rows.tex [environment] ---
+Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}"
+
+--- environments/aligned/with_frac.tex [inline] ---
+Input: "\\begin{aligned}\nf(x) &= \\frac{1}{2} \\\\\ng(x) &= x^2\n\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  f(x) & = \\frac{1}{2} \\\\\n  g(x) & = x^2\n\\end{aligned}"
+Panache: "\\begin{aligned} f(x) & = \\frac{1}{2} \\\\ g(x) & = x^2 \\end{aligned}"
+
+--- environments/aligned/with_frac.tex [display] ---
+Input: "\\begin{aligned}\nf(x) &= \\frac{1}{2} \\\\\ng(x) &= x^2\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    f(x) & = \\frac{1}{2} \\\\\n    g(x) & = x^2\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  f(x) & = \\frac{1}{2} \\\\\n  g(x) & = x^2\n\\end{aligned}"
+
+--- environments/aligned/with_frac.tex [environment] ---
+Input: "\\begin{aligned}\nf(x) &= \\frac{1}{2} \\\\\ng(x) &= x^2\n\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    f(x) & = \\frac{1}{2} \\\\\n    g(x) & = x^2\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    f(x) & = \\frac{1}{2} \\\\\n    g(x) & = x^2\n  \\end{aligned}"
+
+--- environments/cases/piecewise.tex [inline] ---
+Input: "\\begin{cases}\nx^2 & x \\geq 0 \\\\\n-x & x < 0\n\\end{cases}\n"
+Badness: "\\begin{cases}\n  x^2 & x \\geq 0 \\\\\n  -x  & x < 0\n\\end{cases}"
+Panache: "\\begin{cases} x^2 & x \\geq 0 \\\\-x & x < 0 \\end{cases}"
+
+--- environments/cases/piecewise.tex [display] ---
+Input: "\\begin{cases}\nx^2 & x \\geq 0 \\\\\n-x & x < 0\n\\end{cases}\n"
+Badness: "  \\begin{cases}\n    x^2 & x \\geq 0 \\\\\n    -x  & x < 0\n  \\end{cases}\n"
+Panache: "\\begin{cases}\n  x^2 & x \\geq 0 \\\\\n  -x  & x < 0\n\\end{cases}"
+
+--- environments/cases/piecewise.tex [environment] ---
+Input: "\\begin{cases}\nx^2 & x \\geq 0 \\\\\n-x & x < 0\n\\end{cases}\n"
+Badness: "  \\begin{cases}\n    x^2 & x \\geq 0 \\\\\n    -x  & x < 0\n  \\end{cases}\n"
+Panache: "  \\begin{cases}\n    x^2 & x \\geq 0 \\\\\n    -x  & x < 0\n  \\end{cases}"
+
+--- environments/cases/sign.tex [inline] ---
+Input: "\\begin{cases}\n1 & x > 0 \\\\\n0 & x = 0 \\\\\n-1 & x < 0\n\\end{cases}\n"
+Badness: "\\begin{cases}\n  1  & x > 0 \\\\\n  0  & x = 0 \\\\\n  -1 & x < 0\n\\end{cases}"
+Panache: "\\begin{cases} 1 & x > 0 \\\\ 0 & x = 0 \\\\-1 & x < 0 \\end{cases}"
+
+--- environments/cases/sign.tex [display] ---
+Input: "\\begin{cases}\n1 & x > 0 \\\\\n0 & x = 0 \\\\\n-1 & x < 0\n\\end{cases}\n"
+Badness: "  \\begin{cases}\n    1  & x > 0 \\\\\n    0  & x = 0 \\\\\n    -1 & x < 0\n  \\end{cases}\n"
+Panache: "\\begin{cases}\n  1  & x > 0 \\\\\n  0  & x = 0 \\\\\n  -1 & x < 0\n\\end{cases}"
+
+--- environments/cases/sign.tex [environment] ---
+Input: "\\begin{cases}\n1 & x > 0 \\\\\n0 & x = 0 \\\\\n-1 & x < 0\n\\end{cases}\n"
+Badness: "  \\begin{cases}\n    1  & x > 0 \\\\\n    0  & x = 0 \\\\\n    -1 & x < 0\n  \\end{cases}\n"
+Panache: "  \\begin{cases}\n    1  & x > 0 \\\\\n    0  & x = 0 \\\\\n    -1 & x < 0\n  \\end{cases}"
+
+--- environments/cases/single.tex [inline] ---
+Input: "\\begin{cases}\na & b\n\\end{cases}\n"
+Badness: "\\begin{cases}\n  a & b\n\\end{cases}"
+Panache: "\\begin{cases} a & b \\end{cases}"
+
+--- environments/cases/single.tex [display] ---
+Input: "\\begin{cases}\na & b\n\\end{cases}\n"
+Badness: "  \\begin{cases}\n    a & b\n  \\end{cases}\n"
+Panache: "\\begin{cases}\n  a & b\n\\end{cases}"
+
+--- environments/cases/single.tex [environment] ---
+Input: "\\begin{cases}\na & b\n\\end{cases}\n"
+Badness: "  \\begin{cases}\n    a & b\n  \\end{cases}\n"
+Panache: "  \\begin{cases}\n    a & b\n  \\end{cases}"
+
+--- environments/matrix/bmatrix.tex [inline] ---
+Input: "\\begin{bmatrix}\nx \\\\\ny\n\\end{bmatrix}\n"
+Badness: "\\begin{bmatrix}\n  x \\\\\n  y\n\\end{bmatrix}"
+Panache: "\\begin{bmatrix} x \\\\ y \\end{bmatrix}"
+
+--- environments/matrix/bmatrix.tex [display] ---
+Input: "\\begin{bmatrix}\nx \\\\\ny\n\\end{bmatrix}\n"
+Badness: "  \\begin{bmatrix}\n    x \\\\\n    y\n  \\end{bmatrix}\n"
+Panache: "\\begin{bmatrix}\n  x \\\\\n  y\n\\end{bmatrix}"
+
+--- environments/matrix/bmatrix.tex [environment] ---
+Input: "\\begin{bmatrix}\nx \\\\\ny\n\\end{bmatrix}\n"
+Badness: "  \\begin{bmatrix}\n    x \\\\\n    y\n  \\end{bmatrix}\n"
+Panache: "  \\begin{bmatrix}\n    x \\\\\n    y\n  \\end{bmatrix}"
+
+--- environments/matrix/plain.tex [inline] ---
+Input: "\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n"
+Badness: "\\begin{matrix}\n  a & b \\\\\n  c & d\n\\end{matrix}"
+Panache: "\\begin{matrix} a & b \\\\ c & d \\end{matrix}"
+
+--- environments/matrix/plain.tex [display] ---
+Input: "\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n"
+Badness: "  \\begin{matrix}\n    a & b \\\\\n    c & d\n  \\end{matrix}\n"
+Panache: "\\begin{matrix}\n  a & b \\\\\n  c & d\n\\end{matrix}"
+
+--- environments/matrix/plain.tex [environment] ---
+Input: "\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n"
+Badness: "  \\begin{matrix}\n    a & b \\\\\n    c & d\n  \\end{matrix}\n"
+Panache: "  \\begin{matrix}\n    a & b \\\\\n    c & d\n  \\end{matrix}"
+
+--- environments/matrix/pmatrix.tex [inline] ---
+Input: "\\begin{pmatrix}\n1 & 0 \\\\\n0 & 1\n\\end{pmatrix}\n"
+Badness: "\\begin{pmatrix}\n  1 & 0 \\\\\n  0 & 1\n\\end{pmatrix}"
+Panache: "\\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix}"
+
+--- environments/matrix/pmatrix.tex [display] ---
+Input: "\\begin{pmatrix}\n1 & 0 \\\\\n0 & 1\n\\end{pmatrix}\n"
+Badness: "  \\begin{pmatrix}\n    1 & 0 \\\\\n    0 & 1\n  \\end{pmatrix}\n"
+Panache: "\\begin{pmatrix}\n  1 & 0 \\\\\n  0 & 1\n\\end{pmatrix}"
+
+--- environments/matrix/pmatrix.tex [environment] ---
+Input: "\\begin{pmatrix}\n1 & 0 \\\\\n0 & 1\n\\end{pmatrix}\n"
+Badness: "  \\begin{pmatrix}\n    1 & 0 \\\\\n    0 & 1\n  \\end{pmatrix}\n"
+Panache: "  \\begin{pmatrix}\n    1 & 0 \\\\\n    0 & 1\n  \\end{pmatrix}"
+
+--- environments/matrix/three_by_three.tex [inline] ---
+Input: "\\begin{matrix}\n1 & 2 & 3 \\\\\n4 & 5 & 6 \\\\\n7 & 8 & 9\n\\end{matrix}\n"
+Badness: "\\begin{matrix}\n  1 & 2 & 3 \\\\\n  4 & 5 & 6 \\\\\n  7 & 8 & 9\n\\end{matrix}"
+Panache: "\\begin{matrix} 1 & 2 & 3 \\\\ 4 & 5 & 6 \\\\ 7 & 8 & 9 \\end{matrix}"
+
+--- environments/matrix/three_by_three.tex [display] ---
+Input: "\\begin{matrix}\n1 & 2 & 3 \\\\\n4 & 5 & 6 \\\\\n7 & 8 & 9\n\\end{matrix}\n"
+Badness: "  \\begin{matrix}\n    1 & 2 & 3 \\\\\n    4 & 5 & 6 \\\\\n    7 & 8 & 9\n  \\end{matrix}\n"
+Panache: "\\begin{matrix}\n  1 & 2 & 3 \\\\\n  4 & 5 & 6 \\\\\n  7 & 8 & 9\n\\end{matrix}"
+
+--- environments/matrix/three_by_three.tex [environment] ---
+Input: "\\begin{matrix}\n1 & 2 & 3 \\\\\n4 & 5 & 6 \\\\\n7 & 8 & 9\n\\end{matrix}\n"
+Badness: "  \\begin{matrix}\n    1 & 2 & 3 \\\\\n    4 & 5 & 6 \\\\\n    7 & 8 & 9\n  \\end{matrix}\n"
+Panache: "  \\begin{matrix}\n    1 & 2 & 3 \\\\\n    4 & 5 & 6 \\\\\n    7 & 8 & 9\n  \\end{matrix}"
+
+--- environments/nested/delimited_matrix.tex [inline] ---
+Input: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)\n"
+Badness: "\\left( \\begin{matrix}\n         a & b \\\\\n         c & d\n       \\end{matrix} \\right)"
+Panache: "\\left( \\begin{matrix} a & b \\\\ c & d \\end{matrix} \\right)"
+
+--- environments/nested/delimited_matrix.tex [display] ---
+Input: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)\n"
+Badness: "  \\left( \\begin{matrix}\n           a & b \\\\\n           c & d\n         \\end{matrix} \\right)\n"
+Panache: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)"
+
+--- environments/nested/delimited_matrix.tex [environment] ---
+Input: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)\n"
+Badness: "  \\left( \\begin{matrix}\n           a & b \\\\\n           c & d\n         \\end{matrix} \\right)\n"
+Panache: "  \\left( \\begin{matrix} a & b \\\\ c & d \\end{matrix} \\right)"
+
+--- environments/recovery/comment_before_name.tex [inline] ---
+Input: "\\begin% opener\n{aligned}x\\end% closer\n{aligned}\n"
+Badness: "\\begin% opener\n  {aligned}x\n\\end% closer\n{aligned}"
+Panache: <declined>
+
+--- environments/recovery/comment_before_name.tex [display] ---
+Input: "\\begin% opener\n{aligned}x\\end% closer\n{aligned}\n"
+Badness: "  \\begin% opener\n    {aligned}x\n  \\end% closer\n  {aligned}\n"
+Panache: <declined>
+
+--- environments/recovery/comment_before_name.tex [environment] ---
+Input: "\\begin% opener\n{aligned}x\\end% closer\n{aligned}\n"
+Badness: "  \\begin% opener\n    {aligned}x\n  \\end% closer\n  {aligned}\n"
+Panache: <declined>
+
+--- environments/recovery/nested.tex [inline] ---
+Input: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}\n"
+Badness: "\\begin{aligned}\n  \\begin{matrix}\n    x\n  \\end{matrix}\n\\end{aligned}"
+Panache: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}"
+
+--- environments/recovery/nested.tex [display] ---
+Input: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    \\begin{matrix}\n      x\n    \\end{matrix}\n  \\end{aligned}\n"
+Panache: "\\begin{aligned}\n  \\begin{matrix}\n    x\n  \\end{matrix}\n\\end{aligned}"
+
+--- environments/recovery/nested.tex [environment] ---
+Input: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    \\begin{matrix}\n      x\n    \\end{matrix}\n  \\end{aligned}\n"
+Panache: "  \\begin{aligned}\n    \\begin{matrix}\n      x\n    \\end{matrix}\n  \\end{aligned}"
+
+--- environments/recovery/trivia_before_name.tex [inline] ---
+Input: "\\begin {aligned}x\\end {aligned}\n"
+Badness: "\\begin\n  {aligned}x\n\\end {aligned}"
+Panache: "\\begin {aligned}x\\end {aligned}"
+
+--- environments/recovery/trivia_before_name.tex [display] ---
+Input: "\\begin {aligned}x\\end {aligned}\n"
+Badness: "  \\begin\n    {aligned}x\n  \\end {aligned}\n"
+Panache: "\\begin {aligned}\n  x\n\\end {aligned}"
+
+--- environments/recovery/trivia_before_name.tex [environment] ---
+Input: "\\begin {aligned}x\\end {aligned}\n"
+Badness: "  \\begin\n    {aligned}x\n  \\end {aligned}\n"
+Panache: "  \\begin {aligned}\n    x\n  \\end {aligned}"
+
+--- escapes/escaped_brace.tex [display] ---
+Input: "\\{ a \\}\n"
+Badness: "  \\{ a \\}\n"
+Panache: "  \\{ a \\}"
+
+--- escapes/escaped_brace.tex [environment] ---
+Input: "\\{ a \\}\n"
+Badness: "  \\{ a \\}\n"
+Panache: "  \\{ a \\}"
+
+--- escapes/escaped_dollar.tex [display] ---
+Input: "a = \\$ 5\n"
+Badness: "  a = \\$ 5\n"
+Panache: "  a = \\$ 5"
+
+--- escapes/escaped_dollar.tex [environment] ---
+Input: "a = \\$ 5\n"
+Badness: "  a = \\$ 5\n"
+Panache: "  a = \\$ 5"
+
+--- escapes/literal_backslash_in_env.tex [inline] ---
+Input: "\\begin{matrix}\na \\\\\nb\n\\end{matrix}\n"
+Badness: "\\begin{matrix}\n  a \\\\\n  b\n\\end{matrix}"
+Panache: "\\begin{matrix} a \\\\ b \\end{matrix}"
+
+--- escapes/literal_backslash_in_env.tex [display] ---
+Input: "\\begin{matrix}\na \\\\\nb\n\\end{matrix}\n"
+Badness: "  \\begin{matrix}\n    a \\\\\n    b\n  \\end{matrix}\n"
+Panache: "\\begin{matrix}\n  a \\\\\n  b\n\\end{matrix}"
+
+--- escapes/literal_backslash_in_env.tex [environment] ---
+Input: "\\begin{matrix}\na \\\\\nb\n\\end{matrix}\n"
+Badness: "  \\begin{matrix}\n    a \\\\\n    b\n  \\end{matrix}\n"
+Panache: "  \\begin{matrix}\n    a \\\\\n    b\n  \\end{matrix}"
+
+--- groups/braced_group.tex [display] ---
+Input: "{a + b}\n"
+Badness: "  {a + b}\n"
+Panache: "  {a + b}"
+
+--- groups/braced_group.tex [environment] ---
+Input: "{a + b}\n"
+Badness: "  {a + b}\n"
+Panache: "  {a + b}"
+
+--- groups/deep_nesting.tex [display] ---
+Input: "{{{x}}}\n"
+Badness: "  {{{x}}}\n"
+Panache: "  {{{x}}}"
+
+--- groups/deep_nesting.tex [environment] ---
+Input: "{{{x}}}\n"
+Badness: "  {{{x}}}\n"
+Panache: "  {{{x}}}"
+
+--- groups/group_with_command.tex [display] ---
+Input: "\\mathbb{R}^n\n"
+Badness: "  \\mathbb{R}^n\n"
+Panache: "  \\mathbb{R}^n"
+
+--- groups/group_with_command.tex [environment] ---
+Input: "\\mathbb{R}^n\n"
+Badness: "  \\mathbb{R}^n\n"
+Panache: "  \\mathbb{R}^n"
+
+--- groups/left_right_asymmetric.tex [display] ---
+Input: "\\left( a, b \\right]\n"
+Badness: "  \\left( a, b \\right]\n"
+Panache: "  \\left( a, b \\right]"
+
+--- groups/left_right_asymmetric.tex [environment] ---
+Input: "\\left( a, b \\right]\n"
+Badness: "  \\left( a, b \\right]\n"
+Panache: "  \\left( a, b \\right]"
+
+--- groups/left_right_bracket.tex [display] ---
+Input: "\\left[ \\frac{a}{b} \\right]\n"
+Badness: "  \\left[ \\frac{a}{b} \\right]\n"
+Panache: "  \\left[ \\frac{a}{b} \\right]"
+
+--- groups/left_right_bracket.tex [environment] ---
+Input: "\\left[ \\frac{a}{b} \\right]\n"
+Badness: "  \\left[ \\frac{a}{b} \\right]\n"
+Panache: "  \\left[ \\frac{a}{b} \\right]"
+
+--- groups/left_right_nested.tex [display] ---
+Input: "\\left[ \\left( a \\right) \\right]\n"
+Badness: "  \\left[ \\left( a \\right) \\right]\n"
+Panache: "  \\left[ \\left( a \\right) \\right]"
+
+--- groups/left_right_nested.tex [environment] ---
+Input: "\\left[ \\left( a \\right) \\right]\n"
+Badness: "  \\left[ \\left( a \\right) \\right]\n"
+Panache: "  \\left[ \\left( a \\right) \\right]"
+
+--- groups/left_right_null.tex [display] ---
+Input: "\\left. \\frac{a}{b} \\right|\n"
+Badness: "  \\left. \\frac{a}{b} \\right|\n"
+Panache: "  \\left. \\frac{a}{b} \\right|"
+
+--- groups/left_right_null.tex [environment] ---
+Input: "\\left. \\frac{a}{b} \\right|\n"
+Badness: "  \\left. \\frac{a}{b} \\right|\n"
+Panache: "  \\left. \\frac{a}{b} \\right|"
+
+--- groups/left_right_paren.tex [display] ---
+Input: "\\left( a + b \\right)\n"
+Badness: "  \\left( a + b \\right)\n"
+Panache: "  \\left( a + b \\right)"
+
+--- groups/left_right_paren.tex [environment] ---
+Input: "\\left( a + b \\right)\n"
+Badness: "  \\left( a + b \\right)\n"
+Panache: "  \\left( a + b \\right)"
+
+--- groups/left_right_trivia.tex [inline] ---
+Input: "\\left [ x \\right ]\n"
+Badness: "\\left[ x \\right]"
+Panache: "\\left [ x \\right ]"
+
+--- groups/left_right_trivia.tex [display] ---
+Input: "\\left [ x \\right ]\n"
+Badness: "  \\left[ x \\right]\n"
+Panache: "  \\left [ x \\right ]"
+
+--- groups/left_right_trivia.tex [environment] ---
+Input: "\\left [ x \\right ]\n"
+Badness: "  \\left[ x \\right]\n"
+Panache: "  \\left [ x \\right ]"
+
+--- groups/left_right_unclosed.tex [inline] ---
+Input: "\\left( x\n"
+Badness: "\\left( x"
+Panache: <declined>
+
+--- groups/left_right_unclosed.tex [display] ---
+Input: "\\left( x\n"
+Badness: "  \\left( x\n"
+Panache: <declined>
+
+--- groups/left_right_unclosed.tex [environment] ---
+Input: "\\left( x\n"
+Badness: "  \\left( x\n"
+Panache: <declined>
+
+--- groups/nested_braces.tex [display] ---
+Input: "{a + {b + c}}\n"
+Badness: "  {a + {b + c}}\n"
+Panache: "  {a + {b + c}}"
+
+--- groups/nested_braces.tex [environment] ---
+Input: "{a + {b + c}}\n"
+Badness: "  {a + {b + c}}\n"
+Panache: "  {a + {b + c}}"
+
+--- inline/binomial_frac.tex [display] ---
+Input: "\\frac{n!}{k!(n-k)!}\n"
+Badness: "  \\frac{n!}{k!(n - k)!}\n"
+Panache: "  \\frac{n!}{k!(n - k)!}"
+
+--- inline/binomial_frac.tex [environment] ---
+Input: "\\frac{n!}{k!(n-k)!}\n"
+Badness: "  \\frac{n!}{k!(n - k)!}\n"
+Panache: "  \\frac{n!}{k!(n - k)!}"
+
+--- inline/greek_and_cdot.tex [display] ---
+Input: "\\alpha \\cdot \\beta\n"
+Badness: "  \\alpha \\cdot \\beta\n"
+Panache: "  \\alpha \\cdot \\beta"
+
+--- inline/greek_and_cdot.tex [environment] ---
+Input: "\\alpha \\cdot \\beta\n"
+Badness: "  \\alpha \\cdot \\beta\n"
+Panache: "  \\alpha \\cdot \\beta"
+
+--- inline/mixed_scripts.tex [display] ---
+Input: "a_i^2 + b_j^3\n"
+Badness: "  a_i^2 + b_j^3\n"
+Panache: "  a_i^2 + b_j^3"
+
+--- inline/mixed_scripts.tex [environment] ---
+Input: "a_i^2 + b_j^3\n"
+Badness: "  a_i^2 + b_j^3\n"
+Panache: "  a_i^2 + b_j^3"
+
+--- inline/nested_frac.tex [display] ---
+Input: "\\frac{1}{1 + \\frac{1}{x}}\n"
+Badness: "  \\frac{1}{1 + \\frac{1}{x}}\n"
+Panache: "  \\frac{1}{1 + \\frac{1}{x}}"
+
+--- inline/nested_frac.tex [environment] ---
+Input: "\\frac{1}{1 + \\frac{1}{x}}\n"
+Badness: "  \\frac{1}{1 + \\frac{1}{x}}\n"
+Panache: "  \\frac{1}{1 + \\frac{1}{x}}"
+
+--- inline/simple_equality.tex [display] ---
+Input: "x = y\n"
+Badness: "  x = y\n"
+Panache: "  x = y"
+
+--- inline/simple_equality.tex [environment] ---
+Input: "x = y\n"
+Badness: "  x = y\n"
+Panache: "  x = y"
+
+--- inline/sqrt.tex [display] ---
+Input: "\\sqrt{x^2 + y^2}\n"
+Badness: "  \\sqrt{x^2 + y^2}\n"
+Panache: "  \\sqrt{x^2 + y^2}"
+
+--- inline/sqrt.tex [environment] ---
+Input: "\\sqrt{x^2 + y^2}\n"
+Badness: "  \\sqrt{x^2 + y^2}\n"
+Panache: "  \\sqrt{x^2 + y^2}"
+
+--- inline/subscript.tex [display] ---
+Input: "x_i\n"
+Badness: "  x_i\n"
+Panache: "  x_i"
+
+--- inline/subscript.tex [environment] ---
+Input: "x_i\n"
+Badness: "  x_i\n"
+Panache: "  x_i"
+
+--- inline/sum_expression.tex [display] ---
+Input: "a + b = c\n"
+Badness: "  a + b = c\n"
+Panache: "  a + b = c"
+
+--- inline/sum_expression.tex [environment] ---
+Input: "a + b = c\n"
+Badness: "  a + b = c\n"
+Panache: "  a + b = c"
+
+--- inline/superscript.tex [display] ---
+Input: "x^2\n"
+Badness: "  x^2\n"
+Panache: "  x^2"
+
+--- inline/superscript.tex [environment] ---
+Input: "x^2\n"
+Badness: "  x^2\n"
+Panache: "  x^2"
+
+--- inline/whitespace_heavy.tex [display] ---
+Input: "\\alpha   x   +   \\beta\n"
+Badness: "  \\alpha x + \\beta\n"
+Panache: "  \\alpha x + \\beta"
+
+--- inline/whitespace_heavy.tex [environment] ---
+Input: "\\alpha   x   +   \\beta\n"
+Badness: "  \\alpha x + \\beta\n"
+Panache: "  \\alpha x + \\beta"
+
+--- macro_dependent/custom_var.tex [display] ---
+Input: "\\Var(X) = \\sigma^2\n"
+Badness: "  \\Var(X) = \\sigma^2\n"
+Panache: "  \\Var(X) = \\sigma^2"
+
+--- macro_dependent/custom_var.tex [environment] ---
+Input: "\\Var(X) = \\sigma^2\n"
+Badness: "  \\Var(X) = \\sigma^2\n"
+Panache: "  \\Var(X) = \\sigma^2"
+
+--- macro_dependent/expectation.tex [display] ---
+Input: "\\E(e^{tX})\n"
+Badness: "  \\E(e^{tX})\n"
+Panache: "  \\E(e^{tX})"
+
+--- macro_dependent/expectation.tex [environment] ---
+Input: "\\E(e^{tX})\n"
+Badness: "  \\E(e^{tX})\n"
+Panache: "  \\E(e^{tX})"
+
+--- macro_dependent/unknown_arguments.tex [display] ---
+Input: "\\myop{a}{b} = c\n"
+Badness: "  \\myop{a}{b} = c\n"
+Panache: "  \\myop{a}{b} = c"
+
+--- macro_dependent/unknown_arguments.tex [environment] ---
+Input: "\\myop{a}{b} = c\n"
+Badness: "  \\myop{a}{b} = c\n"
+Panache: "  \\myop{a}{b} = c"
+
+--- operators/cdot.tex [display] ---
+Input: "a \\cdot b\n"
+Badness: "  a \\cdot b\n"
+Panache: "  a \\cdot b"
+
+--- operators/cdot.tex [environment] ---
+Input: "a \\cdot b\n"
+Badness: "  a \\cdot b\n"
+Panache: "  a \\cdot b"
+
+--- operators/double_minus.tex [display] ---
+Input: "a - -b\n"
+Badness: "  a - -b\n"
+Panache: "  a - -b"
+
+--- operators/double_minus.tex [environment] ---
+Input: "a - -b\n"
+Badness: "  a - -b\n"
+Panache: "  a - -b"
+
+--- operators/leq.tex [display] ---
+Input: "a \\leq b\n"
+Badness: "  a \\leq b\n"
+Panache: "  a \\leq b"
+
+--- operators/leq.tex [environment] ---
+Input: "a \\leq b\n"
+Badness: "  a \\leq b\n"
+Panache: "  a \\leq b"
+
+--- operators/neq.tex [display] ---
+Input: "a \\neq b\n"
+Badness: "  a \\neq b\n"
+Panache: "  a \\neq b"
+
+--- operators/neq.tex [environment] ---
+Input: "a \\neq b\n"
+Badness: "  a \\neq b\n"
+Panache: "  a \\neq b"
+
+--- operators/plus.tex [display] ---
+Input: "a + b\n"
+Badness: "  a + b\n"
+Panache: "  a + b"
+
+--- operators/plus.tex [environment] ---
+Input: "a + b\n"
+Badness: "  a + b\n"
+Panache: "  a + b"
+
+--- operators/plus_tight.tex [display] ---
+Input: "a+b\n"
+Badness: "  a + b\n"
+Panache: "  a + b"
+
+--- operators/plus_tight.tex [environment] ---
+Input: "a+b\n"
+Badness: "  a + b\n"
+Panache: "  a + b"
+
+--- operators/relation_chain.tex [display] ---
+Input: "a = b = c\n"
+Badness: "  a = b = c\n"
+Panache: "  a = b = c"
+
+--- operators/relation_chain.tex [environment] ---
+Input: "a = b = c\n"
+Badness: "  a = b = c\n"
+Panache: "  a = b = c"
+
+--- operators/unary_minus.tex [display] ---
+Input: "-x\n"
+Badness: "  -x\n"
+Panache: "  -x"
+
+--- operators/unary_minus.tex [environment] ---
+Input: "-x\n"
+Badness: "  -x\n"
+Panache: "  -x"
+
+--- scripts/double_subscript.tex [display] ---
+Input: "x_{i,j}\n"
+Badness: "  x_{i,j}\n"
+Panache: "  x_{i,j}"
+
+--- scripts/double_subscript.tex [environment] ---
+Input: "x_{i,j}\n"
+Badness: "  x_{i,j}\n"
+Panache: "  x_{i,j}"
+
+--- scripts/integral_bounds.tex [display] ---
+Input: "\\int_0^1 x \\, dx\n"
+Badness: "  \\int_0^1 x \\, dx\n"
+Panache: "  \\int_0^1 x \\, dx"
+
+--- scripts/integral_bounds.tex [environment] ---
+Input: "\\int_0^1 x \\, dx\n"
+Badness: "  \\int_0^1 x \\, dx\n"
+Panache: "  \\int_0^1 x \\, dx"
+
+--- scripts/nested_superscript.tex [display] ---
+Input: "e^{x^2}\n"
+Badness: "  e^{x^2}\n"
+Panache: "  e^{x^2}"
+
+--- scripts/nested_superscript.tex [environment] ---
+Input: "e^{x^2}\n"
+Badness: "  e^{x^2}\n"
+Panache: "  e^{x^2}"
+
+--- scripts/prod_bounds.tex [inline] ---
+Input: "\\prod_{k=1}^{m} a_k\n"
+Badness: "\\prod_{k=1}^{m} a_k"
+Panache: "\\prod_{k = 1}^{m} a_k"
+
+--- scripts/prod_bounds.tex [display] ---
+Input: "\\prod_{k=1}^{m} a_k\n"
+Badness: "  \\prod_{k=1}^{m} a_k\n"
+Panache: "  \\prod_{k = 1}^{m} a_k"
+
+--- scripts/prod_bounds.tex [environment] ---
+Input: "\\prod_{k=1}^{m} a_k\n"
+Badness: "  \\prod_{k=1}^{m} a_k\n"
+Panache: "  \\prod_{k = 1}^{m} a_k"
+
+--- scripts/script_on_group.tex [display] ---
+Input: "{a+b}^2\n"
+Badness: "  {a + b}^2\n"
+Panache: "  {a + b}^2"
+
+--- scripts/script_on_group.tex [environment] ---
+Input: "{a+b}^2\n"
+Badness: "  {a + b}^2\n"
+Panache: "  {a + b}^2"
+
+--- scripts/sum_bounds.tex [inline] ---
+Input: "\\sum_{i=1}^{n} i\n"
+Badness: "\\sum_{i=1}^{n} i"
+Panache: "\\sum_{i = 1}^{n} i"
+
+--- scripts/sum_bounds.tex [display] ---
+Input: "\\sum_{i=1}^{n} i\n"
+Badness: "  \\sum_{i=1}^{n} i\n"
+Panache: "  \\sum_{i = 1}^{n} i"
+
+--- scripts/sum_bounds.tex [environment] ---
+Input: "\\sum_{i=1}^{n} i\n"
+Badness: "  \\sum_{i=1}^{n} i\n"
+Panache: "  \\sum_{i = 1}^{n} i"

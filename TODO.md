@@ -279,11 +279,11 @@ formatter-off output byte-identical.
 
 3. **Establish the formatter migration baseline.**
 
-   - [ ] Run the formatter oracle over every applicable shared-corpus case in
+   - [x] Run the formatter oracle over every applicable shared-corpus case in
      inline, display, and environment contexts. Commit a reproducible report
      that classifies parity, controlled-wrapper rejection, and divergence;
      use it to select the first bounded migration slice.
-   - [ ] Expand the shared corpus where the report lacks representative shapes,
+   - [x] Expand the shared corpus where the report lacks representative shapes,
      especially macro-argument whitespace, built-in redefinitions,
      text-domain arguments, malformed recovery, nested
      delimiters/environments, comments, and authored line breaks. Derive

@@ -29,7 +29,7 @@ use panache_parser::syntax::SyntaxNode;
 
 #[path = "common/math_corpus.rs"]
 mod math_corpus;
-use math_corpus::discover_cases;
+use math_corpus::{discover_cases, read_preamble, signature_scope};
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/math_corpus")
@@ -45,14 +45,18 @@ fn context_for(id: &str) -> MathContext {
     }
 }
 
-fn opts(enabled: bool, context: MathContext) -> MathFormatOptions {
+fn opts(
+    enabled: bool,
+    context: MathContext,
+    signature_scope: panache_parser::semantic::math::SignatureScope,
+) -> MathFormatOptions {
     MathFormatOptions {
         enabled,
         math_indent: 2,
         line_width: 80,
         bookdown_equation_labels: false,
         context,
-        signature_scope: Default::default(),
+        signature_scope,
     }
 }
 
@@ -80,6 +84,14 @@ fn corpus_satisfies_math_formatter_properties() {
                 continue;
             }
         };
+        let preamble = match read_preamble(case) {
+            Ok(preamble) => preamble,
+            Err(e) => {
+                failures.push(format!("[{id}] preamble read error: {e}"));
+                continue;
+            }
+        };
+        let signature_scope = signature_scope(preamble.as_deref());
         let context = context_for(&id);
 
         let green = parse_math_content(
@@ -99,7 +111,7 @@ fn corpus_satisfies_math_formatter_properties() {
             continue;
         }
 
-        if format_math(&input, &opts(false, context)).is_some() {
+        if format_math(&input, &opts(false, context, signature_scope.clone())).is_some() {
             failures.push(format!(
                 "[{id}] gate-off should return None (caller emits verbatim):\n  input:\n{}",
                 indent_block(&input),
@@ -107,8 +119,8 @@ fn corpus_satisfies_math_formatter_properties() {
             continue;
         }
 
-        if let Some(once) = format_math(&input, &opts(true, context)) {
-            let twice = format_math(&once, &opts(true, context));
+        if let Some(once) = format_math(&input, &opts(true, context, signature_scope.clone())) {
+            let twice = format_math(&once, &opts(true, context, signature_scope));
             if twice.as_deref() != Some(once.as_str()) {
                 failures.push(format!(
                     "[{id}] idempotency break:\n  pass1:\n{}\n  pass2:\n{}",

@@ -74,25 +74,34 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Typed math CST boundary.** Completed the read-only wrapper surface needed by
-the future Badness-parity lowering without changing parser shape or output.
+**Formatter migration baseline.** Established a pinned, deterministic Badness
+formatter report across all 94 shared cases in inline, display, and environment
+contexts without changing production behavior.
 
-- Added ordered host content segments, host-filtered math elements, and typed
-  source-order views for command arguments and scripts.
-- Added line-break, starred-command, and argument-body accessors; covered
-  malformed groups, modifiers, delimiters, and environments.
-- Adopted command, argument, and scripted-base wrappers in the shared semantic
-  model; parser parity and formatter output remain unchanged.
+- Classified 282 runs as 56 exact matches, 15 controlled oracle rejections, and
+  211 byte-level divergences; display/environment results expose Panache's
+  current trailing-newline difference.
+- Expanded the corpus from 82 to 94 cases, including argument-domain whitespace,
+  redefinitions with same-stem preambles, malformed recovery, nested constructs,
+  comments, and authored breaks. Parser parity is now 92/94, with two explicit
+  Badness wrapper rejections and no structural divergences.
+- Selected inline bodies containing only `MATH_WORD`, `MATH_SPACE`, and
+  `MATH_NEWLINE` as the first migration slice; eight report cases already have
+  exact formatter parity.
 
 ### Suggested next sub-targets
 
-1. Establish the formatter migration baseline across all shared-corpus contexts.
-2. Expand corpus coverage where the baseline exposes missing shapes.
+1. Complete the Panache-owned Badness-style document IR and printer.
+2. Lower the selected flat inline slice into it, retaining the legacy fallback
+   for every unsupported shape.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Typed math CST boundary.** Added typed source-order views and accessors for
+  content, commands, arguments, scripts, delimiters, line breaks, and
+  environments without changing parser shape or formatter output.
 - **Host-owned Bookdown equation labels.** Moved equation labels beside ordered
   math-content segments while preserving ranges and cross-reference behavior.
 - **Conservative argument-contract regressions.** Locked recursive formatting

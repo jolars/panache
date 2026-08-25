@@ -1,8 +1,9 @@
 Badness math parser parity report
 Oracle: badness-parser =0.4.0
 Corpus: ../panache-formatter/tests/fixtures/math_corpus
-Passing: 82 / 82
-Divergent: 0 / 82
+Passing: 92 / 94
+Divergent: 0 / 94
+Oracle rejected: 2 / 94
 
 Regenerate with:
   cargo test -p panache-parser --test math_badness_parity math_badness_full_report -- --ignored --nocapture
@@ -12,9 +13,12 @@ commands/argument_after_comment.tex
 commands/argument_after_newline.tex
 commands/argument_after_space.tex
 commands/big_delimiter_bracket.tex
+commands/math_argument_whitespace.tex
 commands/nested_optional.tex
 commands/optional_argument.tex
 commands/optional_tight_gate.tex
+commands/over_attached_argument.tex
+commands/redefined_frac.tex
 commands/script_command_argument.tex
 commands/script_on_arguments.tex
 commands/script_on_frac.tex
@@ -22,10 +26,15 @@ commands/single_token_commands.tex
 commands/single_token_numeral.tex
 commands/star_optional.tex
 commands/star_variant.tex
+commands/text_argument_whitespace.tex
+commands/unknown_argument_whitespace.tex
 comments/comment_line.tex
+comments/inside_math_argument.tex
 comments/trailing_comment.tex
+display/authored_newline.tex
 display/fraction_block.tex
 display/integral.tex
+display/line_break_comment.tex
 display/line_break_modifiers.tex
 display/long_chain.tex
 display/single_equation.tex
@@ -44,6 +53,7 @@ environments/matrix/bmatrix.tex
 environments/matrix/plain.tex
 environments/matrix/pmatrix.tex
 environments/matrix/three_by_three.tex
+environments/nested/delimited_matrix.tex
 environments/recovery/comment_before_name.tex
 environments/recovery/nested.tex
 environments/recovery/trivia_before_name.tex
@@ -86,9 +96,18 @@ operators/relation_chain.tex
 operators/unary_minus.tex
 scripts/double_subscript.tex
 scripts/integral_bounds.tex
+scripts/missing_argument.tex
 scripts/nested_superscript.tex
 scripts/prod_bounds.tex
 scripts/script_on_group.tex
 scripts/sum_bounds.tex
 
 === Remaining divergences ===
+
+=== Oracle wrapper rejections ===
+
+--- environments/recovery/mismatched.tex ---
+Reason: "wrapper retained \"\\\\begin{aligned}x\" instead of the complete body \"\\\\begin{aligned}x\\\\end{matrix}\\n\""
+
+--- groups/unclosed.tex ---
+Reason: "wrapper was not recognized as inline math"

@@ -40,7 +40,7 @@ use pulldown_latex::{Parser, Storage, push_mathml};
 
 #[path = "common/math_corpus.rs"]
 mod math_corpus;
-use math_corpus::discover_cases;
+use math_corpus::{discover_cases, read_preamble, signature_scope};
 
 const MAX_SKIP_FRACTION: f64 = 0.40;
 
@@ -56,14 +56,17 @@ fn context_for(id: &str) -> MathContext {
     }
 }
 
-fn format_opts(context: MathContext) -> MathFormatOptions {
+fn format_opts(
+    context: MathContext,
+    signature_scope: panache_parser::semantic::math::SignatureScope,
+) -> MathFormatOptions {
     MathFormatOptions {
         enabled: true,
         math_indent: 2,
         line_width: 80,
         bookdown_equation_labels: false,
         context,
-        signature_scope: Default::default(),
+        signature_scope,
     }
 }
 
@@ -131,6 +134,13 @@ fn corpus_cross_validates_against_pulldown_latex() {
                 continue;
             }
         };
+        let preamble = match read_preamble(case) {
+            Ok(preamble) => preamble,
+            Err(e) => {
+                failures.push(format!("[{id}] preamble read error: {e}"));
+                continue;
+            }
+        };
         let context = context_for(&id);
 
         let Some(before) = render_mathml(&input) else {
@@ -138,7 +148,11 @@ fn corpus_cross_validates_against_pulldown_latex() {
             continue;
         };
 
-        let formatted = format_math(&input, &format_opts(context)).unwrap_or_else(|| input.clone());
+        let formatted = format_math(
+            &input,
+            &format_opts(context, signature_scope(preamble.as_deref())),
+        )
+        .unwrap_or_else(|| input.clone());
         let Some(after) = render_mathml(&formatted) else {
             failures.push(format!(
                 "[{id}] format produced oracle-unparseable output:\n  input:\n{}\n  formatted:\n{}",
