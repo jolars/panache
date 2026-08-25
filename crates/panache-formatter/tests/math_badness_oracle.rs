@@ -495,6 +495,19 @@ fn signature_proven_command_migration_slice_matches_badness() {
 }
 
 #[test]
+fn bare_command_migration_slice_matches_badness() {
+    for body in [
+        r"\alpha+\beta",
+        r"a\cdot b",
+        r"x\leq-y",
+        r"\sin x",
+        r"\unknown x",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

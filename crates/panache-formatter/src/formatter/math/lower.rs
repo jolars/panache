@@ -13,7 +13,7 @@ use crate::syntax::{
 
 use super::ir::Ir;
 
-/// Lower inline words, trivia, ordinary groups, and signature-proven commands.
+/// Lower inline words, trivia, ordinary groups, and supported commands.
 ///
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
@@ -22,9 +22,10 @@ pub(super) fn try_lower_inline(content: &MathContent, scope: &SignatureScope) ->
 }
 
 fn lower_elements(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Option<Ir> {
-    if !elements
-        .iter()
-        .all(|element| is_supported_element(element, scope))
+    if has_split_definition_relation(&elements)
+        || !elements
+            .iter()
+            .all(|element| is_supported_element(element, scope))
     {
         return None;
     }
@@ -64,6 +65,27 @@ fn lower_elements(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Optio
     Some(Ir::concat(documents))
 }
 
+fn has_split_definition_relation(elements: &[SyntaxElement]) -> bool {
+    // The legacy renderer repairs this CST boundary into one `:=` atom; keep
+    // the whole list there until the shared semantic stream owns that repair.
+    elements.iter().enumerate().any(|(index, element)| {
+        if !matches!(element, SyntaxElement::Node(node) if MathCommand::cast(node.clone()).is_some()) {
+            return false;
+        }
+        elements[index + 1..]
+            .iter()
+            .find(|candidate| {
+                !matches!(
+                    candidate.kind(),
+                    SyntaxKind::MATH_SPACE | SyntaxKind::MATH_NEWLINE
+                )
+            })
+            .is_some_and(|candidate| {
+                matches!(candidate, SyntaxElement::Token(token) if token.kind() == SyntaxKind::MATH_WORD && token.text().starts_with(":="))
+            })
+    })
+}
+
 fn is_supported_element(element: &SyntaxElement, scope: &SignatureScope) -> bool {
     match element {
         SyntaxElement::Token(token) => matches!(
@@ -77,7 +99,7 @@ fn is_supported_element(element: &SyntaxElement, scope: &SignatureScope) -> bool
                         .body_elements()
                         .all(|element| is_supported_element(&element, scope))
             }) || MathCommand::cast(node.clone())
-                .is_some_and(|command| matched_math_arguments(&command, scope).is_some())
+                .is_some_and(|command| command_is_supported(&command, scope))
         }
     }
 }
@@ -115,8 +137,12 @@ fn atom_document(
 }
 
 fn lower_command(command: &MathCommand, scope: &SignatureScope) -> Option<Ir> {
-    let arguments = matched_math_arguments(command, scope)?;
     let name = command.name_token()?;
+    if is_supported_bare_command(command, scope) {
+        return Some(Ir::verbatim(name.text()));
+    }
+
+    let arguments = matched_math_arguments(command, scope)?;
     let mut previous_end = name.text_range().end();
     let mut documents = vec![Ir::verbatim(name.text())];
     if let Some(star) = command.star_token() {
@@ -134,6 +160,31 @@ fn lower_command(command: &MathCommand, scope: &SignatureScope) -> Option<Ir> {
         previous_end = argument.syntax().text_range().end();
     }
     Some(Ir::concat(documents))
+}
+
+fn command_is_supported(command: &MathCommand, scope: &SignatureScope) -> bool {
+    is_supported_bare_command(command, scope) || matched_math_arguments(command, scope).is_some()
+}
+
+fn is_supported_bare_command(command: &MathCommand, scope: &SignatureScope) -> bool {
+    let Some(name) = command.name() else {
+        return false;
+    };
+    if scope.is_redefined(&name)
+        || command
+            .syntax()
+            .children_with_tokens()
+            .any(|element| element.kind() != SyntaxKind::MATH_CONTROL_WORD)
+    {
+        return false;
+    }
+
+    scope.command_signature(&name).is_none_or(|signature| {
+        signature
+            .arguments
+            .iter()
+            .all(|argument| !argument.required)
+    })
 }
 
 fn matched_math_arguments(
@@ -231,6 +282,7 @@ fn token_slice(range: TextRange, word: &SyntaxToken) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use panache_parser::parser::math::{MathParseOptions, parse_math_content};
+    use panache_parser::parser::parse;
     use panache_parser::semantic::math::SignatureScope;
     use rowan::ast::AstNode;
 
@@ -300,6 +352,33 @@ mod tests {
     }
 
     #[test]
+    fn lowers_bare_commands_through_the_semantic_stream() {
+        let cases = [
+            (r"\alpha+\beta", r"\alpha + \beta"),
+            (r"a\cdot b", r"a \cdot b"),
+            (r"x\leq-y", r"x \leq -y"),
+            (r"\sin x", r"\sin x"),
+            (r"\unknown x", r"\unknown x"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn rejects_redefined_and_incomplete_bare_commands() {
+        for input in [r"\frac", r"\sqrt", r"\text", r"\mu:=\nu"] {
+            assert_eq!(lower(input), None, "{input:?}");
+        }
+
+        let document = parse("\\newcommand{\\leq}{x}\n\n$\\leq$\n", None);
+        let scope = SignatureScope::from_root(&document);
+        assert!(scope.is_redefined("leq"));
+        assert!(try_lower_inline(&content(r"\leq"), &scope).is_none());
+    }
+
+    #[test]
     fn rejects_commands_without_a_complete_math_signature_match() {
         for input in [
             r"\text{ a+b }",
@@ -316,7 +395,6 @@ mod tests {
     #[test]
     fn rejects_every_unsupported_shape_category() {
         let cases = [
-            r"\alpha",
             "x^2",
             "% comment\nx",
             r"a\\b",

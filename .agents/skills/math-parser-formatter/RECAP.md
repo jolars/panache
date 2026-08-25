@@ -74,30 +74,30 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Signature-proven command lowering.** Extended the Panache-owned inline
-lowering slice through complete, closed command signatures whose attached
-arguments are all math-domain.
+**Bare-command lowering.** Extended the Panache-owned inline lowering slice
+through control words without attached arguments.
 
-- Lowered the matching command shell and recursively lowered brace and optional
-  argument bodies through the shared semantic atom stream.
-- Preserved authored attachment gaps as one space, matching Badness; comments,
-  text-domain and unknown commands, redefinitions, missing and over-attached
-  arguments, and malformed groups remain on the legacy path.
-- Added byte-exact Badness parity for `\frac`, `\sqrt`, optional arguments,
-  nested groups, and authored attachment trivia. Marked the first formatter-
-  replacement checklist item complete.
+- Lowered known symbols, named operators, binary and relation commands, and
+  unknown bare commands through the shared semantic atom stream.
+- Kept document-redefined commands, commands missing required signature
+  arguments, and command-adjacent `:=` parser seams on the legacy path,
+  preventing stale or split semantics from affecting their spacing.
+- Added byte-exact Badness parity for representative ordinary, operator,
+  relation, named-operator, and unknown commands.
 
 ### Suggested next sub-targets
 
-1. Lower a bounded bare-command slice through the shared semantic atom stream,
-   with byte-exact Badness parity and redefinition-aware fallbacks.
-2. Lower scripts whose bases and arguments are already supported; keep script
+1. Lower scripts whose bases and arguments are already supported; keep script
    comments, malformed attachment, and unsupported bases on the legacy path.
+2. Lower closed paired delimiters whose bodies are already supported, retaining
+   recovery shapes and unsupported bodies on the legacy path.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Signature-proven command lowering.** Lowered complete math-domain command
+  signatures recursively while preserving unsupported argument contracts.
 - **Ordinary-group typed lowering.** Recursively lowered closed standalone
   groups while preserving each group as one operand in its parent sequence.
 - **Flat-inline typed lowering.** Routed word/trivia-only inline bodies through
