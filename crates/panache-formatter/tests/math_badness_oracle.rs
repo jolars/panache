@@ -621,6 +621,18 @@ fn top_level_edge_comment_migration_slice_matches_badness() {
 }
 
 #[test]
+fn mid_expression_comment_migration_slice_matches_badness() {
+    for body in [
+        "a% operand before comment\n+b",
+        "a+% binary before comment\n-b",
+        "a=% relation before comment\n-b",
+        "\\frac{a % keep this comment\n+b}{c}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",

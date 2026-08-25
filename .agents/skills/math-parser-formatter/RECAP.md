@@ -80,29 +80,30 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Signature-argument edge comments.** Extended typed command lowering through
-comments at the edges of signature-proven math arguments.
+**Mid-expression comment semantics.** Extended typed comment lowering through
+safe mid-expression comments at top level and in signature-proven math
+arguments.
 
-- Lowered leading and same-line trailing comments in required and optional
-  math-domain arguments while preserving each comment's hard newline.
-- Matched Badness's one-column hanging indent for continuation content and a
-  closing delimiter after a trailing comment.
-- Narrowed the nested-comment guard only when the inline typed lowering proves
-  the complete shape safe; unsupported nested comments still bail to verbatim.
-- Added three shared-corpus cases, regenerated the 97-case baseline, and pinned
-  byte-exact inline parity plus idempotency.
+- Sequenced the complete expression before partitioning lowered atoms around
+  comments, preserving operand, binary, and relation context across hard lines.
+- Added focused unit and byte-exact Badness parity coverage, including a nested
+  `\frac` argument, and promoted the existing argument case to inline parity.
+- Added three shared-corpus cases and regenerated the 100-case baseline; inline
+  parity increased from 65 to 69 cases.
 
 ### Suggested next sub-targets
 
-1. Carry semantic operator context across safe mid-expression comments before
-   admitting them to the typed path.
-2. Recursively lower edge comments in ordinary groups and supported scripts,
+1. Recursively lower edge comments in ordinary groups and supported scripts,
    retaining the same aligned-closing rule.
+2. Lower authored breaks after the comment slice reaches the same controlled
+   contexts beyond inline math.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Signature-argument edge comments.** Lowered leading and trailing comments
+  in proven math arguments with Badness-style hanging indentation.
 - **Top-level edge-comment lowering.** Lowered leading and trailing inline
   comments through hard-line IR while preserving unsupported comment fallback.
 - **Nested paired-delimiter lowering.** Recursively lowered closed pairs in

@@ -33,8 +33,11 @@ Returned unchanged, never reflowed:
    single space and the ends trimmed. Spaces are never *removed* (a
    command-terminating space survives: `\alpha   x` → `\alpha x`). A leading
    top-level `%` comment remains on its own line, and a same-line trailing `%`
-   comment retains the newline that terminates it. Mid-expression and nested
-   comments remain on the conservative formatter path.
+   comment retains the newline that terminates it. Safe mid-expression comments
+   retain the preceding atom's semantic context across their hard newline, so a
+   following sign remains binary or unary as authored. The same rule applies in
+   signature-proven math arguments. Comments in ordinary groups and scripts
+   remain on the conservative formatter path.
 
 2. **Display free rows.** Non-environment display content (`$$...$$`) is laid
    out one row per line. Rows split on a top-level `\\` (hard break, kept) or a

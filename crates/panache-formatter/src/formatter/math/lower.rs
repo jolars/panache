@@ -35,22 +35,9 @@ fn lower_edge_comments(
     scope: &SignatureScope,
     spacing: Spacing,
 ) -> Option<Ir> {
-    // A comment between semantic atoms needs the preceding role carried across
-    // its hard break. Keep that context-sensitive case on the legacy path.
-    let first_content = elements.iter().position(|element| {
-        !is_layout_trivia(element) && element.kind() != SyntaxKind::MATH_COMMENT
-    });
-    let last_content = elements.iter().rposition(|element| {
-        !is_layout_trivia(element) && element.kind() != SyntaxKind::MATH_COMMENT
-    });
-    if elements.iter().enumerate().any(|(index, element)| {
-        element.kind() == SyntaxKind::MATH_COMMENT
-            && first_content.is_some_and(|first| index > first)
-            && last_content.is_some_and(|last| index < last)
-    }) {
-        return None;
-    }
-
+    // Sequence once before splitting at comments so a following sign retains
+    // the operand, binary, or relation context authored before the hard break.
+    let semantic_atoms = semantic_math_atoms_in(elements.iter().cloned()).collect::<Vec<_>>();
     let mut documents = Vec::new();
     let mut segment_start = 0;
     for (index, comment) in elements.iter().enumerate() {
@@ -58,10 +45,14 @@ fn lower_edge_comments(
             continue;
         }
         let segment = &elements[segment_start..index];
-        let has_content = semantic_math_atoms_in(segment.iter().cloned())
-            .next()
-            .is_some();
-        documents.push(lower_elements(segment.to_vec(), scope, spacing)?);
+        let segment_atoms = semantic_atoms_for(segment, &semantic_atoms);
+        let has_content = !segment_atoms.is_empty();
+        documents.push(lower_elements_with_atoms(
+            segment.to_vec(),
+            segment_atoms,
+            scope,
+            spacing,
+        )?);
         if has_content {
             let trailing_trivia = segment
                 .iter()
@@ -82,16 +73,44 @@ fn lower_edge_comments(
         documents.extend([Ir::verbatim(comment.to_string()), Ir::HardLine]);
         segment_start = index + 1;
     }
-    documents.push(lower_elements(
-        elements[segment_start..].to_vec(),
+    let segment = &elements[segment_start..];
+    documents.push(lower_elements_with_atoms(
+        segment.to_vec(),
+        semantic_atoms_for(segment, &semantic_atoms),
         scope,
         spacing,
     )?);
     Some(Ir::concat(documents))
 }
 
+fn semantic_atoms_for(
+    elements: &[SyntaxElement],
+    semantic_atoms: &[SemanticMathAtom],
+) -> Vec<SemanticMathAtom> {
+    semantic_atoms
+        .iter()
+        .copied()
+        .filter(|atom| {
+            elements.iter().any(|element| {
+                element.text_range().start() <= atom.range.start()
+                    && element.text_range().end() >= atom.range.end()
+            })
+        })
+        .collect()
+}
+
 fn lower_elements(
     elements: Vec<SyntaxElement>,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
+    let semantic_atoms = semantic_math_atoms_in(elements.iter().cloned()).collect();
+    lower_elements_with_atoms(elements, semantic_atoms, scope, spacing)
+}
+
+fn lower_elements_with_atoms(
+    elements: Vec<SyntaxElement>,
+    semantic_atoms: Vec<SemanticMathAtom>,
     scope: &SignatureScope,
     spacing: Spacing,
 ) -> Option<Ir> {
@@ -107,7 +126,7 @@ fn lower_elements(
     let mut pieces = Vec::new();
     let mut previous_end = None;
 
-    for atom in semantic_math_atoms_in(elements.iter().cloned()) {
+    for atom in semantic_atoms {
         let atom_document = atom_document(atom, &elements, scope, spacing)?;
         pieces.push(Piece {
             role: Role::from(atom.break_priority),
@@ -724,6 +743,10 @@ mod tests {
                 "\\frac{a + b % numerator\n }{c}",
             ),
             ("\\sqrt[% index\n n+1]{x}", "\\sqrt[% index\n n + 1]{x}"),
+            (
+                "\\frac{a % keep this comment\n+b}{c}",
+                "\\frac{a % keep this comment\n + b}{c}",
+            ),
         ];
 
         for (input, expected) in cases {
@@ -866,6 +889,28 @@ mod tests {
     }
 
     #[test]
+    fn carries_operator_context_across_mid_expression_comments() {
+        let cases = [
+            (
+                "a% operand before comment\n+b",
+                "a% operand before comment\n+ b",
+            ),
+            (
+                "a+% binary before comment\n-b",
+                "a +% binary before comment\n-b",
+            ),
+            (
+                "a=% relation before comment\n-b",
+                "a =% relation before comment\n-b",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_malformed_and_unsupported_scripts() {
         for input in [
             "x^",
@@ -923,9 +968,7 @@ mod tests {
         let cases = [
             "x:=y",
             "a::=b",
-            "a% mid-expression\n+b",
             "a+b\n% own line",
-            "\\frac{a % nested\n+b}{c}",
             r"a\\b",
             "a&b",
             r"\begin{matrix}x\end{matrix}",

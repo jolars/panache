@@ -1,11 +1,11 @@
 Badness math formatter parity baseline
 Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
-Cases: 97
-Context runs: 291
-Parity: 65 / 291
-Controlled wrapper rejection: 15 / 291
-Divergent: 211 / 291
+Cases: 100
+Context runs: 300
+Parity: 69 / 300
+Controlled wrapper rejection: 15 / 300
+Divergent: 216 / 300
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,9 +15,9 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 65, rejected 5, divergent 27
-display: parity 0, rejected 5, divergent 92
-environment: parity 0, rejected 5, divergent 92
+inline: parity 69, rejected 5, divergent 26
+display: parity 0, rejected 5, divergent 95
+environment: parity 0, rejected 5, divergent 95
 
 === First-slice parity candidates ===
 display/authored_newline.tex [inline]
@@ -47,6 +47,10 @@ commands/unknown_argument_whitespace.tex [inline]
 comments/argument_leading.tex [inline]
 comments/argument_trailing.tex [inline]
 comments/comment_line.tex [inline]
+comments/inside_math_argument.tex [inline]
+comments/mid_expression_after_binary.tex [inline]
+comments/mid_expression_after_operand.tex [inline]
+comments/mid_expression_after_relation.tex [inline]
 comments/optional_argument_leading.tex [inline]
 comments/trailing_comment.tex [inline]
 display/authored_newline.tex [inline]
@@ -390,11 +394,6 @@ Input: "% leading comment\nx = 1\n"
 Badness: "  % leading comment\n  x = 1\n"
 Panache: "  % leading comment\n  x = 1"
 
---- comments/inside_math_argument.tex [inline] ---
-Input: "\\frac{a % keep this comment\n+ b}{c}\n"
-Badness: "\\frac{a % keep this comment\n + b}{c}"
-Panache: <declined>
-
 --- comments/inside_math_argument.tex [display] ---
 Input: "\\frac{a % keep this comment\n+ b}{c}\n"
 Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
@@ -404,6 +403,36 @@ Panache: <declined>
 Input: "\\frac{a % keep this comment\n+ b}{c}\n"
 Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
 Panache: <declined>
+
+--- comments/mid_expression_after_binary.tex [display] ---
+Input: "a+% binary before comment\n-b\n"
+Badness: "  a +% binary before comment\n  -b\n"
+Panache: "  a + % binary before comment\n  -b"
+
+--- comments/mid_expression_after_binary.tex [environment] ---
+Input: "a+% binary before comment\n-b\n"
+Badness: "  a +% binary before comment\n  -b\n"
+Panache: "  a + % binary before comment\n  -b"
+
+--- comments/mid_expression_after_operand.tex [display] ---
+Input: "a% operand before comment\n+b\n"
+Badness: "  a% operand before comment\n  + b\n"
+Panache: "  a% operand before comment\n  +b"
+
+--- comments/mid_expression_after_operand.tex [environment] ---
+Input: "a% operand before comment\n+b\n"
+Badness: "  a% operand before comment\n  + b\n"
+Panache: "  a% operand before comment\n  +b"
+
+--- comments/mid_expression_after_relation.tex [display] ---
+Input: "a=% relation before comment\n-b\n"
+Badness: "  a =% relation before comment\n  -b\n"
+Panache: "  a = % relation before comment\n  -b"
+
+--- comments/mid_expression_after_relation.tex [environment] ---
+Input: "a=% relation before comment\n-b\n"
+Badness: "  a =% relation before comment\n  -b\n"
+Panache: "  a = % relation before comment\n  -b"
 
 --- comments/optional_argument_leading.tex [display] ---
 Input: "\\sqrt[% index\n n+1]{x}\n"
