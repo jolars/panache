@@ -40,6 +40,7 @@ fn is_math_content_token(kind: SyntaxKind) -> bool {
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DisplayMath(SyntaxNode);
 
 impl AstNode for DisplayMath {
@@ -63,6 +64,12 @@ impl AstNode for DisplayMath {
 }
 
 impl DisplayMath {
+    /// Ordered TeX-content and host equation-label segments between the math
+    /// delimiters.
+    pub fn content_segments(&self) -> impl Iterator<Item = MathContentSegment> + '_ {
+        math_content_segments(&self.0)
+    }
+
     pub fn opening_marker(&self) -> Option<String> {
         self.0.children_with_tokens().find_map(|child| {
             child.into_token().and_then(|token| {
@@ -126,6 +133,7 @@ impl DisplayMath {
 /// The `MATH_CONTENT` subtree root: the parsed TeX content between (but
 /// excluding) the math delimiters. Spliced into the host document tree, so its
 /// tokens carry host-aligned ranges.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathContent(SyntaxNode);
 
 impl AstNode for MathContent {
@@ -145,13 +153,61 @@ impl AstNode for MathContent {
 }
 
 impl MathContent {
+    /// The math-owned direct elements in source order.
+    ///
+    /// Host container prefixes interleaved by block parsing are omitted.
+    pub fn elements(&self) -> impl Iterator<Item = SyntaxElement> + '_ {
+        self.0
+            .children_with_tokens()
+            .filter(is_math_content_element)
+    }
+
+    /// Reconstruct the math source while excluding interleaved host prefixes.
+    pub fn text(&self) -> String {
+        math_content_text(&self.0)
+    }
+
     /// Structural problems in this subtree (see [`math_diagnostics`]).
     pub fn diagnostics(&self) -> Vec<MathDiagnostic> {
         math_diagnostics(&self.0)
     }
 }
 
+/// One ordered host-level segment inside inline or display math.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MathContentSegment {
+    /// A native TeX-math content subtree.
+    Content(MathContent),
+    /// A Bookdown equation label owned by the Markdown host.
+    EquationLabel(SyntaxToken),
+}
+
+impl MathContentSegment {
+    /// Reconstruct this segment's source bytes.
+    pub fn text(&self) -> String {
+        match self {
+            Self::Content(content) => content.text(),
+            Self::EquationLabel(token) => token.text().to_owned(),
+        }
+    }
+}
+
+/// Ordered typed content segments belonging to an inline or display math host.
+pub fn math_content_segments(math: &SyntaxNode) -> impl Iterator<Item = MathContentSegment> + '_ {
+    math.children_with_tokens()
+        .filter_map(|element| match element {
+            rowan::NodeOrToken::Node(node) => {
+                MathContent::cast(node).map(MathContentSegment::Content)
+            }
+            rowan::NodeOrToken::Token(token) if token.kind() == SyntaxKind::MATH_EQUATION_LABEL => {
+                Some(MathContentSegment::EquationLabel(token))
+            }
+            _ => None,
+        })
+}
+
 /// An atom with one or more attached subscript or superscript nodes.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathScripted(SyntaxNode);
 
 impl AstNode for MathScripted {
@@ -195,9 +251,66 @@ impl MathScripted {
     pub fn superscript(&self) -> Option<MathSuperscript> {
         self.0.children().find_map(MathSuperscript::cast)
     }
+
+    /// Every attached script in source order.
+    pub fn scripts(&self) -> impl Iterator<Item = MathScript> + '_ {
+        self.0.children().filter_map(MathScript::cast)
+    }
+}
+
+/// A subscript or superscript attached to a scripted base.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MathScript {
+    Subscript(MathSubscript),
+    Superscript(MathSuperscript),
+}
+
+impl AstNode for MathScript {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        matches!(
+            kind,
+            SyntaxKind::MATH_SUBSCRIPT | SyntaxKind::MATH_SUPERSCRIPT
+        )
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        match syntax.kind() {
+            SyntaxKind::MATH_SUBSCRIPT => MathSubscript::cast(syntax).map(Self::Subscript),
+            SyntaxKind::MATH_SUPERSCRIPT => MathSuperscript::cast(syntax).map(Self::Superscript),
+            _ => None,
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        match self {
+            Self::Subscript(script) => script.syntax(),
+            Self::Superscript(script) => script.syntax(),
+        }
+    }
+}
+
+impl MathScript {
+    /// The `_` or `^` marker token.
+    pub fn marker_token(&self) -> Option<SyntaxToken> {
+        match self {
+            Self::Subscript(script) => script.marker_token(),
+            Self::Superscript(script) => script.marker_token(),
+        }
+    }
+
+    /// The optional one-atom argument after the marker and layout trivia.
+    pub fn argument(&self) -> Option<SyntaxElement> {
+        match self {
+            Self::Subscript(script) => script.argument(),
+            Self::Superscript(script) => script.argument(),
+        }
+    }
 }
 
 /// An `_` marker and its optional one-atom argument.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathSubscript(SyntaxNode);
 
 impl AstNode for MathSubscript {
@@ -229,6 +342,7 @@ impl MathSubscript {
 }
 
 /// A `^` marker and its optional one-atom argument.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathSuperscript(SyntaxNode);
 
 impl AstNode for MathSuperscript {
@@ -261,6 +375,7 @@ impl MathSuperscript {
 
 /// A control word together with the brace and optional arguments it owns
 /// (`\sqrt[3]{x}`, or a bare `\alpha` with none).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathCommand(SyntaxNode);
 
 impl AstNode for MathCommand {
@@ -308,9 +423,84 @@ impl MathCommand {
     pub fn optionals(&self) -> impl Iterator<Item = MathOptional> + '_ {
         self.0.children().filter_map(MathOptional::cast)
     }
+
+    /// Every greedily attached brace or bracket argument in source order.
+    pub fn attached_arguments(&self) -> impl Iterator<Item = MathArgument> + '_ {
+        self.0.children().filter_map(MathArgument::cast)
+    }
+
+    /// A tightly attached starred-variant marker, when present.
+    pub fn star_token(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|element| element.into_token())
+            .find(|token| token.kind() == SyntaxKind::MATH_WORD && token.text() == "*")
+    }
+}
+
+/// A greedily attached command argument.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MathArgument {
+    Brace(MathGroup),
+    Bracket(MathOptional),
+}
+
+impl AstNode for MathArgument {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        matches!(kind, SyntaxKind::MATH_GROUP | SyntaxKind::MATH_OPTIONAL)
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        match syntax.kind() {
+            SyntaxKind::MATH_GROUP => MathGroup::cast(syntax).map(Self::Brace),
+            SyntaxKind::MATH_OPTIONAL => MathOptional::cast(syntax).map(Self::Bracket),
+            _ => None,
+        }
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        match self {
+            Self::Brace(group) => group.syntax(),
+            Self::Bracket(optional) => optional.syntax(),
+        }
+    }
+}
+
+impl MathArgument {
+    /// The opening `{` or `[` token.
+    pub fn open_token(&self) -> Option<SyntaxToken> {
+        match self {
+            Self::Brace(group) => group.open_token(),
+            Self::Bracket(optional) => optional.open_token(),
+        }
+    }
+
+    /// The closing `}` or `]` token, absent for malformed input.
+    pub fn close_token(&self) -> Option<SyntaxToken> {
+        match self {
+            Self::Brace(group) => group.close_token(),
+            Self::Bracket(optional) => optional.close_token(),
+        }
+    }
+
+    /// Whether this argument carries its matching closing delimiter.
+    pub fn is_closed(&self) -> bool {
+        self.close_token().is_some()
+    }
+
+    /// Direct argument-body elements without the argument's outer delimiters.
+    pub fn body_elements(&self) -> std::vec::IntoIter<SyntaxElement> {
+        match self {
+            Self::Brace(group) => group.body_elements(),
+            Self::Bracket(optional) => optional.body_elements(),
+        }
+    }
 }
 
 /// A `[ ... ]` optional argument.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathOptional(SyntaxNode);
 
 impl AstNode for MathOptional {
@@ -344,9 +534,59 @@ impl MathOptional {
     pub fn is_closed(&self) -> bool {
         self.close_token().is_some()
     }
+
+    /// Direct body elements without the outer `[` and matching terminal `]`.
+    pub fn body_elements(&self) -> std::vec::IntoIter<SyntaxElement> {
+        bracketed_body_elements(
+            &self.0,
+            SyntaxKind::MATH_BRACKET_OPEN,
+            SyntaxKind::MATH_BRACKET_CLOSE,
+        )
+    }
+}
+
+/// A `\\` row terminator with optional star and bracket modifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MathLineBreak(SyntaxNode);
+
+impl AstNode for MathLineBreak {
+    type Language = PanacheLanguage;
+
+    fn can_cast(kind: SyntaxKind) -> bool {
+        kind == SyntaxKind::MATH_LINE_BREAK
+    }
+
+    fn cast(syntax: SyntaxNode) -> Option<Self> {
+        Self::can_cast(syntax.kind()).then_some(Self(syntax))
+    }
+
+    fn syntax(&self) -> &SyntaxNode {
+        &self.0
+    }
+}
+
+impl MathLineBreak {
+    /// The `\\` control-symbol token.
+    pub fn marker_token(&self) -> Option<SyntaxToken> {
+        token_child(&self.0, SyntaxKind::MATH_CONTROL_SYMBOL)
+    }
+
+    /// The optional `*` marker.
+    pub fn star_token(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|element| element.into_token())
+            .find(|token| token.kind() == SyntaxKind::MATH_WORD && token.text() == "*")
+    }
+
+    /// The optional bracket modifier, such as `[1ex]`.
+    pub fn modifier(&self) -> Option<MathOptional> {
+        self.0.children().find_map(MathOptional::cast)
+    }
 }
 
 /// A `{ ... }` brace group.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathGroup(SyntaxNode);
 
 impl AstNode for MathGroup {
@@ -380,9 +620,19 @@ impl MathGroup {
     pub fn is_closed(&self) -> bool {
         self.close_token().is_some()
     }
+
+    /// Direct body elements without the outer `{` and matching terminal `}`.
+    pub fn body_elements(&self) -> std::vec::IntoIter<SyntaxElement> {
+        bracketed_body_elements(
+            &self.0,
+            SyntaxKind::MATH_GROUP_OPEN,
+            SyntaxKind::MATH_GROUP_CLOSE,
+        )
+    }
 }
 
 /// A `\begin{env} ... \end{env}` environment.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathEnvironment(SyntaxNode);
 
 impl AstNode for MathEnvironment {
@@ -444,6 +694,7 @@ impl MathEnvironment {
 }
 
 /// A `\begin{name}` environment opener.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathBegin(SyntaxNode);
 
 impl AstNode for MathBegin {
@@ -480,6 +731,7 @@ impl MathBegin {
 }
 
 /// A `\end{name}` environment closer.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathEnd(SyntaxNode);
 
 impl AstNode for MathEnd {
@@ -516,6 +768,7 @@ impl MathEnd {
 }
 
 /// The `{name}` group owned by an environment delimiter.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathNameGroup(SyntaxNode);
 
 impl AstNode for MathNameGroup {
@@ -558,6 +811,7 @@ impl MathNameGroup {
 }
 
 /// A `\left<d> ... \right<d>` paired-delimiter run.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MathDelimited(SyntaxNode);
 
 impl AstNode for MathDelimited {
@@ -830,6 +1084,52 @@ fn script_argument(node: &SyntaxNode) -> Option<SyntaxElement> {
     })
 }
 
+fn bracketed_body_elements(
+    node: &SyntaxNode,
+    open_kind: SyntaxKind,
+    close_kind: SyntaxKind,
+) -> std::vec::IntoIter<SyntaxElement> {
+    let mut elements: Vec<_> = node
+        .children_with_tokens()
+        .filter(is_math_content_element)
+        .collect();
+    if elements
+        .first()
+        .is_some_and(|element| element.kind() == open_kind)
+    {
+        elements.remove(0);
+    }
+    if elements
+        .last()
+        .is_some_and(|element| element.kind() == close_kind)
+    {
+        elements.pop();
+    }
+    elements.into_iter()
+}
+
+fn is_math_content_element(element: &SyntaxElement) -> bool {
+    match element {
+        rowan::NodeOrToken::Node(node) => matches!(
+            node.kind(),
+            SyntaxKind::MATH_CONTENT
+                | SyntaxKind::MATH_GROUP
+                | SyntaxKind::MATH_OPTIONAL
+                | SyntaxKind::MATH_ENVIRONMENT
+                | SyntaxKind::MATH_BEGIN
+                | SyntaxKind::MATH_END
+                | SyntaxKind::MATH_NAME_GROUP
+                | SyntaxKind::MATH_DELIMITED
+                | SyntaxKind::MATH_SCRIPTED
+                | SyntaxKind::MATH_SUBSCRIPT
+                | SyntaxKind::MATH_SUPERSCRIPT
+                | SyntaxKind::MATH_COMMAND
+                | SyntaxKind::MATH_LINE_BREAK
+        ),
+        rowan::NodeOrToken::Token(token) => is_math_content_token(token.kind()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -955,6 +1255,242 @@ mod tests {
             Some("]")
         );
         assert!(optional.is_closed());
+    }
+
+    #[test]
+    fn typed_command_arguments_preserve_source_order_and_bodies() {
+        let node = SyntaxNode::new_root(parse_math_content(
+            r"\sqrt[3]{x}{extra}",
+            MathParseOptions::default(),
+        ));
+        let command = node
+            .children()
+            .find_map(MathCommand::cast)
+            .expect("command");
+
+        let arguments: Vec<_> = command.attached_arguments().collect();
+        assert_eq!(arguments.len(), 3);
+        assert!(matches!(arguments[0], MathArgument::Bracket(_)));
+        assert!(matches!(arguments[1], MathArgument::Brace(_)));
+        assert!(matches!(arguments[2], MathArgument::Brace(_)));
+        assert_eq!(
+            arguments
+                .iter()
+                .map(|argument| {
+                    argument
+                        .body_elements()
+                        .map(|element| element.to_string())
+                        .collect::<String>()
+                })
+                .collect::<Vec<_>>(),
+            ["3", "x", "extra"]
+        );
+    }
+
+    #[test]
+    fn typed_command_wrapper_exposes_attached_star() {
+        let node = SyntaxNode::new_root(parse_math_content(
+            r"\operatorname*{arg}",
+            MathParseOptions::default(),
+        ));
+        let command = node
+            .children()
+            .find_map(MathCommand::cast)
+            .expect("command");
+
+        assert_eq!(
+            command.star_token().as_ref().map(SyntaxToken::text),
+            Some("*")
+        );
+    }
+
+    #[test]
+    fn typed_scripts_preserve_source_order() {
+        let node = SyntaxNode::new_root(parse_math_content("x^a_b^c", MathParseOptions::default()));
+        let scripted = node
+            .children()
+            .find_map(MathScripted::cast)
+            .expect("scripted atom");
+
+        let scripts: Vec<_> = scripted.scripts().collect();
+        assert!(matches!(scripts[0], MathScript::Superscript(_)));
+        assert!(matches!(scripts[1], MathScript::Subscript(_)));
+        assert!(matches!(scripts[2], MathScript::Superscript(_)));
+        assert_eq!(
+            scripts
+                .iter()
+                .filter_map(MathScript::argument)
+                .map(|argument| argument.to_string())
+                .collect::<Vec<_>>(),
+            ["a", "b", "c"]
+        );
+    }
+
+    #[test]
+    fn typed_line_break_exposes_star_and_optional_modifier() {
+        let node = SyntaxNode::new_root(parse_math_content(
+            r"a\\*[1ex]b",
+            MathParseOptions::default(),
+        ));
+        let line_break = node
+            .children()
+            .find_map(MathLineBreak::cast)
+            .expect("line break");
+
+        assert_eq!(
+            line_break.marker_token().as_ref().map(SyntaxToken::text),
+            Some(r"\\")
+        );
+        assert_eq!(
+            line_break.star_token().as_ref().map(SyntaxToken::text),
+            Some("*")
+        );
+        let modifier = line_break.modifier().expect("line-break modifier");
+        assert_eq!(
+            modifier
+                .body_elements()
+                .map(|element| element.to_string())
+                .collect::<String>(),
+            "1ex"
+        );
+    }
+
+    #[test]
+    fn typed_line_break_preserves_an_unclosed_modifier() {
+        let node =
+            SyntaxNode::new_root(parse_math_content(r"a\\[1ex", MathParseOptions::default()));
+        let line_break = node
+            .children()
+            .find_map(MathLineBreak::cast)
+            .expect("line break");
+
+        assert!(line_break.star_token().is_none());
+        let modifier = line_break.modifier().expect("line-break modifier");
+        assert!(!modifier.is_closed());
+        assert_eq!(
+            modifier
+                .body_elements()
+                .map(|element| element.to_string())
+                .collect::<String>(),
+            "1ex"
+        );
+    }
+
+    #[test]
+    fn typed_content_segments_keep_host_labels_between_tex_segments() {
+        let mut options = crate::ParserOptions::default();
+        options.extensions.bookdown_equation_references = true;
+        let tree = parse(r"$x (\#eq:inline) + y$", Some(options));
+        let math = tree
+            .descendants()
+            .find_map(InlineMath::cast)
+            .expect("inline math");
+
+        let segments: Vec<_> = math.content_segments().collect();
+        assert_eq!(segments.len(), 3);
+        assert!(matches!(segments[0], MathContentSegment::Content(_)));
+        assert!(matches!(segments[1], MathContentSegment::EquationLabel(_)));
+        assert!(matches!(segments[2], MathContentSegment::Content(_)));
+        assert_eq!(
+            segments
+                .iter()
+                .map(MathContentSegment::text)
+                .collect::<Vec<_>>(),
+            ["x ", r"(\#eq:inline)", " + y"]
+        );
+    }
+
+    #[test]
+    fn typed_display_content_segments_keep_host_labels_in_order() {
+        let mut options = crate::ParserOptions::default();
+        options.extensions.bookdown_equation_references = true;
+        let tree = parse("$$x (\\#eq:display) + y$$\n", Some(options));
+        let math = tree
+            .descendants()
+            .find_map(DisplayMath::cast)
+            .expect("display math");
+
+        assert_eq!(
+            math.content_segments()
+                .map(|segment| segment.text())
+                .collect::<Vec<_>>(),
+            ["x ", r"(\#eq:display)", " + y"]
+        );
+    }
+
+    #[test]
+    fn typed_math_content_elements_exclude_container_prefixes() {
+        let tree = parse("> $x\n>  + y$\n", None);
+        let content = tree
+            .descendants()
+            .find_map(MathContent::cast)
+            .expect("math content");
+
+        assert_eq!(content.text(), "x\n + y");
+        assert_eq!(
+            content
+                .elements()
+                .map(|element| element.to_string())
+                .collect::<String>(),
+            "x\n + y"
+        );
+    }
+
+    #[test]
+    fn typed_argument_body_preserves_nested_and_malformed_content() {
+        let node = SyntaxNode::new_root(parse_math_content(
+            "\\foo{a{b}% note\n c",
+            MathParseOptions::default(),
+        ));
+        let command = node
+            .children()
+            .find_map(MathCommand::cast)
+            .expect("command");
+        let argument = command
+            .attached_arguments()
+            .next()
+            .expect("attached argument");
+
+        assert!(!argument.is_closed());
+        assert_eq!(
+            argument
+                .body_elements()
+                .map(|element| element.to_string())
+                .collect::<String>(),
+            "a{b}% note\n c"
+        );
+    }
+
+    #[test]
+    fn typed_delimiter_and_environment_access_respects_recovery_shapes() {
+        let delimited_tree =
+            SyntaxNode::new_root(parse_math_content(r"\left( x", MathParseOptions::default()));
+        assert_eq!(
+            delimited_tree
+                .children()
+                .filter_map(MathDelimited::cast)
+                .count(),
+            0
+        );
+        assert_eq!(
+            math_diagnostics(&delimited_tree)
+                .into_iter()
+                .map(|diagnostic| diagnostic.kind)
+                .collect::<Vec<_>>(),
+            [MathDiagnosticKind::UnclosedDelimiter]
+        );
+
+        let environment_tree = SyntaxNode::new_root(parse_math_content(
+            r"\begin{aligned}x",
+            MathParseOptions::default(),
+        ));
+        let environment = environment_tree
+            .children()
+            .find_map(MathEnvironment::cast)
+            .expect("environment");
+        assert_eq!(environment.begin_name().as_deref(), Some("aligned"));
+        assert!(environment.end().is_none());
+        assert!(!environment.is_closed());
     }
 
     #[test]

@@ -10,7 +10,10 @@ use std::sync::LazyLock;
 
 use rowan::{TextRange, TextSize};
 
-use crate::syntax::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+use crate::syntax::{
+    AstNode, MathArgument, MathCommand, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode,
+    SyntaxToken,
+};
 
 /// The useful TeX math-atom class family.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -309,30 +312,12 @@ fn token_info(token: &SyntaxToken) -> MathAtomInfo {
 
 fn node_info(node: &SyntaxNode) -> MathAtomInfo {
     match node.kind() {
-        SyntaxKind::MATH_COMMAND => node
-            .children_with_tokens()
-            .filter_map(SyntaxElement::into_token)
-            .find(|token| {
-                matches!(
-                    token.kind(),
-                    SyntaxKind::MATH_CONTROL_WORD | SyntaxKind::MATH_CONTROL_SYMBOL
-                )
-            })
+        SyntaxKind::MATH_COMMAND => MathCommand::cast(node.clone())
+            .and_then(|command| command.name_token())
             .as_ref()
             .map_or_else(MathAtomInfo::default, token_info),
-        SyntaxKind::MATH_SCRIPTED => node
-            .children_with_tokens()
-            .find(|element| {
-                !matches!(
-                    element.kind(),
-                    SyntaxKind::MATH_SPACE
-                        | SyntaxKind::MATH_NEWLINE
-                        | SyntaxKind::MATH_SUBSCRIPT
-                        | SyntaxKind::MATH_SUPERSCRIPT
-                        | SyntaxKind::LINE_PREFIX
-                        | SyntaxKind::NEWLINE
-                )
-            })
+        SyntaxKind::MATH_SCRIPTED => MathScripted::cast(node.clone())
+            .and_then(|scripted| scripted.base())
             .and_then(|base| math_atoms(&base).next())
             .map_or_else(MathAtomInfo::default, |base| {
                 atom_info(base.class, base.delimiter)
@@ -563,17 +548,16 @@ pub fn argument_domain(group: &SyntaxNode) -> ArgumentDomain {
 
 /// Return an attached math argument's domain using a precomputed document scope.
 pub fn argument_domain_with_scope(group: &SyntaxNode, scope: &SignatureScope) -> ArgumentDomain {
-    match group.kind() {
-        SyntaxKind::MATH_GROUP | SyntaxKind::MATH_OPTIONAL => {}
-        _ => return ArgumentDomain::Unknown,
-    }
+    let Some(argument) = MathArgument::cast(group.clone()) else {
+        return ArgumentDomain::Unknown;
+    };
     let Some(owner) = group.parent() else {
         return ArgumentDomain::Unknown;
     };
-    if owner.kind() != SyntaxKind::MATH_COMMAND {
+    let Some(command) = MathCommand::cast(owner) else {
         return ArgumentDomain::Unknown;
-    }
-    let Some(name) = command_name(&owner) else {
+    };
+    let Some(name) = command.name() else {
         return ArgumentDomain::Unknown;
     };
     let Some(signature) = scope.command_signature(&name) else {
@@ -581,15 +565,14 @@ pub fn argument_domain_with_scope(group: &SyntaxNode, scope: &SignatureScope) ->
     };
 
     let mut slot = 0;
-    for candidate in owner.children() {
-        let candidate_kind = match candidate.kind() {
-            SyntaxKind::MATH_GROUP => ArgKind::Brace,
-            SyntaxKind::MATH_OPTIONAL => ArgKind::Bracket,
-            _ => continue,
+    for candidate in command.attached_arguments() {
+        let candidate_kind = match candidate {
+            MathArgument::Brace(_) => ArgKind::Brace,
+            MathArgument::Bracket(_) => ArgKind::Bracket,
         };
         let domain = match_arg_slot(&signature.arguments, &mut slot, candidate_kind)
             .map_or(ArgumentDomain::Unknown, |argument| argument.domain);
-        if candidate == *group {
+        if candidate.syntax() == argument.syntax() {
             return domain;
         }
     }
@@ -675,17 +658,6 @@ fn skip_tex_trivia(text: &str, mut cursor: usize) -> usize {
             .find('\n')
             .map_or(bytes.len(), |offset| cursor + offset + 1);
     }
-}
-
-fn command_name(command: &SyntaxNode) -> Option<String> {
-    command
-        .children_with_tokens()
-        .find_map(|element| match element {
-            SyntaxElement::Token(token) if token.kind() == SyntaxKind::MATH_CONTROL_WORD => {
-                token.text().strip_prefix('\\').map(str::to_owned)
-            }
-            _ => None,
-        })
 }
 
 #[cfg(test)]

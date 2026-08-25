@@ -271,7 +271,7 @@ formatter-off output byte-identical.
      and formatter regressions for inline/display math, blockquotes, lists,
      raw math environments, delimiter extensions, and unavoidable host
      trivia.
-   - [ ] Complete typed access to every CST shape the formatter and downstream
+   - [x] Complete typed access to every CST shape the formatter and downstream
      consumers need—content, commands, attached brace/bracket arguments,
      scripts, delimiters, line breaks, and environments. Keep rows and cells
      as formatter-layout concepts derived from `&` and `\\`, not new CST

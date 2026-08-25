@@ -2,6 +2,7 @@
 
 use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InlineMath(SyntaxNode);
 
 impl AstNode for InlineMath {
@@ -25,6 +26,12 @@ impl AstNode for InlineMath {
 }
 
 impl InlineMath {
+    /// Ordered TeX-content and host equation-label segments between the math
+    /// delimiters.
+    pub fn content_segments(&self) -> impl Iterator<Item = super::math::MathContentSegment> + '_ {
+        super::math::math_content_segments(&self.0)
+    }
+
     pub fn opening_marker(&self) -> Option<String> {
         self.0.children_with_tokens().find_map(|child| {
             child.into_token().and_then(|token| {

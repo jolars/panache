@@ -74,26 +74,27 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Host-owned Bookdown equation labels.** Moved `MATH_EQUATION_LABEL` tokens
-beside ordered `MATH_CONTENT` segments while preserving host-aligned ranges and
-cross-reference indexing.
+**Typed math CST boundary.** Completed the read-only wrapper surface needed by
+the future Badness-parity lowering without changing parser shape or output.
 
-- Reconstructed math text across all TeX segments and intervening host labels,
-  mechanically excluding injected blockquote and list prefixes.
-- Added parser and formatter coverage for inline/display math, raw math
-  environments, blockquotes, lists, GFM/backslash delimiters, gate-on
-  formatting, and gate-off byte preservation.
-- Retained label source ranges and existing linter/LSP cross-reference behavior.
+- Added ordered host content segments, host-filtered math elements, and typed
+  source-order views for command arguments and scripts.
+- Added line-break, starred-command, and argument-body accessors; covered
+  malformed groups, modifiers, delimiters, and environments.
+- Adopted command, argument, and scripted-base wrappers in the shared semantic
+  model; parser parity and formatter output remain unchanged.
 
 ### Suggested next sub-targets
 
-1. Complete typed math CST accessors needed by the new lowering.
-2. Establish the formatter migration baseline across all shared-corpus contexts.
+1. Establish the formatter migration baseline across all shared-corpus contexts.
+2. Expand corpus coverage where the baseline exposes missing shapes.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Host-owned Bookdown equation labels.** Moved equation labels beside ordered
+  math-content segments while preserving ranges and cross-reference behavior.
 - **Conservative argument-contract regressions.** Locked recursive formatting
   to signature-proven math arguments and preserved opaque arguments
   byte-for-byte.
