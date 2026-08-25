@@ -1,5 +1,5 @@
 Badness math formatter parity baseline
-Oracle: badness-formatter =0.5.0
+Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
 Cases: 94
 Context runs: 282
@@ -509,17 +509,17 @@ Panache: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\
 
 --- environments/aligned/ragged_columns.tex [inline] ---
 Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  \\alpha & = 1 \\\\\n  x      & = 22\n\\end{aligned}"
+Badness: "\\begin{aligned}\n  \\alpha & = 1  \\\\\n  x      & = 22\n\\end{aligned}"
 Panache: "\\begin{aligned} \\alpha & = 1 \\\\ x & = 22 \\end{aligned}"
 
 --- environments/aligned/ragged_columns.tex [display] ---
 Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
-Badness: "  \\begin{aligned}\n    \\alpha & = 1 \\\\\n    x      & = 22\n  \\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    \\alpha & = 1  \\\\\n    x      & = 22\n  \\end{aligned}\n"
 Panache: "\\begin{aligned}\n  \\alpha & = 1  \\\\\n  x      & = 22\n\\end{aligned}"
 
 --- environments/aligned/ragged_columns.tex [environment] ---
 Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
-Badness: "  \\begin{aligned}\n    \\alpha & = 1 \\\\\n    x      & = 22\n  \\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    \\alpha & = 1  \\\\\n    x      & = 22\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    \\alpha & = 1  \\\\\n    x      & = 22\n  \\end{aligned}"
 
 --- environments/aligned/single_row.tex [inline] ---
@@ -539,32 +539,32 @@ Panache: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}"
 
 --- environments/aligned/three_rows.tex [inline] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  x & = 1 \\\\\n  y & = 22 \\\\\n  z & = 333\n\\end{aligned}"
+Badness: "\\begin{aligned}\n  x & = 1   \\\\\n  y & = 22  \\\\\n  z & = 333\n\\end{aligned}"
 Panache: "\\begin{aligned} x & = 1 \\\\ y & = 22 \\\\ z & = 333 \\end{aligned}"
 
 --- environments/aligned/three_rows.tex [display] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
-Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22 \\\\\n    z & = 333\n  \\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1   \\\\\n    y & = 22  \\\\\n    z & = 333\n  \\end{aligned}\n"
 Panache: "\\begin{aligned}\n  x & = 1   \\\\\n  y & = 22  \\\\\n  z & = 333\n\\end{aligned}"
 
 --- environments/aligned/three_rows.tex [environment] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
-Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22 \\\\\n    z & = 333\n  \\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1   \\\\\n    y & = 22  \\\\\n    z & = 333\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    x & = 1   \\\\\n    y & = 22  \\\\\n    z & = 333\n  \\end{aligned}"
 
 --- environments/aligned/two_rows.tex [inline] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  x & = 1 \\\\\n  y & = 22\n\\end{aligned}"
+Badness: "\\begin{aligned}\n  x & = 1  \\\\\n  y & = 22\n\\end{aligned}"
 Panache: "\\begin{aligned} x & = 1 \\\\ y & = 22 \\end{aligned}"
 
 --- environments/aligned/two_rows.tex [display] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
-Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22\n  \\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}\n"
 Panache: "\\begin{aligned}\n  x & = 1  \\\\\n  y & = 22\n\\end{aligned}"
 
 --- environments/aligned/two_rows.tex [environment] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
-Badness: "  \\begin{aligned}\n    x & = 1 \\\\\n    y & = 22\n  \\end{aligned}\n"
+Badness: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}"
 
 --- environments/aligned/with_frac.tex [inline] ---

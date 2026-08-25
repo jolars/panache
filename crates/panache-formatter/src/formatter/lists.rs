@@ -294,39 +294,36 @@ impl Formatter {
                             self.output.drain(start..start + def_indent);
                         }
                     }
-                    SyntaxKind::BLOCK_QUOTE => {
-                        if self.output.ends_with(":   ") {
-                            let mut pieces: Vec<String> = Vec::new();
-                            let block_text = n.text().to_string();
-                            for line in block_text.lines() {
-                                let trimmed = line.trim_start();
-                                let content = if let Some(rest) = trimmed.strip_prefix('>') {
-                                    rest.trim_start()
-                                } else {
-                                    trimmed
-                                };
-                                if !content.is_empty() {
-                                    pieces.push(content.to_string());
-                                }
+                    SyntaxKind::BLOCK_QUOTE if self.output.ends_with(":   ") => {
+                        let mut pieces: Vec<String> = Vec::new();
+                        let block_text = n.text().to_string();
+                        for line in block_text.lines() {
+                            let trimmed = line.trim_start();
+                            let content = if let Some(rest) = trimmed.strip_prefix('>') {
+                                rest.trim_start()
+                            } else {
+                                trimmed
+                            };
+                            if !content.is_empty() {
+                                pieces.push(content.to_string());
                             }
+                        }
 
-                            self.output.push_str("> ");
-                            self.output.push_str(&pieces.join(" "));
+                        self.output.push_str("> ");
+                        self.output.push_str(&pieces.join(" "));
+                        self.output.push('\n');
+
+                        if let Some(next_non_blank) = node
+                            .children()
+                            .skip(i + 1)
+                            .find(|sibling| sibling.kind() != SyntaxKind::BLANK_LINE)
+                            && is_block_element(next_non_blank.kind())
+                            && !self.output.ends_with("\n\n")
+                        {
                             self.output.push('\n');
-
-                            if let Some(next_non_blank) = node
-                                .children()
-                                .skip(i + 1)
-                                .find(|sibling| sibling.kind() != SyntaxKind::BLANK_LINE)
-                                && is_block_element(next_non_blank.kind())
-                                && !self.output.ends_with("\n\n")
-                            {
-                                self.output.push('\n');
-                            }
-                        } else {
-                            self.format_node_sync(n, def_indent);
                         }
                     }
+                    SyntaxKind::BLOCK_QUOTE => self.format_node_sync(n, def_indent),
                     _ => {
                         self.format_node_sync(n, def_indent);
                     }

@@ -96,14 +96,12 @@ pub(crate) fn completion(
 
     let query = citation_query_prefix(&text, offset)?;
 
-    let (salsa_file, salsa_config, doc_path) = match snap.document_state(uri) {
-        Some(state) => (
-            state.salsa_file,
-            state.salsa_config,
-            crate::salsa::Db::path_of_id(snap.db(), state.file_id),
-        ),
-        None => return None,
-    };
+    let state = snap.document_state(uri)?;
+    let (salsa_file, salsa_config, doc_path) = (
+        state.salsa_file,
+        state.salsa_config,
+        crate::salsa::Db::path_of_id(snap.db(), state.file_id),
+    );
     let parsed_yaml_regions = snap.parsed_yaml_regions(uri);
 
     let offset_in_frontmatter = helpers::is_offset_in_yaml_frontmatter(parsed_yaml_regions, offset);

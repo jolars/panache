@@ -1075,12 +1075,10 @@ fn project_flow_map_entries(flow_map: &SyntaxNode, handles: &TagHandles, out: &m
                 }
                 SyntaxKind::YAML_FLOW_INDICATOR => match tok.text() {
                     "{" | "}" => {}
-                    "," => {
-                        if pending_has_content {
-                            flush_pending_orphan(&pending, handles, out);
-                            pending.clear();
-                            pending_has_content = false;
-                        }
+                    "," if pending_has_content => {
+                        flush_pending_orphan(&pending, handles, out);
+                        pending.clear();
+                        pending_has_content = false;
                     }
                     _ => {}
                 },

@@ -76,12 +76,7 @@ fn parse_marker_and_code<'a>(
         return None;
     }
     let spacing_after_marker = &suffix[..spacing_len];
-    let mut code = &suffix[spacing_len..];
-    if let Some(stripped) = code.strip_suffix("``") {
-        code = stripped;
-    } else {
-        return None;
-    }
+    let code = suffix[spacing_len..].strip_suffix("``")?;
     if code.trim().is_empty() {
         return None;
     }

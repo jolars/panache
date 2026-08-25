@@ -671,14 +671,14 @@ fn append_link_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
         match child {
             NodeOrToken::Node(link_child) => match link_child.kind() {
                 SyntaxKind::LINK_TEXT => past_link_text = true,
-                SyntaxKind::LINK_DEST | SyntaxKind::LINK_REF | SyntaxKind::ATTRIBUTE => {
-                    if past_link_text {
-                        if link_child.kind() == SyntaxKind::LINK_DEST {
-                            let raw = link_child.text().to_string();
-                            append_normalized_link_dest(&raw, out);
-                        } else {
-                            let _ = write!(out, "{}", link_child.text());
-                        }
+                SyntaxKind::LINK_DEST | SyntaxKind::LINK_REF | SyntaxKind::ATTRIBUTE
+                    if past_link_text =>
+                {
+                    if link_child.kind() == SyntaxKind::LINK_DEST {
+                        let raw = link_child.text().to_string();
+                        append_normalized_link_dest(&raw, out);
+                    } else {
+                        let _ = write!(out, "{}", link_child.text());
                     }
                 }
                 _ => {}
@@ -731,14 +731,14 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
         match child {
             NodeOrToken::Node(img_child) => match img_child.kind() {
                 SyntaxKind::IMAGE_ALT => past_image_alt = true,
-                SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE | SyntaxKind::LINK_REF => {
-                    if past_image_alt {
-                        if img_child.kind() == SyntaxKind::LINK_DEST {
-                            let raw = img_child.text().to_string();
-                            append_normalized_link_dest(&raw, out);
-                        } else {
-                            let _ = write!(out, "{}", img_child.text());
-                        }
+                SyntaxKind::LINK_DEST | SyntaxKind::ATTRIBUTE | SyntaxKind::LINK_REF
+                    if past_image_alt =>
+                {
+                    if img_child.kind() == SyntaxKind::LINK_DEST {
+                        let raw = img_child.text().to_string();
+                        append_normalized_link_dest(&raw, out);
+                    } else {
+                        let _ = write!(out, "{}", img_child.text());
                     }
                 }
                 _ => {}

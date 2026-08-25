@@ -917,7 +917,7 @@ fn parse_inline_range_impl(
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
             }
-            log::trace!("Matched shortcode at pos {}: {}", pos, &name);
+            log::trace!("Matched shortcode at pos {}: {}", pos, name);
             emit_shortcode(builder, &name, attrs);
             pos += len;
             text_start = pos;
@@ -1319,10 +1319,10 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
                 if is_crossref {
-                    log::trace!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                    log::trace!("Matched Quarto crossref at pos {}: {}", pos, key);
                     super::citations::emit_crossref(builder, key, has_suppress);
                 } else {
-                    log::trace!("Matched bare citation at pos {}: {}", pos, &key);
+                    log::trace!("Matched bare citation at pos {}: {}", pos, key);
                     emit_bare_citation(builder, key, has_suppress);
                 }
                 pos += len;
@@ -1345,10 +1345,10 @@ fn parse_inline_range_impl(
                     builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
                 }
                 if is_crossref {
-                    log::trace!("Matched Quarto crossref at pos {}: {}", pos, &key);
+                    log::trace!("Matched Quarto crossref at pos {}: {}", pos, key);
                     super::citations::emit_crossref(builder, key, has_suppress);
                 } else {
-                    log::trace!("Matched suppress-author citation at pos {}: {}", pos, &key);
+                    log::trace!("Matched suppress-author citation at pos {}: {}", pos, key);
                     emit_bare_citation(builder, key, has_suppress);
                 }
                 pos += len;

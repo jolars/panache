@@ -59,7 +59,7 @@ pub struct WordAtoms<'a> {
 
 /// Slice a lexical word into TeX atom candidates without changing the CST.
 ///
-/// Relations (`=<>`) form maximal runs, `:=` joins the same relation run,
+/// Relations (`=<>`) form maximal runs, colon runs ending in `=` join the same relation run,
 /// binary signs and fixed delimiters are single-scalar atoms, and all other
 /// characters remain maximal ordinary runs.
 pub fn word_atoms(word: &str) -> WordAtoms<'_> {
@@ -74,21 +74,36 @@ impl<'a> Iterator for WordAtoms<'a> {
             return None;
         }
 
-        let (len, class) = if self.rest.starts_with(":=") {
-            let tail = &self.rest[1..];
-            (1 + relation_prefix_len(tail), AtomClass::Rel)
+        let (len, class) = if let Some(len) = definition_relation_prefix_len(self.rest) {
+            (len, AtomClass::Rel)
         } else {
             let first = self.rest.chars().next().expect("non-empty word");
-            match semantic_char_class(first) {
-                Some(AtomClass::Rel) => (relation_prefix_len(self.rest), AtomClass::Rel),
-                Some(class) => (first.len_utf8(), class),
-                None => (ordinary_prefix_len(self.rest), AtomClass::Ord),
+            match first {
+                ':' => (colon_prefix_len(self.rest), AtomClass::Ord),
+                _ => match semantic_char_class(first) {
+                    Some(AtomClass::Rel) => (relation_prefix_len(self.rest), AtomClass::Rel),
+                    Some(class) => (first.len_utf8(), class),
+                    None => (ordinary_prefix_len(self.rest), AtomClass::Ord),
+                },
             }
         };
         let (text, rest) = self.rest.split_at(len);
         self.rest = rest;
         Some(WordAtom::new(text, class))
     }
+}
+
+fn colon_prefix_len(text: &str) -> usize {
+    text.char_indices()
+        .find_map(|(offset, ch)| (ch != ':').then_some(offset))
+        .unwrap_or(text.len())
+}
+
+fn definition_relation_prefix_len(text: &str) -> Option<usize> {
+    let colon_end = colon_prefix_len(text);
+    let tail = &text[colon_end..];
+    tail.starts_with('=')
+        .then(|| colon_end + relation_prefix_len(tail))
 }
 
 /// The single source of truth for which characters end an ordinary run and
@@ -308,6 +323,14 @@ mod tests {
                 WordAtom::new("α", AtomClass::Ord),
                 WordAtom::new("+", AtomClass::Bin),
                 WordAtom::new("β", AtomClass::Ord),
+            ]
+        );
+        assert_eq!(
+            word_atoms("a::=b").collect::<Vec<_>>(),
+            vec![
+                WordAtom::new("a", AtomClass::Ord),
+                WordAtom::new("::=", AtomClass::Rel),
+                WordAtom::new("b", AtomClass::Ord),
             ]
         );
     }

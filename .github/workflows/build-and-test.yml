@@ -14,6 +14,25 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  msrv:
+    name: Rust 1.95 MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust 1.95
+        run: rustup toolchain install 1.95.0 --profile minimal
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: "false"
+          prefix-key: "v1-rust-msrv"
+
+      - name: Check workspace
+        run: cargo +1.95.0 check --workspace --all-targets --all-features
+
   test:
     if: github.event_name != 'schedule'
     name: Test
@@ -124,7 +143,7 @@ jobs:
 
   versionary:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [cargo-deny, test, extension, zed]
+    needs: [cargo-deny, msrv, test, extension, zed]
     runs-on: ubuntu-latest
     permissions:
       contents: write

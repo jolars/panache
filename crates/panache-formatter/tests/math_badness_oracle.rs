@@ -290,7 +290,7 @@ fn render_report(mut records: Vec<BaselineRecord>, corpus_count: usize) -> Strin
     let divergent = total - parity - rejected;
     let mut report = String::new();
     writeln!(report, "Badness math formatter parity baseline").unwrap();
-    writeln!(report, "Oracle: badness-formatter =0.5.0").unwrap();
+    writeln!(report, "Oracle: badness-formatter =0.6.0").unwrap();
     writeln!(report, "Corpus: tests/fixtures/math_corpus").unwrap();
     writeln!(report, "Cases: {corpus_count}").unwrap();
     writeln!(report, "Context runs: {total}").unwrap();
@@ -473,13 +473,24 @@ fn flat_inline_edge_cases_match_badness() {
 }
 
 #[test]
-fn panache_preserves_composite_relations_where_badness_splits_them() {
+fn composite_relations_match_badness() {
     for (body, expected) in [
         ("x:=y", "x := y"),
         ("x:=-y", "x := -y"),
-        ("a::=b", "a: := b"),
+        ("a::=b", "a ::= b"),
         ("a:=_ib", "a :=_i b"),
-        ("a::=_ib", "a: :=_i b"),
+        ("a::=_ib", "a ::=_i b"),
+    ] {
+        let panache = panache_body(body, OracleContext::Inline).expect("Panache formatter");
+        let badness = badness_body(body, OracleContext::Inline).expect("Badness formatter");
+        assert_eq!(panache, expected, "{body:?}");
+        assert_eq!(panache, badness, "{body:?}");
+    }
+}
+
+#[test]
+fn panache_preserves_scripted_composite_relations_where_badness_splits_them() {
+    for (body, expected) in [
         ("x<=_iy", "x <=_i y"),
         ("x>=_iy", "x >=_i y"),
         ("a==_kb", "a ==_k b"),

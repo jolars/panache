@@ -1,8 +1,7 @@
 [workspace.package]
 edition = "2024"
-# Kept in lockstep with the pinned toolchain in `rust-toolchain.toml`, which is
-# the only version CI builds. Bump both together.
-rust-version = "1.94"
+# The default toolchain tracks stable; CI checks this minimum separately.
+rust-version = "1.95"
 license = "MIT"
 repository = "https://github.com/jolars/panache"
 homepage = "https://panache.bz"

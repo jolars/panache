@@ -1011,7 +1011,7 @@ enum Demand {
 }
 
 /// Whether `atom` — the final atom of its word token — is a relation head the
-/// parser's script split severed from its final scalar (`a:` + scripted `=`,
+/// parser's script split severed from its final scalar (`a:` + scripted `:=`,
 /// `x<` + scripted `=`). The severed scalar is always the '='/`<`/`>`-led
 /// `MATH_WORD` token that immediately follows.
 fn severed_relation_head(atom: &operators::WordAtom, next: Option<&FlatToken>) -> bool {
@@ -1019,8 +1019,13 @@ fn severed_relation_head(atom: &operators::WordAtom, next: Option<&FlatToken>) -
         return false;
     };
     match atom.class {
-        // A definition colon fuses only with an equals-led relation.
-        AtomClass::Ord => atom.text == ":" && next_text.starts_with('='),
+        // A definition colon fuses only with a following definition relation.
+        AtomClass::Ord => {
+            atom.text.chars().all(|character| character == ':')
+                && operators::word_atoms(next_text)
+                    .next()
+                    .is_some_and(|next| next.class == AtomClass::Rel && next.text.ends_with('='))
+        }
         AtomClass::Rel => next_text.starts_with(['=', '<', '>']),
         _ => false,
     }

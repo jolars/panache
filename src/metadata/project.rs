@@ -534,10 +534,9 @@ fn parse_bookdown_rmd_files(yaml: &str) -> Option<BookdownFiles> {
                 let value = entry.value()?;
                 let files = if let Some(seq) = value.as_flow_sequence() {
                     flow_seq_to_strings(&seq)
-                } else if let Some(seq) = value.as_block_sequence() {
-                    block_seq_to_strings(&seq)
                 } else {
-                    return None;
+                    let seq = value.as_block_sequence()?;
+                    block_seq_to_strings(&seq)
                 };
                 Some((key, files))
             })

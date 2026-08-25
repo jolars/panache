@@ -1464,10 +1464,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            if matches!(
-                self.containers.last(),
-                Some(Container::ListItem { content_col: _, .. })
-            ) {
+            if matches!(self.containers.last(), Some(Container::ListItem { .. })) {
                 let (indent_cols, _) = leading_indent(inner_content);
                 let content_indent = self.content_container_indent_to_strip();
                 let effective_indent = indent_cols.saturating_sub(content_indent);

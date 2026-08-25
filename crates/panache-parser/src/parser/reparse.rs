@@ -2924,7 +2924,7 @@ mod tests {
     fn the_token_tier_alphabet_bans_terminators_and_brackets() {
         for (name, options) in every_flavor() {
             let allowed = token_tier_allowed_mask(&options);
-            for byte in [b'\n', b'\r', b'[', b']'] {
+            for &byte in b"\n\r[]" {
                 assert!(
                     !allowed[byte as usize],
                     "{name}: byte {:?} must never be admitted",

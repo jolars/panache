@@ -34,11 +34,8 @@ pub(crate) fn try_parse_div_fence_open(content: &str) -> Option<DivFenceInfo> {
     let after_colons = trimmed[colon_count..].trim_start();
 
     let attributes = if after_colons.starts_with('{') {
-        if let Some(close_idx) = after_colons.find('}') {
-            after_colons[..=close_idx].to_string()
-        } else {
-            return None;
-        }
+        let close_idx = after_colons.find('}')?;
+        after_colons[..=close_idx].to_string()
     } else if after_colons.is_empty() {
         return None;
     } else {

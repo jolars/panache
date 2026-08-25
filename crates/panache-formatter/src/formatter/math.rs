@@ -592,9 +592,9 @@ mod tests {
     }
 
     #[test]
-    fn ordinary_colon_before_a_scripted_definition_survives() {
-        assert_eq!(fmt("a::=_ib", MathContext::Inline), "a: :=_i b");
-        assert_eq!(fmt("a::=b", MathContext::Inline), "a: := b");
+    fn colon_runs_in_definition_relations_stay_fused() {
+        assert_eq!(fmt("a::=_ib", MathContext::Inline), "a ::=_i b");
+        assert_eq!(fmt("a::=b", MathContext::Inline), "a ::= b");
         for case in ["a::=_ib", "a::=b"] {
             assert_idempotent(case, MathContext::Inline);
         }

@@ -145,7 +145,7 @@ fn lower_elements(
 
 fn has_scripted_composite_relation(elements: &[SyntaxElement]) -> bool {
     // The legacy renderer fuses an adjacent relation head with the scalar that
-    // owns the script (`a:` + `=_i`, or `x<` + `=_i`). Keep those seams on the
+    // owns the script (`a:` + `:=_i`, or `x<` + `=_i`). Keep those seams on the
     // fallback until typed lowering can preserve the established spelling.
     elements.windows(2).any(|pair| {
         let [SyntaxElement::Token(head), SyntaxElement::Node(node)] = pair else {
@@ -169,7 +169,7 @@ fn has_scripted_composite_relation(elements: &[SyntaxElement]) -> bool {
         };
 
         match head {
-            ':' => base == '=',
+            ':' => base == ':' || base == '=',
             '=' | '<' | '>' => matches!(base, '=' | '<' | '>'),
             _ => false,
         }
@@ -177,11 +177,17 @@ fn has_scripted_composite_relation(elements: &[SyntaxElement]) -> bool {
 }
 
 fn has_definition_relation(elements: &[SyntaxElement]) -> bool {
-    // Badness splits `:=` into punctuation plus relation atoms. Keep Panache's
-    // authored composite spelling on the compatibility path, including the CST
-    // boundary created when a command precedes the definition.
-    if elements.iter().any(|element| {
-        matches!(element, SyntaxElement::Token(token) if token.kind() == SyntaxKind::MATH_WORD && token.text().contains(":="))
+    // Keep authored definition-relation spelling on the compatibility path,
+    // including the CST boundary created when a command precedes it.
+    if elements.iter().any(|element| match element {
+        SyntaxElement::Token(token) => {
+            token.kind() == SyntaxKind::MATH_WORD && token.text().contains(":=")
+        }
+        SyntaxElement::Node(node) => node.descendants_with_tokens().any(|descendant| {
+            descendant.into_token().is_some_and(|token| {
+                token.kind() == SyntaxKind::MATH_WORD && token.text().contains(":=")
+            })
+        }),
     }) {
         return true;
     }

@@ -1,5 +1,5 @@
 Badness math parser parity report
-Oracle: badness-parser =0.4.0
+Oracle: badness-parser =0.5.0
 Corpus: ../panache-formatter/tests/fixtures/math_corpus
 Passing: 92 / 94
 Divergent: 0 / 94

@@ -1736,21 +1736,19 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
                     header_cells = None;
                 }
             }
-            SyntaxKind::TABLE_ROW => {
-                if !columns.is_empty() {
-                    if first_data_row_line.is_none() {
-                        first_data_row_line = Some(raw_text_without_prefixes(&child));
-                    }
+            SyntaxKind::TABLE_ROW if !columns.is_empty() => {
+                if first_data_row_line.is_none() {
+                    first_data_row_line = Some(raw_text_without_prefixes(&child));
+                }
 
-                    let cells = extract_row_cells(&child, config, true);
+                let cells = extract_row_cells(&child, config, true);
 
-                    if !cells.is_empty() {
-                        rows.push(cells);
-                    } else {
-                        let row_content = format_cell_content(&child, config, false);
-                        let cells = split_simple_table_row(&row_content, &columns);
-                        rows.push(cells);
-                    }
+                if !cells.is_empty() {
+                    rows.push(cells);
+                } else {
+                    let row_content = format_cell_content(&child, config, false);
+                    let cells = split_simple_table_row(&row_content, &columns);
+                    rows.push(cells);
                 }
             }
             _ => {}

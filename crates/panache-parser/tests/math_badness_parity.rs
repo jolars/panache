@@ -411,7 +411,7 @@ fn math_badness_full_report() {
     let total = passing.len() + divergent.len() + rejected.len();
     let mut report = String::new();
     writeln!(report, "Badness math parser parity report").unwrap();
-    writeln!(report, "Oracle: badness-parser =0.4.0").unwrap();
+    writeln!(report, "Oracle: badness-parser =0.5.0").unwrap();
     writeln!(
         report,
         "Corpus: ../panache-formatter/tests/fixtures/math_corpus"

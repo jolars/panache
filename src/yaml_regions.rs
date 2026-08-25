@@ -75,10 +75,8 @@ mod tests {
                         break;
                     }
                 }
-                SyntaxKind::NEWLINE => {
-                    if content_start.is_none() && first_delim_end.is_some() {
-                        content_start = Some(token.text_range().end());
-                    }
+                SyntaxKind::NEWLINE if content_start.is_none() && first_delim_end.is_some() => {
+                    content_start = Some(token.text_range().end());
                 }
                 _ => {}
             }

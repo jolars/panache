@@ -358,10 +358,8 @@ fn descendant_blank_at_end(node: &SyntaxNode, end: rowan::TextSize) -> bool {
                     return true;
                 }
             }
-            SyntaxKind::LIST | SyntaxKind::LIST_ITEM => {
-                if descendant_blank_at_end(&child, end) {
-                    return true;
-                }
+            SyntaxKind::LIST | SyntaxKind::LIST_ITEM if descendant_blank_at_end(&child, end) => {
+                return true;
             }
             _ => {}
         }
