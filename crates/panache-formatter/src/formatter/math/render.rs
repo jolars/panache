@@ -37,12 +37,15 @@ fn render_inline_content(
     elements: &[SyntaxElement],
     opts: &MathFormatOptions,
 ) -> String {
-    MathContent::cast(tree.clone())
+    if let Some(document) = MathContent::cast(tree.clone())
         .and_then(|content| lower::try_lower_inline(&content, &opts.signature_scope))
-        .map(|document| Printer::new(opts.line_width, INDENT.len()).print_flat(&document))
-        .unwrap_or_else(|| render_inline(elements, &opts.signature_scope))
-        .trim()
-        .to_string()
+    {
+        Printer::new(opts.line_width, INDENT.len()).print_flat(&document)
+    } else {
+        render_inline(elements, &opts.signature_scope)
+            .trim()
+            .to_string()
+    }
 }
 
 fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {

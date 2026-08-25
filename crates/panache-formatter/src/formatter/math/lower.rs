@@ -14,12 +14,76 @@ use crate::syntax::{
 
 use super::ir::Ir;
 
-/// Lower inline words, trivia, ordinary groups, supported commands, and scripts.
+/// Lower supported inline syntax, including conservative top-level edge comments.
 ///
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
 pub(super) fn try_lower_inline(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
-    lower_elements(content.elements().collect(), scope, Spacing::Normal)
+    let elements = content.elements().collect::<Vec<_>>();
+    if elements
+        .iter()
+        .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
+    {
+        lower_edge_comments(elements, scope)
+    } else {
+        lower_elements(elements, scope, Spacing::Normal)
+    }
+}
+
+fn lower_edge_comments(elements: Vec<SyntaxElement>, scope: &SignatureScope) -> Option<Ir> {
+    // A comment between semantic atoms needs the preceding role carried across
+    // its hard break. Keep that context-sensitive case on the legacy path.
+    let first_content = elements.iter().position(|element| {
+        !is_layout_trivia(element) && element.kind() != SyntaxKind::MATH_COMMENT
+    });
+    let last_content = elements.iter().rposition(|element| {
+        !is_layout_trivia(element) && element.kind() != SyntaxKind::MATH_COMMENT
+    });
+    if elements.iter().enumerate().any(|(index, element)| {
+        element.kind() == SyntaxKind::MATH_COMMENT
+            && first_content.is_some_and(|first| index > first)
+            && last_content.is_some_and(|last| index < last)
+    }) {
+        return None;
+    }
+
+    let mut documents = Vec::new();
+    let mut segment_start = 0;
+    for (index, comment) in elements.iter().enumerate() {
+        if comment.kind() != SyntaxKind::MATH_COMMENT {
+            continue;
+        }
+        let segment = &elements[segment_start..index];
+        let has_content = semantic_math_atoms_in(segment.iter().cloned())
+            .next()
+            .is_some();
+        documents.push(lower_elements(segment.to_vec(), scope, Spacing::Normal)?);
+        if has_content {
+            let trailing_trivia = segment
+                .iter()
+                .rev()
+                .take_while(|element| is_layout_trivia(element));
+            let mut has_space = false;
+            let mut has_newline = false;
+            for trivia in trailing_trivia {
+                has_space = true;
+                has_newline |= trivia.kind() == SyntaxKind::MATH_NEWLINE;
+            }
+            if has_newline {
+                return None;
+            } else if has_space {
+                documents.push(Ir::text(" "));
+            }
+        }
+        documents.extend([Ir::verbatim(comment.to_string()), Ir::HardLine]);
+        segment_start = index + 1;
+    }
+    documents.push(lower_elements(
+        elements[segment_start..].to_vec(),
+        scope,
+        Spacing::Normal,
+    )?);
+    Some(Ir::concat(documents))
 }
 
 fn lower_elements(
@@ -27,7 +91,7 @@ fn lower_elements(
     scope: &SignatureScope,
     spacing: Spacing,
 ) -> Option<Ir> {
-    if has_split_definition_relation(&elements)
+    if has_definition_relation(&elements)
         || has_scripted_composite_relation(&elements)
         || !elements
             .iter()
@@ -112,9 +176,15 @@ fn has_scripted_composite_relation(elements: &[SyntaxElement]) -> bool {
     })
 }
 
-fn has_split_definition_relation(elements: &[SyntaxElement]) -> bool {
-    // The legacy renderer repairs this CST boundary into one `:=` atom; keep
-    // the whole list there until the shared semantic stream owns that repair.
+fn has_definition_relation(elements: &[SyntaxElement]) -> bool {
+    // Badness splits `:=` into punctuation plus relation atoms. Keep Panache's
+    // authored composite spelling on the compatibility path, including the CST
+    // boundary created when a command precedes the definition.
+    if elements.iter().any(|element| {
+        matches!(element, SyntaxElement::Token(token) if token.kind() == SyntaxKind::MATH_WORD && token.text().contains(":="))
+    }) {
+        return true;
+    }
     elements.iter().enumerate().any(|(index, element)| {
         if !matches!(element, SyntaxElement::Node(node) if MathCommand::cast(node.clone()).is_some()) {
             return false;
@@ -742,10 +812,22 @@ mod tests {
     }
 
     #[test]
+    fn lowers_leading_and_trailing_top_level_comments() {
+        let cases = [
+            ("% leading comment\nx = 1\n", "% leading comment\nx = 1"),
+            ("% base comment\nx^2", "% base comment\nx^2"),
+            ("a + b % this is a comment\n", "a + b % this is a comment\n"),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_malformed_and_unsupported_scripts() {
         for input in [
             "x^",
-            "% base comment\nx^2",
             "x^% argument comment\n2",
             r"\text{ a+b }^2",
             r"a:=_ib",
@@ -798,7 +880,11 @@ mod tests {
     #[test]
     fn rejects_every_unsupported_shape_category() {
         let cases = [
-            "% comment\nx",
+            "x:=y",
+            "a::=b",
+            "a% mid-expression\n+b",
+            "a+b\n% own line",
+            "\\frac{a % nested\n+b}{c}",
             r"a\\b",
             "a&b",
             r"\begin{matrix}x\end{matrix}",

@@ -1092,7 +1092,9 @@ as one symbol (`x:=y` → `x := y`), never split into `x : = y`; a colon that is
 not followed directly by `=` keeps the spacing you wrote (`x:y`, `f: A`). Macro
 contents are not rewritten (no `\frac` canonicalization, no auto-`&` insertion).
 Alignment uses **source character widths** (it tidies the source, it does not
-align rendered glyphs), and malformed math is left untouched.
+align rendered glyphs), and malformed math is left untouched. A leading
+top-level `%` comment stays on its own line, and a same-line trailing comment
+retains its terminating newline.
 
 Whitespace that TeX ignores is normalized away: sub/superscript markers (`_`,
 `^`) are tightened (`H _{ 00}^{-1 }` → `H_{00}^{-1}`), and the leading/trailing

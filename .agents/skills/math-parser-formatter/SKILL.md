@@ -58,6 +58,12 @@ and design decisions live in this skill and `RECAP.md`.
   projectors may mechanically rename kinds, remove wrapper offsets, and discard
   documented host trivia; they must never parse, infer attachment, or repair a
   tree.
+- **Known Badness formatter defect:** it splits the authored definition
+  relation `:=` into punctuation plus relation (`x:=y` → `x: = y`). It also
+  splits a relation head from its CST-separated scripted tail (`:=_i` →
+  `: =_i`, `<=_i` → `< =_i`). Panache preserves these composite relations.
+  Keep the cases on the Panache compatibility path and outside mandatory byte
+  parity unless the pinned oracle is corrected.
 
 Follow the math-parser, parser, and formatter invariants in the repository's
 root `AGENTS.md`.

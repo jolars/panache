@@ -69,34 +69,42 @@ still-relevant trap into Persistent traps. Keep it short.
   `Bin` becomes `Ord` at list start, after an effective binary or relation, or
   after an atom with `DelimiterRole::Open`. `Punct`, `Op`, and an `Open` class
   without a genuine delimiter role remain operands for this purpose.
+- **Composite relations expose a known Badness 0.5.0 defect.** Its formatter
+  splits `:=` into punctuation plus relation (`x:=y` → `x: = y`) and splits a
+  CST-severed head from its scripted tail (`:=_i` → `: =_i`, `<=_i` →
+  `< =_i`). Panache preserves authored composite relations through the
+  compatibility path; exclude these cases from mandatory byte parity until the
+  pinned oracle is corrected.
 
 --------------------------------------------------------------------------------
 
 ## Latest session
 
-**Nested paired-delimiter lowering.** Extended the Panache-owned typed inline
-path recursively through closed `\left…\right` pairs.
+**Top-level edge-comment lowering.** Began the next formatter migration stage
+with a conservative inline-comment slice.
 
-- Lowered recursively nested pairs in normal and compact script-argument
-  spacing modes, including a nested pair that serves as a scripted base.
-- Kept unclosed/missing delimiter recovery, delimiter-shell comments, and
-  unsupported descendants on the legacy path through the recursive eligibility
-  checks.
-- Added focused routing regressions and mandatory byte-exact Badness parity;
-  the complete typed-lowering and formatter-oracle suites pass.
+- Lowered leading top-level comment lines and same-line trailing comments,
+  preserving the hard newline each `%` comment requires.
+- Kept mid-expression, own-line trailing, and nested comments on the legacy
+  path until role carryover and aligned group closing migrate.
+- Regenerated the formatter baseline, added focused byte-exact oracle parity,
+  and passed the full workspace gates.
+- Restored Panache's documented `:=` formatting where the typed Badness-parity
+  path had split it, and recorded the broader oracle defect with a regression.
 
 ### Suggested next sub-targets
 
-1. Inventory the remaining command/script/delimiter cases that still route to
-   the legacy renderer, separating intentional conservative fallback from
-   seams that belong in the typed path.
-2. Select one remaining seam with mandatory byte parity before removing its
-   corresponding flattened-token compatibility logic.
+1. Lower comments inside signature-proven math arguments, aligning continuation
+   content and keeping closing delimiters out of the comment line.
+2. Carry semantic operator context across safe mid-expression comments before
+   admitting them to the typed path.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Nested paired-delimiter lowering.** Recursively lowered closed pairs in
+  normal and compact script spacing while preserving recovery fallback.
 - **Paired-delimiter script lowering.** Lowered supported scripts inside closed
   pairs and allowed a supported pair to serve as a scripted atom's base.
 - **Plain paired-delimiter lowering.** Lowered closed, non-nested pairs with

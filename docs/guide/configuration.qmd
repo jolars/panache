@@ -676,6 +676,8 @@ When enabled, Panache reformats the **content** of math spans (`$...$`,
 `$$...$$`, and `\(...\)` or `\[...\]`) structurally:
 
 - inline whitespace runs collapse to a single space;
+- leading top-level `%` comments stay on their own lines, and same-line trailing
+  comments retain their terminating newlines;
 - environment bodies (`\begin{aligned}…\end{aligned}` and friends) are indented
   two spaces and laid out one row per line;
 - `\\` line breaks are normalized to a trailing `\\`;

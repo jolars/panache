@@ -467,10 +467,27 @@ fn flat_inline_migration_slice_matches_badness() {
 
 #[test]
 fn flat_inline_edge_cases_match_badness() {
-    for body in [
-        "- x", "x = - y", "f( - x)", "x:=y", "x:=-y", "a::=b", "a/b", "a/ b", "a /b",
-    ] {
+    for body in ["- x", "x = - y", "f( - x)", "a/b", "a/ b", "a /b"] {
         assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
+fn panache_preserves_composite_relations_where_badness_splits_them() {
+    for (body, expected) in [
+        ("x:=y", "x := y"),
+        ("x:=-y", "x := -y"),
+        ("a::=b", "a: := b"),
+        ("a:=_ib", "a :=_i b"),
+        ("a::=_ib", "a: :=_i b"),
+        ("x<=_iy", "x <=_i y"),
+        ("x>=_iy", "x >=_i y"),
+        ("a==_kb", "a ==_k b"),
+    ] {
+        let panache = panache_body(body, OracleContext::Inline).expect("Panache formatter");
+        let badness = badness_body(body, OracleContext::Inline).expect("Badness formatter");
+        assert_eq!(panache, expected, "{body:?}");
+        assert_ne!(panache, badness, "known Badness defect: {body:?}");
     }
 }
 
@@ -565,6 +582,17 @@ fn nested_paired_delimiter_migration_slice_matches_badness() {
         r"\left[ \left( a+b \right) + c \right]",
         r"x ^ { \left[ \left( a+b \right) \right] }",
         r"\left( \left[ x \right] ^ 2 \right) _ i",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
+fn top_level_edge_comment_migration_slice_matches_badness() {
+    for body in [
+        "% leading comment\nx = 1\n",
+        "% base comment\nx^2",
+        "a + b % this is a comment\n",
     ] {
         assert_formatter_parity(body, OracleContext::Inline);
     }

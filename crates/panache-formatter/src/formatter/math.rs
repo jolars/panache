@@ -561,10 +561,10 @@ mod tests {
 
     #[test]
     fn inline_definition_colon_spacing_respects_the_migration_slice() {
-        assert_eq!(fmt("x:=y", MathContext::Inline), "x: = y");
-        assert_eq!(fmt("x := y", MathContext::Inline), "x : = y");
+        assert_eq!(fmt("x:=y", MathContext::Inline), "x := y");
+        assert_eq!(fmt("x := y", MathContext::Inline), "x := y");
         assert_eq!(fmt("\\mu:=\\nu", MathContext::Inline), "\\mu := \\nu");
-        assert_eq!(fmt("x:=-y", MathContext::Inline), "x: = -y");
+        assert_eq!(fmt("x:=-y", MathContext::Inline), "x := -y");
         assert_eq!(fmt("x:y", MathContext::Inline), "x:y");
         assert_eq!(fmt("f: A", MathContext::Inline), "f: A");
         assert_eq!(fmt("x : = y", MathContext::Inline), "x : = y");
@@ -594,7 +594,7 @@ mod tests {
     #[test]
     fn ordinary_colon_before_a_scripted_definition_survives() {
         assert_eq!(fmt("a::=_ib", MathContext::Inline), "a: :=_i b");
-        assert_eq!(fmt("a::=b", MathContext::Inline), "a:: = b");
+        assert_eq!(fmt("a::=b", MathContext::Inline), "a: := b");
         for case in ["a::=_ib", "a::=b"] {
             assert_idempotent(case, MathContext::Inline);
         }

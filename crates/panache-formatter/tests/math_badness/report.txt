@@ -3,9 +3,9 @@ Oracle: badness-formatter =0.5.0
 Corpus: tests/fixtures/math_corpus
 Cases: 94
 Context runs: 282
-Parity: 56 / 282
+Parity: 62 / 282
 Controlled wrapper rejection: 15 / 282
-Divergent: 211 / 282
+Divergent: 205 / 282
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,7 +15,7 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 56, rejected 5, divergent 33
+inline: parity 62, rejected 5, divergent 27
 display: parity 0, rejected 5, divergent 89
 environment: parity 0, rejected 5, divergent 89
 
@@ -44,11 +44,14 @@ commands/star_optional.tex [inline]
 commands/star_variant.tex [inline]
 commands/text_argument_whitespace.tex [inline]
 commands/unknown_argument_whitespace.tex [inline]
+comments/comment_line.tex [inline]
+comments/trailing_comment.tex [inline]
 display/authored_newline.tex [inline]
 display/fraction_block.tex [inline]
 display/integral.tex [inline]
 display/long_chain.tex [inline]
 display/single_equation.tex [inline]
+display/sum_over_n.tex [inline]
 display/with_text.tex [inline]
 escapes/escaped_brace.tex [inline]
 escapes/escaped_dollar.tex [inline]
@@ -60,6 +63,7 @@ groups/left_right_bracket.tex [inline]
 groups/left_right_nested.tex [inline]
 groups/left_right_null.tex [inline]
 groups/left_right_paren.tex [inline]
+groups/left_right_trivia.tex [inline]
 groups/nested_braces.tex [inline]
 inline/binomial_frac.tex [inline]
 inline/greek_and_cdot.tex [inline]
@@ -85,7 +89,9 @@ operators/unary_minus.tex [inline]
 scripts/double_subscript.tex [inline]
 scripts/integral_bounds.tex [inline]
 scripts/nested_superscript.tex [inline]
+scripts/prod_bounds.tex [inline]
 scripts/script_on_group.tex [inline]
+scripts/sum_bounds.tex [inline]
 
 === Controlled wrapper rejections ===
 
@@ -351,11 +357,6 @@ Input: "\\unknown { a   +   b }\n"
 Badness: "  \\unknown { a   +   b }\n"
 Panache: "  \\unknown { a   +   b }"
 
---- comments/comment_line.tex [inline] ---
-Input: "% leading comment\nx = 1\n"
-Badness: "% leading comment\nx = 1"
-Panache: "% leading comment x = 1"
-
 --- comments/comment_line.tex [display] ---
 Input: "% leading comment\nx = 1\n"
 Badness: "  % leading comment\n  x = 1\n"
@@ -380,11 +381,6 @@ Panache: <declined>
 Input: "\\frac{a % keep this comment\n+ b}{c}\n"
 Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
 Panache: <declined>
-
---- comments/trailing_comment.tex [inline] ---
-Input: "a + b % this is a comment\n"
-Badness: "a + b % this is a comment\n"
-Panache: "a + b % this is a comment"
 
 --- comments/trailing_comment.tex [display] ---
 Input: "a + b % this is a comment\n"
@@ -475,11 +471,6 @@ Panache: "  E = mc^2"
 Input: "E = mc^2\n"
 Badness: "  E = mc^2\n"
 Panache: "  E = mc^2"
-
---- display/sum_over_n.tex [inline] ---
-Input: "\\sum_{i=1}^{N} x_i y_i\n"
-Badness: "\\sum_{i=1}^{N} x_i y_i"
-Panache: "\\sum_{i = 1}^{N} x_i y_i"
 
 --- display/sum_over_n.tex [display] ---
 Input: "\\sum_{i=1}^{N} x_i y_i\n"
@@ -871,11 +862,6 @@ Input: "\\left( a + b \\right)\n"
 Badness: "  \\left( a + b \\right)\n"
 Panache: "  \\left( a + b \\right)"
 
---- groups/left_right_trivia.tex [inline] ---
-Input: "\\left [ x \\right ]\n"
-Badness: "\\left[ x \\right]"
-Panache: "\\left [ x \\right ]"
-
 --- groups/left_right_trivia.tex [display] ---
 Input: "\\left [ x \\right ]\n"
 Badness: "  \\left[ x \\right]\n"
@@ -1151,11 +1137,6 @@ Input: "e^{x^2}\n"
 Badness: "  e^{x^2}\n"
 Panache: "  e^{x^2}"
 
---- scripts/prod_bounds.tex [inline] ---
-Input: "\\prod_{k=1}^{m} a_k\n"
-Badness: "\\prod_{k=1}^{m} a_k"
-Panache: "\\prod_{k = 1}^{m} a_k"
-
 --- scripts/prod_bounds.tex [display] ---
 Input: "\\prod_{k=1}^{m} a_k\n"
 Badness: "  \\prod_{k=1}^{m} a_k\n"
@@ -1175,11 +1156,6 @@ Panache: "  {a + b}^2"
 Input: "{a+b}^2\n"
 Badness: "  {a + b}^2\n"
 Panache: "  {a + b}^2"
-
---- scripts/sum_bounds.tex [inline] ---
-Input: "\\sum_{i=1}^{n} i\n"
-Badness: "\\sum_{i=1}^{n} i"
-Panache: "\\sum_{i = 1}^{n} i"
 
 --- scripts/sum_bounds.tex [display] ---
 Input: "\\sum_{i=1}^{n} i\n"
