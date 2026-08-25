@@ -74,31 +74,34 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Formatter migration baseline.** Established a pinned, deterministic Badness
-formatter report across all 94 shared cases in inline, display, and environment
-contexts without changing production behavior.
+**Math document IR and printer.** Replaced the reduced mixed-environment layout
+module with a Panache-owned, math-focused Badness-style document algebra and
+width-aware printer without changing current formatter output.
 
-- Classified 282 runs as 56 exact matches, 15 controlled oracle rejections, and
-  211 byte-level divergences; display/environment results expose Panache's
-  current trailing-newline difference.
-- Expanded the corpus from 82 to 94 cases, including argument-domain whitespace,
-  redefinitions with same-stem preambles, malformed recovery, nested constructs,
-  comments, and authored breaks. Parser parity is now 92/94, with two explicit
-  Badness wrapper rejections and no structural divergences.
-- Selected inline bodies containing only `MATH_WORD`, `MATH_SPACE`, and
-  `MATH_NEWLINE` as the first migration slice; eight report cases already have
-  exact formatter parity.
+- Added the math primitives needed by the planned typed lowering: literal and
+  verbatim text, concatenation, flat/soft/hard/empty lines, indentation,
+  alignment, bounded alignment, groups, and nil.
+- Made group fits account for trailing same-line content, made bounded hanging
+  indents fall back when a continuation would overflow, and retained deferred
+  indentation so blank lines never acquire trailing spaces. Width-independent
+  flat printing is ready for later environment-grid measurement.
+- Migrated the existing mixed-environment layout onto the new engine. Focused
+  engine tests, the Badness oracle, corpus properties, and MathML
+  cross-validation pass with no baseline changes.
 
 ### Suggested next sub-targets
 
-1. Complete the Panache-owned Badness-style document IR and printer.
-2. Lower the selected flat inline slice into it, retaining the legacy fallback
-   for every unsupported shape.
+1. Lower inline bodies containing only `MATH_WORD`, `MATH_SPACE`, and
+   `MATH_NEWLINE` through typed CST traversal into the new IR.
+2. Promote the eight selected corpus cases to mandatory byte-parity assertions,
+   retaining the legacy fallback for every unsupported shape.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Formatter migration baseline.** Established the pinned 94-case, three-context
+  Badness report and selected the eight-case flat-inline migration slice.
 - **Typed math CST boundary.** Added typed source-order views and accessors for
   content, commands, arguments, scripts, delimiters, line breaks, and
   environments without changing parser shape or formatter output.

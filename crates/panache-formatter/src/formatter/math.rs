@@ -34,9 +34,10 @@ use panache_parser::semantic::math::SignatureScope;
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
 
-mod layout;
+mod ir;
 mod linebreak;
 pub mod operators;
+mod printer;
 mod render;
 
 impl Formatter {

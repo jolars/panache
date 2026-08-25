@@ -9,8 +9,9 @@
 
 use rowan::{GreenNodeBuilder, NodeOrToken};
 
-use super::layout::{Doc, Printer};
+use super::ir::Ir;
 use super::operators::{self, AtomClass};
+use super::printer::Printer;
 use super::{MathContext, MathFormatOptions, linebreak};
 use crate::syntax::{
     AstNode, MathEnvironment, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken,
@@ -176,11 +177,11 @@ fn render_mixed_delimited_display(
     .trim()
     .to_string();
     let body = delimited_body_doc(&elems[open + 1..close], opts)?;
-    let doc = Doc::group(Doc::concat([
-        Doc::text(prefix),
-        Doc::indent(Doc::concat([Doc::SoftLine, body])),
-        Doc::SoftLine,
-        Doc::text(suffix),
+    let doc = Ir::group(Ir::concat([
+        Ir::text(prefix),
+        Ir::indent(Ir::concat([Ir::SoftLine, body])),
+        Ir::SoftLine,
+        Ir::text(suffix),
     ]));
 
     Some(Printer::new(opts.line_width, INDENT.len()).print(&doc, opts.math_indent))
@@ -299,7 +300,7 @@ fn ordinary_delimiters_balanced(elems: &[SyntaxElement]) -> bool {
     openings.is_empty()
 }
 
-fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Option<Doc> {
+fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Option<Ir> {
     let mut segments = Vec::new();
     let mut start = 0usize;
     let mut depth = 0usize;
@@ -309,9 +310,9 @@ fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Optio
             Some(AtomClass::Open) => depth += 1,
             Some(AtomClass::Close) => depth = depth.saturating_sub(1),
             Some(AtomClass::Punct) if depth == 0 => {
-                segments.push(Doc::concat([
+                segments.push(Ir::concat([
                     mixed_segment_doc(&body[start..index], opts)?,
-                    Doc::text(element.to_string()),
+                    Ir::text(element.to_string()),
                 ]));
                 start = index + 1;
             }
@@ -319,10 +320,10 @@ fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Optio
         }
     }
     segments.push(mixed_segment_doc(&body[start..], opts)?);
-    Some(Doc::join(Doc::Line, segments))
+    Some(Ir::join(Ir::Line, segments))
 }
 
-fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Option<Doc> {
+fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Option<Ir> {
     if segment.iter().any(contains_unsafe_mixed_trivia) {
         return None;
     }
@@ -338,7 +339,7 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
         .filter_map(|(index, element)| environment_block(element).is_some().then_some(index))
         .collect();
     match environment_indices.as_slice() {
-        [] => Some(Doc::text(
+        [] => Some(Ir::text(
             render_inline(segment, &opts.signature_scope)
                 .trim()
                 .to_string(),
@@ -349,11 +350,11 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
             let prefix = render_before_operand(before, &opts.signature_scope);
             let prefix_width = prefix.chars().count();
             let (environment, scripts) = environment_block(&segment[*environment_index])?;
-            let environment_doc = Doc::join(
-                Doc::HardLine,
+            let environment_doc = Ir::join(
+                Ir::HardLine,
                 render_environment_lines(&environment, 0, opts)
                     .into_iter()
-                    .map(Doc::text),
+                    .map(Ir::text),
             );
             let mut suffix =
                 render_inline_seeded(after, Some(AtomClass::Close), &opts.signature_scope)
@@ -370,10 +371,10 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
                     render_inline(&scripts, &opts.signature_scope).trim()
                 );
             }
-            Some(Doc::concat([
-                Doc::text(prefix),
-                Doc::align(prefix_width, environment_doc),
-                Doc::text(suffix),
+            Some(Ir::concat([
+                Ir::text(prefix),
+                Ir::align(prefix_width, environment_doc),
+                Ir::text(suffix),
             ]))
         }
         _ => None,
