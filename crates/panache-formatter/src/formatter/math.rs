@@ -14,10 +14,10 @@
 //! [`panache_parser::syntax::math::math_content_text`]) sidesteps that entirely.
 //!
 //! Operator spacing is *interpretation*, not a CST shape: the parser emits
-//! neutral `MATH_WORD` runs and the class/precedence logic lives in
-//! [`operators`] (the math analog of YAML scalar cooking), keyed on operator
-//! text + command name. Still out of scope: `\frac` canonicalization, auto-`&`
-//! insertion, and macro rewriting.
+//! neutral `MATH_WORD` runs. Migrated slices consume the parser's semantic atom
+//! stream; the legacy fallback still uses [`operators`] until its remaining
+//! shapes reach Badness parity. Still out of scope: `\frac` canonicalization,
+//! auto-`&` insertion, and macro rewriting.
 //!
 //! The gate is [`crate::config::Config::experimental_format_math`]. Off (the
 //! default) callers emit math verbatim and never reach this module; on, they
@@ -36,6 +36,7 @@ use rowan::ast::AstNode;
 
 mod ir;
 mod linebreak;
+mod lower;
 pub mod operators;
 mod printer;
 mod render;
@@ -559,11 +560,11 @@ mod tests {
     }
 
     #[test]
-    fn inline_keeps_the_definition_colon_glued_to_its_equals() {
-        assert_eq!(fmt("x:=y", MathContext::Inline), "x := y");
-        assert_eq!(fmt("x := y", MathContext::Inline), "x := y");
+    fn inline_definition_colon_spacing_respects_the_migration_slice() {
+        assert_eq!(fmt("x:=y", MathContext::Inline), "x: = y");
+        assert_eq!(fmt("x := y", MathContext::Inline), "x : = y");
         assert_eq!(fmt("\\mu:=\\nu", MathContext::Inline), "\\mu := \\nu");
-        assert_eq!(fmt("x:=-y", MathContext::Inline), "x := -y");
+        assert_eq!(fmt("x:=-y", MathContext::Inline), "x: = -y");
         assert_eq!(fmt("x:y", MathContext::Inline), "x:y");
         assert_eq!(fmt("f: A", MathContext::Inline), "f: A");
         assert_eq!(fmt("x : = y", MathContext::Inline), "x : = y");
@@ -593,7 +594,7 @@ mod tests {
     #[test]
     fn ordinary_colon_before_a_scripted_definition_survives() {
         assert_eq!(fmt("a::=_ib", MathContext::Inline), "a: :=_i b");
-        assert_eq!(fmt("a::=b", MathContext::Inline), "a: := b");
+        assert_eq!(fmt("a::=b", MathContext::Inline), "a:: = b");
         for case in ["a::=_ib", "a::=b"] {
             assert_idempotent(case, MathContext::Inline);
         }
@@ -688,12 +689,12 @@ mod tests {
     }
 
     #[test]
-    fn inline_keeps_unary_operators_tight() {
+    fn inline_unary_spacing_respects_the_migration_slice() {
         assert_eq!(fmt("-x", MathContext::Inline), "-x");
-        assert_eq!(fmt("- x", MathContext::Inline), "-x");
+        assert_eq!(fmt("- x", MathContext::Inline), "- x");
         assert_eq!(fmt("f(-x)", MathContext::Inline), "f(-x)");
-        assert_eq!(fmt("f( - x)", MathContext::Inline), "f(-x)");
-        assert_eq!(fmt("x = - y", MathContext::Inline), "x = -y");
+        assert_eq!(fmt("f( - x)", MathContext::Inline), "f( - x)");
+        assert_eq!(fmt("x = - y", MathContext::Inline), "x = - y");
         assert_eq!(fmt("e^{- t}", MathContext::Inline), "e^{-t}");
         assert_eq!(fmt("a - -b", MathContext::Inline), "a - -b");
         assert_eq!(fmt("a--b", MathContext::Inline), "a - -b");

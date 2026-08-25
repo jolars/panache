@@ -74,32 +74,32 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Math document IR and printer.** Replaced the reduced mixed-environment layout
-module with a Panache-owned, math-focused Badness-style document algebra and
-width-aware printer without changing current formatter output.
+**Flat-inline typed lowering.** Routed inline bodies containing only
+`MATH_WORD`, `MATH_SPACE`, and `MATH_NEWLINE` through the Panache-owned document
+IR and flat printer; every unsupported CST shape still uses the legacy path.
 
-- Added the math primitives needed by the planned typed lowering: literal and
-  verbatim text, concatenation, flat/soft/hard/empty lines, indentation,
-  alignment, bounded alignment, groups, and nil.
-- Made group fits account for trailing same-line content, made bounded hanging
-  indents fall back when a continuation would overflow, and retained deferred
-  indentation so blank lines never acquire trailing spaces. Width-independent
-  flat printing is ready for later environment-grid measurement.
-- Migrated the existing mixed-environment layout onto the new engine. Focused
-  engine tests, the Badness oracle, corpus properties, and MathML
-  cross-validation pass with no baseline changes.
+- Used the shared semantic atom stream for contextual binary/relation spacing,
+  exact token-relative source slices for Unicode-safe emission, and symmetric
+  spacing around authored loose slashes.
+- Promoted the selected eight corpus cases to mandatory Badness byte parity and
+  added edge parity for unary trivia, definition colons, and slashes. The
+  94-case baseline report, corpus properties, and MathML cross-validation remain
+  unchanged.
 
 ### Suggested next sub-targets
 
-1. Lower inline bodies containing only `MATH_WORD`, `MATH_SPACE`, and
-   `MATH_NEWLINE` through typed CST traversal into the new IR.
-2. Promote the eight selected corpus cases to mandatory byte-parity assertions,
-   retaining the legacy fallback for every unsupported shape.
+1. Lower ordinary brace groups recursively through the shared math sequencer.
+2. Extend recursive lowering only to signature-proven math arguments; keep
+   text-domain, unknown, redefined, over-attached, and malformed arguments
+   verbatim.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Math document IR and printer.** Added the Badness-style document algebra
+  and width-aware printer, then migrated mixed-environment layout without
+  changing formatter output.
 - **Formatter migration baseline.** Established the pinned 94-case, three-context
   Badness report and selected the eight-case flat-inline migration slice.
 - **Typed math CST boundary.** Added typed source-order views and accessors for

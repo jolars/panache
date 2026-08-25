@@ -12,9 +12,10 @@ use rowan::{GreenNodeBuilder, NodeOrToken};
 use super::ir::Ir;
 use super::operators::{self, AtomClass};
 use super::printer::Printer;
-use super::{MathContext, MathFormatOptions, linebreak};
+use super::{MathContext, MathFormatOptions, linebreak, lower};
 use crate::syntax::{
-    AstNode, MathEnvironment, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken,
+    AstNode, MathContent, MathEnvironment, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode,
+    SyntaxToken,
 };
 use panache_parser::parser::math::MathParseOptions;
 use panache_parser::semantic::math::{ArgKind, ArgumentDomain, SignatureScope, match_arg_slot};
@@ -25,12 +26,23 @@ const INDENT: &str = "  ";
 pub(super) fn render(tree: &SyntaxNode, opts: &MathFormatOptions) -> String {
     let top: Vec<SyntaxElement> = tree.children_with_tokens().collect();
     match opts.context {
-        MathContext::Inline => render_inline(&top, &opts.signature_scope)
-            .trim()
-            .to_string(),
+        MathContext::Inline => render_inline_content(tree, &top, opts),
         MathContext::Display => render_display(&top, opts),
         MathContext::EnvironmentBody => render_body_lines(&top, 1, opts).join("\n"),
     }
+}
+
+fn render_inline_content(
+    tree: &SyntaxNode,
+    elements: &[SyntaxElement],
+    opts: &MathFormatOptions,
+) -> String {
+    MathContent::cast(tree.clone())
+        .and_then(|content| lower::try_lower_flat_inline(&content))
+        .map(|document| Printer::new(opts.line_width, INDENT.len()).print_flat(&document))
+        .unwrap_or_else(|| render_inline(elements, &opts.signature_scope))
+        .trim()
+        .to_string()
 }
 
 fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {

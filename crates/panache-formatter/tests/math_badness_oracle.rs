@@ -441,6 +441,40 @@ fn oracle_compares_formatter_output_byte_for_byte() {
 }
 
 #[test]
+fn flat_inline_migration_slice_matches_badness() {
+    const CASES: &[&str] = &[
+        "display/authored_newline.tex",
+        "inline/simple_equality.tex",
+        "inline/sum_expression.tex",
+        "operators/double_minus.tex",
+        "operators/plus.tex",
+        "operators/plus_tight.tex",
+        "operators/relation_chain.tex",
+        "operators/unary_minus.tex",
+    ];
+
+    let root = corpus_root();
+    for id in CASES {
+        let input = fs::read_to_string(root.join(id))
+            .unwrap_or_else(|error| panic!("failed to read `{id}`: {error}"));
+        assert!(
+            is_flat_inline_candidate(&input),
+            "mandatory flat-inline case `{id}` left the selected CST slice",
+        );
+        assert_formatter_parity(&input, OracleContext::Inline);
+    }
+}
+
+#[test]
+fn flat_inline_edge_cases_match_badness() {
+    for body in [
+        "- x", "x = - y", "f( - x)", "x:=y", "x:=-y", "a::=b", "a/b", "a/ b", "a /b",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
 fn argument_recursion_contract_matches_badness() {
     let cases = [
         r"\frac{ a   +   b }{ c   +   d }",
