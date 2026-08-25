@@ -259,7 +259,7 @@ formatter-off output byte-identical.
      domains, merge it into `SignatureScope`, regenerate the schema, and
      document the setting. Raw-TeX redefinitions must shadow both configured
      and built-in signatures.
-   - [ ] Lock the conservative argument contract with regressions: formatter
+   - [x] Lock the conservative argument contract with regressions: formatter
      consumers may recurse only into signature-proven math arguments and
      must preserve text-domain, unknown, redefined, over-attached, and
      malformed arguments byte-for-byte.

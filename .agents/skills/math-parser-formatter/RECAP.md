@@ -74,27 +74,27 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Configured command signatures.** Added a stable, typed
-`[format.math-signatures]` surface and wired it through semantic scope and math
-lowering.
+**Conservative argument-contract regressions.** Locked the formatter boundary
+between recursively formatted and opaque command arguments.
 
-- Configured positional brace/bracket domains replace built-in signatures;
-  raw-TeX definitions still shadow both tiers.
-- Proven math arguments recurse, while text and unknown arguments take an
-  opaque byte-preserving path.
-- Added config/schema/docs coverage, focused formatter regressions, and
-  gate-off/idempotency checks.
+- Added byte-exact Badness parity cases in inline, display, and environment
+  contexts for math, text, unknown-command, and over-attached arguments.
+- Added formatter regressions for configured unknown domains, over-attached
+  groups, malformed arguments, and idempotency.
+- Confirmed that raw-TeX redefinitions retain their existing opaque path.
 
 ### Suggested next sub-targets
 
-1. Lock conservative formatting for unknown and redefined arguments.
-2. Move Bookdown equation labels out of `MATH_CONTENT`.
-3. Complete typed math CST accessors needed by the new lowering.
+1. Move Bookdown equation labels out of `MATH_CONTENT`.
+2. Complete typed math CST accessors needed by the new lowering.
+3. Establish the formatter migration baseline across all shared-corpus contexts.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Configured command signatures.** Added typed configuration, semantic-scope
+  merging, raw-definition shadowing, schema/docs, and focused formatter tests.
 - **Contextual semantic atom stream.** Added host-ranged atoms, contextual
   Bin-to-Ord coercion, break priorities, and focused Badness differentials.
 - **Generated Unicode math baseline.** Added reproducible Panache-owned command

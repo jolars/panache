@@ -417,6 +417,21 @@ fn experimental_format_math_preserves_text_group_interiors() {
 }
 
 #[test]
+fn experimental_format_math_preserves_unproven_argument_interiors() {
+    let input = "Inline $\\unknown{ a   +   b }\\sqrt{ c   +   d }{ e   +   f }$ end.\n";
+    let expected = "Inline $\\unknown{ a   +   b }\\sqrt{c + d}{ e   +   f }$ end.\n";
+    let output = format(input, Some(math_config(true)), None);
+    similar_asserts::assert_eq!(output, expected);
+    similar_asserts::assert_eq!(format(&output, Some(math_config(true)), None), output);
+}
+
+#[test]
+fn experimental_format_math_preserves_malformed_argument_bytes() {
+    let input = "Inline $\\frac{ a   +   b }{ c   +   d$ end.\n";
+    similar_asserts::assert_eq!(format(input, Some(math_config(true)), None), input);
+}
+
+#[test]
 fn configured_math_signature_controls_argument_recursion() {
     let mut cfg = math_config(true);
     cfg.math_signatures.insert(
@@ -428,12 +443,16 @@ fn configured_math_signature_controls_argument_recursion() {
             },
             panache_formatter::MathArgumentConfig {
                 kind: ArgKind::Brace,
+                domain: ArgumentDomain::Unknown,
+            },
+            panache_formatter::MathArgumentConfig {
+                kind: ArgKind::Brace,
                 domain: ArgumentDomain::Math,
             },
         ],
     );
-    let input = "Inline $\\custom[ label + value ]{ a   +   b }$ end.\n";
-    let expected = "Inline $\\custom[ label + value ]{a + b}$ end.\n";
+    let input = "Inline $\\custom[ t + u ]{ v   +   w }{ a   +   b }{ x   +   y }$ end.\n";
+    let expected = "Inline $\\custom[ t + u ]{ v   +   w }{a + b}{ x   +   y }$ end.\n";
     let output = format(input, Some(cfg.clone()), None);
     similar_asserts::assert_eq!(output, expected);
     similar_asserts::assert_eq!(format(&output, Some(cfg), None), output);

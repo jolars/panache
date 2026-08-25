@@ -110,6 +110,21 @@ fn oracle_compares_formatter_output_byte_for_byte() {
 }
 
 #[test]
+fn argument_recursion_contract_matches_badness() {
+    let cases = [
+        r"\frac{ a   +   b }{ c   +   d }",
+        r"\text{ a   +   b }",
+        r"\unknown{ a   +   b }",
+        r"\sqrt{ a   +   b }{ c   +   d }",
+    ];
+    for body in cases {
+        for context in OracleContext::ALL {
+            assert_formatter_parity(body, context);
+        }
+    }
+}
+
+#[test]
 fn oracle_ranks_relations_above_binaries_and_never_breaks_at_unary_signs() {
     let formatted = badness_body_with_width(
         "aaaaaaaa = -bbbbbbbb + cccccccc = dddddddd",
