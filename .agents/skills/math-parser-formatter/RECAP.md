@@ -80,32 +80,35 @@ still-relevant trap into Persistent traps. Keep it short.
 
 ## Latest session
 
-**Bracketed-body comment lowering.** Extended typed comment lowering into
-ordinary groups and braced script arguments, unifying the hanging-indent rule
-across every bracket level.
+**Paired-delimiter body comments.** Extended typed comment lowering into
+`\left`/`\right` bodies, completing the inline comment slice for every
+bracketing construct already on the typed path.
 
-- Routed content, group, and argument bodies through one `lower_body` dispatch
-  and replaced the argument-only alignment with a shared `hanging` helper that
-  indents any comment-broken body by one column per bracket level.
-- Groups now accept `MATH_COMMENT` body elements; lowerability still comes from
-  `lower_body`, so unsafe comments keep the conservative fallback.
-- Added focused unit coverage, byte-exact Badness parity for group, nested,
-  bracket-argument, `\left`/`\right`, and script-argument shapes, and an
-  explicit idempotency guard for the re-parsed hanging indent.
-- Added five shared-corpus cases and regenerated the 105-case baseline; inline
-  parity increased from 69 to 74 cases.
+- `lower_delimited` now routes its body through the shared `lower_body`
+  dispatch, and `delimited_is_supported` accepts `MATH_COMMENT` body elements.
+  A comment outside the body, such as one between `\left` and its delimiter,
+  stays on the conservative fallback.
+- The existing opening-width alignment and body padding already reproduce
+  Badness's layout: continuation lines land at the opening width plus one
+  column, and a trailing comment pushes `\right` one column further out.
+- Added focused unit coverage, byte-exact parity for leading, trailing, mid,
+  empty, nested, scripted, and argument-embedded pairs, and extended the
+  idempotency guard.
+- Added two shared-corpus cases and regenerated the 107-case baseline; inline
+  parity increased from 74 to 76 cases.
 
 ### Suggested next sub-targets
 
-1. Lower comments that sit directly in a `\left`/`\right` body, which still
-   fall back because a bare comment is not a supported body element.
-2. Lower authored `\\` breaks, then extend the comment slice beyond inline
-   math into the display and environment contexts.
+1. Lower authored `\\` breaks, the last inline shape still on the fallback.
+2. Extend the comment and break slices beyond inline math into the display and
+   environment contexts, where `can_lower_nested_comments` still declines.
 
 --------------------------------------------------------------------------------
 
 ## Earlier sessions
 
+- **Bracketed-body comment lowering.** Unified the comment dispatch and gave
+  every bracket level one column of hanging indent.
 - **Mid-expression comment semantics.** Carried operand, binary, and relation
   context across safe mid-expression comments at top level and in proven math
   arguments.

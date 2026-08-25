@@ -1,11 +1,11 @@
 Badness math formatter parity baseline
 Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
-Cases: 105
-Context runs: 315
-Parity: 74 / 315
-Controlled wrapper rejection: 15 / 315
-Divergent: 226 / 315
+Cases: 107
+Context runs: 321
+Parity: 76 / 321
+Controlled wrapper rejection: 15 / 321
+Divergent: 230 / 321
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,9 +15,9 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 74, rejected 5, divergent 26
-display: parity 0, rejected 5, divergent 100
-environment: parity 0, rejected 5, divergent 100
+inline: parity 76, rejected 5, divergent 26
+display: parity 0, rejected 5, divergent 102
+environment: parity 0, rejected 5, divergent 102
 
 === First-slice parity candidates ===
 display/authored_newline.tex [inline]
@@ -47,6 +47,8 @@ commands/unknown_argument_whitespace.tex [inline]
 comments/argument_leading.tex [inline]
 comments/argument_trailing.tex [inline]
 comments/comment_line.tex [inline]
+comments/delimiter_body_mid.tex [inline]
+comments/delimiter_body_trailing.tex [inline]
 comments/group_leading.tex [inline]
 comments/group_nested.tex [inline]
 comments/group_trailing.tex [inline]
@@ -398,6 +400,26 @@ Panache: "  % leading comment\n  x = 1"
 Input: "% leading comment\nx = 1\n"
 Badness: "  % leading comment\n  x = 1\n"
 Panache: "  % leading comment\n  x = 1"
+
+--- comments/delimiter_body_mid.tex [display] ---
+Input: "\\left( a % inner\n+ b \\right)\n"
+Badness: "  \\left( a % inner\n         + b \\right)\n"
+Panache: <declined>
+
+--- comments/delimiter_body_mid.tex [environment] ---
+Input: "\\left( a % inner\n+ b \\right)\n"
+Badness: "  \\left( a % inner\n         + b \\right)\n"
+Panache: <declined>
+
+--- comments/delimiter_body_trailing.tex [display] ---
+Input: "\\left( a+b % trail\n\\right)\n"
+Badness: "  \\left( a + b % trail\n          \\right)\n"
+Panache: <declined>
+
+--- comments/delimiter_body_trailing.tex [environment] ---
+Input: "\\left( a+b % trail\n\\right)\n"
+Badness: "  \\left( a + b % trail\n          \\right)\n"
+Panache: <declined>
 
 --- comments/group_leading.tex [display] ---
 Input: "{% inner\n a+b}\n"

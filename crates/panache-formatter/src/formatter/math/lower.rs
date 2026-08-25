@@ -345,7 +345,7 @@ fn lower_delimited(
     let close = delimited.closing_delimiter()?;
     let mut documents = vec![Ir::verbatim(left.text()), Ir::verbatim(open.text())];
     if !body.text().trim().is_empty() {
-        let inner = lower_elements(body.elements().collect(), scope, spacing)?;
+        let inner = lower_body(body.elements().collect(), scope, spacing)?;
         let opening_width = left.text().chars().count() + open.text().chars().count();
         documents.push(Ir::align(
             opening_width + 1,
@@ -375,9 +375,11 @@ fn delimited_is_supported(delimited: &MathDelimited, scope: &SignatureScope) -> 
     ];
     delimited.syntax().children_with_tokens().all(|element| {
         structural_ranges.contains(&element.text_range()) || is_layout_trivia(&element)
-    }) && body
-        .elements()
-        .all(|element| is_supported_element(&element, scope))
+    }) && body.elements().all(|element| {
+        // The body's own comments break through `lower_body`; a comment outside
+        // it, such as one between `\left` and its delimiter, stays unsupported.
+        element.kind() == SyntaxKind::MATH_COMMENT || is_supported_element(&element, scope)
+    })
 }
 
 fn lower_scripted(scripted: &MathScripted, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
@@ -928,6 +930,48 @@ mod tests {
             (
                 "\\left( {a % inner\n} \\right)",
                 "\\left( {a % inner\n        } \\right)",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_edge_comments_in_paired_delimiter_bodies() {
+        let cases = [
+            (
+                "\\left( a % inner\n+ b \\right)",
+                "\\left( a % inner\n       + b \\right)",
+            ),
+            (
+                "\\left( % lead\n a+b \\right)",
+                "\\left( % lead\n       a + b \\right)",
+            ),
+            (
+                "\\left(a % inner\n\\right)",
+                "\\left( a % inner\n        \\right)",
+            ),
+            (
+                "\\left( % only\n \\right)",
+                "\\left( % only\n        \\right)",
+            ),
+            (
+                "\\left\\langle a % inner\n+b \\right\\rangle",
+                "\\left\\langle a % inner\n             + b \\right\\rangle",
+            ),
+            (
+                "\\left( \\left[ a % inner\n \\right] \\right)",
+                "\\left( \\left[ a % inner\n               \\right] \\right)",
+            ),
+            (
+                "\\left( a % inner\n \\right)^2",
+                "\\left( a % inner\n        \\right)^2",
+            ),
+            (
+                "\\frac{\\left( a % inner\n \\right)}{b}",
+                "\\frac{\\left( a % inner\n         \\right)}{b}",
             ),
         ];
 

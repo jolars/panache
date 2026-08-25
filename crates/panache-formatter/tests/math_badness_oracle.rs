@@ -663,6 +663,23 @@ fn script_argument_comment_migration_slice_matches_badness() {
     }
 }
 
+#[test]
+fn paired_delimiter_body_comment_migration_slice_matches_badness() {
+    for body in [
+        "\\left( a % inner\n+ b \\right)",
+        "\\left( % lead\n a+b \\right)",
+        "\\left( a+b % trail\n \\right)",
+        "\\left(a % inner\n\\right)",
+        "\\left( % only\n \\right)",
+        "\\left\\langle a % inner\n+b \\right\\rangle",
+        "\\left( \\left[ a % inner\n \\right] \\right)",
+        "\\left( a % inner\n \\right)^2",
+        "\\frac{\\left( a % inner\n \\right)}{b}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
 /// The hanging indent this slice emits re-enters the parser as `MATH_SPACE` on
 /// the next pass, so guard the round trip explicitly.
 #[test]
@@ -683,6 +700,12 @@ fn bracketed_body_comment_lowering_is_idempotent() {
         "x_{a % inner\n}^2",
         "x^{{a % inner\n}}",
         "x^{a % inner\n}_{b % other\n}",
+        "\\left( a % inner\n+ b \\right)",
+        "\\left( % lead\n a+b \\right)",
+        "\\left( a+b % trail\n \\right)",
+        "\\left( % only\n \\right)",
+        "\\left( \\left[ a % inner\n \\right] \\right)",
+        "\\left( a % inner\n \\right)^2",
     ] {
         let once = panache_body(body, OracleContext::Inline).expect("first pass");
         let twice = panache_body(&once, OracleContext::Inline).expect("second pass");
