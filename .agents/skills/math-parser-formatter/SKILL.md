@@ -62,6 +62,9 @@ are relative to the repository root.
   relations. Keep those cases on the compatibility path and outside mandatory
   byte parity until the pinned oracle is corrected. Definition relations,
   including `:=_i`, now have byte parity.
+- **Raise issues with Badness to the user:** if you see a Badness parser 
+  or formatter defect, record it and elevate it to the user so that
+  it can be fixed in the Badness repository.
 
 Follow the math-parser, parser, and formatter invariants in the repository's
 root `AGENTS.md`.
