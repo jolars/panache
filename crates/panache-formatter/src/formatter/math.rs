@@ -274,21 +274,24 @@ fn has_nested_comment(tree: &SyntaxNode) -> bool {
 }
 
 fn can_lower_nested_comments(tree: &SyntaxNode, opts: &MathFormatOptions) -> bool {
-    let context_is_supported = match opts.context {
-        MathContext::Inline => true,
-        MathContext::Display => !tree.descendants_with_tokens().any(|element| {
+    if opts.context == MathContext::EnvironmentBody
+        && tree.descendants_with_tokens().any(|element| {
+            matches!(
+                element.kind(),
+                SyntaxKind::MATH_ALIGN | SyntaxKind::MATH_LINE_BREAK
+            )
+        })
+    {
+        return render::can_render_environment_grid_comments(tree, &opts.signature_scope);
+    }
+
+    let context_is_supported = opts.context != MathContext::Display
+        || !tree.descendants_with_tokens().any(|element| {
             matches!(
                 element.kind(),
                 SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_LINE_BREAK
             )
-        }),
-        MathContext::EnvironmentBody => !tree.descendants_with_tokens().any(|element| {
-            matches!(
-                element.kind(),
-                SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_LINE_BREAK
-            )
-        }),
-    };
+        });
     context_is_supported
         && MathContent::cast(tree.clone())
             .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))

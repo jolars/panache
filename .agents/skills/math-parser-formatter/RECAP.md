@@ -45,28 +45,27 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Comments in free environment bodies.** Routed supported comment-bearing raw
-environment bodies through the shared typed document IR at the environment's
-one-level indent.
+**Comments in final environment-grid cells.** Routed one supported nested
+comment-bearing construct in the final cell of a top-level environment row
+through the shared typed document IR.
 
-- All 16 comment corpus shapes now have mandatory byte parity with Badness in
-  controlled environment bodies without a terminal wrapper newline. Coverage
-  includes top-level comments, math arguments, groups, scripts, paired
-  delimiters, and operator context carried across comment lines.
-- The slice excludes alignment separators, authored `\\` markers, and nested
-  environments. Those grid shapes remain on the legacy row renderer until
-  their own bounded migrations land.
-- Every migrated environment comment case is explicitly checked for
-  idempotency. Nested hanging indentation composes with the environment's
-  fixed two-space body indent through the document printer.
-- Regenerated the 107-case report. Its raw corpus includes a terminal newline
-  in every fixture, which the environment wrapper retains while Panache's
-  delimiter-free formatter intentionally omits it; therefore, only the
-  trailing-comment fixture moves to raw report parity (79 to 80 overall).
+- Mandatory byte parity with Badness now covers groups, signature-proven math
+  arguments, braced scripts, and paired delimiters in final grid cells,
+  including Unicode content and rows terminated by authored `\\` markers.
+- Continuation indentation composes the environment's two-column indent, the
+  aligned cell start, and the nested construct's hanging offset. Column widths
+  continue to use Unicode-scalar counts, and every migrated case is explicitly
+  idempotent.
+- Multiline non-final cells remain on the compatibility path. Badness does not
+  apply its ordinary grid spacing to the separator after such a cell, so that
+  behavior needs its own bounded analysis before migration.
+- The committed 107-case report is unchanged because this slice adds focused
+  controlled bodies rather than new corpus fixtures.
 
 ### Suggested next sub-targets
 
-1. Extend typed comments into supported environment grid cells and nested
-   environments, replacing the corresponding legacy row renderer incrementally.
-2. Move display and environment authored-break layout onto the document IR,
+1. Analyze and migrate comment-bearing non-final grid cells, including their
+   separator and width semantics, as a distinct bounded slice.
+2. Extend typed comments into nested environments.
+3. Move display and environment authored-break layout onto the document IR,
    including modifier and adjacent-comment behavior.

@@ -618,9 +618,29 @@ enum BodyItem {
     Block(Vec<String>),
     /// A normal table row: trimmed cells split on top-level `&`.
     Row {
-        cells: Vec<String>,
+        cells: Vec<BodyCell>,
         break_text: Option<String>,
     },
+}
+
+enum BodyCell {
+    Flat(String),
+    Document(Ir),
+}
+
+impl BodyCell {
+    fn first_line_width(&self, printer: &Printer) -> usize {
+        match self {
+            Self::Flat(text) => text.chars().count(),
+            Self::Document(document) => printer
+                .print(document, 0)
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .chars()
+                .count(),
+        }
+    }
 }
 
 fn render_body_lines(
@@ -629,6 +649,7 @@ fn render_body_lines(
     opts: &MathFormatOptions,
 ) -> Vec<String> {
     let indent = INDENT.repeat(depth);
+    let printer = Printer::new(opts.line_width, INDENT.len());
     let mut items: Vec<BodyItem> = Vec::new();
 
     for row in split_rows(body) {
@@ -641,9 +662,23 @@ fn render_body_lines(
             let cells = split_cells(&row.elems)
                 .iter()
                 .map(|cell| {
-                    render_inline(cell, &opts.signature_scope)
-                        .trim()
-                        .to_string()
+                    if cell.iter().any(contains_nested_comment) {
+                        lower_grid_cell(cell, &opts.signature_scope)
+                            .map(BodyCell::Document)
+                            .unwrap_or_else(|| {
+                                BodyCell::Flat(
+                                    render_inline(cell, &opts.signature_scope)
+                                        .trim()
+                                        .to_string(),
+                                )
+                            })
+                    } else {
+                        BodyCell::Flat(
+                            render_inline(cell, &opts.signature_scope)
+                                .trim()
+                                .to_string(),
+                        )
+                    }
                 })
                 .collect();
             items.push(BodyItem::Row {
@@ -653,17 +688,32 @@ fn render_body_lines(
         }
     }
 
-    let widths = column_widths(&items);
+    let widths = column_widths(&items, &printer);
     let mut out: Vec<String> = Vec::new();
     for item in items {
         match item {
             BodyItem::Block(lines) => out.extend(lines),
             BodyItem::Row { cells, break_text } => {
-                let line = join_cells(&cells, &widths, break_text.is_some());
-                out.push(format!(
-                    "{indent}{}",
-                    with_break(line, break_text.as_deref())
-                ));
+                if cells
+                    .iter()
+                    .any(|cell| matches!(cell, BodyCell::Document(_)))
+                {
+                    let document = join_cell_documents(&cells, &widths, break_text.as_deref());
+                    out.push(printer.print(&document, indent.len()));
+                } else {
+                    let cells = cells
+                        .iter()
+                        .map(|cell| match cell {
+                            BodyCell::Flat(text) => text.clone(),
+                            BodyCell::Document(_) => unreachable!("handled typed row"),
+                        })
+                        .collect::<Vec<_>>();
+                    let line = join_cells(&cells, &widths, break_text.is_some());
+                    out.push(format!(
+                        "{indent}{}",
+                        with_break(line, break_text.as_deref())
+                    ));
+                }
             }
         }
     }
@@ -674,7 +724,7 @@ fn render_body_lines(
 /// last column, so trailing `\\` can be aligned too). Single-cell rows have no
 /// separator and don't participate. Computed on already-trimmed cells — this is
 /// the idempotency engine.
-fn column_widths(items: &[BodyItem]) -> Vec<usize> {
+fn column_widths(items: &[BodyItem], printer: &Printer) -> Vec<usize> {
     let mut widths: Vec<usize> = Vec::new();
     for item in items {
         if let BodyItem::Row { cells, .. } = item {
@@ -682,7 +732,7 @@ fn column_widths(items: &[BodyItem]) -> Vec<usize> {
                 continue; // single cell ⇒ no column separator ⇒ nothing to pad
             }
             for (col, cell) in cells.iter().enumerate() {
-                let w = cell.chars().count();
+                let w = cell.first_line_width(printer);
                 if col >= widths.len() {
                     widths.resize(col + 1, 0);
                 }
@@ -691,6 +741,99 @@ fn column_widths(items: &[BodyItem]) -> Vec<usize> {
         }
     }
     widths
+}
+
+fn join_cell_documents(cells: &[BodyCell], widths: &[usize], break_text: Option<&str>) -> Ir {
+    let last = cells.len().saturating_sub(1);
+    let mut documents = Vec::new();
+    let mut prefix_width = 0;
+    for (column, cell) in cells.iter().enumerate() {
+        if column > 0 {
+            documents.push(Ir::text(" & "));
+            prefix_width += 3;
+        }
+        let document = match cell {
+            BodyCell::Flat(text) => Ir::verbatim(text.clone()),
+            BodyCell::Document(document) => document.clone(),
+        };
+        documents.push(Ir::align(prefix_width, document));
+
+        let cell_width = cell.first_line_width(&Printer::new(usize::MAX / 2, INDENT.len()));
+        let pad = if column == last && break_text.is_none() {
+            0
+        } else {
+            widths
+                .get(column)
+                .copied()
+                .unwrap_or(0)
+                .saturating_sub(cell_width)
+        };
+        if pad > 0 {
+            documents.push(Ir::text(" ".repeat(pad)));
+        }
+        prefix_width += cell_width + pad;
+    }
+    if let Some(marker) = break_text {
+        if !cells.is_empty() {
+            documents.push(Ir::text(" "));
+        }
+        documents.push(Ir::verbatim(marker));
+    }
+    Ir::concat(documents)
+}
+
+pub(super) fn can_render_environment_grid_comments(
+    tree: &SyntaxNode,
+    scope: &SignatureScope,
+) -> bool {
+    if tree
+        .descendants()
+        .any(|node| node.kind() == SyntaxKind::MATH_ENVIRONMENT)
+    {
+        return false;
+    }
+    let elements = tree.children_with_tokens().collect::<Vec<_>>();
+    split_rows(&elements).into_iter().all(|row| {
+        let cells = split_cells(&row.elems);
+        let last = cells.len().saturating_sub(1);
+        cells.iter().enumerate().all(|(index, cell)| {
+            !cell.iter().any(contains_nested_comment)
+                || index == last && lower_grid_cell(cell, scope).is_some()
+        })
+    })
+}
+
+fn lower_grid_cell(elements: &[SyntaxElement], scope: &SignatureScope) -> Option<Ir> {
+    let document = lower::try_lower_elements(elements.to_vec(), scope)?;
+    let comment_elements = elements
+        .iter()
+        .filter(|element| contains_nested_comment(element))
+        .collect::<Vec<_>>();
+    let [comment_element] = comment_elements.as_slice() else {
+        return None;
+    };
+    let comment_document = lower::try_lower_elements(vec![(*comment_element).clone()], scope)?;
+    let printer = Printer::new(usize::MAX / 2, INDENT.len());
+    let first_line = printer.print(&document, 0).lines().next()?.to_string();
+    let comment_first_line = printer
+        .print(&comment_document, 0)
+        .lines()
+        .next()?
+        .to_string();
+    // The nested document's own hanging indent is relative to its containing
+    // atom, so carry that atom's formatted cell offset into the row document.
+    let offset = first_line[..first_line.rfind(&comment_first_line)?]
+        .chars()
+        .count();
+    Some(Ir::align(offset, document))
+}
+
+fn contains_nested_comment(element: &SyntaxElement) -> bool {
+    element.as_node().is_some_and(|node| {
+        node.descendants_with_tokens()
+            .filter_map(|descendant| descendant.into_token())
+            .any(|token| token.kind() == SyntaxKind::MATH_COMMENT)
+    })
 }
 
 /// Pad cells to their column width and join with the canonical ` & ` separator

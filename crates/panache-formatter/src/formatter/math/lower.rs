@@ -22,6 +22,14 @@ pub(super) fn try_lower_content(content: &MathContent, scope: &SignatureScope) -
     lower_body(content.elements().collect(), scope, Spacing::Normal)
 }
 
+/// Lower a formatter-derived row or cell without inventing a CST wrapper.
+pub(super) fn try_lower_elements(
+    elements: Vec<SyntaxElement>,
+    scope: &SignatureScope,
+) -> Option<Ir> {
+    lower_body(elements, scope, Spacing::Normal)
+}
+
 /// Lower a bracketed body, routing comment-bearing bodies through hard lines.
 fn lower_body(
     elements: Vec<SyntaxElement>,

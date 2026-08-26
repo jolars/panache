@@ -103,6 +103,13 @@ Returned unchanged, never reflowed:
    **source character counts**, so alignment is cosmetic source-tidiness, not
    rendered-glyph alignment (`\alpha` counts as 6).
 
+   A final grid cell containing one comment-bearing group, signature-proven
+   argument, braced script, or `\left`/`\right` body uses the typed comment
+   layout from Rule 1. Its continuation indent composes the environment indent,
+   the aligned cell's starting column, and the enclosing construct's hanging
+   indent. Multiline non-final cells remain on the verbatim compatibility path
+   because their separators require a separate grid-layout migration.
+
    Ragged rows are fine: a column's width is the max over only the rows that
    have a non-last cell there; a short row contributes to and is padded for only
    the columns it has.
