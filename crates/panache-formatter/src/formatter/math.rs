@@ -282,7 +282,12 @@ fn can_lower_nested_comments(tree: &SyntaxNode, opts: &MathFormatOptions) -> boo
                 SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_LINE_BREAK
             )
         }),
-        MathContext::EnvironmentBody => false,
+        MathContext::EnvironmentBody => !tree.descendants_with_tokens().any(|element| {
+            matches!(
+                element.kind(),
+                SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_LINE_BREAK
+            )
+        }),
     };
     context_is_supported
         && MathContent::cast(tree.clone())

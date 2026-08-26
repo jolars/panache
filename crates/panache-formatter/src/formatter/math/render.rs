@@ -28,8 +28,32 @@ pub(super) fn render(tree: &SyntaxNode, opts: &MathFormatOptions) -> String {
     match opts.context {
         MathContext::Inline => render_inline_content(tree, &top, opts),
         MathContext::Display => render_display(tree, &top, opts),
-        MathContext::EnvironmentBody => render_body_lines(&top, 1, opts).join("\n"),
+        MathContext::EnvironmentBody => render_environment_body(tree, &top, opts),
     }
+}
+
+fn render_environment_body(
+    tree: &SyntaxNode,
+    elements: &[SyntaxElement],
+    opts: &MathFormatOptions,
+) -> String {
+    if !elements.iter().any(contains_environment)
+        && tree
+            .descendants_with_tokens()
+            .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
+        && !tree.descendants_with_tokens().any(|element| {
+            matches!(
+                element.kind(),
+                SyntaxKind::MATH_ALIGN | SyntaxKind::MATH_LINE_BREAK
+            )
+        })
+        && let Some(document) = MathContent::cast(tree.clone())
+            .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
+    {
+        return Printer::new(opts.line_width, INDENT.len()).print(&document, INDENT.len());
+    }
+
+    render_body_lines(elements, 1, opts).join("\n")
 }
 
 fn render_inline_content(

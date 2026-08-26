@@ -3,9 +3,9 @@ Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
 Cases: 107
 Context runs: 321
-Parity: 79 / 321
+Parity: 80 / 321
 Controlled wrapper rejection: 15 / 321
-Divergent: 227 / 321
+Divergent: 226 / 321
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -17,7 +17,7 @@ Selected first migration slice:
 === Counts by context ===
 inline: parity 78, rejected 5, divergent 24
 display: parity 1, rejected 5, divergent 101
-environment: parity 0, rejected 5, divergent 102
+environment: parity 1, rejected 5, divergent 101
 
 === First-slice parity candidates ===
 display/authored_newline.tex [inline]
@@ -61,6 +61,7 @@ comments/script_argument_mid.tex [inline]
 comments/script_argument_trailing.tex [inline]
 comments/trailing_comment.tex [inline]
 comments/trailing_comment.tex [display]
+comments/trailing_comment.tex [environment]
 display/authored_newline.tex [inline]
 display/fraction_block.tex [inline]
 display/integral.tex [inline]
@@ -382,7 +383,7 @@ Panache: "  \\frac{% numerator\n   a + b}{c}"
 --- comments/argument_leading.tex [environment] ---
 Input: "\\frac{% numerator\n a+b}{c}\n"
 Badness: "  \\frac{% numerator\n   a + b}{c}\n"
-Panache: <declined>
+Panache: "  \\frac{% numerator\n   a + b}{c}"
 
 --- comments/argument_trailing.tex [display] ---
 Input: "\\frac{a+b % numerator\n}{c}\n"
@@ -392,7 +393,7 @@ Panache: "  \\frac{a + b % numerator\n   }{c}"
 --- comments/argument_trailing.tex [environment] ---
 Input: "\\frac{a+b % numerator\n}{c}\n"
 Badness: "  \\frac{a + b % numerator\n   }{c}\n"
-Panache: <declined>
+Panache: "  \\frac{a + b % numerator\n   }{c}"
 
 --- comments/comment_line.tex [display] ---
 Input: "% leading comment\nx = 1\n"
@@ -412,7 +413,7 @@ Panache: "  \\left( a % inner\n         + b \\right)"
 --- comments/delimiter_body_mid.tex [environment] ---
 Input: "\\left( a % inner\n+ b \\right)\n"
 Badness: "  \\left( a % inner\n         + b \\right)\n"
-Panache: <declined>
+Panache: "  \\left( a % inner\n         + b \\right)"
 
 --- comments/delimiter_body_trailing.tex [display] ---
 Input: "\\left( a+b % trail\n\\right)\n"
@@ -422,7 +423,7 @@ Panache: "  \\left( a + b % trail\n          \\right)"
 --- comments/delimiter_body_trailing.tex [environment] ---
 Input: "\\left( a+b % trail\n\\right)\n"
 Badness: "  \\left( a + b % trail\n          \\right)\n"
-Panache: <declined>
+Panache: "  \\left( a + b % trail\n          \\right)"
 
 --- comments/group_leading.tex [display] ---
 Input: "{% inner\n a+b}\n"
@@ -432,7 +433,7 @@ Panache: "  {% inner\n   a + b}"
 --- comments/group_leading.tex [environment] ---
 Input: "{% inner\n a+b}\n"
 Badness: "  {% inner\n   a + b}\n"
-Panache: <declined>
+Panache: "  {% inner\n   a + b}"
 
 --- comments/group_nested.tex [display] ---
 Input: "{{a % inner\n}}\n"
@@ -442,7 +443,7 @@ Panache: "  {{a % inner\n    }}"
 --- comments/group_nested.tex [environment] ---
 Input: "{{a % inner\n}}\n"
 Badness: "  {{a % inner\n    }}\n"
-Panache: <declined>
+Panache: "  {{a % inner\n    }}"
 
 --- comments/group_trailing.tex [display] ---
 Input: "{a+b % inner\n}\n"
@@ -452,7 +453,7 @@ Panache: "  {a + b % inner\n   }"
 --- comments/group_trailing.tex [environment] ---
 Input: "{a+b % inner\n}\n"
 Badness: "  {a + b % inner\n   }\n"
-Panache: <declined>
+Panache: "  {a + b % inner\n   }"
 
 --- comments/inside_math_argument.tex [display] ---
 Input: "\\frac{a % keep this comment\n+ b}{c}\n"
@@ -462,7 +463,7 @@ Panache: "  \\frac{a % keep this comment\n   + b}{c}"
 --- comments/inside_math_argument.tex [environment] ---
 Input: "\\frac{a % keep this comment\n+ b}{c}\n"
 Badness: "  \\frac{a % keep this comment\n   + b}{c}\n"
-Panache: <declined>
+Panache: "  \\frac{a % keep this comment\n   + b}{c}"
 
 --- comments/mid_expression_after_binary.tex [display] ---
 Input: "a+% binary before comment\n-b\n"
@@ -472,7 +473,7 @@ Panache: "  a +% binary before comment\n  -b"
 --- comments/mid_expression_after_binary.tex [environment] ---
 Input: "a+% binary before comment\n-b\n"
 Badness: "  a +% binary before comment\n  -b\n"
-Panache: "  a + % binary before comment\n  -b"
+Panache: "  a +% binary before comment\n  -b"
 
 --- comments/mid_expression_after_operand.tex [display] ---
 Input: "a% operand before comment\n+b\n"
@@ -482,7 +483,7 @@ Panache: "  a% operand before comment\n  + b"
 --- comments/mid_expression_after_operand.tex [environment] ---
 Input: "a% operand before comment\n+b\n"
 Badness: "  a% operand before comment\n  + b\n"
-Panache: "  a% operand before comment\n  +b"
+Panache: "  a% operand before comment\n  + b"
 
 --- comments/mid_expression_after_relation.tex [display] ---
 Input: "a=% relation before comment\n-b\n"
@@ -492,7 +493,7 @@ Panache: "  a =% relation before comment\n  -b"
 --- comments/mid_expression_after_relation.tex [environment] ---
 Input: "a=% relation before comment\n-b\n"
 Badness: "  a =% relation before comment\n  -b\n"
-Panache: "  a = % relation before comment\n  -b"
+Panache: "  a =% relation before comment\n  -b"
 
 --- comments/optional_argument_leading.tex [display] ---
 Input: "\\sqrt[% index\n n+1]{x}\n"
@@ -502,7 +503,7 @@ Panache: "  \\sqrt[% index\n   n + 1]{x}"
 --- comments/optional_argument_leading.tex [environment] ---
 Input: "\\sqrt[% index\n n+1]{x}\n"
 Badness: "  \\sqrt[% index\n   n + 1]{x}\n"
-Panache: <declined>
+Panache: "  \\sqrt[% index\n   n + 1]{x}"
 
 --- comments/script_argument_mid.tex [display] ---
 Input: "x^{a % inner\n+b}\n"
@@ -512,7 +513,7 @@ Panache: "  x^{a % inner\n   +b}"
 --- comments/script_argument_mid.tex [environment] ---
 Input: "x^{a % inner\n+b}\n"
 Badness: "  x^{a % inner\n   +b}\n"
-Panache: <declined>
+Panache: "  x^{a % inner\n   +b}"
 
 --- comments/script_argument_trailing.tex [display] ---
 Input: "x^{a+b % inner\n}\n"
@@ -522,12 +523,7 @@ Panache: "  x^{a+b % inner\n   }"
 --- comments/script_argument_trailing.tex [environment] ---
 Input: "x^{a+b % inner\n}\n"
 Badness: "  x^{a+b % inner\n   }\n"
-Panache: <declined>
-
---- comments/trailing_comment.tex [environment] ---
-Input: "a + b % this is a comment\n"
-Badness: "  a + b % this is a comment\n"
-Panache: "  a + b % this is a comment"
+Panache: "  x^{a+b % inner\n   }"
 
 --- display/authored_newline.tex [display] ---
 Input: "a + b\n= c + d\n"

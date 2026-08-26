@@ -716,6 +716,40 @@ fn free_display_comment_migration_slice_matches_badness() {
 }
 
 #[test]
+fn free_environment_comment_migration_slice_matches_badness() {
+    let root = corpus_root();
+    for id in [
+        "comments/argument_leading.tex",
+        "comments/argument_trailing.tex",
+        "comments/comment_line.tex",
+        "comments/delimiter_body_mid.tex",
+        "comments/delimiter_body_trailing.tex",
+        "comments/group_leading.tex",
+        "comments/group_nested.tex",
+        "comments/group_trailing.tex",
+        "comments/inside_math_argument.tex",
+        "comments/mid_expression_after_binary.tex",
+        "comments/mid_expression_after_operand.tex",
+        "comments/mid_expression_after_relation.tex",
+        "comments/optional_argument_leading.tex",
+        "comments/script_argument_mid.tex",
+        "comments/script_argument_trailing.tex",
+        "comments/trailing_comment.tex",
+    ] {
+        let input = fs::read_to_string(root.join(id))
+            .unwrap_or_else(|error| panic!("failed to read `{id}`: {error}"));
+        let body = input.trim_end_matches('\n');
+        assert_formatter_parity(body, OracleContext::Environment);
+        let once = panache_body(body, OracleContext::Environment).expect("first Panache pass");
+        let twice = panache_body(&once, OracleContext::Environment).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "environment comment case is not idempotent: `{id}`"
+        );
+    }
+}
+
+#[test]
 fn authored_line_break_migration_slice_matches_badness() {
     for body in [
         "a\\\\b",

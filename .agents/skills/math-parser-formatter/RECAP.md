@@ -45,28 +45,28 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Comments in free display math.** Routed supported comment-bearing display
-bodies through the shared typed document IR, while leaving displays containing
-environments on the legacy path.
+**Comments in free environment bodies.** Routed supported comment-bearing raw
+environment bodies through the shared typed document IR at the environment's
+one-level indent.
 
 - All 16 comment corpus shapes now have mandatory byte parity with Badness in
-  controlled display bodies without a terminal wrapper newline. Coverage
+  controlled environment bodies without a terminal wrapper newline. Coverage
   includes top-level comments, math arguments, groups, scripts, paired
   delimiters, and operator context carried across comment lines.
-- Display printing applies `math_indent` as the IR's base indentation, so nested
-  hanging indentation composes with the host display indent instead of being
-  reconstructed by the legacy row renderer.
-- A final comment without an authored newline no longer gains one. The same
-  boundary is pinned in inline and display oracle coverage, and every migrated
-  display comment case is explicitly checked for idempotency.
+- The slice excludes alignment separators, authored `\\` markers, and nested
+  environments. Those grid shapes remain on the legacy row renderer until
+  their own bounded migrations land.
+- Every migrated environment comment case is explicitly checked for
+  idempotency. Nested hanging indentation composes with the environment's
+  fixed two-space body indent through the document printer.
 - Regenerated the 107-case report. Its raw corpus includes a terminal newline
-  in every fixture, which the display wrapper retains while Panache's
+  in every fixture, which the environment wrapper retains while Panache's
   delimiter-free formatter intentionally omits it; therefore, only the
-  trailing-comment fixture moves to raw report parity (78 to 79 overall).
+  trailing-comment fixture moves to raw report parity (79 to 80 overall).
 
 ### Suggested next sub-targets
 
-1. Extend typed comments into environment bodies and nested environments,
-   replacing the corresponding legacy cell renderer only for supported rows.
+1. Extend typed comments into supported environment grid cells and nested
+   environments, replacing the corresponding legacy row renderer incrementally.
 2. Move display and environment authored-break layout onto the document IR,
    including modifier and adjacent-comment behavior.

@@ -57,6 +57,11 @@ Returned unchanged, never reflowed:
    2-space, opinionated --- may become configurable later under the experimental
    clause).
 
+   A free comment-bearing body without `&`, an authored `\\`, or a nested
+   environment follows the typed comment rules from Rule 1 at the environment's
+   one-level indent. Its operator context survives comment newlines, and nested
+   brackets contribute their normal hanging indentation.
+
    An environment embedded as an operand inside a balanced ordinary delimiter
    pair (`(...)` or `[...]`) remains in the surrounding expression. If it makes
    the delimiter body multiline, the body breaks after the opening delimiter, at
@@ -77,8 +82,8 @@ Returned unchanged, never reflowed:
    formatter owns delimiter-adjacent line breaks, so the verbatim fallback
    removes only leading and trailing newline characters. It preserves
    indentation and all internal whitespace. The math-local Wadler-style document
-   model (`layout.rs`) preserves multiline fragments compositionally; it never
-   uses string sentinels.
+   model (`ir.rs`) preserves multiline fragments compositionally; it never uses
+   string sentinels.
 
 4. **`\\` normalization.** Display and environment row layout emits a trailing
    hard break as `\\` with one preceding space. Typed inline lowering follows
