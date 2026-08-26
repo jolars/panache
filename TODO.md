@@ -301,10 +301,6 @@ formatter-off output byte-identical.
    - [ ] Lower comments, authored breaks, display wrapping, nested environments,
      and environment grids. Replace the separate embedded-environment path
      once the shared cases pass in every controlled context.
-   - [ ] Add Panache's sole style extension: right-pad final cells in
-     alignment-capable environments so trailing `\\` markers align. Test it
-     independently, and restrict the differential comparator's exception to
-     that padding.
    - [ ] Reconnect the new formatter to Markdown delimiter spelling and the
      existing experimental gate. Enabling the gate must produce the same TeX
      style in every host delimiter form; disabling it must remain
