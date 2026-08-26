@@ -45,25 +45,28 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Authored inline row breaks.** Lowered typed `MATH_LINE_BREAK` nodes through
-the document IR, completing the inline comment-and-break shapes already
-represented in the shared corpus.
+**Comments in free display math.** Routed supported comment-bearing display
+bodies through the shared typed document IR, while leaving displays containing
+environments on the legacy path.
 
-- Plain breaks, tight `*` and bracket modifiers, nested group/argument/pair
-  breaks, and comments after breaks now take the typed path. Unclosed bracket
-  modifiers remain on the conservative fallback.
-- Break layout preserves whether the author placed whitespace before `\\`,
-  reproducing Badness's distinction between `a\\b` and `a \\ b`.
-- Row lowering shares one semantic atom stream across every break. This
-  preserves Badness's contextual operator role after `\\`, while each row is
-  still formatted and indented independently.
-- Added focused lowering, malformed-input, idempotency, and byte-exact oracle
-  coverage. Regenerated the 107-case baseline; inline parity increased from 76
-  to 78 cases.
+- All 16 comment corpus shapes now have mandatory byte parity with Badness in
+  controlled display bodies without a terminal wrapper newline. Coverage
+  includes top-level comments, math arguments, groups, scripts, paired
+  delimiters, and operator context carried across comment lines.
+- Display printing applies `math_indent` as the IR's base indentation, so nested
+  hanging indentation composes with the host display indent instead of being
+  reconstructed by the legacy row renderer.
+- A final comment without an authored newline no longer gains one. The same
+  boundary is pinned in inline and display oracle coverage, and every migrated
+  display comment case is explicitly checked for idempotency.
+- Regenerated the 107-case report. Its raw corpus includes a terminal newline
+  in every fixture, which the display wrapper retains while Panache's
+  delimiter-free formatter intentionally omits it; therefore, only the
+  trailing-comment fixture moves to raw report parity (78 to 79 overall).
 
 ### Suggested next sub-targets
 
-1. Extend typed comments into display and environment contexts, where
-   `can_lower_nested_comments` still declines.
+1. Extend typed comments into environment bodies and nested environments,
+   replacing the corresponding legacy cell renderer only for supported rows.
 2. Move display and environment authored-break layout onto the document IR,
    including modifier and adjacent-comment behavior.

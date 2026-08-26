@@ -27,7 +27,7 @@ pub(super) fn render(tree: &SyntaxNode, opts: &MathFormatOptions) -> String {
     let top: Vec<SyntaxElement> = tree.children_with_tokens().collect();
     match opts.context {
         MathContext::Inline => render_inline_content(tree, &top, opts),
-        MathContext::Display => render_display(&top, opts),
+        MathContext::Display => render_display(tree, &top, opts),
         MathContext::EnvironmentBody => render_body_lines(&top, 1, opts).join("\n"),
     }
 }
@@ -38,7 +38,7 @@ fn render_inline_content(
     opts: &MathFormatOptions,
 ) -> String {
     if let Some(document) = MathContent::cast(tree.clone())
-        .and_then(|content| lower::try_lower_inline(&content, &opts.signature_scope))
+        .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
     {
         Printer::new(opts.line_width, INDENT.len()).print_flat(&document)
     } else {
@@ -48,7 +48,20 @@ fn render_inline_content(
     }
 }
 
-fn render_display(top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
+fn render_display(tree: &SyntaxNode, top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
+    if !top.iter().any(contains_environment)
+        && tree
+            .descendants_with_tokens()
+            .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
+        && !tree
+            .descendants_with_tokens()
+            .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK)
+        && let Some(document) = MathContent::cast(tree.clone())
+            .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
+    {
+        return Printer::new(opts.line_width, INDENT.len()).print(&document, opts.math_indent);
+    }
+
     if has_mixed_environment_content(top) {
         let semantic = expand_word_elements(top);
         return render_mixed_delimited_display(&semantic, opts)

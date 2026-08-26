@@ -615,6 +615,7 @@ fn top_level_edge_comment_migration_slice_matches_badness() {
         "% leading comment\nx = 1\n",
         "% base comment\nx^2",
         "a + b % this is a comment\n",
+        "a + b % final comment",
     ] {
         assert_formatter_parity(body, OracleContext::Inline);
     }
@@ -677,6 +678,40 @@ fn paired_delimiter_body_comment_migration_slice_matches_badness() {
         "\\frac{\\left( a % inner\n \\right)}{b}",
     ] {
         assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
+#[test]
+fn free_display_comment_migration_slice_matches_badness() {
+    let root = corpus_root();
+    for id in [
+        "comments/argument_leading.tex",
+        "comments/argument_trailing.tex",
+        "comments/comment_line.tex",
+        "comments/delimiter_body_mid.tex",
+        "comments/delimiter_body_trailing.tex",
+        "comments/group_leading.tex",
+        "comments/group_nested.tex",
+        "comments/group_trailing.tex",
+        "comments/inside_math_argument.tex",
+        "comments/mid_expression_after_binary.tex",
+        "comments/mid_expression_after_operand.tex",
+        "comments/mid_expression_after_relation.tex",
+        "comments/optional_argument_leading.tex",
+        "comments/script_argument_mid.tex",
+        "comments/script_argument_trailing.tex",
+        "comments/trailing_comment.tex",
+    ] {
+        let input = fs::read_to_string(root.join(id))
+            .unwrap_or_else(|error| panic!("failed to read `{id}`: {error}"));
+        let body = input.trim_end_matches('\n');
+        assert_formatter_parity(body, OracleContext::Display);
+        let once = panache_body(body, OracleContext::Display).expect("first Panache pass");
+        let twice = panache_body(&once, OracleContext::Display).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "display comment case is not idempotent: `{id}`"
+        );
     }
 }
 

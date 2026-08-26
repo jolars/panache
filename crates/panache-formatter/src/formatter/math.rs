@@ -274,9 +274,19 @@ fn has_nested_comment(tree: &SyntaxNode) -> bool {
 }
 
 fn can_lower_nested_comments(tree: &SyntaxNode, opts: &MathFormatOptions) -> bool {
-    opts.context == MathContext::Inline
+    let context_is_supported = match opts.context {
+        MathContext::Inline => true,
+        MathContext::Display => !tree.descendants_with_tokens().any(|element| {
+            matches!(
+                element.kind(),
+                SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_LINE_BREAK
+            )
+        }),
+        MathContext::EnvironmentBody => false,
+    };
+    context_is_supported
         && MathContent::cast(tree.clone())
-            .and_then(|content| lower::try_lower_inline(&content, &opts.signature_scope))
+            .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
             .is_some()
 }
 

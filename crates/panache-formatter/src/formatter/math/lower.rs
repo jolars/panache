@@ -14,11 +14,11 @@ use crate::syntax::{
 
 use super::ir::Ir;
 
-/// Lower supported inline syntax, including conservative top-level edge comments.
+/// Lower a supported math content body into the shared document IR.
 ///
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
-pub(super) fn try_lower_inline(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
+pub(super) fn try_lower_content(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
     lower_body(content.elements().collect(), scope, Spacing::Normal)
 }
 
@@ -149,7 +149,10 @@ fn lower_edge_comments(
                 documents.push(Ir::text(" "));
             }
         }
-        documents.extend([Ir::verbatim(comment.to_string()), Ir::HardLine]);
+        documents.push(Ir::verbatim(comment.to_string()));
+        if index + 1 < elements.len() {
+            documents.push(Ir::HardLine);
+        }
         segment_start = index + 1;
     }
     let segment = &elements[segment_start..];
@@ -762,7 +765,7 @@ mod tests {
     }
 
     fn lower(input: &str) -> Option<String> {
-        try_lower_inline(&content(input), &SignatureScope::default())
+        try_lower_content(&content(input), &SignatureScope::default())
             .map(|document| Printer::new(80, 2).print_flat(&document))
     }
 
@@ -1165,7 +1168,7 @@ mod tests {
         let document = parse("\\newcommand{\\leq}{x}\n\n$\\leq$\n", None);
         let scope = SignatureScope::from_root(&document);
         assert!(scope.is_redefined("leq"));
-        assert!(try_lower_inline(&content(r"\leq"), &scope).is_none());
+        assert!(try_lower_content(&content(r"\leq"), &scope).is_none());
     }
 
     #[test]
