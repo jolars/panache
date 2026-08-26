@@ -45,21 +45,19 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Environment nested inside structured delimiters.** Composed the existing
-environment-row document inside the typed `MATH_DELIMITED` lowering for the
-shared `environments/nested/delimited_matrix.tex` case.
+**Host newline ownership and signature-name validation.** Fixed two review
+findings without changing the formatter-oracle classification.
 
-- Mandatory byte parity and second-pass idempotency now cover the case in
-  inline, display, and environment contexts.
-- The matrix body hangs from the `\left` delimiter's opening width while its
-  `\begin` remains on the opening line and `\end` returns to the same column.
-- Selection remains narrow: the delimiter must be closed, its body must contain
-  exactly one well-formed environment plus layout trivia, and mixed or malformed
-  shapes remain on the compatibility paths.
-- Display and environment contexts retain an authored final math newline;
-  inline context flattens it, matching the controlled Badness wrappers.
-- The regenerated 107-case report improves from 95 to 98 parity runs and from
-  211 to 208 divergences; all three changes promote the delimited matrix case.
+- Display and environment renderers may still retain an authored final math
+  newline for Badness parity. Host delimiter emitters now add a separator only
+  when the rendered body lacks one, preventing a blank line before `$$`, `\]`,
+  or `\end{...}` and preserving the Markdown parse across formatting passes.
+- The formatter golden suite now covers a `\left(...\right)`-delimited matrix
+  in an ordinary `$$` fence and checks complete-document idempotency.
+- `[format.math-signatures]` keys now follow the lexer exactly: one or more
+  ASCII letters or `@`, without a leading backslash. Invalid punctuation,
+  digits, whitespace, and non-ASCII names fail configuration finalization.
+- The focused Badness parity test for the delimited matrix remains byte-exact.
 
 ### Suggested next sub-targets
 

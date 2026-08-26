@@ -110,8 +110,7 @@ impl Formatter {
             match format_math(&content, &opts) {
                 Some(body) => {
                     self.output.push('\n');
-                    self.output.push_str(&body);
-                    self.output.push('\n');
+                    push_body_with_trailing_newline(&mut self.output, &body);
                 }
                 None => {
                     self.output.push_str(&content);
@@ -131,8 +130,7 @@ impl Formatter {
         let opts = MathFormatOptions::from_config(&self.config, MathContext::Display);
         match format_math(&content, &opts) {
             Some(body) => {
-                self.output.push_str(&body);
-                self.output.push('\n');
+                push_body_with_trailing_newline(&mut self.output, &body);
             }
             None => {
                 for line in content.trim().lines() {
@@ -144,6 +142,15 @@ impl Formatter {
         }
         self.output.push_str(close);
         self.output.push('\n');
+    }
+}
+
+/// Renderers may retain an authored final newline for TeX parity, while the
+/// host still needs exactly one separator before its closing delimiter.
+pub(super) fn push_body_with_trailing_newline(output: &mut String, body: &str) {
+    output.push_str(body);
+    if !body.ends_with('\n') {
+        output.push('\n');
     }
 }
 

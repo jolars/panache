@@ -2139,6 +2139,32 @@ textual = [{ kind = "brace", domain = "text" }]
     }
 
     #[test]
+    fn math_signature_command_names_match_the_lexer_grammar() {
+        let valid = r#"
+[format.math-signatures]
+"make@letter" = [{ kind = "brace", domain = "math" }]
+"#;
+        let cfg = parse_config_str(valid, Path::new("panache.toml"))
+            .expect("the lexer accepts ASCII letters and `@`");
+        assert!(cfg.math_signatures.contains_key("make@letter"));
+
+        for name in ["foo-bar", "foo1", "foo bar", "føø"] {
+            let toml = format!(
+                r#"
+[format.math-signatures]
+"{name}" = [{{ kind = "brace", domain = "math" }}]
+"#
+            );
+            let err = parse_config_str(&toml, Path::new("panache.toml"))
+                .expect_err("unlexable command names must be rejected");
+            assert!(
+                err.to_string().contains("ASCII letters or `@`"),
+                "got: {err}"
+            );
+        }
+    }
+
+    #[test]
     fn unknown_key_inside_experimental_section_is_rejected() {
         let toml = "[experimental]\nformat-maths = true\n";
         let err = parse_config_str(toml, Path::new("panache.toml"))

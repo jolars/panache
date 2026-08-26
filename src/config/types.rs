@@ -299,7 +299,8 @@ pub struct StyleConfig {
     pub math_delimiter_style: MathDelimiterStyle,
     /// Math indentation (spaces)
     pub math_indent: usize,
-    /// Explicit positional signatures for TeX math commands.
+    /// Explicit positional signatures for TeX math commands. Keys omit the
+    /// leading backslash and contain only ASCII letters or `@`.
     pub math_signatures: std::collections::BTreeMap<String, Vec<MathArgumentConfig>>,
     /// Indentation (columns) for top-level pipe, simple, and multiline tables.
     /// Accepts 0--3; grid tables stay flush at column 0 regardless.
@@ -741,6 +742,14 @@ impl RawConfig {
             if name.starts_with('\\') {
                 return Err(format!(
                     "math signature command `{name}` must be written without a leading backslash"
+                ));
+            }
+            if !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphabetic() || byte == b'@')
+            {
+                return Err(format!(
+                    "math signature command `{name}` must contain only ASCII letters or `@`"
                 ));
             }
         }

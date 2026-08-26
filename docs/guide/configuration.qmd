@@ -595,7 +595,8 @@ blocks. Default is 2; set it to 0 to keep content flush against the left margin.
 Panache formats a command argument recursively only when the command's signature
 proves that the argument contains math. Add signatures for project or package
 commands under `[format.math-signatures]`; command names omit the leading
-backslash, and arguments appear in source order:
+backslash, contain only ASCII letters or `@`, and arguments appear in source
+order:
 
 ```toml
 [format.math-signatures]

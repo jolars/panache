@@ -348,7 +348,7 @@
             "type": "array"
           },
           "default": {},
-          "description": "Explicit positional signatures for TeX math commands.",
+          "description": "Explicit positional signatures for TeX math commands. Keys omit the\nleading backslash and contain only ASCII letters or `@`.",
           "type": "object"
         },
         "no-break-abbreviations": {

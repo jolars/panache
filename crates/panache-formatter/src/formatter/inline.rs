@@ -506,8 +506,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
                 match math::format_math(&content, &opts) {
                     Some(body) => {
                         result.push('\n');
-                        result.push_str(&body);
-                        result.push('\n');
+                        math::push_body_with_trailing_newline(&mut result, &body);
                     }
                     None => {
                         result.push_str(&content);
@@ -526,8 +525,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
             let opts = MathFormatOptions::from_config(config, MathContext::Display);
             match math::format_math(&content, &opts) {
                 Some(body) => {
-                    result.push_str(&body);
-                    result.push('\n');
+                    math::push_body_with_trailing_newline(&mut result, &body);
                 }
                 None => {
                     let mut trimmed_content = content.trim_end();
