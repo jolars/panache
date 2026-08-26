@@ -417,8 +417,10 @@ fn sample_report_records() -> Vec<BaselineRecord> {
 }
 
 fn assert_formatter_parity(body: &str, context: OracleContext) {
-    let badness = badness_body(body, context).unwrap_or_else(|error| panic!("{error}"));
-    let panache = panache_body(body, context).unwrap_or_else(|error| panic!("{error}"));
+    let badness =
+        badness_body(body, context).unwrap_or_else(|error| panic!("{error}; body: {body:?}"));
+    let panache =
+        panache_body(body, context).unwrap_or_else(|error| panic!("{error}; body: {body:?}"));
     assert_eq!(
         panache, badness,
         "formatter parity failed in {context:?} context"
@@ -815,6 +817,11 @@ fn authored_line_break_migration_slice_matches_badness() {
         "a\\\\b",
         "a \\\\*[2ex]\n-b",
         "a+b\\\\c-d",
+        "a&=b\\\\\nc&=d",
+        "x&=a\\\\\n&=b",
+        "a&&=b\\\\\nc&&=d",
+        "a&=bb\\\\\nccc&=d",
+        "a&={b % inner\n+c}\\\\\nd&=e",
         "{a+b\\\\c-d}",
         "\\frac{a+b\\\\c-d}{e}",
         "\\left( a+b\\\\c-d \\right)",

@@ -279,12 +279,9 @@ fn can_lower_nested_comments(tree: &SyntaxNode, opts: &MathFormatOptions) -> boo
     }
 
     let context_is_supported = opts.context != MathContext::Display
-        || !tree.descendants_with_tokens().any(|element| {
-            matches!(
-                element.kind(),
-                SyntaxKind::MATH_ENVIRONMENT | SyntaxKind::MATH_LINE_BREAK
-            )
-        });
+        || !tree
+            .descendants_with_tokens()
+            .any(|element| element.kind() == SyntaxKind::MATH_ENVIRONMENT);
     context_is_supported
         && MathContent::cast(tree.clone())
             .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))

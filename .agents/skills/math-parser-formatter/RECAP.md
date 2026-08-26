@@ -45,30 +45,30 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Authored breaks in display and free environment bodies.** Routed supported
-non-chain `\\` rows through the typed document IR in display math and non-grid
-environment bodies, with byte parity against Badness and explicit idempotency
-coverage in all three controlled contexts. Display relation chains retain the
-legacy path until their Panache-specific continuation alignment exists in IR.
+**Authored-break alignment cells.** Routed supported `\\` rows containing
+top-level `&` separators through the typed document IR, with byte parity and
+idempotency in inline, display, and environment contexts.
 
-- Display bodies retain source-ordered semantic context across `\\`; environment
-  rows reset it, matching Badness's treatment of a leading unary operator.
-- Environment lowering aligns trailing row markers from typed flat widths,
-  retains closed `*`/bracket modifiers, and keeps an adjacent `%` comment on the
-  marker line. Nested groups and delimiters retain inline/display break style.
-- Mandatory parity now covers bare and modified markers, unequal row widths,
-  operators, nested groups, proven command arguments, paired delimiters, and
-  adjacent comments; every controlled context is checked for idempotency.
-- Regenerating the 107-case report leaves its classification counts unchanged.
-  It records the newly migrated environment comment layout and refreshes one
-  stale malformed-environment divergence left by the preceding nested-comment
-  slice.
+- `&` remains layout rather than a semantic atom. Each cell is lowered against
+  its slice of the source-ordered semantic stream, so contextual operator roles
+  survive the separator while authored and operator-required separator spacing
+  matches Badness.
+- Environment grids lower supported ordinary cells to documents only when the
+  body contains an authored break. Existing column widths and trailing-marker
+  alignment therefore operate on typed flat widths without changing unrelated
+  compatibility cases.
+- Mandatory parity now covers ordinary and unequal-width grids plus a nested
+  multiline comment in the final cell. All cases run through every controlled
+  context and an explicit second formatting pass.
+- Display nested-comment safety now accepts an authored break when complete
+  typed lowering proves the body is supported. Regenerating the 107-case report
+  leaves both its contents and classification counts unchanged.
 
 ### Suggested next sub-targets
 
-1. Move authored-break rows containing `&` alignment cells onto the document
-   IR, preserving trailing-marker alignment and comment behavior.
-2. Replace the remaining embedded-environment compatibility path for supported
+1. Replace the remaining embedded-environment compatibility path for supported
    standalone and mixed rows.
+2. Add typed relation-chain continuation alignment, then retire the display
+   authored-break compatibility path for supported chains.
 3. Expand grid-comment parity to rows combining multiple multiline cells if a
    motivating corpus case appears.

@@ -699,6 +699,9 @@ fn render_body_lines(
     let indent = INDENT.repeat(depth);
     let printer = Printer::new(opts.line_width, INDENT.len());
     let mut items: Vec<BodyItem> = Vec::new();
+    let has_authored_break = body
+        .iter()
+        .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK);
 
     for row in split_rows(body) {
         if row.is_blank() {
@@ -714,6 +717,16 @@ fn render_body_lines(
                 .map(|(column, cell)| {
                     if cell.iter().any(contains_nested_comment) {
                         lower_grid_cell(cell, &opts.signature_scope, column == 0)
+                            .map(BodyCell::Document)
+                            .unwrap_or_else(|| {
+                                BodyCell::Flat(
+                                    render_inline(cell, &opts.signature_scope)
+                                        .trim()
+                                        .to_string(),
+                                )
+                            })
+                    } else if has_authored_break {
+                        lower::try_lower_elements(cell.clone(), &opts.signature_scope)
                             .map(BodyCell::Document)
                             .unwrap_or_else(|| {
                                 BodyCell::Flat(

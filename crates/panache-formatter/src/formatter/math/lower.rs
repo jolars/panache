@@ -166,9 +166,10 @@ fn lower_authored_breaks(
         } else {
             semantic_atoms_for(&row, &semantic_atoms)
         };
-        let document = lower_body_with_atoms(
-            std::mem::take(&mut row),
-            row_atoms,
+        let row_elements = std::mem::take(&mut row);
+        let document = lower_authored_row(
+            row_elements,
+            &row_atoms,
             scope,
             spacing,
             preserve_comment_context,
@@ -207,9 +208,9 @@ fn lower_authored_breaks(
     } else {
         semantic_atoms_for(&row, &semantic_atoms)
     };
-    let document = lower_body_with_atoms(
+    let document = lower_authored_row(
         row,
-        row_atoms,
+        &row_atoms,
         scope,
         spacing,
         preserve_comment_context,
@@ -249,6 +250,89 @@ fn lower_authored_breaks(
         }
         documents.push(Ir::HardLine);
     }
+    Some(Ir::concat(documents))
+}
+
+fn lower_authored_row(
+    elements: Vec<SyntaxElement>,
+    semantic_atoms: &[SemanticMathAtom],
+    scope: &SignatureScope,
+    spacing: Spacing,
+    preserve_comment_context: bool,
+    environment_rows: bool,
+) -> Option<Ir> {
+    if !elements
+        .iter()
+        .any(|element| element.kind() == SyntaxKind::MATH_ALIGN)
+    {
+        return lower_body_with_atoms(
+            elements,
+            semantic_atoms.to_vec(),
+            scope,
+            spacing,
+            preserve_comment_context,
+            environment_rows,
+        );
+    }
+
+    let mut documents = Vec::new();
+    let mut cell = Vec::new();
+    for (index, element) in elements.iter().enumerate() {
+        if element.kind() != SyntaxKind::MATH_ALIGN {
+            cell.push(element.clone());
+            continue;
+        }
+
+        let spaced_before = cell.last().is_some_and(|element| {
+            element.kind() == SyntaxKind::MATH_SPACE
+                && cell.iter().any(|element| !is_layout_trivia(element))
+        });
+        let cell_atoms = semantic_atoms_for(&cell, semantic_atoms);
+        let spaced_before = spaced_before
+            || cell_atoms
+                .last()
+                .is_some_and(|atom| atom.break_priority != MathBreakPriority::None);
+        documents.push(lower_body_with_atoms(
+            std::mem::take(&mut cell),
+            cell_atoms,
+            scope,
+            spacing,
+            preserve_comment_context,
+            environment_rows,
+        )?);
+
+        let next_separator = elements[index + 1..]
+            .iter()
+            .find(|element| element.kind() == SyntaxKind::MATH_ALIGN)
+            .map(SyntaxElement::text_range);
+        let spaced_after = elements[index + 1..]
+            .first()
+            .is_some_and(|element| element.kind() == SyntaxKind::MATH_SPACE)
+            || semantic_atoms
+                .iter()
+                .find(|atom| {
+                    atom.range.start() >= element.text_range().end()
+                        && next_separator.is_none_or(|range| atom.range.end() <= range.start())
+                })
+                .is_some_and(|atom| atom.break_priority != MathBreakPriority::None);
+        if spaced_before {
+            documents.push(Ir::text(" "));
+        }
+        documents.push(Ir::verbatim(element.to_string()));
+        if spaced_after {
+            documents.push(Ir::text(" "));
+        }
+    }
+
+    let cell_atoms = semantic_atoms_for(&cell, semantic_atoms);
+    documents.push(lower_body_with_atoms(
+        cell,
+        cell_atoms,
+        scope,
+        spacing,
+        preserve_comment_context,
+        environment_rows,
+    )?);
     Some(Ir::concat(documents))
 }
 
