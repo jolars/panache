@@ -103,12 +103,21 @@ Returned unchanged, never reflowed:
    **source character counts**, so alignment is cosmetic source-tidiness, not
    rendered-glyph alignment (`\alpha` counts as 6).
 
-   A final grid cell containing one comment-bearing group, signature-proven
-   argument, braced script, or `\left`/`\right` body uses the typed comment
-   layout from Rule 1. Its continuation indent composes the environment indent,
+   A grid cell containing one comment-bearing group, signature-proven argument,
+   braced script, or `\left`/`\right` body uses the typed comment layout from
+   Rule 1. A final cell's continuation indent composes the environment indent,
    the aligned cell's starting column, and the enclosing construct's hanging
-   indent. Multiline non-final cells remain on the verbatim compatibility path
-   because their separators require a separate grid-layout migration.
+   indent.
+
+   For Badness parity, a multiline non-final cell switches the entire
+   environment to tight separators: `&` has no surrounding grid space, columns
+   are not padded, and a trailing `\\` is not preceded by a synthesized space.
+   Cell contents still receive ordinary operator formatting. The pinned oracle
+   has one construct-sensitive inconsistency: after a comment in an ordinary
+   first-column group, the next operator receives line-local context, while
+   commands, scripts, paired delimiters, and later columns preserve semantic
+   context across the comment. Panache reproduces this behavior until the oracle
+   is corrected.
 
    Ragged rows are fine: a column's width is the max over only the rows that
    have a non-last cell there; a short row contributes to and is padded for only

@@ -641,6 +641,32 @@ impl BodyCell {
                 .count(),
         }
     }
+
+    fn starts_relation(&self) -> bool {
+        let first_line = match self {
+            Self::Flat(text) => text.as_str(),
+            Self::Document(document) => {
+                let rendered = Printer::new(usize::MAX / 2, INDENT.len()).print(document, 0);
+                return rendered.lines().next().is_some_and(starts_relation);
+            }
+        };
+        starts_relation(first_line)
+    }
+}
+
+fn starts_relation(text: &str) -> bool {
+    let text = text.trim_start();
+    if text.starts_with(['=', '<', '>']) || text.starts_with(":=") {
+        return true;
+    }
+    let Some(command) = text.strip_prefix('\\') else {
+        return false;
+    };
+    let name = command
+        .chars()
+        .take_while(|character| character.is_ascii_alphabetic())
+        .collect::<String>();
+    operators::command_class(&name) == Some(AtomClass::Rel)
 }
 
 fn render_body_lines(
@@ -659,11 +685,14 @@ fn render_body_lines(
         if let Some(env) = row.single_environment() {
             items.push(BodyItem::Block(render_environment_lines(&env, depth, opts)));
         } else {
-            let cells = split_cells(&row.elems)
+            let split = split_cells(&row.elems);
+            let last = split.len().saturating_sub(1);
+            let cells = split
                 .iter()
-                .map(|cell| {
+                .enumerate()
+                .map(|(column, cell)| {
                     if cell.iter().any(contains_nested_comment) {
-                        lower_grid_cell(cell, &opts.signature_scope)
+                        lower_grid_cell(cell, &opts.signature_scope, column == 0 && column < last)
                             .map(BodyCell::Document)
                             .unwrap_or_else(|| {
                                 BodyCell::Flat(
@@ -688,13 +717,26 @@ fn render_body_lines(
         }
     }
 
+    let tight_grid = items.iter().any(|item| match item {
+        BodyItem::Row { cells, .. } => {
+            let last = cells.len().saturating_sub(1);
+            cells
+                .iter()
+                .take(last)
+                .any(|cell| matches!(cell, BodyCell::Document(document) if document.contains_forced_break()))
+        }
+        BodyItem::Block(_) => false,
+    });
     let widths = column_widths(&items, &printer);
     let mut out: Vec<String> = Vec::new();
     for item in items {
         match item {
             BodyItem::Block(lines) => out.extend(lines),
             BodyItem::Row { cells, break_text } => {
-                if cells
+                if tight_grid {
+                    let document = join_tight_cell_documents(&cells, break_text.as_deref());
+                    out.push(printer.print(&document, indent.len()));
+                } else if cells
                     .iter()
                     .any(|cell| matches!(cell, BodyCell::Document(_)))
                 {
@@ -718,6 +760,30 @@ fn render_body_lines(
         }
     }
     out
+}
+
+/// Badness suppresses grid padding and separator spaces for the whole
+/// environment when a non-final cell is multiline. An ordinary first-cell
+/// group also hangs one column beyond the usual bracket indent.
+fn join_tight_cell_documents(cells: &[BodyCell], break_text: Option<&str>) -> Ir {
+    let mut documents = Vec::new();
+    for (column, cell) in cells.iter().enumerate() {
+        if column > 0 {
+            documents.push(Ir::text("&"));
+            if cell.starts_relation() {
+                documents.push(Ir::text(" "));
+            }
+        }
+        let document = match cell {
+            BodyCell::Flat(text) => Ir::verbatim(text.clone()),
+            BodyCell::Document(document) => document.clone(),
+        };
+        documents.push(document);
+    }
+    if let Some(marker) = break_text {
+        documents.push(Ir::verbatim(marker));
+    }
+    Ir::concat(documents)
 }
 
 /// Per-column max width over **every** cell of multi-cell rows (including the
@@ -796,15 +862,18 @@ pub(super) fn can_render_environment_grid_comments(
     split_rows(&elements).into_iter().all(|row| {
         let cells = split_cells(&row.elems);
         let last = cells.len().saturating_sub(1);
-        cells.iter().enumerate().all(|(index, cell)| {
+        cells.iter().enumerate().all(|(column, cell)| {
             !cell.iter().any(contains_nested_comment)
-                || index == last && lower_grid_cell(cell, scope).is_some()
+                || lower_grid_cell(cell, scope, column == 0 && column < last).is_some()
         })
     })
 }
 
-fn lower_grid_cell(elements: &[SyntaxElement], scope: &SignatureScope) -> Option<Ir> {
-    let document = lower::try_lower_elements(elements.to_vec(), scope)?;
+fn lower_grid_cell(
+    elements: &[SyntaxElement],
+    scope: &SignatureScope,
+    first_nonfinal_cell: bool,
+) -> Option<Ir> {
     let comment_elements = elements
         .iter()
         .filter(|element| contains_nested_comment(element))
@@ -812,7 +881,17 @@ fn lower_grid_cell(elements: &[SyntaxElement], scope: &SignatureScope) -> Option
     let [comment_element] = comment_elements.as_slice() else {
         return None;
     };
-    let comment_document = lower::try_lower_elements(vec![(*comment_element).clone()], scope)?;
+    let first_group = first_nonfinal_cell
+        && comment_element
+            .as_node()
+            .is_some_and(|node| node.kind() == SyntaxKind::MATH_GROUP);
+    let lower = if first_group {
+        lower::try_lower_first_grid_cell
+    } else {
+        lower::try_lower_elements
+    };
+    let mut document = lower(elements.to_vec(), scope)?;
+    let comment_document = lower(vec![(*comment_element).clone()], scope)?;
     let printer = Printer::new(usize::MAX / 2, INDENT.len());
     let first_line = printer.print(&document, 0).lines().next()?.to_string();
     let comment_first_line = printer
@@ -825,7 +904,11 @@ fn lower_grid_cell(elements: &[SyntaxElement], scope: &SignatureScope) -> Option
     let offset = first_line[..first_line.rfind(&comment_first_line)?]
         .chars()
         .count();
-    Some(Ir::align(offset, document))
+    document = Ir::align(offset, document);
+    if first_group {
+        document = Ir::align(1, document);
+    }
+    Some(document)
 }
 
 fn contains_nested_comment(element: &SyntaxElement) -> bool {

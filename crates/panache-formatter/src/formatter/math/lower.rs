@@ -19,7 +19,7 @@ use super::ir::Ir;
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
 pub(super) fn try_lower_content(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
-    lower_body(content.elements().collect(), scope, Spacing::Normal)
+    lower_body(content.elements().collect(), scope, Spacing::Normal, true)
 }
 
 /// Lower a formatter-derived row or cell without inventing a CST wrapper.
@@ -27,7 +27,15 @@ pub(super) fn try_lower_elements(
     elements: Vec<SyntaxElement>,
     scope: &SignatureScope,
 ) -> Option<Ir> {
-    lower_body(elements, scope, Spacing::Normal)
+    lower_body(elements, scope, Spacing::Normal, true)
+}
+
+/// Lower a first alignment cell using Badness's line-local comment context.
+pub(super) fn try_lower_first_grid_cell(
+    elements: Vec<SyntaxElement>,
+    scope: &SignatureScope,
+) -> Option<Ir> {
+    lower_body(elements, scope, Spacing::Normal, false)
 }
 
 /// Lower a bracketed body, routing comment-bearing bodies through hard lines.
@@ -35,6 +43,7 @@ fn lower_body(
     elements: Vec<SyntaxElement>,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     // A row break changes layout, but Badness retains the preceding atom when
     // assigning the following operator's contextual role.
@@ -43,9 +52,21 @@ fn lower_body(
         .iter()
         .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK)
     {
-        lower_authored_breaks(elements, semantic_atoms, scope, spacing)
+        lower_authored_breaks(
+            elements,
+            semantic_atoms,
+            scope,
+            spacing,
+            preserve_comment_context,
+        )
     } else {
-        lower_body_with_atoms(elements, semantic_atoms, scope, spacing)
+        lower_body_with_atoms(
+            elements,
+            semantic_atoms,
+            scope,
+            spacing,
+            preserve_comment_context,
+        )
     }
 }
 
@@ -54,14 +75,27 @@ fn lower_body_with_atoms(
     semantic_atoms: Vec<SemanticMathAtom>,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     if elements
         .iter()
         .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
     {
-        lower_edge_comments(elements, semantic_atoms, scope, spacing)
+        lower_edge_comments(
+            elements,
+            semantic_atoms,
+            scope,
+            spacing,
+            preserve_comment_context,
+        )
     } else {
-        lower_elements_with_atoms(elements, semantic_atoms, scope, spacing)
+        lower_elements_with_atoms(
+            elements,
+            semantic_atoms,
+            scope,
+            spacing,
+            preserve_comment_context,
+        )
     }
 }
 
@@ -70,6 +104,7 @@ fn lower_authored_breaks(
     semantic_atoms: Vec<SemanticMathAtom>,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     let mut documents = Vec::new();
     let mut row = Vec::new();
@@ -96,6 +131,7 @@ fn lower_authored_breaks(
             row_atoms,
             scope,
             spacing,
+            preserve_comment_context,
         )?);
         if authored_space {
             documents.push(Ir::text(" "));
@@ -104,7 +140,13 @@ fn lower_authored_breaks(
     }
 
     let row_atoms = semantic_atoms_for(&row, &semantic_atoms);
-    documents.push(lower_body_with_atoms(row, row_atoms, scope, spacing)?);
+    documents.push(lower_body_with_atoms(
+        row,
+        row_atoms,
+        scope,
+        spacing,
+        preserve_comment_context,
+    )?);
     Some(Ir::concat(documents))
 }
 
@@ -124,6 +166,7 @@ fn lower_edge_comments(
     semantic_atoms: Vec<SemanticMathAtom>,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     let mut documents = Vec::new();
     let mut segment_start = 0;
@@ -132,13 +175,18 @@ fn lower_edge_comments(
             continue;
         }
         let segment = &elements[segment_start..index];
-        let segment_atoms = semantic_atoms_for(segment, &semantic_atoms);
+        let segment_atoms = if preserve_comment_context {
+            semantic_atoms_for(segment, &semantic_atoms)
+        } else {
+            semantic_math_atoms_in(segment.iter().cloned()).collect()
+        };
         let has_content = !segment_atoms.is_empty();
         documents.push(lower_elements_with_atoms(
             segment.to_vec(),
             segment_atoms,
             scope,
             spacing,
+            preserve_comment_context,
         )?);
         if has_content {
             let trailing_trivia = segment
@@ -164,11 +212,17 @@ fn lower_edge_comments(
         segment_start = index + 1;
     }
     let segment = &elements[segment_start..];
+    let trailing_atoms = if preserve_comment_context {
+        semantic_atoms_for(segment, &semantic_atoms)
+    } else {
+        semantic_math_atoms_in(segment.iter().cloned()).collect()
+    };
     documents.push(lower_elements_with_atoms(
         segment.to_vec(),
-        semantic_atoms_for(segment, &semantic_atoms),
+        trailing_atoms,
         scope,
         spacing,
+        preserve_comment_context,
     )?);
     Some(Ir::concat(documents))
 }
@@ -193,9 +247,16 @@ fn lower_elements(
     elements: Vec<SyntaxElement>,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     let semantic_atoms = semantic_math_atoms_in(elements.iter().cloned()).collect();
-    lower_elements_with_atoms(elements, semantic_atoms, scope, spacing)
+    lower_elements_with_atoms(
+        elements,
+        semantic_atoms,
+        scope,
+        spacing,
+        preserve_comment_context,
+    )
 }
 
 fn lower_elements_with_atoms(
@@ -203,6 +264,7 @@ fn lower_elements_with_atoms(
     semantic_atoms: Vec<SemanticMathAtom>,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     if has_definition_relation(&elements)
         || has_scripted_composite_relation(&elements)
@@ -217,7 +279,8 @@ fn lower_elements_with_atoms(
     let mut previous_end = None;
 
     for atom in semantic_atoms {
-        let atom_document = atom_document(atom, &elements, scope, spacing)?;
+        let atom_document =
+            atom_document(atom, &elements, scope, spacing, preserve_comment_context)?;
         pieces.push(Piece {
             role: Role::from(atom.break_priority),
             delimiter: atom.delimiter,
@@ -358,6 +421,7 @@ fn atom_document(
     elements: &[SyntaxElement],
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<AtomDocument> {
     let range = atom.range;
     let element = elements.iter().find(|element| {
@@ -373,7 +437,12 @@ fn atom_document(
             if let Some(group) = MathGroup::cast(node.clone()) {
                 let open = group.open_token()?;
                 let close = group.close_token()?;
-                let body = lower_body(group.body_elements().collect(), scope, spacing)?;
+                let body = lower_body(
+                    group.body_elements().collect(),
+                    scope,
+                    spacing,
+                    preserve_comment_context,
+                )?;
                 (
                     Ir::concat([
                         Ir::verbatim(open.text()),
@@ -383,12 +452,21 @@ fn atom_document(
                     false,
                 )
             } else if let Some(command) = MathCommand::cast(node.clone()) {
-                (lower_command(&command, scope, spacing)?, false)
+                (
+                    lower_command(&command, scope, spacing, preserve_comment_context)?,
+                    false,
+                )
             } else if let Some(delimited) = MathDelimited::cast(node.clone()) {
-                (lower_delimited(&delimited, scope, spacing)?, false)
+                (
+                    lower_delimited(&delimited, scope, spacing, preserve_comment_context)?,
+                    false,
+                )
             } else {
                 let scripted = MathScripted::cast(node.clone())?;
-                (lower_scripted(&scripted, scope, spacing)?, false)
+                (
+                    lower_scripted(&scripted, scope, spacing, preserve_comment_context)?,
+                    false,
+                )
             }
         }
         _ => return None,
@@ -410,6 +488,7 @@ fn lower_delimited(
     delimited: &MathDelimited,
     scope: &SignatureScope,
     spacing: Spacing,
+    preserve_comment_context: bool,
 ) -> Option<Ir> {
     if !delimited_is_supported(delimited, scope) {
         return None;
@@ -422,7 +501,12 @@ fn lower_delimited(
     let close = delimited.closing_delimiter()?;
     let mut documents = vec![Ir::verbatim(left.text()), Ir::verbatim(open.text())];
     if !body.text().trim().is_empty() {
-        let inner = lower_body(body.elements().collect(), scope, spacing)?;
+        let inner = lower_body(
+            body.elements().collect(),
+            scope,
+            spacing,
+            preserve_comment_context,
+        )?;
         let opening_width = left.text().chars().count() + open.text().chars().count();
         documents.push(Ir::align(
             opening_width + 1,
@@ -459,19 +543,34 @@ fn delimited_is_supported(delimited: &MathDelimited, scope: &SignatureScope) -> 
     })
 }
 
-fn lower_scripted(scripted: &MathScripted, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
+fn lower_scripted(
+    scripted: &MathScripted,
+    scope: &SignatureScope,
+    spacing: Spacing,
+    preserve_comment_context: bool,
+) -> Option<Ir> {
     let base = scripted.base()?;
     let scripts = scripted.scripts().collect::<Vec<_>>();
     if scripts.is_empty() || !scripted_is_supported(scripted, scope) {
         return None;
     }
 
-    let mut documents = vec![lower_elements(vec![base], scope, spacing)?];
+    let mut documents = vec![lower_elements(
+        vec![base],
+        scope,
+        spacing,
+        preserve_comment_context,
+    )?];
     for script in scripts {
         let marker = script.marker_token()?;
         let argument = script.argument()?;
         documents.push(Ir::verbatim(marker.text()));
-        documents.push(lower_elements(vec![argument], scope, Spacing::Script)?);
+        documents.push(lower_elements(
+            vec![argument],
+            scope,
+            Spacing::Script,
+            preserve_comment_context,
+        )?);
     }
     Some(Ir::concat(documents))
 }
@@ -518,7 +617,12 @@ fn is_layout_trivia(element: &SyntaxElement) -> bool {
     )
 }
 
-fn lower_command(command: &MathCommand, scope: &SignatureScope, spacing: Spacing) -> Option<Ir> {
+fn lower_command(
+    command: &MathCommand,
+    scope: &SignatureScope,
+    spacing: Spacing,
+    preserve_comment_context: bool,
+) -> Option<Ir> {
     let name = command.name_token()?;
     if is_supported_bare_command(command, scope) {
         return Some(Ir::verbatim(name.text()));
@@ -535,7 +639,10 @@ fn lower_command(command: &MathCommand, scope: &SignatureScope, spacing: Spacing
         let open = argument.open_token()?;
         let close = argument.close_token()?;
         let elements = argument.body_elements().collect::<Vec<_>>();
-        let body = hanging(1, lower_body(elements, scope, spacing)?);
+        let body = hanging(
+            1,
+            lower_body(elements, scope, spacing, preserve_comment_context)?,
+        );
         if previous_end < argument.syntax().text_range().start() {
             documents.push(Ir::text(" "));
         }

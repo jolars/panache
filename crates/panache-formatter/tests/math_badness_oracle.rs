@@ -769,12 +769,25 @@ fn environment_grid_final_cell_comment_migration_slice_matches_badness() {
 }
 
 #[test]
-fn environment_grid_nonfinal_cell_comment_stays_on_compatibility_path() {
-    let body = "{a % left cell\n+b}&=c\\\\\nd&=e";
-    assert!(
-        panache_body(body, OracleContext::Environment).is_err(),
-        "a multiline non-final cell must remain verbatim until its grid semantics migrate"
-    );
+fn environment_grid_nonfinal_cell_comment_migration_slice_matches_badness() {
+    for body in [
+        "{a % left cell\n+b}&=c\\\\\nd&=e",
+        "{α % left cell\n+β}&=γ\\\\\nδ&=ε",
+        "a&{b % middle cell\n+c}&=d\\\\\ne&f&=g",
+        "\\frac{a % numerator\n+b}{c}&=d\\\\\ne&=f",
+        "x^{a % exponent\n+b}&=c\\\\\nd&=e",
+        "\\left( a % inner\n+b \\right)&=c\\\\\nd&=e",
+        "a&\\frac{b % numerator\n+c}{d}&=e\\\\\nf&g&=h",
+        "{a % left cell\n+b}&=c",
+    ] {
+        assert_formatter_parity(body, OracleContext::Environment);
+        let once = panache_body(body, OracleContext::Environment).expect("first Panache pass");
+        let twice = panache_body(&once, OracleContext::Environment).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "environment non-final grid cell is not idempotent: {body:?}"
+        );
+    }
 }
 
 #[test]
