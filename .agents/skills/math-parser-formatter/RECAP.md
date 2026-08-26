@@ -45,29 +45,26 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Authored-break alignment cells.** Routed supported `\\` rows containing
-top-level `&` separators through the typed document IR, with byte parity and
-idempotency in inline, display, and environment contexts.
+**Inline embedded environments.** Routed supported standalone and mixed inline
+environments through the compositional environment-row document path instead of
+flattening them through the compatibility renderer.
 
-- `&` remains layout rather than a semantic atom. Each cell is lowered against
-  its slice of the source-ordered semantic stream, so contextual operator roles
-  survive the separator while authored and operator-required separator spacing
-  matches Badness.
-- Environment grids lower supported ordinary cells to documents only when the
-  body contains an authored break. Existing column widths and trailing-marker
-  alignment therefore operate on typed flat widths without changing unrelated
-  compatibility cases.
-- Mandatory parity now covers ordinary and unequal-width grids plus a nested
-  multiline comment in the final cell. All cases run through every controlled
-  context and an explicit second formatting pass.
-- Display nested-comment safety now accepts an authored break when complete
-  typed lowering proves the body is supported. Regenerating the 107-case report
-  leaves both its contents and classification counts unchanged.
+- Mandatory byte parity and second-pass idempotency now cover all 15 supported
+  inline environment corpus cases, plus top-level mixed and ordinary-delimiter
+  rows.
+- Inline continuation lines return to the math body's base column, matching
+  Badness; display mixed environments retain their existing hanging layout.
+- Environment delimiters must be closed, matched, and trivia-free before this
+  path is selected. Malformed delimiter shapes remain byte-preserved on the
+  compatibility path.
+- The regenerated 107-case report improves from 80 to 95 parity runs and from
+  226 to 211 divergences; all 15 changes are inline environment promotions.
 
 ### Suggested next sub-targets
 
-1. Replace the remaining embedded-environment compatibility path for supported
-   standalone and mixed rows.
+1. Lower an environment nested inside a structured `\left`/`\right` body; the
+   shared `environments/nested/delimited_matrix.tex` case remains outside this
+   slice.
 2. Add typed relation-chain continuation alignment, then retire the display
    authored-break compatibility path for supported chains.
 3. Expand grid-comment parity to rows combining multiple multiline cells if a

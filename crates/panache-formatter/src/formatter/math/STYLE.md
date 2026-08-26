@@ -72,9 +72,11 @@ Returned unchanged, never reflowed:
    is formatter-side delimiter interpretation; ordinary delimiters remain flat
    tokens in the lossless CST because they do not create TeX scope.
 
-   A single top-level environment with surrounding free content uses the same
-   hanging layout. Its `\begin` stays after the preceding expression, and its
-   body and `\end` align relative to the environment's starting column.
+   In display math, a single top-level environment with surrounding free content
+   uses the same hanging layout. Its `\begin` stays after the preceding
+   expression, and its body and `\end` align relative to the environment's
+   starting column. Inline math follows Badness's distinct layout: the
+   environment's continuation lines return to the math body's base column.
 
    Mixed shapes this layout does not yet model safely --- multiple environments
    in one segment, unbalanced ordinary delimiters, or a segment containing a

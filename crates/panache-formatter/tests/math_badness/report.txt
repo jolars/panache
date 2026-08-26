@@ -3,9 +3,9 @@ Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
 Cases: 107
 Context runs: 321
-Parity: 80 / 321
+Parity: 95 / 321
 Controlled wrapper rejection: 15 / 321
-Divergent: 226 / 321
+Divergent: 211 / 321
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,7 +15,7 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 78, rejected 5, divergent 24
+inline: parity 93, rejected 5, divergent 9
 display: parity 1, rejected 5, divergent 101
 environment: parity 1, rejected 5, divergent 101
 
@@ -71,8 +71,23 @@ display/long_chain.tex [inline]
 display/single_equation.tex [inline]
 display/sum_over_n.tex [inline]
 display/with_text.tex [inline]
+environments/aligned/multi_ampersand.tex [inline]
+environments/aligned/ragged_columns.tex [inline]
+environments/aligned/single_row.tex [inline]
+environments/aligned/three_rows.tex [inline]
+environments/aligned/two_rows.tex [inline]
+environments/aligned/with_frac.tex [inline]
+environments/cases/piecewise.tex [inline]
+environments/cases/sign.tex [inline]
+environments/cases/single.tex [inline]
+environments/matrix/bmatrix.tex [inline]
+environments/matrix/plain.tex [inline]
+environments/matrix/pmatrix.tex [inline]
+environments/matrix/three_by_three.tex [inline]
+environments/recovery/nested.tex [inline]
 escapes/escaped_brace.tex [inline]
 escapes/escaped_dollar.tex [inline]
+escapes/literal_backslash_in_env.tex [inline]
 groups/braced_group.tex [inline]
 groups/deep_nesting.tex [inline]
 groups/group_with_command.tex [inline]
@@ -615,11 +630,6 @@ Input: "x = y \\quad \\text{and} \\quad z = w\n"
 Badness: "  x = y \\quad \\text{and} \\quad z = w\n"
 Panache: "  x = y \\quad \\text{and} \\quad z = w"
 
---- environments/aligned/multi_ampersand.tex [inline] ---
-Input: "\\begin{aligned}\na &= 1 & b &= 2 \\\\\nc &= 3 & d &= 4\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  a & = 1 & b & = 2 \\\\\n  c & = 3 & d & = 4\n\\end{aligned}"
-Panache: "\\begin{aligned} a & = 1 & b & = 2 \\\\ c & = 3 & d & = 4 \\end{aligned}"
-
 --- environments/aligned/multi_ampersand.tex [display] ---
 Input: "\\begin{aligned}\na &= 1 & b &= 2 \\\\\nc &= 3 & d &= 4\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\n  \\end{aligned}\n"
@@ -629,11 +639,6 @@ Panache: "\\begin{aligned}\n  a & = 1 & b & = 2 \\\\\n  c & = 3 & d & = 4\n\\end
 Input: "\\begin{aligned}\na &= 1 & b &= 2 \\\\\nc &= 3 & d &= 4\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    a & = 1 & b & = 2 \\\\\n    c & = 3 & d & = 4\n  \\end{aligned}"
-
---- environments/aligned/ragged_columns.tex [inline] ---
-Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  \\alpha & = 1  \\\\\n  x      & = 22\n\\end{aligned}"
-Panache: "\\begin{aligned} \\alpha & = 1 \\\\ x & = 22 \\end{aligned}"
 
 --- environments/aligned/ragged_columns.tex [display] ---
 Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
@@ -645,11 +650,6 @@ Input: "\\begin{aligned}\n\\alpha &= 1 \\\\\nx &= 22\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    \\alpha & = 1  \\\\\n    x      & = 22\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    \\alpha & = 1  \\\\\n    x      & = 22\n  \\end{aligned}"
 
---- environments/aligned/single_row.tex [inline] ---
-Input: "\\begin{aligned}\nx &= y + z\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  x & = y + z\n\\end{aligned}"
-Panache: "\\begin{aligned} x & = y + z \\end{aligned}"
-
 --- environments/aligned/single_row.tex [display] ---
 Input: "\\begin{aligned}\nx &= y + z\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}\n"
@@ -659,11 +659,6 @@ Panache: "\\begin{aligned}\n  x & = y + z\n\\end{aligned}"
 Input: "\\begin{aligned}\nx &= y + z\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    x & = y + z\n  \\end{aligned}"
-
---- environments/aligned/three_rows.tex [inline] ---
-Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  x & = 1   \\\\\n  y & = 22  \\\\\n  z & = 333\n\\end{aligned}"
-Panache: "\\begin{aligned} x & = 1 \\\\ y & = 22 \\\\ z & = 333 \\end{aligned}"
 
 --- environments/aligned/three_rows.tex [display] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
@@ -675,11 +670,6 @@ Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22 \\\\\nz &= 333\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    x & = 1   \\\\\n    y & = 22  \\\\\n    z & = 333\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    x & = 1   \\\\\n    y & = 22  \\\\\n    z & = 333\n  \\end{aligned}"
 
---- environments/aligned/two_rows.tex [inline] ---
-Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  x & = 1  \\\\\n  y & = 22\n\\end{aligned}"
-Panache: "\\begin{aligned} x & = 1 \\\\ y & = 22 \\end{aligned}"
-
 --- environments/aligned/two_rows.tex [display] ---
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}\n"
@@ -689,11 +679,6 @@ Panache: "\\begin{aligned}\n  x & = 1  \\\\\n  y & = 22\n\\end{aligned}"
 Input: "\\begin{aligned}\nx &= 1 \\\\\ny &= 22\n\\end{aligned}\n"
 Badness: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    x & = 1  \\\\\n    y & = 22\n  \\end{aligned}"
-
---- environments/aligned/with_frac.tex [inline] ---
-Input: "\\begin{aligned}\nf(x) &= \\frac{1}{2} \\\\\ng(x) &= x^2\n\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  f(x) & = \\frac{1}{2} \\\\\n  g(x) & = x^2\n\\end{aligned}"
-Panache: "\\begin{aligned} f(x) & = \\frac{1}{2} \\\\ g(x) & = x^2 \\end{aligned}"
 
 --- environments/aligned/with_frac.tex [display] ---
 Input: "\\begin{aligned}\nf(x) &= \\frac{1}{2} \\\\\ng(x) &= x^2\n\\end{aligned}\n"
@@ -705,11 +690,6 @@ Input: "\\begin{aligned}\nf(x) &= \\frac{1}{2} \\\\\ng(x) &= x^2\n\\end{aligned}
 Badness: "  \\begin{aligned}\n    f(x) & = \\frac{1}{2} \\\\\n    g(x) & = x^2\n  \\end{aligned}\n"
 Panache: "  \\begin{aligned}\n    f(x) & = \\frac{1}{2} \\\\\n    g(x) & = x^2\n  \\end{aligned}"
 
---- environments/cases/piecewise.tex [inline] ---
-Input: "\\begin{cases}\nx^2 & x \\geq 0 \\\\\n-x & x < 0\n\\end{cases}\n"
-Badness: "\\begin{cases}\n  x^2 & x \\geq 0 \\\\\n  -x  & x < 0\n\\end{cases}"
-Panache: "\\begin{cases} x^2 & x \\geq 0 \\\\-x & x < 0 \\end{cases}"
-
 --- environments/cases/piecewise.tex [display] ---
 Input: "\\begin{cases}\nx^2 & x \\geq 0 \\\\\n-x & x < 0\n\\end{cases}\n"
 Badness: "  \\begin{cases}\n    x^2 & x \\geq 0 \\\\\n    -x  & x < 0\n  \\end{cases}\n"
@@ -719,11 +699,6 @@ Panache: "\\begin{cases}\n  x^2 & x \\geq 0 \\\\\n  -x  & x < 0\n\\end{cases}"
 Input: "\\begin{cases}\nx^2 & x \\geq 0 \\\\\n-x & x < 0\n\\end{cases}\n"
 Badness: "  \\begin{cases}\n    x^2 & x \\geq 0 \\\\\n    -x  & x < 0\n  \\end{cases}\n"
 Panache: "  \\begin{cases}\n    x^2 & x \\geq 0 \\\\\n    -x  & x < 0\n  \\end{cases}"
-
---- environments/cases/sign.tex [inline] ---
-Input: "\\begin{cases}\n1 & x > 0 \\\\\n0 & x = 0 \\\\\n-1 & x < 0\n\\end{cases}\n"
-Badness: "\\begin{cases}\n  1  & x > 0 \\\\\n  0  & x = 0 \\\\\n  -1 & x < 0\n\\end{cases}"
-Panache: "\\begin{cases} 1 & x > 0 \\\\ 0 & x = 0 \\\\-1 & x < 0 \\end{cases}"
 
 --- environments/cases/sign.tex [display] ---
 Input: "\\begin{cases}\n1 & x > 0 \\\\\n0 & x = 0 \\\\\n-1 & x < 0\n\\end{cases}\n"
@@ -735,11 +710,6 @@ Input: "\\begin{cases}\n1 & x > 0 \\\\\n0 & x = 0 \\\\\n-1 & x < 0\n\\end{cases}
 Badness: "  \\begin{cases}\n    1  & x > 0 \\\\\n    0  & x = 0 \\\\\n    -1 & x < 0\n  \\end{cases}\n"
 Panache: "  \\begin{cases}\n    1  & x > 0 \\\\\n    0  & x = 0 \\\\\n    -1 & x < 0\n  \\end{cases}"
 
---- environments/cases/single.tex [inline] ---
-Input: "\\begin{cases}\na & b\n\\end{cases}\n"
-Badness: "\\begin{cases}\n  a & b\n\\end{cases}"
-Panache: "\\begin{cases} a & b \\end{cases}"
-
 --- environments/cases/single.tex [display] ---
 Input: "\\begin{cases}\na & b\n\\end{cases}\n"
 Badness: "  \\begin{cases}\n    a & b\n  \\end{cases}\n"
@@ -749,11 +719,6 @@ Panache: "\\begin{cases}\n  a & b\n\\end{cases}"
 Input: "\\begin{cases}\na & b\n\\end{cases}\n"
 Badness: "  \\begin{cases}\n    a & b\n  \\end{cases}\n"
 Panache: "  \\begin{cases}\n    a & b\n  \\end{cases}"
-
---- environments/matrix/bmatrix.tex [inline] ---
-Input: "\\begin{bmatrix}\nx \\\\\ny\n\\end{bmatrix}\n"
-Badness: "\\begin{bmatrix}\n  x \\\\\n  y\n\\end{bmatrix}"
-Panache: "\\begin{bmatrix} x \\\\ y \\end{bmatrix}"
 
 --- environments/matrix/bmatrix.tex [display] ---
 Input: "\\begin{bmatrix}\nx \\\\\ny\n\\end{bmatrix}\n"
@@ -765,11 +730,6 @@ Input: "\\begin{bmatrix}\nx \\\\\ny\n\\end{bmatrix}\n"
 Badness: "  \\begin{bmatrix}\n    x \\\\\n    y\n  \\end{bmatrix}\n"
 Panache: "  \\begin{bmatrix}\n    x \\\\\n    y\n  \\end{bmatrix}"
 
---- environments/matrix/plain.tex [inline] ---
-Input: "\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n"
-Badness: "\\begin{matrix}\n  a & b \\\\\n  c & d\n\\end{matrix}"
-Panache: "\\begin{matrix} a & b \\\\ c & d \\end{matrix}"
-
 --- environments/matrix/plain.tex [display] ---
 Input: "\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n"
 Badness: "  \\begin{matrix}\n    a & b \\\\\n    c & d\n  \\end{matrix}\n"
@@ -780,11 +740,6 @@ Input: "\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n"
 Badness: "  \\begin{matrix}\n    a & b \\\\\n    c & d\n  \\end{matrix}\n"
 Panache: "  \\begin{matrix}\n    a & b \\\\\n    c & d\n  \\end{matrix}"
 
---- environments/matrix/pmatrix.tex [inline] ---
-Input: "\\begin{pmatrix}\n1 & 0 \\\\\n0 & 1\n\\end{pmatrix}\n"
-Badness: "\\begin{pmatrix}\n  1 & 0 \\\\\n  0 & 1\n\\end{pmatrix}"
-Panache: "\\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix}"
-
 --- environments/matrix/pmatrix.tex [display] ---
 Input: "\\begin{pmatrix}\n1 & 0 \\\\\n0 & 1\n\\end{pmatrix}\n"
 Badness: "  \\begin{pmatrix}\n    1 & 0 \\\\\n    0 & 1\n  \\end{pmatrix}\n"
@@ -794,11 +749,6 @@ Panache: "\\begin{pmatrix}\n  1 & 0 \\\\\n  0 & 1\n\\end{pmatrix}"
 Input: "\\begin{pmatrix}\n1 & 0 \\\\\n0 & 1\n\\end{pmatrix}\n"
 Badness: "  \\begin{pmatrix}\n    1 & 0 \\\\\n    0 & 1\n  \\end{pmatrix}\n"
 Panache: "  \\begin{pmatrix}\n    1 & 0 \\\\\n    0 & 1\n  \\end{pmatrix}"
-
---- environments/matrix/three_by_three.tex [inline] ---
-Input: "\\begin{matrix}\n1 & 2 & 3 \\\\\n4 & 5 & 6 \\\\\n7 & 8 & 9\n\\end{matrix}\n"
-Badness: "\\begin{matrix}\n  1 & 2 & 3 \\\\\n  4 & 5 & 6 \\\\\n  7 & 8 & 9\n\\end{matrix}"
-Panache: "\\begin{matrix} 1 & 2 & 3 \\\\ 4 & 5 & 6 \\\\ 7 & 8 & 9 \\end{matrix}"
 
 --- environments/matrix/three_by_three.tex [display] ---
 Input: "\\begin{matrix}\n1 & 2 & 3 \\\\\n4 & 5 & 6 \\\\\n7 & 8 & 9\n\\end{matrix}\n"
@@ -839,11 +789,6 @@ Panache: <declined>
 Input: "\\begin% opener\n{aligned}x\\end% closer\n{aligned}\n"
 Badness: "  \\begin% opener\n    {aligned}x\n  \\end% closer\n  {aligned}\n"
 Panache: "  \\begin% opener\n{aligned}\n    x\n  \\end% closer\n{aligned}"
-
---- environments/recovery/nested.tex [inline] ---
-Input: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}\n"
-Badness: "\\begin{aligned}\n  \\begin{matrix}\n    x\n  \\end{matrix}\n\\end{aligned}"
-Panache: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}"
 
 --- environments/recovery/nested.tex [display] ---
 Input: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}\n"
@@ -889,11 +834,6 @@ Panache: "  a = \\$ 5"
 Input: "a = \\$ 5\n"
 Badness: "  a = \\$ 5\n"
 Panache: "  a = \\$ 5"
-
---- escapes/literal_backslash_in_env.tex [inline] ---
-Input: "\\begin{matrix}\na \\\\\nb\n\\end{matrix}\n"
-Badness: "\\begin{matrix}\n  a \\\\\n  b\n\\end{matrix}"
-Panache: "\\begin{matrix} a \\\\ b \\end{matrix}"
 
 --- escapes/literal_backslash_in_env.tex [display] ---
 Input: "\\begin{matrix}\na \\\\\nb\n\\end{matrix}\n"

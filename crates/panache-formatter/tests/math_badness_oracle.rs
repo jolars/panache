@@ -811,6 +811,61 @@ fn nested_environment_comment_migration_slice_matches_badness() {
 }
 
 #[test]
+fn embedded_environment_migration_slice_matches_badness() {
+    let root = corpus_root();
+    for id in [
+        "environments/aligned/multi_ampersand.tex",
+        "environments/aligned/ragged_columns.tex",
+        "environments/aligned/single_row.tex",
+        "environments/aligned/three_rows.tex",
+        "environments/aligned/two_rows.tex",
+        "environments/aligned/with_frac.tex",
+        "environments/cases/piecewise.tex",
+        "environments/cases/sign.tex",
+        "environments/cases/single.tex",
+        "environments/matrix/bmatrix.tex",
+        "environments/matrix/plain.tex",
+        "environments/matrix/pmatrix.tex",
+        "environments/matrix/three_by_three.tex",
+        "environments/recovery/nested.tex",
+        "escapes/literal_backslash_in_env.tex",
+    ] {
+        let body = fs::read_to_string(root.join(id))
+            .unwrap_or_else(|error| panic!("failed to read `{id}`: {error}"));
+        assert_formatter_parity(&body, OracleContext::Inline);
+        let once = panache_body(&body, OracleContext::Inline).expect("first Panache pass");
+        let twice = panache_body(&once, OracleContext::Inline).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "embedded environment is not idempotent: `{id}`"
+        );
+    }
+
+    for body in [
+        "\\begin{matrix}\na&b\\\\\nc&d\n\\end{matrix}",
+        "x+\\begin{matrix}\na&b\\\\\nc&d\n\\end{matrix}",
+        "(x,\\begin{matrix}\na&b\\\\\nc&d\n\\end{matrix},y)",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+        let once = panache_body(body, OracleContext::Inline).expect("first Panache pass");
+        let twice = panache_body(&once, OracleContext::Inline).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "embedded environment is not idempotent: {body:?}"
+        );
+    }
+}
+
+#[test]
+fn malformed_embedded_environment_stays_on_compatibility_path() {
+    let body = r"\begin {aligned}x\end {aligned}";
+    assert_eq!(
+        panache_body(body, OracleContext::Inline).as_deref(),
+        Ok(body)
+    );
+}
+
+#[test]
 fn authored_line_break_migration_slice_matches_badness() {
     for body in [
         "a\\\\*[2ex]\nb",

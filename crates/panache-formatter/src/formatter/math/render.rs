@@ -72,6 +72,12 @@ fn render_inline_content(
     elements: &[SyntaxElement],
     opts: &MathFormatOptions,
 ) -> String {
+    if elements.iter().any(contains_environment) {
+        let semantic = expand_word_elements(elements);
+        if let Some(document) = mixed_segment_doc(&semantic, opts, false) {
+            return Printer::new(opts.line_width, INDENT.len()).print(&document, 0);
+        }
+    }
     if let Some(document) = MathContent::cast(tree.clone())
         .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
     {
@@ -343,7 +349,7 @@ fn render_top_level_mixed_environment(
     if elems.iter().any(contains_comment) || !ordinary_delimiters_balanced(elems) {
         return None;
     }
-    let doc = mixed_segment_doc(elems, opts)?;
+    let doc = mixed_segment_doc(elems, opts, true)?;
     Some(Printer::new(opts.line_width, INDENT.len()).print(&doc, opts.math_indent))
 }
 
@@ -385,7 +391,7 @@ fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Optio
             Some(AtomClass::Close) => depth = depth.saturating_sub(1),
             Some(AtomClass::Punct) if depth == 0 => {
                 segments.push(Ir::concat([
-                    mixed_segment_doc(&body[start..index], opts)?,
+                    mixed_segment_doc(&body[start..index], opts, true)?,
                     Ir::text(element.to_string()),
                 ]));
                 start = index + 1;
@@ -393,11 +399,15 @@ fn delimited_body_doc(body: &[SyntaxElement], opts: &MathFormatOptions) -> Optio
             _ => {}
         }
     }
-    segments.push(mixed_segment_doc(&body[start..], opts)?);
+    segments.push(mixed_segment_doc(&body[start..], opts, true)?);
     Some(Ir::join(Ir::Line, segments))
 }
 
-fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Option<Ir> {
+fn mixed_segment_doc(
+    segment: &[SyntaxElement],
+    opts: &MathFormatOptions,
+    hang_environment: bool,
+) -> Option<Ir> {
     if segment.iter().any(contains_unsafe_mixed_trivia) {
         return None;
     }
@@ -424,6 +434,9 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
             let prefix = render_before_operand(before, &opts.signature_scope);
             let prefix_width = prefix.chars().count();
             let (environment, scripts) = environment_block(&segment[*environment_index])?;
+            if !is_well_formed_environment(&environment) {
+                return None;
+            }
             let environment_doc = Ir::join(
                 Ir::HardLine,
                 render_environment_lines(&environment, 0, opts)
@@ -445,14 +458,34 @@ fn mixed_segment_doc(segment: &[SyntaxElement], opts: &MathFormatOptions) -> Opt
                     render_inline(&scripts, &opts.signature_scope).trim()
                 );
             }
+            let environment_doc = if hang_environment {
+                Ir::align(prefix_width, environment_doc)
+            } else {
+                environment_doc
+            };
             Some(Ir::concat([
                 Ir::text(prefix),
-                Ir::align(prefix_width, environment_doc),
+                environment_doc,
                 Ir::text(suffix),
             ]))
         }
         _ => None,
     }
+}
+
+fn is_well_formed_environment(environment: &SyntaxNode) -> bool {
+    let Some(environment) = MathEnvironment::cast(environment.clone()) else {
+        return false;
+    };
+    let (Some(begin), Some(end)) = (environment.begin(), environment.end()) else {
+        return false;
+    };
+    let (Some(begin_name), Some(end_name)) = (begin.name(), end.name()) else {
+        return false;
+    };
+    begin_name == end_name
+        && begin.syntax().text().to_string() == format!(r"\begin{{{begin_name}}}")
+        && end.syntax().text().to_string() == format!(r"\end{{{end_name}}}")
 }
 
 fn contains_unsafe_mixed_trivia(element: &SyntaxElement) -> bool {
