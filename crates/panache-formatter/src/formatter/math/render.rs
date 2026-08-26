@@ -14,8 +14,8 @@ use super::operators::{self, AtomClass};
 use super::printer::Printer;
 use super::{MathContext, MathFormatOptions, linebreak, lower};
 use crate::syntax::{
-    AstNode, MathContent, MathEnvironment, MathScripted, SyntaxElement, SyntaxKind, SyntaxNode,
-    SyntaxToken,
+    AstNode, MathContent, MathEnvironment, MathLineBreak, MathScripted, SyntaxElement, SyntaxKind,
+    SyntaxNode, SyntaxToken,
 };
 use panache_parser::parser::math::MathParseOptions;
 use panache_parser::semantic::math::{ArgKind, ArgumentDomain, SignatureScope, match_arg_slot};
@@ -37,18 +37,29 @@ fn render_environment_body(
     elements: &[SyntaxElement],
     opts: &MathFormatOptions,
 ) -> String {
+    let has_comment = tree
+        .descendants_with_tokens()
+        .any(|element| element.kind() == SyntaxKind::MATH_COMMENT);
+    let has_authored_break = tree
+        .descendants_with_tokens()
+        .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK);
+    let has_top_level_authored_break = elements.iter().any(|element| {
+        element
+            .as_node()
+            .cloned()
+            .and_then(MathLineBreak::cast)
+            .and_then(|line_break| line_break.marker_token())
+            .is_some_and(|marker| marker.text() == r"\\")
+    });
     if !elements.iter().any(contains_environment)
-        && tree
+        && ((has_comment && !has_authored_break)
+            || (has_authored_break && (!has_comment || has_top_level_authored_break)))
+        && !tree
             .descendants_with_tokens()
-            .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
-        && !tree.descendants_with_tokens().any(|element| {
-            matches!(
-                element.kind(),
-                SyntaxKind::MATH_ALIGN | SyntaxKind::MATH_LINE_BREAK
-            )
+            .any(|element| element.kind() == SyntaxKind::MATH_ALIGN)
+        && let Some(document) = MathContent::cast(tree.clone()).and_then(|content| {
+            lower::try_lower_environment_content(&content, &opts.signature_scope)
         })
-        && let Some(document) = MathContent::cast(tree.clone())
-            .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
     {
         return Printer::new(opts.line_width, INDENT.len()).print(&document, INDENT.len());
     }
@@ -73,13 +84,24 @@ fn render_inline_content(
 }
 
 fn render_display(tree: &SyntaxNode, top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
+    let has_comment = tree
+        .descendants_with_tokens()
+        .any(|element| element.kind() == SyntaxKind::MATH_COMMENT);
+    let has_authored_break = tree
+        .descendants_with_tokens()
+        .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK);
+    let authored_break_uses_legacy_alignment = has_authored_break && {
+        let rows = split_logical_rows(top);
+        let parse_opts = MathParseOptions {
+            bookdown_equation_labels: opts.bookdown_equation_labels,
+        };
+        relation_chain_alignment(&rows, parse_opts, &opts.signature_scope)
+            .into_iter()
+            .any(|indent| indent > 0)
+    };
     if !top.iter().any(contains_environment)
-        && tree
-            .descendants_with_tokens()
-            .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
-        && !tree
-            .descendants_with_tokens()
-            .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK)
+        && (has_comment || has_authored_break)
+        && !authored_break_uses_legacy_alignment
         && let Some(document) = MathContent::cast(tree.clone())
             .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
     {

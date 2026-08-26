@@ -19,7 +19,28 @@ use super::ir::Ir;
 /// Returning `None` keeps every unsupported shape on the legacy renderer until
 /// its own parity slice lands.
 pub(super) fn try_lower_content(content: &MathContent, scope: &SignatureScope) -> Option<Ir> {
-    lower_body(content.elements().collect(), scope, Spacing::Normal, true)
+    lower_body(
+        content.elements().collect(),
+        scope,
+        Spacing::Normal,
+        true,
+        false,
+    )
+}
+
+/// Lower an environment body, where Badness canonicalizes a space before each
+/// authored row marker.
+pub(super) fn try_lower_environment_content(
+    content: &MathContent,
+    scope: &SignatureScope,
+) -> Option<Ir> {
+    lower_body(
+        content.elements().collect(),
+        scope,
+        Spacing::Normal,
+        true,
+        true,
+    )
 }
 
 /// Lower a formatter-derived row or cell without inventing a CST wrapper.
@@ -27,7 +48,7 @@ pub(super) fn try_lower_elements(
     elements: Vec<SyntaxElement>,
     scope: &SignatureScope,
 ) -> Option<Ir> {
-    lower_body(elements, scope, Spacing::Normal, true)
+    lower_body(elements, scope, Spacing::Normal, true, false)
 }
 
 /// Lower a first alignment cell using Badness's line-local comment context.
@@ -35,7 +56,7 @@ pub(super) fn try_lower_first_grid_cell(
     elements: Vec<SyntaxElement>,
     scope: &SignatureScope,
 ) -> Option<Ir> {
-    lower_body(elements, scope, Spacing::Normal, false)
+    lower_body(elements, scope, Spacing::Normal, false, false)
 }
 
 /// Lower a bracketed body, routing comment-bearing bodies through hard lines.
@@ -44,6 +65,7 @@ fn lower_body(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
     // A row break changes layout, but Badness retains the preceding atom when
     // assigning the following operator's contextual role.
@@ -58,6 +80,7 @@ fn lower_body(
             scope,
             spacing,
             preserve_comment_context,
+            environment_rows,
         )
     } else {
         lower_body_with_atoms(
@@ -66,6 +89,7 @@ fn lower_body(
             scope,
             spacing,
             preserve_comment_context,
+            environment_rows,
         )
     }
 }
@@ -76,6 +100,7 @@ fn lower_body_with_atoms(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
     if elements
         .iter()
@@ -87,6 +112,7 @@ fn lower_body_with_atoms(
             scope,
             spacing,
             preserve_comment_context,
+            environment_rows,
         )
     } else {
         lower_elements_with_atoms(
@@ -95,6 +121,7 @@ fn lower_body_with_atoms(
             scope,
             spacing,
             preserve_comment_context,
+            environment_rows,
         )
     }
 }
@@ -105,11 +132,20 @@ fn lower_authored_breaks(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
-    let mut documents = Vec::new();
-    let mut row = Vec::new();
+    struct AuthoredRow {
+        document: Ir,
+        marker: Option<String>,
+        authored_space: bool,
+        adjacent_comment: Option<String>,
+    }
 
-    for element in elements {
+    let mut rows = Vec::new();
+    let mut row = Vec::new();
+    let mut elements = elements.into_iter().peekable();
+
+    while let Some(element) = elements.next() {
         if element.kind() != SyntaxKind::MATH_LINE_BREAK {
             row.push(element);
             continue;
@@ -125,28 +161,94 @@ fn lower_authored_breaks(
         }
 
         let authored_space = row.last().is_some_and(is_layout_trivia);
-        let row_atoms = semantic_atoms_for(&row, &semantic_atoms);
-        documents.push(lower_body_with_atoms(
+        let row_atoms = if environment_rows {
+            semantic_math_atoms_in(row.iter().cloned()).collect()
+        } else {
+            semantic_atoms_for(&row, &semantic_atoms)
+        };
+        let document = lower_body_with_atoms(
             std::mem::take(&mut row),
             row_atoms,
             scope,
             spacing,
             preserve_comment_context,
-        )?);
-        if authored_space {
-            documents.push(Ir::text(" "));
-        }
-        documents.extend([Ir::verbatim(line_break.syntax().to_string()), Ir::HardLine]);
+            environment_rows,
+        )?;
+        let adjacent_comment = environment_rows
+            && elements
+                .clone()
+                .find(|element| !is_layout_trivia(element))
+                .is_some_and(|element| element.kind() == SyntaxKind::MATH_COMMENT);
+        let adjacent_comment = if adjacent_comment {
+            while elements.peek().is_some_and(is_layout_trivia) {
+                elements.next();
+            }
+            let comment = elements.next()?;
+            if elements
+                .peek()
+                .is_some_and(|element| element.kind() == SyntaxKind::MATH_NEWLINE)
+            {
+                elements.next();
+            }
+            Some(comment.to_string())
+        } else {
+            None
+        };
+        rows.push(AuthoredRow {
+            document,
+            marker: Some(line_break.syntax().to_string()),
+            authored_space,
+            adjacent_comment,
+        });
     }
 
-    let row_atoms = semantic_atoms_for(&row, &semantic_atoms);
-    documents.push(lower_body_with_atoms(
+    let row_atoms = if environment_rows {
+        semantic_math_atoms_in(row.iter().cloned()).collect()
+    } else {
+        semantic_atoms_for(&row, &semantic_atoms)
+    };
+    let document = lower_body_with_atoms(
         row,
         row_atoms,
         scope,
         spacing,
         preserve_comment_context,
-    )?);
+        environment_rows,
+    )?;
+    rows.push(AuthoredRow {
+        document,
+        marker: None,
+        authored_space: false,
+        adjacent_comment: None,
+    });
+
+    let max_row_width = if environment_rows {
+        rows.iter()
+            .filter_map(|row| row.document.flat_width())
+            .max()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    let mut documents = Vec::new();
+    for row in rows {
+        let row_width = row.document.flat_width();
+        documents.push(row.document);
+        let Some(marker) = row.marker else {
+            continue;
+        };
+        if environment_rows {
+            let padding = row_width.map_or(1, |width| max_row_width.saturating_sub(width) + 1);
+            documents.push(Ir::text(" ".repeat(padding)));
+        } else if row.authored_space {
+            documents.push(Ir::text(" "));
+        }
+        documents.push(Ir::verbatim(marker));
+        if let Some(comment) = row.adjacent_comment {
+            documents.extend([Ir::text(" "), Ir::verbatim(comment)]);
+        }
+        documents.push(Ir::HardLine);
+    }
     Some(Ir::concat(documents))
 }
 
@@ -167,6 +269,7 @@ fn lower_edge_comments(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
     let mut documents = Vec::new();
     let mut segment_start = 0;
@@ -187,6 +290,7 @@ fn lower_edge_comments(
             scope,
             spacing,
             preserve_comment_context,
+            environment_rows,
         )?);
         if has_content {
             let trailing_trivia = segment
@@ -223,6 +327,7 @@ fn lower_edge_comments(
         scope,
         spacing,
         preserve_comment_context,
+        environment_rows,
     )?);
     Some(Ir::concat(documents))
 }
@@ -248,6 +353,7 @@ fn lower_elements(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
     let semantic_atoms = semantic_math_atoms_in(elements.iter().cloned()).collect();
     lower_elements_with_atoms(
@@ -256,6 +362,7 @@ fn lower_elements(
         scope,
         spacing,
         preserve_comment_context,
+        environment_rows,
     )
 }
 
@@ -265,6 +372,7 @@ fn lower_elements_with_atoms(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
     if has_definition_relation(&elements)
         || has_scripted_composite_relation(&elements)
@@ -279,8 +387,14 @@ fn lower_elements_with_atoms(
     let mut previous_end = None;
 
     for atom in semantic_atoms {
-        let atom_document =
-            atom_document(atom, &elements, scope, spacing, preserve_comment_context)?;
+        let atom_document = atom_document(
+            atom,
+            &elements,
+            scope,
+            spacing,
+            preserve_comment_context,
+            environment_rows,
+        )?;
         pieces.push(Piece {
             role: Role::from(atom.break_priority),
             delimiter: atom.delimiter,
@@ -422,6 +536,7 @@ fn atom_document(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<AtomDocument> {
     let range = atom.range;
     let element = elements.iter().find(|element| {
@@ -442,6 +557,7 @@ fn atom_document(
                     scope,
                     spacing,
                     preserve_comment_context,
+                    false,
                 )?;
                 (
                     Ir::concat([
@@ -453,18 +569,36 @@ fn atom_document(
                 )
             } else if let Some(command) = MathCommand::cast(node.clone()) {
                 (
-                    lower_command(&command, scope, spacing, preserve_comment_context)?,
+                    lower_command(
+                        &command,
+                        scope,
+                        spacing,
+                        preserve_comment_context,
+                        environment_rows,
+                    )?,
                     false,
                 )
             } else if let Some(delimited) = MathDelimited::cast(node.clone()) {
                 (
-                    lower_delimited(&delimited, scope, spacing, preserve_comment_context)?,
+                    lower_delimited(
+                        &delimited,
+                        scope,
+                        spacing,
+                        preserve_comment_context,
+                        environment_rows,
+                    )?,
                     false,
                 )
             } else {
                 let scripted = MathScripted::cast(node.clone())?;
                 (
-                    lower_scripted(&scripted, scope, spacing, preserve_comment_context)?,
+                    lower_scripted(
+                        &scripted,
+                        scope,
+                        spacing,
+                        preserve_comment_context,
+                        environment_rows,
+                    )?,
                     false,
                 )
             }
@@ -489,6 +623,7 @@ fn lower_delimited(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    _environment_rows: bool,
 ) -> Option<Ir> {
     if !delimited_is_supported(delimited, scope) {
         return None;
@@ -506,6 +641,7 @@ fn lower_delimited(
             scope,
             spacing,
             preserve_comment_context,
+            false,
         )?;
         let opening_width = left.text().chars().count() + open.text().chars().count();
         documents.push(Ir::align(
@@ -548,6 +684,7 @@ fn lower_scripted(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    environment_rows: bool,
 ) -> Option<Ir> {
     let base = scripted.base()?;
     let scripts = scripted.scripts().collect::<Vec<_>>();
@@ -560,6 +697,7 @@ fn lower_scripted(
         scope,
         spacing,
         preserve_comment_context,
+        environment_rows,
     )?];
     for script in scripts {
         let marker = script.marker_token()?;
@@ -570,6 +708,7 @@ fn lower_scripted(
             scope,
             Spacing::Script,
             preserve_comment_context,
+            environment_rows,
         )?);
     }
     Some(Ir::concat(documents))
@@ -622,6 +761,7 @@ fn lower_command(
     scope: &SignatureScope,
     spacing: Spacing,
     preserve_comment_context: bool,
+    _environment_rows: bool,
 ) -> Option<Ir> {
     let name = command.name_token()?;
     if is_supported_bare_command(command, scope) {
@@ -641,7 +781,7 @@ fn lower_command(
         let elements = argument.body_elements().collect::<Vec<_>>();
         let body = hanging(
             1,
-            lower_body(elements, scope, spacing, preserve_comment_context)?,
+            lower_body(elements, scope, spacing, preserve_comment_context, false)?,
         );
         if previous_end < argument.syntax().text_range().start() {
             documents.push(Ir::text(" "));

@@ -563,7 +563,7 @@ Panache: "  a \\\\\n  % first row\n  b"
 --- display/line_break_comment.tex [environment] ---
 Input: "a \\\\ % first row\nb\n"
 Badness: "  a \\\\ % first row\n  b\n"
-Panache: "  a \\\\\n  % first row\n  b"
+Panache: "  a \\\\ % first row\n  b"
 
 --- display/line_break_modifiers.tex [display] ---
 Input: "a \\\\*[2ex]\nb\n"
@@ -838,7 +838,7 @@ Panache: <declined>
 --- environments/recovery/comment_before_name.tex [environment] ---
 Input: "\\begin% opener\n{aligned}x\\end% closer\n{aligned}\n"
 Badness: "  \\begin% opener\n    {aligned}x\n  \\end% closer\n  {aligned}\n"
-Panache: <declined>
+Panache: "  \\begin% opener\n{aligned}\n    x\n  \\end% closer\n{aligned}"
 
 --- environments/recovery/nested.tex [inline] ---
 Input: "\\begin{aligned}\\begin{matrix}x\\end{matrix}\\end{aligned}\n"

@@ -120,4 +120,21 @@ impl Ir {
             Self::Text(_) | Self::Line | Self::SoftLine | Self::Nil => false,
         }
     }
+
+    /// Return the width of the flat form, or `None` when the document must
+    /// break. Environment rows use this to align authored `\\` markers.
+    pub(super) fn flat_width(&self) -> Option<usize> {
+        match self {
+            Self::Text(text) => Some(text.chars().count()),
+            Self::Verbatim(text) => (!text.contains('\n')).then(|| text.chars().count()),
+            Self::Concat(documents) => documents.iter().try_fold(0usize, |width, document| {
+                width.checked_add(document.flat_width()?)
+            }),
+            Self::Line => Some(1),
+            Self::SoftLine | Self::Nil => Some(0),
+            Self::Indent(inner) | Self::Align(_, inner) | Self::Group(inner) => inner.flat_width(),
+            Self::BoundedAlign { aligned, .. } => aligned.flat_width(),
+            Self::HardLine | Self::EmptyLine => None,
+        }
+    }
 }

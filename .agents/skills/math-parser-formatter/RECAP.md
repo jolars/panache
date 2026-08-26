@@ -45,27 +45,30 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Comments in nested environments.** Extended typed comment lowering and its
-eligibility check recursively through standalone nested-environment rows, with
-byte parity against Badness and explicit idempotency coverage.
+**Authored breaks in display and free environment bodies.** Routed supported
+non-chain `\\` rows through the typed document IR in display math and non-grid
+environment bodies, with byte parity against Badness and explicit idempotency
+coverage in all three controlled contexts. Display relation chains retain the
+legacy path until their Panache-specific continuation alignment exists in IR.
 
-- The safety gate now mirrors the renderer's row structure: a standalone nested
-  environment recurses into its body, while mixed or otherwise unsupported
-  comment-bearing cells still take the verbatim compatibility path.
-- Mandatory parity covers free, aligned final-cell, aligned first-cell, and
-  two-level nested cases; each case is explicitly idempotent.
-- The pinned Badness formatter's first-column ordinary-group inconsistency also
-  applies to single-cell nested-environment rows: it resets operator context
-  after the comment and adds one continuation column. Panache reproduces this
-  behavior for parity, but it should be raised and corrected in Badness.
-- The committed 107-case report is unchanged because this slice adds focused
-  controlled bodies rather than new corpus fixtures.
+- Display bodies retain source-ordered semantic context across `\\`; environment
+  rows reset it, matching Badness's treatment of a leading unary operator.
+- Environment lowering aligns trailing row markers from typed flat widths,
+  retains closed `*`/bracket modifiers, and keeps an adjacent `%` comment on the
+  marker line. Nested groups and delimiters retain inline/display break style.
+- Mandatory parity now covers bare and modified markers, unequal row widths,
+  operators, nested groups, proven command arguments, paired delimiters, and
+  adjacent comments; every controlled context is checked for idempotency.
+- Regenerating the 107-case report leaves its classification counts unchanged.
+  It records the newly migrated environment comment layout and refreshes one
+  stale malformed-environment divergence left by the preceding nested-comment
+  slice.
 
 ### Suggested next sub-targets
 
-1. Move display and environment authored-break layout onto the document IR,
-   including modifier and adjacent-comment behavior.
-2. Expand grid-comment parity to rows combining multiple multiline cells if a
+1. Move authored-break rows containing `&` alignment cells onto the document
+   IR, preserving trailing-marker alignment and comment behavior.
+2. Replace the remaining embedded-environment compatibility path for supported
+   standalone and mixed rows.
+3. Expand grid-comment parity to rows combining multiple multiline cells if a
    motivating corpus case appears.
-3. Extend nested-environment comment parity to mixed surrounding expressions
-   only if that mixed layout is migrated as its own bounded slice.

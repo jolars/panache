@@ -811,6 +811,7 @@ fn nested_environment_comment_migration_slice_matches_badness() {
 #[test]
 fn authored_line_break_migration_slice_matches_badness() {
     for body in [
+        "a\\\\*[2ex]\nb",
         "a\\\\b",
         "a \\\\*[2ex]\n-b",
         "a+b\\\\c-d",
@@ -819,7 +820,15 @@ fn authored_line_break_migration_slice_matches_badness() {
         "\\left( a+b\\\\c-d \\right)",
         "a \\\\ % first row\nb",
     ] {
-        assert_formatter_parity(body, OracleContext::Inline);
+        for context in OracleContext::ALL {
+            assert_formatter_parity(body, context);
+            let once = panache_body(body, context).expect("first Panache pass");
+            let twice = panache_body(&once, context).expect("second Panache pass");
+            assert_eq!(
+                once, twice,
+                "authored line break is not idempotent in {context:?}: {body:?}"
+            );
+        }
     }
 }
 
