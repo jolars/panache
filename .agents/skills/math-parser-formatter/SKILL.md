@@ -5,8 +5,7 @@ description: Advance Panache's math parser and formatter one bounded phase at a
   Badness parity, math formatting, or the next math-roadmap task.
 ---
 
-This is a **long-horizon, multi-session effort**. Move one bounded sub-task
-forward per session; do not attempt sweeping rewrites. All source paths below
+This is a multi-session effort. All source paths below
 are relative to the repository root.
 
 ## Scope boundaries
@@ -71,7 +70,7 @@ root `AGENTS.md`.
 
 ## Session workflow
 
-1. Read the [repository roadmap](../../../TODO.md#math-parser-and-formatter-redesign)
+1. Read the repository roadmap at `TODO.md` in the root. Follow its checkboxes
    for the authoritative sequence, then read `RECAP.md` for the latest completed
    slice and suggested next sub-targets.
 2. Pick one bounded sub-task. If the roadmap, recap, and repository disagree,
