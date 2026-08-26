@@ -114,17 +114,20 @@ Returned unchanged, never reflowed:
    are not padded, and a trailing `\\` is not preceded by a synthesized space.
    Cell contents still receive ordinary operator formatting. The pinned oracle
    has one construct-sensitive inconsistency: after a comment in an ordinary
-   first-column group, the next operator receives line-local context, while
-   commands, scripts, paired delimiters, and later columns preserve semantic
-   context across the comment. Panache reproduces this behavior until the oracle
-   is corrected.
+   first-column group---including a single-cell row---the next operator receives
+   line-local context, and the continuation gains one column, while commands,
+   scripts, paired delimiters, and later columns preserve semantic context
+   across the comment. Panache reproduces this behavior until the oracle is
+   corrected.
 
    Ragged rows are fine: a column's width is the max over only the rows that
    have a non-last cell there; a short row contributes to and is padded for only
    the columns it has.
 
    A row whose sole content is a single nested environment (no `&`, no `\\`) is
-   block-laid-out at the body indent rather than inlined.
+   block-laid-out at the body indent rather than inlined. Comment-bearing cells
+   inside such an environment recurse through the same typed layout and safety
+   checks at every nesting depth.
 
 6. **Operator spacing.** The char operators `+ - * = < >` (the parser's neutral
    `MATH_OPERATOR` tokens) are spaced by *interpretation*, not by CST shape ---

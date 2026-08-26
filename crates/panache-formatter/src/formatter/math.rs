@@ -274,15 +274,8 @@ fn has_nested_comment(tree: &SyntaxNode) -> bool {
 }
 
 fn can_lower_nested_comments(tree: &SyntaxNode, opts: &MathFormatOptions) -> bool {
-    if opts.context == MathContext::EnvironmentBody
-        && tree.descendants_with_tokens().any(|element| {
-            matches!(
-                element.kind(),
-                SyntaxKind::MATH_ALIGN | SyntaxKind::MATH_LINE_BREAK
-            )
-        })
-    {
-        return render::can_render_environment_grid_comments(tree, &opts.signature_scope);
+    if opts.context == MathContext::EnvironmentBody {
+        return render::can_render_environment_comments(tree, &opts.signature_scope);
     }
 
     let context_is_supported = opts.context != MathContext::Display

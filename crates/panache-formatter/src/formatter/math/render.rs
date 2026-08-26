@@ -686,13 +686,12 @@ fn render_body_lines(
             items.push(BodyItem::Block(render_environment_lines(&env, depth, opts)));
         } else {
             let split = split_cells(&row.elems);
-            let last = split.len().saturating_sub(1);
             let cells = split
                 .iter()
                 .enumerate()
                 .map(|(column, cell)| {
                     if cell.iter().any(contains_nested_comment) {
-                        lower_grid_cell(cell, &opts.signature_scope, column == 0 && column < last)
+                        lower_grid_cell(cell, &opts.signature_scope, column == 0)
                             .map(BodyCell::Document)
                             .unwrap_or_else(|| {
                                 BodyCell::Flat(
@@ -848,23 +847,30 @@ fn join_cell_documents(cells: &[BodyCell], widths: &[usize], break_text: Option<
     Ir::concat(documents)
 }
 
-pub(super) fn can_render_environment_grid_comments(
-    tree: &SyntaxNode,
+pub(super) fn can_render_environment_comments(tree: &SyntaxNode, scope: &SignatureScope) -> bool {
+    let elements = tree.children_with_tokens().collect::<Vec<_>>();
+    can_render_environment_body_comments(&elements, scope)
+}
+
+fn can_render_environment_body_comments(
+    elements: &[SyntaxElement],
     scope: &SignatureScope,
 ) -> bool {
-    if tree
-        .descendants()
-        .any(|node| node.kind() == SyntaxKind::MATH_ENVIRONMENT)
-    {
-        return false;
-    }
-    let elements = tree.children_with_tokens().collect::<Vec<_>>();
-    split_rows(&elements).into_iter().all(|row| {
+    split_rows(elements).into_iter().all(|row| {
+        if row.is_blank() {
+            return true;
+        }
+        if let Some(environment) = row.single_environment() {
+            let Some(parts) = EnvParts::of(&environment) else {
+                return false;
+            };
+            return can_render_environment_body_comments(&parts.body, scope);
+        }
+
         let cells = split_cells(&row.elems);
-        let last = cells.len().saturating_sub(1);
         cells.iter().enumerate().all(|(column, cell)| {
             !cell.iter().any(contains_nested_comment)
-                || lower_grid_cell(cell, scope, column == 0 && column < last).is_some()
+                || lower_grid_cell(cell, scope, column == 0).is_some()
         })
     })
 }
@@ -872,7 +878,7 @@ pub(super) fn can_render_environment_grid_comments(
 fn lower_grid_cell(
     elements: &[SyntaxElement],
     scope: &SignatureScope,
-    first_nonfinal_cell: bool,
+    first_cell: bool,
 ) -> Option<Ir> {
     let comment_elements = elements
         .iter()
@@ -881,7 +887,7 @@ fn lower_grid_cell(
     let [comment_element] = comment_elements.as_slice() else {
         return None;
     };
-    let first_group = first_nonfinal_cell
+    let first_group = first_cell
         && comment_element
             .as_node()
             .is_some_and(|node| node.kind() == SyntaxKind::MATH_GROUP);

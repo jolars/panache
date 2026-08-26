@@ -791,6 +791,24 @@ fn environment_grid_nonfinal_cell_comment_migration_slice_matches_badness() {
 }
 
 #[test]
+fn nested_environment_comment_migration_slice_matches_badness() {
+    for body in [
+        "\\begin{gathered}\n{a % inner\n+b}\n\\end{gathered}",
+        "\\begin{aligned}\na&={b % inner\n+c}\\\\\nd&=e\n\\end{aligned}",
+        "\\begin{aligned}\n{a % left cell\n+b}&=c\\\\\nd&=e\n\\end{aligned}",
+        "\\begin{gathered}\n\\begin{aligned}\na&={b % inner\n+c}\\\\\nd&=e\n\\end{aligned}\n\\end{gathered}",
+    ] {
+        assert_formatter_parity(body, OracleContext::Environment);
+        let once = panache_body(body, OracleContext::Environment).expect("first Panache pass");
+        let twice = panache_body(&once, OracleContext::Environment).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "nested environment comment case is not idempotent: {body:?}"
+        );
+    }
+}
+
+#[test]
 fn authored_line_break_migration_slice_matches_badness() {
     for body in [
         "a\\\\b",

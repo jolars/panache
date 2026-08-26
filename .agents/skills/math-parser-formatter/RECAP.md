@@ -45,27 +45,27 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Comments in non-final environment-grid cells.** Routed supported multiline
-first and middle cells through the typed document IR with byte parity against
-Badness and explicit idempotency coverage.
+**Comments in nested environments.** Extended typed comment lowering and its
+eligibility check recursively through standalone nested-environment rows, with
+byte parity against Badness and explicit idempotency coverage.
 
-- A multiline non-final cell puts the whole environment on Badness's tight-grid
-  path: separators have no surrounding space, column padding is suppressed,
-  and authored trailing `\\` markers remain tight.
-- Mandatory parity covers ordinary groups, Unicode content, signature-proven
-  arguments, braced scripts, and paired delimiters in first and middle cells.
-- The pinned Badness formatter handles a comment in an ordinary first-column
-  group inconsistently: it resets operator context after the comment and adds
-  one continuation column, while commands, scripts, paired delimiters, and
-  later cells preserve context. Panache reproduces this behavior for parity,
-  but it should be raised and corrected in Badness.
+- The safety gate now mirrors the renderer's row structure: a standalone nested
+  environment recurses into its body, while mixed or otherwise unsupported
+  comment-bearing cells still take the verbatim compatibility path.
+- Mandatory parity covers free, aligned final-cell, aligned first-cell, and
+  two-level nested cases; each case is explicitly idempotent.
+- The pinned Badness formatter's first-column ordinary-group inconsistency also
+  applies to single-cell nested-environment rows: it resets operator context
+  after the comment and adds one continuation column. Panache reproduces this
+  behavior for parity, but it should be raised and corrected in Badness.
 - The committed 107-case report is unchanged because this slice adds focused
   controlled bodies rather than new corpus fixtures.
 
 ### Suggested next sub-targets
 
-1. Extend typed comments into nested environments.
-2. Move display and environment authored-break layout onto the document IR,
+1. Move display and environment authored-break layout onto the document IR,
    including modifier and adjacent-comment behavior.
-3. Expand grid-comment parity to rows combining multiple multiline cells if a
+2. Expand grid-comment parity to rows combining multiple multiline cells if a
    motivating corpus case appears.
+3. Extend nested-environment comment parity to mixed surrounding expressions
+   only if that mixed layout is migrated as its own bounded slice.
