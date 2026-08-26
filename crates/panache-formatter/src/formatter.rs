@@ -34,6 +34,32 @@ pub use code_blocks::collect_code_blocks;
 pub use core::Formatter;
 pub use indent_utils::continuation_indent_at;
 
+/// Derive the effective math signature scope for `tree`: the configured
+/// `math-signatures` entries layered under the document's own `\newcommand`
+/// and `\renewcommand` definitions.
+///
+/// Hosts that drive [`Formatter`] directly instead of going through
+/// [`format_tree`] must apply this to their config; without it both configured
+/// and document signatures are silently inert.
+pub fn resolve_math_signature_scope(tree: &SyntaxNode, config: &Config) -> SignatureScope {
+    let configured = config.math_signatures.iter().map(|(name, arguments)| {
+        (
+            name.clone(),
+            CommandSignature {
+                arguments: arguments
+                    .iter()
+                    .map(|argument| ArgSpec {
+                        required: argument.kind == panache_parser::semantic::math::ArgKind::Brace,
+                        kind: argument.kind,
+                        domain: argument.domain,
+                    })
+                    .collect(),
+            },
+        )
+    });
+    SignatureScope::from_root_with_configured(tree, configured)
+}
+
 pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usize)>) -> String {
     format_tree_with_formatted_code(tree, config, range, FormattedCodeMap::new())
 }
@@ -69,24 +95,8 @@ pub fn format_tree_with_formatted_code(
     #[cfg(target_arch = "wasm32")]
     let formatted_yaml: Option<(String, String)> = None;
 
-    let configured = config.math_signatures.iter().map(|(name, arguments)| {
-        (
-            name.clone(),
-            CommandSignature {
-                arguments: arguments
-                    .iter()
-                    .map(|argument| ArgSpec {
-                        required: argument.kind == panache_parser::semantic::math::ArgKind::Brace,
-                        kind: argument.kind,
-                        domain: argument.domain,
-                    })
-                    .collect(),
-            },
-        )
-    });
     let mut effective_config = config.clone();
-    effective_config.math_signature_scope =
-        SignatureScope::from_root_with_configured(tree, configured);
+    effective_config.math_signature_scope = resolve_math_signature_scope(tree, config);
     let mut output = Formatter::new(effective_config, formatted_code, range).format(tree);
 
     if let Some((original_yaml, formatted_yaml)) = formatted_yaml {

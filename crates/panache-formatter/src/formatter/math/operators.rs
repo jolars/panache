@@ -14,6 +14,9 @@
 //! view for known control words.
 
 use crate::syntax::{AstNode, MathScripted, SyntaxElement, SyntaxKind, SyntaxToken};
+use panache_parser::semantic::math::{
+    MathClass, coerces_binary_to_ordinary, math_char_info, math_command_info,
+};
 use rowan::NodeOrToken;
 
 /// TeX atom classes (the subset the formatter's spacing pass needs; see The
@@ -79,7 +82,7 @@ impl<'a> Iterator for WordAtoms<'a> {
         } else {
             let first = self.rest.chars().next().expect("non-empty word");
             match first {
-                ':' => (colon_prefix_len(self.rest), AtomClass::Ord),
+                ':' => (colon_prefix_len(self.rest), AtomClass::Punct),
                 _ => match semantic_char_class(first) {
                     Some(AtomClass::Rel) => (relation_prefix_len(self.rest), AtomClass::Rel),
                     Some(class) => (first.len_utf8(), class),
@@ -106,20 +109,16 @@ fn definition_relation_prefix_len(text: &str) -> Option<usize> {
         .then(|| colon_end + relation_prefix_len(tail))
 }
 
-/// The single source of truth for which characters end an ordinary run and
-/// which atom class each contributes. `None` means the character is part of an
-/// ordinary run. A `:` is semantic (it is an atom of its own, and may start a
-/// `:=` definition) but ordinary-classed on its own.
+/// Which characters end an ordinary run and which atom class each contributes.
+/// `None` means the character is part of an ordinary run.
+///
+/// This resolves through [`math_char_info`], the same table the parser's
+/// semantic atom stream uses, so the legacy renderer and the typed lowering
+/// cannot classify a character differently. A `:` is punctuation: it is an atom
+/// of its own, and it may start a `:=` definition relation, which
+/// [`word_atoms`] recognizes before consulting this.
 fn semantic_char_class(c: char) -> Option<AtomClass> {
-    match c {
-        '=' | '<' | '>' => Some(AtomClass::Rel),
-        '+' | '-' | '*' => Some(AtomClass::Bin),
-        '(' | '[' => Some(AtomClass::Open),
-        ')' | ']' => Some(AtomClass::Close),
-        ',' | ';' => Some(AtomClass::Punct),
-        ':' => Some(AtomClass::Ord),
-        _ => None,
-    }
+    atom_class(math_char_info(c).class)
 }
 
 fn relation_prefix_len(text: &str) -> usize {
@@ -200,27 +199,30 @@ pub fn scripted_base_class(base: &SyntaxElement) -> Option<AtomClass> {
 }
 
 /// Class of a command operator, keyed on its name **without** the leading
-/// backslash. `None` for any command not in the curated table — the caller
-/// treats those as [`AtomClass::Ord`] (Greek letters, `\frac`, `\text`, …).
+/// backslash. `None` for any command that spaces like an ordinary atom (Greek
+/// letters, `\frac`, `\text`, …), which the caller treats as
+/// [`AtomClass::Ord`].
 ///
-/// Only standard TeX/KaTeX symbols are listed (the cross-validation corpus is
-/// KaTeX-bounded). Extend freely; the `Op` arm is deliberately conservative.
+/// This resolves through [`math_command_info`], the same table the parser's
+/// semantic atom stream uses, so the legacy renderer and the typed lowering
+/// cannot classify a command differently.
 pub fn command_class(name: &str) -> Option<AtomClass> {
-    let class = match name {
-        "leq" | "le" | "geq" | "ge" | "neq" | "ne" | "equiv" | "approx" | "sim" | "simeq"
-        | "cong" | "propto" | "subset" | "supset" | "subseteq" | "supseteq" | "in" | "ni"
-        | "notin" | "to" | "gets" | "mapsto" | "rightarrow" | "leftarrow" | "leftrightarrow"
-        | "Rightarrow" | "Leftarrow" | "Leftrightarrow" | "implies" | "iff" | "perp"
-        | "parallel" | "mid" | "models" | "vdash" | "dashv" | "prec" | "succ" | "preceq"
-        | "succeq" | "ll" | "gg" | "doteq" | "asymp" | "coloneqq" => AtomClass::Rel,
-        "cdot" | "times" | "div" | "pm" | "mp" | "ast" | "star" | "circ" | "bullet" | "oplus"
-        | "ominus" | "otimes" | "oslash" | "odot" | "cap" | "cup" | "uplus" | "sqcap" | "sqcup"
-        | "wedge" | "vee" | "setminus" | "amalg" => AtomClass::Bin,
-        "sum" | "prod" | "int" | "oint" | "coprod" | "bigcup" | "bigcap" | "bigoplus"
-        | "bigotimes" | "bigvee" | "bigwedge" | "lim" => AtomClass::Op,
-        _ => return None,
-    };
-    Some(class)
+    atom_class(math_command_info(name).class)
+}
+
+/// Map a parser atom class onto the formatter's spacing class. `None` is the
+/// ordinary-spacing default, which also covers the delimiter-ish classes that
+/// carry no spacing of their own.
+fn atom_class(class: MathClass) -> Option<AtomClass> {
+    match class {
+        MathClass::Bin => Some(AtomClass::Bin),
+        MathClass::Rel => Some(AtomClass::Rel),
+        MathClass::Op => Some(AtomClass::Op),
+        MathClass::Open => Some(AtomClass::Open),
+        MathClass::Close => Some(AtomClass::Close),
+        MathClass::Punct => Some(AtomClass::Punct),
+        MathClass::Ord | MathClass::Fence | MathClass::Inner => None,
+    }
 }
 
 /// Whether `*` immediately following this command is a syntactic modifier,
@@ -258,16 +260,30 @@ pub fn is_text_mode_command(name: &str) -> bool {
 /// TeX Bin→Ord coercion (the rule that yields unary minus): a [`AtomClass::Bin`]
 /// run becomes [`AtomClass::Ord`] when the preceding atom is absent (list start)
 /// or one of Bin/Rel/Open/Punct/Op. [`AtomClass::Rel`] never coerces.
+///
+/// The rule itself lives in [`coerces_binary_to_ordinary`], shared with the
+/// parser's semantic atom stream so the two paths agree on every input.
 pub fn coerce(run_class: AtomClass, prev: Option<AtomClass>) -> AtomClass {
     if run_class != AtomClass::Bin {
         return run_class;
     }
-    match prev {
-        None
-        | Some(
-            AtomClass::Bin | AtomClass::Rel | AtomClass::Open | AtomClass::Punct | AtomClass::Op,
-        ) => AtomClass::Ord,
-        _ => AtomClass::Bin,
+    if coerces_binary_to_ordinary(prev.map(math_class)) {
+        AtomClass::Ord
+    } else {
+        AtomClass::Bin
+    }
+}
+
+/// Map a formatter spacing class back onto the parser's atom class.
+fn math_class(class: AtomClass) -> MathClass {
+    match class {
+        AtomClass::Ord => MathClass::Ord,
+        AtomClass::Bin => MathClass::Bin,
+        AtomClass::Rel => MathClass::Rel,
+        AtomClass::Open => MathClass::Open,
+        AtomClass::Close => MathClass::Close,
+        AtomClass::Punct => MathClass::Punct,
+        AtomClass::Op => MathClass::Op,
     }
 }
 

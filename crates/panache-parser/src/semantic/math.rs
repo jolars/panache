@@ -73,6 +73,10 @@ pub struct SemanticMathAtom {
     pub class: MathClass,
     pub delimiter: Option<DelimiterRole>,
     pub break_priority: MathBreakPriority,
+    /// Whether TeX's Bin-to-Ord rule coerced a binary atom into a unary sign
+    /// (`-x`, `f(-x)`, `x = -y`). A coerced sign binds to the operand that
+    /// follows it, so it takes no surrounding space of its own.
+    pub coerced_unary: bool,
 }
 
 const fn atom_info(class: MathClass, delimiter: Option<DelimiterRole>) -> MathAtomInfo {
@@ -113,6 +117,18 @@ pub fn math_char_info(character: char) -> MathAtomInfo {
                 .map(|index| UNICODE_MATH_CHARS[index].1)
         })
         .unwrap_or_default()
+}
+
+/// Whether a binary atom is coerced to ordinary when it follows an atom of
+/// `previous` class -- the TeXbook's Bin-to-Ord rule, and the reason `-x` reads
+/// as a unary sign. `None` means the binary atom starts the list.
+pub fn coerces_binary_to_ordinary(previous: Option<MathClass>) -> bool {
+    previous.is_none_or(|class| {
+        matches!(
+            class,
+            MathClass::Bin | MathClass::Rel | MathClass::Open | MathClass::Punct | MathClass::Op
+        )
+    })
 }
 
 /// Virtual atoms for one CST element. A coalesced `MATH_WORD` yields one atom
@@ -181,9 +197,10 @@ impl Iterator for MathAtoms<'_> {
 /// Trivia and formatter-level separators are not atoms. Coalesced `MATH_WORD`
 /// tokens are sliced at Unicode-scalar boundaries, except that consecutive
 /// relation scalars remain one surface atom. Structural nodes stay indivisible.
-/// A binary atom is contextually ordinary at list start, after another binary
-/// or relation, or after a genuine opening delimiter, matching Badness's math
-/// sequencer.
+/// A binary atom is contextually ordinary at list start, after another binary,
+/// relation, punctuation, or large operator, and after a genuine opening
+/// delimiter -- the TeXbook's Bin-to-Ord rule, which is what makes `-x` read as
+/// a unary sign.
 pub fn semantic_math_atoms(content: &SyntaxNode) -> SemanticMathAtoms {
     semantic_math_atoms_in(content.children_with_tokens())
 }
@@ -196,7 +213,7 @@ pub fn semantic_math_atoms_in(
     elements: impl IntoIterator<Item = SyntaxElement>,
 ) -> SemanticMathAtoms {
     let mut interpreted = Vec::new();
-    let mut previous_role = MathRole::Relation;
+    let mut previous_class: Option<MathClass> = None;
     let mut previous_opener = false;
     for element in elements {
         if !is_semantic_math_element(&element) {
@@ -218,31 +235,26 @@ pub fn semantic_math_atoms_in(
             element_atoms.push(raw);
         }
         for atom in element_atoms {
-            let raw_role = MathRole::from_class(atom.class);
-            let role = if raw_role == MathRole::Binary
-                && (previous_role != MathRole::Operand || previous_opener)
-            {
-                MathRole::Operand
-            } else {
-                raw_role
-            };
-            let class = if atom.class == MathClass::Bin && role == MathRole::Operand {
+            let coerced_unary = atom.class == MathClass::Bin
+                && (previous_opener || coerces_binary_to_ordinary(previous_class));
+            let class = if coerced_unary {
                 MathClass::Ord
             } else {
                 atom.class
             };
-            let break_priority = match role {
+            let break_priority = match MathRole::from_class(class) {
                 MathRole::Operand => MathBreakPriority::None,
                 MathRole::Binary => MathBreakPriority::Binary,
                 MathRole::Relation => MathBreakPriority::Relation,
             };
-            previous_role = role;
+            previous_class = Some(class);
             previous_opener = atom.delimiter == Some(DelimiterRole::Open);
             interpreted.push(SemanticMathAtom {
                 range: atom.range,
                 class,
                 delimiter: atom.delimiter,
                 break_priority,
+                coerced_unary,
             });
         }
     }
@@ -457,11 +469,20 @@ impl SignatureScope {
     }
 
     fn collect_redefinitions(&mut self, root: &SyntaxNode) {
-        for node in root.descendants().filter(|node| {
+        let is_raw_tex = |node: &SyntaxNode| {
             matches!(
                 node.kind(),
                 SyntaxKind::TEX_BLOCK | SyntaxKind::LATEX_COMMAND
             )
+        };
+        for node in root.descendants().filter(|node| {
+            // An enclosing raw-TeX node already covers this text; scanning the
+            // nested node too would re-read and re-scan the same bytes.
+            is_raw_tex(node)
+                && !node
+                    .ancestors()
+                    .skip(1)
+                    .any(|ancestor| is_raw_tex(&ancestor))
         }) {
             collect_definition_targets(&node.text().to_string(), &mut self.redefined_commands);
         }
@@ -550,6 +571,10 @@ pub fn match_arg_slot(arguments: &[ArgSpec], slot: &mut usize, kind: ArgKind) ->
 /// Return the curated positional domain of an attached math argument.
 ///
 /// Unowned, unmatched, over-attached, and unknown-command groups are unknown.
+///
+/// This rebuilds the document's whole signature scope for one lookup. Any
+/// caller resolving more than a single group should build the scope once and
+/// use [`argument_domain_with_scope`] instead.
 pub fn argument_domain(group: &SyntaxNode) -> ArgumentDomain {
     let root = group.ancestors().last().unwrap_or_else(|| group.clone());
     let scope = SignatureScope::from_root(&root);
@@ -609,14 +634,15 @@ fn collect_definition_targets(text: &str, targets: &mut HashSet<String>) {
     let mut line_start = 0;
     while line_start < bytes.len() {
         let mut cursor = line_start;
-        while matches!(bytes.get(cursor), Some(b' ' | b'\t')) {
-            cursor += 1;
-        }
-        if let Some((head, after_head)) = control_word(text, cursor)
-            && DEFINITION_COMMANDS.contains(&head)
-            && let Some(target) = definition_target(text, after_head)
+        // A line may carry several definitions in a row
+        // (`\newcommand{\a}{x}\newcommand{\b}{y}`), so keep scanning past each
+        // one instead of jumping straight to the next line.
+        while let Some((_, after_head)) = control_word(text, skip_spaces(text, cursor))
+            .filter(|(head, _)| DEFINITION_COMMANDS.contains(head))
+            && let Some((target, after_target)) = definition_target(text, after_head)
         {
             targets.insert(target.to_owned());
+            cursor = skip_definition_body(text, after_target);
         }
         line_start = text[line_start..]
             .find('\n')
@@ -624,19 +650,78 @@ fn collect_definition_targets(text: &str, targets: &mut HashSet<String>) {
     }
 }
 
-fn definition_target(text: &str, mut cursor: usize) -> Option<&str> {
+/// The defined command name and the offset just past it.
+fn definition_target(text: &str, mut cursor: usize) -> Option<(&str, usize)> {
     cursor = skip_tex_trivia(text, cursor);
     if text.as_bytes().get(cursor) == Some(&b'*') {
         cursor = skip_tex_trivia(text, cursor + 1);
     }
     if text.as_bytes().get(cursor) != Some(&b'{') {
-        return control_word(text, cursor).map(|(name, _)| name);
+        return control_word(text, cursor);
     }
 
     cursor = skip_tex_trivia(text, cursor + 1);
     let (name, after_name) = control_word(text, cursor)?;
     cursor = skip_tex_trivia(text, after_name);
-    (text.as_bytes().get(cursor) == Some(&b'}')).then_some(name)
+    (text.as_bytes().get(cursor) == Some(&b'}')).then_some((name, cursor + 1))
+}
+
+/// Skip the argument-count and replacement-text groups that follow a definition
+/// target, so the scan resumes at whatever comes after the whole definition.
+fn skip_definition_body(text: &str, mut cursor: usize) -> usize {
+    loop {
+        let next = skip_tex_trivia(text, cursor);
+        match skip_balanced_group(text, next) {
+            Some(after) => cursor = after,
+            None => return cursor,
+        }
+    }
+}
+
+/// The offset just past the balanced `{...}` or `[...]` group at `cursor`, or
+/// `None` when there is no such group or it never closes.
+fn skip_balanced_group(text: &str, cursor: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let (open, close) = match bytes.get(cursor)? {
+        b'{' => (b'{', b'}'),
+        b'[' => (b'[', b']'),
+        _ => return None,
+    };
+    let mut depth = 0usize;
+    let mut pos = cursor;
+    while pos < bytes.len() {
+        match bytes[pos] {
+            // A control symbol escapes its character; a comment runs to end of
+            // line. Neither can close the group.
+            b'\\' => {
+                pos += 2;
+                continue;
+            }
+            b'%' => {
+                pos = text[pos..]
+                    .find('\n')
+                    .map_or(bytes.len(), |offset| pos + offset + 1);
+                continue;
+            }
+            byte if byte == open => depth += 1,
+            byte if byte == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(pos + 1);
+                }
+            }
+            _ => {}
+        }
+        pos += 1;
+    }
+    None
+}
+
+fn skip_spaces(text: &str, mut cursor: usize) -> usize {
+    while matches!(text.as_bytes().get(cursor), Some(b' ' | b'\t')) {
+        cursor += 1;
+    }
+    cursor
 }
 
 fn control_word(text: &str, cursor: usize) -> Option<(&str, usize)> {

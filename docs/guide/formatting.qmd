@@ -1096,6 +1096,12 @@ align rendered glyphs), and malformed math is left untouched. A leading
 top-level `%` comment stays on its own line, and a same-line trailing comment
 retains its terminating newline.
 
+Inline math is kept on a single line: an environment or a `\\` row break inside
+`$…$` is flattened, because a newline there would end the surrounding paragraph
+or split a table row. The one exception is a `%` comment, which runs to end of
+line and so keeps the break that follows it. Display math owns its own lines and
+keeps the structural layout above.
+
 Whitespace that TeX ignores is normalized away: sub/superscript markers (`_`,
 `^`) are tightened (`H _{ 00}^{-1 }` → `H_{00}^{-1}`), and the leading/trailing
 interior whitespace of a math-mode brace group is trimmed (`{ 00 }` → `{00}`).

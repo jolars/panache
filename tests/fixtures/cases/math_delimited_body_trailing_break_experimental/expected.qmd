@@ -1,0 +1,14 @@
+A body ending in a comment or a row break keeps the closing delimiter on the
+next line, with no blank line between.
+
+$$
+  x = y % trailing
+$$
+
+$$
+  b\\
+$$
+
+\begin{align}
+  x = y % trailing
+\end{align}

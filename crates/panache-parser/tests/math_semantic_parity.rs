@@ -12,8 +12,8 @@ use badness_parser::syntax::SyntaxKind as BadnessKind;
 use panache_parser::parser::math::{MathParseOptions, parse_math_content};
 use panache_parser::semantic::math::{
     ArgKind, ArgSpec, ArgumentDomain, CommandSignature, DelimiterRole, MathBreakPriority,
-    MathClass, SignatureScope, argument_domain, argument_domain_with_scope,
-    builtin_command_signature, math_atoms, math_char_info, math_command_info, semantic_math_atoms,
+    MathClass, SignatureScope, argument_domain_with_scope, builtin_command_signature, math_atoms,
+    math_char_info, math_command_info, semantic_math_atoms,
 };
 use panache_parser::syntax::{SyntaxElement, SyntaxKind, SyntaxNode};
 use panache_parser::{ParserOptions, parse};
@@ -35,6 +35,7 @@ fn badness_domains(body: &str) -> Vec<BadnessDomain> {
 
 fn panache_domains(body: &str) -> Vec<ArgumentDomain> {
     let root = SyntaxNode::new_root(parse_math_content(body, MathParseOptions::default()));
+    let scope = SignatureScope::from_root(&root);
     root.descendants()
         .filter(|node| {
             matches!(
@@ -46,7 +47,7 @@ fn panache_domains(body: &str) -> Vec<ArgumentDomain> {
             node.parent()
                 .is_some_and(|parent| parent.kind() == SyntaxKind::MATH_COMMAND)
         })
-        .map(|group| argument_domain(&group))
+        .map(|group| argument_domain_with_scope(&group, &scope))
         .collect()
 }
 
@@ -69,6 +70,7 @@ fn badness_document_domains(source: &str) -> Vec<BadnessDomain> {
 
 fn panache_document_domains(source: &str) -> Vec<ArgumentDomain> {
     let root = parse(source, Some(ParserOptions::default()));
+    let scope = SignatureScope::from_root(&root);
     root.descendants()
         .filter(|node| {
             matches!(
@@ -80,7 +82,7 @@ fn panache_document_domains(source: &str) -> Vec<ArgumentDomain> {
             node.parent()
                 .is_some_and(|parent| parent.kind() == SyntaxKind::MATH_COMMAND)
         })
-        .map(|group| argument_domain(&group))
+        .map(|group| argument_domain_with_scope(&group, &scope))
         .collect()
 }
 
@@ -609,7 +611,6 @@ fn semantic_atom_stream_matches_badness_differentially() {
         "a+-b",
         "x=-y",
         "f(-x)",
-        "a,-b",
         r"a\leq b",
         r"a\cdot b",
         "{a}+b",
@@ -623,6 +624,35 @@ fn semantic_atom_stream_matches_badness_differentially() {
             "{body}",
         );
     }
+}
+
+/// Badness's sequencer leaves a binary atom binary after punctuation. Panache
+/// applies the full TeXbook Bin-to-Ord rule instead, so `a,-b` reads `-b` as a
+/// unary sign -- matching `operators::coerce` and the formatter output Panache
+/// has always shipped.
+#[test]
+fn panache_coerces_after_punctuation_where_badness_does_not() {
+    use MathBreakPriority::{Binary, None as NoBreak};
+    use MathClass::{Bin, Ord, Punct};
+
+    assert_eq!(
+        panache_semantic_atoms("a,-b"),
+        vec![
+            (0, 1, Ord, None, NoBreak),
+            (1, 2, Punct, None, NoBreak),
+            (2, 3, Ord, None, NoBreak),
+            (3, 4, Ord, None, NoBreak),
+        ],
+    );
+    assert_eq!(
+        badness_semantic_atoms("a,-b"),
+        vec![
+            (0, 1, Ord, None, NoBreak),
+            (1, 2, Punct, None, NoBreak),
+            (2, 3, Bin, None, Binary),
+            (3, 4, Ord, None, NoBreak),
+        ],
+    );
 }
 
 #[test]
@@ -642,7 +672,7 @@ fn semantic_atom_stream_matches_badness_contextual_roles() {
             ("-".into(), Ord, None, NoBreak),
             ("c".into(), Ord, None, NoBreak),
             (",".into(), Punct, None, NoBreak),
-            ("-".into(), Bin, None, Binary),
+            ("-".into(), Ord, None, NoBreak),
             ("d".into(), Ord, None, NoBreak),
             ("{x}".into(), Inner, None, NoBreak),
             (r"\cdot".into(), Bin, None, Binary),

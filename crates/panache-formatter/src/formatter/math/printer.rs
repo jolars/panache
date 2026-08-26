@@ -4,6 +4,10 @@
 // engine-only change.
 #![allow(dead_code)]
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use super::ir::Ir;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -22,6 +26,15 @@ struct Command<'a> {
 pub(super) struct Printer {
     line_width: usize,
     indent_width: usize,
+    /// Render `HardLine`, `EmptyLine`, and multiline `Verbatim` as a single
+    /// space instead of a newline. Inline math lives inside a host line, so a
+    /// newline there would break the surrounding paragraph or table cell.
+    flatten_forced_breaks: bool,
+    /// Memo for [`Printer::bounded_align_fits`], keyed by aligned document,
+    /// start column, and indent. Deciding one bounded alignment renders its
+    /// whole subtree, and a nested alignment is re-decided once per enclosing
+    /// decision, so without this the renders compound.
+    bounded_align_fits: RefCell<HashMap<(*const Ir, usize, usize), bool>>,
 }
 
 impl Printer {
@@ -29,6 +42,8 @@ impl Printer {
         Self {
             line_width,
             indent_width,
+            flatten_forced_breaks: false,
+            bounded_align_fits: RefCell::new(HashMap::new()),
         }
     }
 
@@ -37,9 +52,12 @@ impl Printer {
         self.run(document, initial_indent, 0, true, Mode::Break)
     }
 
-    /// Print every conditional break flat, regardless of the configured width.
+    /// Print the whole document on one line, regardless of the configured
+    /// width and of any forced break the document carries.
     pub(super) fn print_flat(&self, document: &Ir) -> String {
-        self.wide().run(document, 0, 0, false, Mode::Flat)
+        let mut printer = self.wide();
+        printer.flatten_forced_breaks = true;
+        printer.run(document, 0, 0, false, Mode::Flat)
     }
 
     /// Return the flat source width, or `None` for an unflattenable document.
@@ -51,6 +69,8 @@ impl Printer {
         Self {
             line_width: usize::MAX / 2,
             indent_width: self.indent_width,
+            flatten_forced_breaks: self.flatten_forced_breaks,
+            bounded_align_fits: RefCell::new(HashMap::new()),
         }
     }
 
@@ -62,7 +82,12 @@ impl Printer {
         emit_initial_indent: bool,
         initial_mode: Mode,
     ) -> String {
-        let mut writer = Writer::new(initial_column, base_indent, emit_initial_indent);
+        let mut writer = Writer::new(
+            initial_column,
+            base_indent,
+            emit_initial_indent,
+            self.flatten_forced_breaks,
+        );
         let mut stack = vec![Command {
             indent: base_indent,
             mode: initial_mode,
@@ -73,6 +98,9 @@ impl Printer {
             match command.document {
                 Ir::Nil => {}
                 Ir::Text(text) => writer.write_text(text),
+                Ir::Verbatim(text) if self.flatten_forced_breaks => {
+                    writer.write_flattened_verbatim(text)
+                }
                 Ir::Verbatim(text) => writer.write_verbatim(text),
                 Ir::Concat(documents) => {
                     for document in documents.iter().rev() {
@@ -90,6 +118,9 @@ impl Printer {
                     if command.mode == Mode::Break {
                         writer.newline(command.indent);
                     }
+                }
+                Ir::HardLine | Ir::EmptyLine if self.flatten_forced_breaks => {
+                    writer.write_separating_space()
                 }
                 Ir::HardLine => writer.newline(command.indent),
                 Ir::EmptyLine => writer.empty_line(command.indent),
@@ -166,10 +197,23 @@ impl Printer {
         Some(column)
     }
 
+    /// Whether what remains on the line after a group still fits.
+    ///
+    /// `rest` is the caller's pending stack, walked from the top down without
+    /// copying it; only the documents this walk expands are buffered.
     fn rest_fits(&self, start_column: usize, rest: &[Command<'_>]) -> bool {
         let mut column = start_column;
-        let mut work = rest.to_vec();
-        while let Some(command) = work.pop() {
+        let mut work: Vec<Command<'_>> = Vec::new();
+        let mut pending = rest.len();
+        loop {
+            let command = match work.pop() {
+                Some(command) => command,
+                None if pending > 0 => {
+                    pending -= 1;
+                    rest[pending]
+                }
+                None => return true,
+            };
             match command.document {
                 Ir::Nil => {}
                 Ir::SoftLine if command.mode == Mode::Flat => {}
@@ -233,15 +277,20 @@ impl Printer {
                 return false;
             }
         }
-        true
     }
 
-    fn bounded_align_fits(&self, start_column: usize, indent: usize, aligned: &Ir) -> bool {
+    fn bounded_align_fits(&self, start_column: usize, indent: usize, aligned: &Rc<Ir>) -> bool {
+        let key = (Rc::as_ptr(aligned), start_column, indent);
+        if let Some(&fits) = self.bounded_align_fits.borrow().get(&key) {
+            return fits;
+        }
         let rendered = self.run(aligned, indent, start_column, false, Mode::Break);
-        rendered
+        let fits = rendered
             .split('\n')
             .skip(1)
-            .all(|line| line.chars().count() <= self.line_width)
+            .all(|line| line.chars().count() <= self.line_width);
+        self.bounded_align_fits.borrow_mut().insert(key, fits);
+        fits
     }
 }
 
@@ -250,15 +299,22 @@ struct Writer {
     column: usize,
     pending_indent: usize,
     needs_indent: bool,
+    /// Flat printing joins logical lines with a single space. The lines it
+    /// joins already carry their own layout indentation as literal text, so
+    /// that indentation is dropped at every join.
+    flatten: bool,
+    drop_leading_space: bool,
 }
 
 impl Writer {
-    fn new(column: usize, pending_indent: usize, needs_indent: bool) -> Self {
+    fn new(column: usize, pending_indent: usize, needs_indent: bool, flatten: bool) -> Self {
         Self {
             output: String::new(),
             column,
             pending_indent,
             needs_indent,
+            flatten,
+            drop_leading_space: false,
         }
     }
 
@@ -280,12 +336,39 @@ impl Writer {
     }
 
     fn write_text(&mut self, text: &str) {
+        let text = if self.drop_leading_space {
+            text.trim_start_matches([' ', '\t'])
+        } else {
+            text
+        };
         if text.is_empty() {
             return;
         }
+        self.drop_leading_space = false;
         self.flush_indent();
         self.output.push_str(text);
         self.column += text.chars().count();
+    }
+
+    /// Write one space, unless the line is still empty or already ends in one.
+    fn write_separating_space(&mut self) {
+        self.drop_leading_space = false;
+        if !self.output.is_empty() && !self.output.ends_with(' ') {
+            self.write_text(" ");
+        }
+        self.drop_leading_space = self.flatten;
+    }
+
+    /// Write opaque text with its newlines collapsed to single spaces.
+    fn write_flattened_verbatim(&mut self, text: &str) {
+        let mut first = true;
+        for segment in text.split('\n') {
+            if !first {
+                self.write_separating_space();
+            }
+            first = false;
+            self.write_text(segment.trim());
+        }
     }
 
     fn write_verbatim(&mut self, text: &str) {
@@ -441,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn flat_print_ignores_width_but_not_forced_breaks() {
+    fn flat_print_ignores_width_and_forced_breaks() {
         let document = Ir::concat([
             Ir::text("aaaaaaaa"),
             Ir::Line,
@@ -451,7 +534,35 @@ mod tests {
             Ir::HardLine,
             Ir::text("d"),
         ]);
-        assert_eq!(printer(4).print_flat(&document), "aaaaaaaa bbbbbbbbc\nd");
+        assert_eq!(printer(4).print_flat(&document), "aaaaaaaa bbbbbbbbc d");
         assert_eq!(printer(4).flat_width(&document), None);
+    }
+
+    #[test]
+    fn flat_print_drops_the_layout_indent_of_joined_lines() {
+        let document = Ir::join(
+            Ir::HardLine,
+            [
+                Ir::text("\\begin{x}"),
+                Ir::text("  a & b \\\\"),
+                Ir::text("  c & d"),
+                Ir::text("\\end{x}"),
+            ],
+        );
+        assert_eq!(
+            printer(4).print_flat(&document),
+            "\\begin{x} a & b \\\\ c & d \\end{x}"
+        );
+    }
+
+    #[test]
+    fn flat_print_collapses_multiline_verbatim() {
+        let document = Ir::concat([
+            Ir::text("a"),
+            Ir::HardLine,
+            Ir::verbatim("b\nc"),
+            Ir::HardLine,
+        ]);
+        assert_eq!(printer(4).print_flat(&document), "a b c ");
     }
 }

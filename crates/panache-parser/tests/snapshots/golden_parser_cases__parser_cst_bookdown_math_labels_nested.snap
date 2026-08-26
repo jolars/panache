@@ -1,0 +1,89 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..188
+  PARAGRAPH@0..51
+    TEXT@0..50 "A label only splits m ..."
+    NEWLINE@50..51 "\n"
+  BLANK_LINE@51..52
+    BLANK_LINE@51..52 "\n"
+  PARAGRAPH@52..106
+    DISPLAY_MATH@52..105
+      DISPLAY_MATH_MARKER@52..54 "$$"
+      MATH_CONTENT@54..103
+        MATH_NEWLINE@54..55 "\n"
+        MATH_ENVIRONMENT@55..102
+          MATH_BEGIN@55..70
+            MATH_CONTROL_WORD@55..61 "\\begin"
+            MATH_NAME_GROUP@61..70
+              MATH_GROUP_OPEN@61..62 "{"
+              MATH_WORD@62..69 "aligned"
+              MATH_GROUP_CLOSE@69..70 "}"
+          MATH_CONTENT@70..89
+            MATH_NEWLINE@70..71 "\n"
+            MATH_WORD@71..72 "x"
+            MATH_SPACE@72..73 " "
+            MATH_ALIGN@73..74 "&"
+            MATH_WORD@74..75 "="
+            MATH_SPACE@75..76 " "
+            MATH_WORD@76..77 "y"
+            MATH_SPACE@77..78 " "
+            MATH_WORD@78..79 "("
+            MATH_CONTROL_SYMBOL@79..81 "\\#"
+            MATH_WORD@81..88 "eq:env)"
+            MATH_NEWLINE@88..89 "\n"
+          MATH_END@89..102
+            MATH_CONTROL_WORD@89..93 "\\end"
+            MATH_NAME_GROUP@93..102
+              MATH_GROUP_OPEN@93..94 "{"
+              MATH_WORD@94..101 "aligned"
+              MATH_GROUP_CLOSE@101..102 "}"
+        MATH_NEWLINE@102..103 "\n"
+      DISPLAY_MATH_MARKER@103..105 "$$"
+    NEWLINE@105..106 "\n"
+  BLANK_LINE@106..107
+    BLANK_LINE@106..107 "\n"
+  PARAGRAPH@107..138
+    TEXT@107..115 "Inline: "
+    INLINE_MATH@115..136
+      INLINE_MATH_MARKER@115..116 "$"
+      MATH_CONTENT@116..135
+        MATH_COMMAND@116..135
+          MATH_CONTROL_WORD@116..121 "\\text"
+          MATH_GROUP@121..135
+            MATH_GROUP_OPEN@121..122 "{"
+            MATH_WORD@122..123 "("
+            MATH_CONTROL_SYMBOL@123..125 "\\#"
+            MATH_WORD@125..134 "eq:group)"
+            MATH_GROUP_CLOSE@134..135 "}"
+      INLINE_MATH_MARKER@135..136 "$"
+    TEXT@136..137 "."
+    NEWLINE@137..138 "\n"
+  BLANK_LINE@138..139
+    BLANK_LINE@138..139 "\n"
+  PARAGRAPH@139..168
+    DISPLAY_MATH@139..167
+      DISPLAY_MATH_MARKER@139..141 "$$"
+      MATH_CONTENT@141..165
+        MATH_NEWLINE@141..142 "\n"
+        MATH_WORD@142..143 "z"
+        MATH_SPACE@143..144 " "
+        MATH_COMMENT@144..164 "% see (\\#eq:comment)"
+        MATH_NEWLINE@164..165 "\n"
+      DISPLAY_MATH_MARKER@165..167 "$$"
+    NEWLINE@167..168 "\n"
+  BLANK_LINE@168..169
+    BLANK_LINE@168..169 "\n"
+  PARAGRAPH@169..188
+    DISPLAY_MATH@169..187
+      DISPLAY_MATH_MARKER@169..171 "$$"
+      MATH_CONTENT@171..174
+        MATH_NEWLINE@171..172 "\n"
+        MATH_WORD@172..173 "w"
+        MATH_SPACE@173..174 " "
+      MATH_EQUATION_LABEL@174..184 "(\\#eq:top)"
+      MATH_CONTENT@184..185
+        MATH_NEWLINE@184..185 "\n"
+      DISPLAY_MATH_MARKER@185..187 "$$"
+    NEWLINE@187..188 "\n"

@@ -1,0 +1,17 @@
+A label only splits math content at the top level.
+
+$$
+\begin{aligned}
+x &= y (\#eq:env)
+\end{aligned}
+$$
+
+Inline: $\text{(\#eq:group)}$.
+
+$$
+z % see (\#eq:comment)
+$$
+
+$$
+w (\#eq:top)
+$$

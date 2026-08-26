@@ -564,11 +564,15 @@ mod tests {
             .collect()
     }
 
+    /// A star modifier is part of its command, never a break site. Nor is the
+    /// operator `*` in the last case: `\operatorname` is a large operator, so
+    /// TeX coerces the binary atom after it into a unary sign, and a unary sign
+    /// is not a break site either.
     #[test]
     fn starred_command_modifier_is_not_a_break_candidate() {
         assert!(spaced_operator_breaks(&elems("\\operatorname*{minimize} a")).is_empty());
         assert!(spaced_operator_breaks(&elems("\\operatorname*_i{x}")).is_empty());
-        assert!(!spaced_operator_breaks(&elems("\\operatorname_i*{x}")).is_empty());
+        assert!(spaced_operator_breaks(&elems("\\operatorname_i*{x}")).is_empty());
     }
 
     #[test]

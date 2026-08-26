@@ -706,6 +706,10 @@ mod tests {
         assert_idempotent(input, MathContext::Display);
     }
 
+    /// A `*` separated from its command by a script is an operator atom, not a
+    /// modifier, so it stays where it was written rather than migrating back
+    /// onto the command. It prints tight because `\operatorname` is a large
+    /// operator, and TeX coerces a binary atom after one into a unary sign.
     #[test]
     fn star_modifier_does_not_cross_a_script() {
         assert_eq!(
@@ -714,18 +718,18 @@ mod tests {
         );
         assert_eq!(
             fmt(r"\operatorname_i*{x}", MathContext::Inline),
-            r"\operatorname_i * {x}"
+            r"\operatorname_i*{x}"
         );
     }
 
     #[test]
-    fn inline_unary_spacing_respects_the_migration_slice() {
+    fn inline_keeps_unary_operators_tight() {
         assert_eq!(fmt("-x", MathContext::Inline), "-x");
-        assert_eq!(fmt("- x", MathContext::Inline), "- x");
+        assert_eq!(fmt("- x", MathContext::Inline), "-x");
         assert_eq!(fmt("f(-x)", MathContext::Inline), "f(-x)");
-        assert_eq!(fmt("f( - x)", MathContext::Inline), "f( - x)");
-        assert_eq!(fmt("x = - y", MathContext::Inline), "x = - y");
-        assert_eq!(fmt("e^{- t}", MathContext::Inline), "e^{- t}");
+        assert_eq!(fmt("f( - x)", MathContext::Inline), "f(-x)");
+        assert_eq!(fmt("x = - y", MathContext::Inline), "x = -y");
+        assert_eq!(fmt("e^{- t}", MathContext::Inline), "e^{-t}");
         assert_eq!(fmt("a - -b", MathContext::Inline), "a - -b");
         assert_eq!(fmt("a--b", MathContext::Inline), "a - -b");
         for case in [

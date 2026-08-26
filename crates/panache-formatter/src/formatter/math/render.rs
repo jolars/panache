@@ -70,37 +70,65 @@ fn render_environment_body(
             lower::try_lower_environment_content(&content, &opts.signature_scope)
         })
     {
-        return Printer::new(opts.line_width, INDENT.len()).print(&document, INDENT.len());
+        return trimmed_body(
+            &Printer::new(opts.line_width, INDENT.len()),
+            &document,
+            INDENT.len(),
+        );
     }
 
     render_body_lines(elements, 1, opts).join("\n")
 }
 
+/// Inline math shares its line with the host paragraph or table cell, so a
+/// lowered body is printed flat: a newline here would end the paragraph or
+/// split the cell across rows. The exception is a body carrying a `%` comment,
+/// which runs to end of line and therefore keeps its hard breaks.
 fn render_inline_content(
     tree: &SyntaxNode,
     elements: &[SyntaxElement],
     opts: &MathFormatOptions,
 ) -> String {
+    let printer = Printer::new(opts.line_width, INDENT.len());
+    let keeps_breaks = tree
+        .descendants_with_tokens()
+        .any(|element| element.kind() == SyntaxKind::MATH_COMMENT);
+    let print = |document: &Ir| {
+        if keeps_breaks {
+            printer.print(document, 0)
+        } else {
+            printer.print_flat(document).trim().to_string()
+        }
+    };
+
     if let Some(document) = MathContent::cast(tree.clone())
         .and_then(|content| lower::try_lower_delimited_environment(&content, opts))
     {
-        return Printer::new(opts.line_width, INDENT.len()).print(&document, 0);
+        return print(&document);
     }
     if elements.iter().any(contains_environment) {
         let semantic = expand_word_elements(elements);
         if let Some(document) = mixed_segment_doc(&semantic, opts, false) {
-            return Printer::new(opts.line_width, INDENT.len()).print(&document, 0);
+            return print(&document);
         }
     }
     if let Some(document) = MathContent::cast(tree.clone())
         .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
     {
-        Printer::new(opts.line_width, INDENT.len()).print_flat(&document)
+        print(&document)
     } else {
         render_inline(elements, &opts.signature_scope)
             .trim()
             .to_string()
     }
+}
+
+/// Print a delimited body without its own trailing break. A body that ends in
+/// a comment or a `\\` row lowers to a trailing hard line so nothing follows it
+/// on that line; the caller already puts the closing delimiter on a line of its
+/// own, so keeping the break would leave a blank line between them.
+fn trimmed_body(printer: &Printer, document: &Ir, indent: usize) -> String {
+    printer.print(document, indent).trim_end().to_string()
 }
 
 fn render_display(tree: &SyntaxNode, top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
@@ -135,7 +163,11 @@ fn render_display(tree: &SyntaxNode, top: &[SyntaxElement], opts: &MathFormatOpt
         && let Some(document) = MathContent::cast(tree.clone())
             .and_then(|content| lower::try_lower_content(&content, &opts.signature_scope))
     {
-        return Printer::new(opts.line_width, INDENT.len()).print(&document, opts.math_indent);
+        return trimmed_body(
+            &Printer::new(opts.line_width, INDENT.len()),
+            &document,
+            opts.math_indent,
+        );
     }
 
     if has_mixed_environment_content(top) {
@@ -1353,8 +1385,9 @@ fn flatten_element(element: &SyntaxElement, scope: &SignatureScope, out: &mut Ve
                 }
             }
         }
+        // Star-modifier handling lives in the `MATH_COMMAND` arm above; only a
+        // command node owns a `*` that is a modifier rather than an operator.
         NodeOrToken::Node(node) => {
-            let is_command = node.kind() == SyntaxKind::MATH_COMMAND;
             let is_script = matches!(
                 node.kind(),
                 SyntaxKind::MATH_SUBSCRIPT | SyntaxKind::MATH_SUPERSCRIPT
@@ -1363,15 +1396,7 @@ fn flatten_element(element: &SyntaxElement, scope: &SignatureScope, out: &mut Ve
                 out.push(FlatToken::ScriptStart);
             }
             for child in node.children_with_tokens() {
-                if is_command
-                    && child.as_token().is_some_and(|token| {
-                        token.kind() == SyntaxKind::MATH_WORD && token.text() == "*"
-                    })
-                {
-                    out.push(FlatToken::CommandStar("*".to_string()));
-                } else {
-                    flatten_element(&child, scope, out);
-                }
+                flatten_element(&child, scope, out);
             }
             if is_script {
                 out.push(FlatToken::ScriptEnd);
@@ -1402,7 +1427,8 @@ fn severed_relation_head(atom: &operators::WordAtom, next: Option<&FlatToken>) -
     };
     match atom.class {
         // A definition colon fuses only with a following definition relation.
-        AtomClass::Ord => {
+        // A bare colon run is punctuation; `:=` is already a relation.
+        AtomClass::Punct => {
             atom.text.chars().all(|character| character == ':')
                 && operators::word_atoms(next_text)
                     .next()

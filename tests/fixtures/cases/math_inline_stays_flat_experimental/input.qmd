@@ -1,0 +1,6 @@
+Inline math shares the host line, so it never breaks: $a \\ b$ and
+$\begin{pmatrix}a & b \\ c & d\end{pmatrix}$.
+
+| $\begin{pmatrix}a & b \\ c & d\end{pmatrix}$ | $a \\ b$ |
+|---|---|
+| x | y |

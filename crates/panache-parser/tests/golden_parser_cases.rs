@@ -218,6 +218,7 @@ golden_test_cases!(
     bracketed_spans,
     bookdown,
     bookdown_math_labels_host,
+    bookdown_math_labels_nested,
     chunk_options_complex,
     code_blocks_executable,
     code_blocks_executable_with_classes,

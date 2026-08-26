@@ -206,7 +206,8 @@ fn lower_authored_breaks(
             return None;
         }
 
-        let authored_space = row.last().is_some_and(is_layout_trivia);
+        let authored_space = row.iter().any(|element| !is_layout_trivia(element))
+            && row.last().is_some_and(is_layout_trivia);
         let row_atoms = if environment_rows {
             semantic_math_atoms_in(row.iter().cloned()).collect()
         } else {
@@ -221,16 +222,18 @@ fn lower_authored_breaks(
             preserve_comment_context,
             environment_rows,
         )?;
-        let adjacent_comment = environment_rows
+        // Look past the trivia after the marker for a comment on the same
+        // logical row, buffering it rather than cloning the whole iterator.
+        let mut skipped = Vec::new();
+        while environment_rows && elements.peek().is_some_and(is_layout_trivia) {
+            skipped.push(elements.next().expect("peeked element"));
+        }
+        let adjacent_comment = if environment_rows
             && elements
-                .clone()
-                .find(|element| !is_layout_trivia(element))
-                .is_some_and(|element| element.kind() == SyntaxKind::MATH_COMMENT);
-        let adjacent_comment = if adjacent_comment {
-            while elements.peek().is_some_and(is_layout_trivia) {
-                elements.next();
-            }
-            let comment = elements.next()?;
+                .peek()
+                .is_some_and(|element| element.kind() == SyntaxKind::MATH_COMMENT)
+        {
+            let comment = elements.next().expect("peeked comment");
             if elements
                 .peek()
                 .is_some_and(|element| element.kind() == SyntaxKind::MATH_NEWLINE)
@@ -239,6 +242,8 @@ fn lower_authored_breaks(
             }
             Some(comment.to_string())
         } else {
+            // No comment followed, so the trivia opens the next row.
+            row.extend(skipped);
             None
         };
         rows.push(AuthoredRow {
@@ -269,6 +274,16 @@ fn lower_authored_breaks(
         adjacent_comment: None,
     });
 
+    // A final row with no content of its own would otherwise leave a trailing
+    // hard break, printing as a blank line before the closing delimiter.
+    if rows.len() > 1
+        && rows
+            .last()
+            .is_some_and(|row| row.marker.is_none() && matches!(row.document, Ir::Nil))
+    {
+        rows.pop();
+    }
+
     let max_row_width = if environment_rows {
         rows.iter()
             .filter_map(|row| row.document.flat_width())
@@ -278,7 +293,8 @@ fn lower_authored_breaks(
         0
     };
     let mut documents = Vec::new();
-    for row in rows {
+    let row_count = rows.len();
+    for (index, row) in rows.into_iter().enumerate() {
         let row_width = row.document.flat_width();
         documents.push(row.document);
         let Some(marker) = row.marker else {
@@ -294,7 +310,9 @@ fn lower_authored_breaks(
         if let Some(comment) = row.adjacent_comment {
             documents.extend([Ir::text(" "), Ir::verbatim(comment)]);
         }
-        documents.push(Ir::HardLine);
+        if index + 1 < row_count {
+            documents.push(Ir::HardLine);
+        }
     }
     Some(Ir::concat(documents))
 }
@@ -440,6 +458,9 @@ fn lower_edge_comments(
             }
         }
         documents.push(Ir::verbatim(comment.to_string()));
+        // A comment runs to end of line, so anything the caller emits after
+        // this body -- a closing brace, `\end`, the next segment -- has to
+        // start on a new line.
         if index + 1 < elements.len() {
             documents.push(Ir::HardLine);
         }
@@ -528,6 +549,7 @@ fn lower_elements_with_atoms(
         pieces.push(Piece {
             role: Role::from(atom.break_priority),
             delimiter: atom.delimiter,
+            unary: atom.coerced_unary,
             authored_space_before: previous_end.is_some_and(|end| end < atom.range.start()),
             slash: atom_document.slash,
             control_word_operator: atom_document.control_word_operator,
@@ -1001,6 +1023,9 @@ fn matched_math_arguments(
 struct Piece {
     role: Role,
     delimiter: Option<DelimiterRole>,
+    /// A `+`/`-` that TeX coerced to a unary sign. It binds to the operand
+    /// beside it, so it strips the authored space on either side.
+    unary: bool,
     authored_space_before: bool,
     slash: bool,
     control_word_operator: bool,
@@ -1026,17 +1051,25 @@ fn gap_before(pieces: &[Piece], index: usize, spacing: Spacing) -> bool {
         return true;
     }
 
+    // A binary operator or relation always wins its space, even next to a
+    // unary sign (`a - -b`); otherwise a unary sign strips the authored space
+    // it would have kept as an ordinary atom (`f( - x)` -> `f(-x)`).
+    let tight = previous.unary || current.unary;
+
     match spacing {
         Spacing::Normal => {
-            current.role != Role::Operand
-                || previous.role != Role::Operand
-                || current.authored_space_before
+            if current.role != Role::Operand || previous.role != Role::Operand {
+                true
+            } else {
+                !tight && current.authored_space_before
+            }
         }
         Spacing::Script => {
             current.control_word_operator
                 || previous.control_word_operator
                 || current.role == Role::Operand
                     && previous.role == Role::Operand
+                    && !tight
                     && current.authored_space_before
                     && !touches_delimiter(previous, current)
         }
@@ -1093,8 +1126,13 @@ fn element_boundary_token(element: &SyntaxElement, first: bool) -> Option<Syntax
     }
 }
 
+/// Whether `character` could extend a preceding control word, forcing a space
+/// between them. The parser's control-word alphabet is `[A-Za-z@]`; non-ASCII
+/// letters stay included here because gluing a command to a following Greek
+/// letter reads as one word even though the parser would still split it.
+/// Catcode-12 characters such as `:` and `_` never extend a control word.
 fn is_control_word_letter(character: char) -> bool {
-    character.is_alphabetic() || matches!(character, '@' | '_' | ':')
+    character.is_alphabetic() || character == '@'
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1149,9 +1187,12 @@ mod tests {
         .expect("math content root")
     }
 
+    /// Print with forced breaks intact — these tests assert the lowered layout,
+    /// including the hard lines that comments and `\\` rows introduce. Inline
+    /// math flattens them instead; see `Printer::print_flat`.
     fn lower(input: &str) -> Option<String> {
         try_lower_content(&content(input), &SignatureScope::default())
-            .map(|document| Printer::new(80, 2).print_flat(&document))
+            .map(|document| Printer::new(80, 2).print(&document, 0))
     }
 
     #[test]
@@ -1161,7 +1202,7 @@ mod tests {
             ("α+β", "α + β"),
             ("x=-y", "x = -y"),
             ("a--b", "a - -b"),
-            ("- x", "- x"),
+            ("- x", "-x"),
             ("a<=b", "a <= b"),
             ("a/ b", "a / b"),
             ("a /b", "a / b"),
@@ -1177,7 +1218,7 @@ mod tests {
         let cases = [
             ("{ a+b }", "{a + b}"),
             ("a+{b-c}", "a + {b - c}"),
-            ("a {- b}", "a {- b}"),
+            ("a {- b}", "a {-b}"),
             ("{{ α<=β }}", "{{α <= β}}"),
             ("{   }", "{}"),
         ];
@@ -1257,7 +1298,7 @@ mod tests {
             ("x^{a/ b}", "x^{a / b}"),
             (r"x^{\frac{a+b}{c-d}}", r"x^{\frac{a+b}{c-d}}"),
             (r"a\leq_i-b", r"a \leq_i -b"),
-            (r"e^{- t}", r"e^{- t}"),
+            (r"e^{- t}", r"e^{-t}"),
             (r"a: =_ib", r"a: =_i b"),
             (r"x< =_iy", r"x < =_i y"),
         ];

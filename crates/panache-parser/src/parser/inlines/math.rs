@@ -33,23 +33,64 @@ fn emit_math_content(builder: &mut impl InlineSink, content: &str, opts: MathPar
     let tex_opts = MathParseOptions {
         bookdown_equation_labels: false,
     };
+    let bytes = content.as_bytes();
     let mut segment_start = 0;
     let mut pos = 0;
+    // Only a label at the top level may split the content: splitting inside a
+    // group or an environment would leave each half unbalanced, and a label
+    // written inside a `%` comment is prose, not a definition.
+    let mut brace_depth = 0usize;
+    let mut environment_depth = 0usize;
     while pos < content.len() {
-        if content[pos..].starts_with('(')
-            && let Some((len, _)) = try_parse_bookdown_equation_definition(&content[pos..])
-        {
-            copy_green_node(
-                builder,
-                &parse_math_content(&content[segment_start..pos], tex_opts),
-            );
-            builder.token(
-                SyntaxKind::MATH_EQUATION_LABEL.into(),
-                &content[pos..pos + len],
-            );
-            pos += len;
-            segment_start = pos;
-            continue;
+        match bytes[pos] {
+            b'%' => {
+                pos = content[pos..]
+                    .find('\n')
+                    .map_or(content.len(), |offset| pos + offset + 1);
+                continue;
+            }
+            b'\\' => {
+                pos += match control_word_at(content, pos) {
+                    Some(name) => {
+                        match name {
+                            "begin" => environment_depth += 1,
+                            "end" => environment_depth = environment_depth.saturating_sub(1),
+                            _ => {}
+                        }
+                        1 + name.len()
+                    }
+                    // A control symbol escapes whatever character it carries,
+                    // so `\{`, `\}`, and `\%` are literal text.
+                    None => 1 + content[pos + 1..].chars().next().map_or(0, char::len_utf8),
+                };
+                continue;
+            }
+            b'{' => {
+                brace_depth += 1;
+                pos += 1;
+                continue;
+            }
+            b'}' => {
+                brace_depth = brace_depth.saturating_sub(1);
+                pos += 1;
+                continue;
+            }
+            b'(' if brace_depth == 0 && environment_depth == 0 => {
+                if let Some((len, _)) = try_parse_bookdown_equation_definition(&content[pos..]) {
+                    copy_green_node(
+                        builder,
+                        &parse_math_content(&content[segment_start..pos], tex_opts),
+                    );
+                    builder.token(
+                        SyntaxKind::MATH_EQUATION_LABEL.into(),
+                        &content[pos..pos + len],
+                    );
+                    pos += len;
+                    segment_start = pos;
+                    continue;
+                }
+            }
+            _ => {}
         }
         pos += content[pos..]
             .chars()
@@ -61,6 +102,17 @@ fn emit_math_content(builder: &mut impl InlineSink, content: &str, opts: MathPar
         builder,
         &parse_math_content(&content[segment_start..], tex_opts),
     );
+}
+
+/// The control-word name at `pos`, using the math parser's `[A-Za-z@]`
+/// alphabet. `None` for a control symbol such as `\\` or `\{`.
+fn control_word_at(text: &str, pos: usize) -> Option<&str> {
+    let after = text[pos..].strip_prefix('\\')?;
+    let len = after
+        .bytes()
+        .take_while(|byte| byte.is_ascii_alphabetic() || *byte == b'@')
+        .count();
+    (len > 0).then(|| &after[..len])
 }
 
 /// Derive math-content parse options from the parser config. Keeps the

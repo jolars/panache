@@ -416,9 +416,43 @@ fn sample_report_records() -> Vec<BaselineRecord> {
     ]
 }
 
+/// Whether `body` carries a TeX comment, which runs to end of line and so
+/// pins the break that follows it.
+fn has_tex_comment(body: &str) -> bool {
+    let mut escaped = false;
+    for character in body.chars() {
+        match character {
+            '\\' => escaped = !escaped,
+            '%' if !escaped => return true,
+            _ => escaped = false,
+        }
+    }
+    false
+}
+
+/// Join the lines of a Badness inline body the way Panache prints them.
+///
+/// Badness formats LaTeX, where a newline inside `$...$` costs nothing. Panache
+/// emits inline math into a Markdown line -- a paragraph, or a table cell whose
+/// row ends at the newline -- so it prints inline bodies flat and drops the
+/// layout indent of each joined line. Display and environment contexts compare
+/// byte for byte, as does an inline body whose comment pins its breaks.
+fn flatten_inline(body: &str) -> String {
+    body.split('\n')
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn assert_formatter_parity(body: &str, context: OracleContext) {
     let badness =
         badness_body(body, context).unwrap_or_else(|error| panic!("{error}; body: {body:?}"));
+    let badness = if context == OracleContext::Inline && !has_tex_comment(body) {
+        flatten_inline(&badness)
+    } else {
+        badness
+    };
     let panache =
         panache_body(body, context).unwrap_or_else(|error| panic!("{error}; body: {body:?}"));
     assert_eq!(
@@ -469,7 +503,7 @@ fn flat_inline_migration_slice_matches_badness() {
 
 #[test]
 fn flat_inline_edge_cases_match_badness() {
-    for body in ["- x", "x = - y", "f( - x)", "a/b", "a/ b", "a /b"] {
+    for body in ["a/b", "a/ b", "a /b"] {
         assert_formatter_parity(body, OracleContext::Inline);
     }
 }
@@ -490,6 +524,25 @@ fn composite_relations_match_badness() {
     }
 }
 
+/// Badness keeps whatever space the author wrote around a coerced unary sign.
+/// Panache strips it, so a unary sign always binds to its operand -- the
+/// behavior `docs/guide/formatting.qmd` documents (`x = -y`, `f(-x)`).
+#[test]
+fn panache_tightens_unary_signs_where_badness_keeps_author_space() {
+    for (body, expected) in [
+        ("- x", "-x"),
+        ("x = - y", "x = -y"),
+        ("f( - x)", "f(-x)"),
+        ("a {- b}", "a {-b}"),
+        ("e^{- t}", "e^{-t}"),
+    ] {
+        let panache = panache_body(body, OracleContext::Inline).expect("Panache formatter");
+        let badness = badness_body(body, OracleContext::Inline).expect("Badness formatter");
+        assert_eq!(panache, expected, "{body:?}");
+        assert_ne!(panache, badness, "{body:?}");
+    }
+}
+
 #[test]
 fn panache_preserves_scripted_composite_relations_where_badness_splits_them() {
     for (body, expected) in [
@@ -506,7 +559,7 @@ fn panache_preserves_scripted_composite_relations_where_badness_splits_them() {
 
 #[test]
 fn ordinary_group_migration_slice_matches_badness() {
-    for body in ["{ a+b }", "a+{b-c}", "a {- b}", "{{ α<=β }}", "{   }"] {
+    for body in ["{ a+b }", "a+{b-c}", "{{ α<=β }}", "{   }"] {
         assert_formatter_parity(body, OracleContext::Inline);
     }
 }
@@ -565,7 +618,6 @@ fn script_migration_slice_matches_badness() {
         "x^{a/ b}",
         r"x^{\frac{a+b}{c-d}}",
         r"a\leq_i-b",
-        r"e^{- t}",
     ] {
         assert_formatter_parity(body, OracleContext::Inline);
     }
