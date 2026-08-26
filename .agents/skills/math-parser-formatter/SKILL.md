@@ -5,8 +5,9 @@ description: Advance Panache's math parser and formatter one bounded phase at a
   Badness parity, math formatting, or the next math-roadmap task.
 ---
 
-This is a multi-session effort. All source paths below
-are relative to the repository root.
+This is a multi-session effort. Project source paths below are relative to the
+repository root. Skill resources linked from this file are relative to this
+`SKILL.md` file.
 
 ## Scope boundaries
 
@@ -71,8 +72,10 @@ root `AGENTS.md`.
 ## Session workflow
 
 1. Read the repository roadmap at `TODO.md` in the root. Follow its checkboxes
-   for the authoritative sequence, then read `RECAP.md` for the latest completed
-   slice and suggested next sub-targets.
+   for the authoritative sequence, then read the skill-local
+   [RECAP.md](RECAP.md) for the latest completed slice and suggested next
+   sub-targets. Resolve that link relative to this `SKILL.md`, not the
+   repository root.
 2. Pick one bounded sub-task. If the roadmap, recap, and repository disagree,
    verify the implementation and correct the stale document before proceeding.
 3. TDD: add the failing test first (parser golden / formatter golden / unit).
