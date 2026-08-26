@@ -37,6 +37,15 @@ fn render_environment_body(
     elements: &[SyntaxElement],
     opts: &MathFormatOptions,
 ) -> String {
+    if let Some(document) = MathContent::cast(tree.clone())
+        .and_then(|content| lower::try_lower_delimited_environment(&content, opts))
+    {
+        let mut output = Printer::new(opts.line_width, INDENT.len()).print(&document, INDENT.len());
+        if ends_in_math_newline(elements) {
+            output.push('\n');
+        }
+        return output;
+    }
     let has_comment = tree
         .descendants_with_tokens()
         .any(|element| element.kind() == SyntaxKind::MATH_COMMENT);
@@ -72,6 +81,11 @@ fn render_inline_content(
     elements: &[SyntaxElement],
     opts: &MathFormatOptions,
 ) -> String {
+    if let Some(document) = MathContent::cast(tree.clone())
+        .and_then(|content| lower::try_lower_delimited_environment(&content, opts))
+    {
+        return Printer::new(opts.line_width, INDENT.len()).print(&document, 0);
+    }
     if elements.iter().any(contains_environment) {
         let semantic = expand_word_elements(elements);
         if let Some(document) = mixed_segment_doc(&semantic, opts, false) {
@@ -90,6 +104,16 @@ fn render_inline_content(
 }
 
 fn render_display(tree: &SyntaxNode, top: &[SyntaxElement], opts: &MathFormatOptions) -> String {
+    if let Some(document) = MathContent::cast(tree.clone())
+        .and_then(|content| lower::try_lower_delimited_environment(&content, opts))
+    {
+        let mut output =
+            Printer::new(opts.line_width, INDENT.len()).print(&document, opts.math_indent);
+        if ends_in_math_newline(top) {
+            output.push('\n');
+        }
+        return output;
+    }
     let has_comment = tree
         .descendants_with_tokens()
         .any(|element| element.kind() == SyntaxKind::MATH_COMMENT);
@@ -158,6 +182,12 @@ fn render_display(tree: &SyntaxNode, top: &[SyntaxElement], opts: &MathFormatOpt
         &mut lines,
     );
     lines.join("\n")
+}
+
+fn ends_in_math_newline(elements: &[SyntaxElement]) -> bool {
+    elements
+        .last()
+        .is_some_and(|element| element.kind() == SyntaxKind::MATH_NEWLINE)
 }
 
 /// Split each top-level multi-atom `MATH_WORD` token into one token per
@@ -642,6 +672,21 @@ fn render_environment_lines(
     lines.extend(render_body_lines(&parts.body, depth + 1, opts));
     lines.push(format!("{indent}{}", parts.end_line));
     lines
+}
+
+pub(super) fn environment_document(
+    environment: &SyntaxNode,
+    opts: &MathFormatOptions,
+) -> Option<Ir> {
+    if !is_well_formed_environment(environment) {
+        return None;
+    }
+    Some(Ir::join(
+        Ir::HardLine,
+        render_environment_lines(environment, 0, opts)
+            .into_iter()
+            .map(Ir::text),
+    ))
 }
 
 struct EnvParts {

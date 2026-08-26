@@ -857,6 +857,23 @@ fn embedded_environment_migration_slice_matches_badness() {
 }
 
 #[test]
+fn delimited_environment_migration_slice_matches_badness() {
+    let id = "environments/nested/delimited_matrix.tex";
+    let body = fs::read_to_string(corpus_root().join(id))
+        .unwrap_or_else(|error| panic!("failed to read `{id}`: {error}"));
+
+    for context in OracleContext::ALL {
+        assert_formatter_parity(&body, context);
+        let once = panache_body(&body, context).expect("first Panache pass");
+        let twice = panache_body(&once, context).expect("second Panache pass");
+        assert_eq!(
+            once, twice,
+            "delimited environment is not idempotent in {context:?}"
+        );
+    }
+}
+
+#[test]
 fn malformed_embedded_environment_stays_on_compatibility_path() {
     let body = r"\begin {aligned}x\end {aligned}";
     assert_eq!(

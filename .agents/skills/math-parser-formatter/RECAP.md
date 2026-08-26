@@ -45,27 +45,27 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Inline embedded environments.** Routed supported standalone and mixed inline
-environments through the compositional environment-row document path instead of
-flattening them through the compatibility renderer.
+**Environment nested inside structured delimiters.** Composed the existing
+environment-row document inside the typed `MATH_DELIMITED` lowering for the
+shared `environments/nested/delimited_matrix.tex` case.
 
-- Mandatory byte parity and second-pass idempotency now cover all 15 supported
-  inline environment corpus cases, plus top-level mixed and ordinary-delimiter
-  rows.
-- Inline continuation lines return to the math body's base column, matching
-  Badness; display mixed environments retain their existing hanging layout.
-- Environment delimiters must be closed, matched, and trivia-free before this
-  path is selected. Malformed delimiter shapes remain byte-preserved on the
-  compatibility path.
-- The regenerated 107-case report improves from 80 to 95 parity runs and from
-  226 to 211 divergences; all 15 changes are inline environment promotions.
+- Mandatory byte parity and second-pass idempotency now cover the case in
+  inline, display, and environment contexts.
+- The matrix body hangs from the `\left` delimiter's opening width while its
+  `\begin` remains on the opening line and `\end` returns to the same column.
+- Selection remains narrow: the delimiter must be closed, its body must contain
+  exactly one well-formed environment plus layout trivia, and mixed or malformed
+  shapes remain on the compatibility paths.
+- Display and environment contexts retain an authored final math newline;
+  inline context flattens it, matching the controlled Badness wrappers.
+- The regenerated 107-case report improves from 95 to 98 parity runs and from
+  211 to 208 divergences; all three changes promote the delimited matrix case.
 
 ### Suggested next sub-targets
 
-1. Lower an environment nested inside a structured `\left`/`\right` body; the
-   shared `environments/nested/delimited_matrix.tex` case remains outside this
-   slice.
-2. Add typed relation-chain continuation alignment, then retire the display
+1. Add typed relation-chain continuation alignment, then retire the display
    authored-break compatibility path for supported chains.
+2. Expand structured-delimiter environment lowering to mixed bodies only when a
+   representative oracle case can pin the spacing and break policy.
 3. Expand grid-comment parity to rows combining multiple multiline cells if a
    motivating corpus case appears.

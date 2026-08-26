@@ -8,11 +8,12 @@ use rowan::TextRange;
 use rowan::ast::AstNode;
 
 use crate::syntax::{
-    MathArgument, MathCommand, MathContent, MathDelimited, MathGroup, MathLineBreak, MathScript,
-    MathScripted, SyntaxElement, SyntaxKind, SyntaxToken,
+    MathArgument, MathCommand, MathContent, MathDelimited, MathEnvironment, MathGroup,
+    MathLineBreak, MathScript, MathScripted, SyntaxElement, SyntaxKind, SyntaxToken,
 };
 
 use super::ir::Ir;
+use super::{MathFormatOptions, render};
 
 /// Lower a supported math content body into the shared document IR.
 ///
@@ -26,6 +27,51 @@ pub(super) fn try_lower_content(content: &MathContent, scope: &SignatureScope) -
         true,
         false,
     )
+}
+
+/// Lower a closed paired delimiter whose body is one well-formed environment.
+///
+/// This stays separate from ordinary atom lowering until environments become
+/// first-class typed atom documents. The narrow shape lets the existing
+/// environment-grid document compose without admitting mixed or malformed
+/// delimiter bodies.
+pub(super) fn try_lower_delimited_environment(
+    content: &MathContent,
+    opts: &MathFormatOptions,
+) -> Option<Ir> {
+    let mut top = content
+        .elements()
+        .filter(|element| !is_layout_trivia(element));
+    let delimited = top.next()?.into_node().and_then(MathDelimited::cast)?;
+    if top.next().is_some() {
+        return None;
+    }
+
+    let left = delimited.left_token()?;
+    let open = delimited.opening_delimiter()?;
+    let body = delimited.body()?;
+    let right = delimited.right_token()?;
+    let close = delimited.closing_delimiter()?;
+    let mut body_elements = body.elements().filter(|element| !is_layout_trivia(element));
+    let environment = body_elements
+        .next()?
+        .into_node()
+        .and_then(MathEnvironment::cast)?;
+    if body_elements.next().is_some() {
+        return None;
+    }
+
+    let environment = render::environment_document(environment.syntax(), opts)?;
+    let opening_width = left.text().chars().count() + open.text().chars().count();
+    Some(Ir::concat([
+        Ir::verbatim(left.text()),
+        Ir::verbatim(open.text()),
+        Ir::text(" "),
+        Ir::align(opening_width + 1, environment),
+        Ir::text(" "),
+        Ir::verbatim(right.text()),
+        Ir::verbatim(close.text()),
+    ]))
 }
 
 /// Lower an environment body, where Badness canonicalizes a space before each

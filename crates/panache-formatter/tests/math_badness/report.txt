@@ -3,9 +3,9 @@ Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
 Cases: 107
 Context runs: 321
-Parity: 95 / 321
+Parity: 98 / 321
 Controlled wrapper rejection: 15 / 321
-Divergent: 211 / 321
+Divergent: 208 / 321
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,9 +15,9 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 93, rejected 5, divergent 9
-display: parity 1, rejected 5, divergent 101
-environment: parity 1, rejected 5, divergent 101
+inline: parity 94, rejected 5, divergent 8
+display: parity 2, rejected 5, divergent 100
+environment: parity 2, rejected 5, divergent 100
 
 === First-slice parity candidates ===
 display/authored_newline.tex [inline]
@@ -84,6 +84,9 @@ environments/matrix/bmatrix.tex [inline]
 environments/matrix/plain.tex [inline]
 environments/matrix/pmatrix.tex [inline]
 environments/matrix/three_by_three.tex [inline]
+environments/nested/delimited_matrix.tex [inline]
+environments/nested/delimited_matrix.tex [display]
+environments/nested/delimited_matrix.tex [environment]
 environments/recovery/nested.tex [inline]
 escapes/escaped_brace.tex [inline]
 escapes/escaped_dollar.tex [inline]
@@ -759,21 +762,6 @@ Panache: "\\begin{matrix}\n  1 & 2 & 3 \\\\\n  4 & 5 & 6 \\\\\n  7 & 8 & 9\n\\en
 Input: "\\begin{matrix}\n1 & 2 & 3 \\\\\n4 & 5 & 6 \\\\\n7 & 8 & 9\n\\end{matrix}\n"
 Badness: "  \\begin{matrix}\n    1 & 2 & 3 \\\\\n    4 & 5 & 6 \\\\\n    7 & 8 & 9\n  \\end{matrix}\n"
 Panache: "  \\begin{matrix}\n    1 & 2 & 3 \\\\\n    4 & 5 & 6 \\\\\n    7 & 8 & 9\n  \\end{matrix}"
-
---- environments/nested/delimited_matrix.tex [inline] ---
-Input: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)\n"
-Badness: "\\left( \\begin{matrix}\n         a & b \\\\\n         c & d\n       \\end{matrix} \\right)"
-Panache: "\\left( \\begin{matrix} a & b \\\\ c & d \\end{matrix} \\right)"
-
---- environments/nested/delimited_matrix.tex [display] ---
-Input: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)\n"
-Badness: "  \\left( \\begin{matrix}\n           a & b \\\\\n           c & d\n         \\end{matrix} \\right)\n"
-Panache: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)"
-
---- environments/nested/delimited_matrix.tex [environment] ---
-Input: "\\left(\n\\begin{matrix}\na & b \\\\\nc & d\n\\end{matrix}\n\\right)\n"
-Badness: "  \\left( \\begin{matrix}\n           a & b \\\\\n           c & d\n         \\end{matrix} \\right)\n"
-Panache: "  \\left( \\begin{matrix} a & b \\\\ c & d \\end{matrix} \\right)"
 
 --- environments/recovery/comment_before_name.tex [inline] ---
 Input: "\\begin% opener\n{aligned}x\\end% closer\n{aligned}\n"
