@@ -8,8 +8,8 @@ use rowan::TextRange;
 use rowan::ast::AstNode;
 
 use crate::syntax::{
-    MathArgument, MathCommand, MathContent, MathDelimited, MathGroup, MathScript, MathScripted,
-    SyntaxElement, SyntaxKind, SyntaxToken,
+    MathArgument, MathCommand, MathContent, MathDelimited, MathGroup, MathLineBreak, MathScript,
+    MathScripted, SyntaxElement, SyntaxKind, SyntaxToken,
 };
 
 use super::ir::Ir;
@@ -28,14 +28,76 @@ fn lower_body(
     scope: &SignatureScope,
     spacing: Spacing,
 ) -> Option<Ir> {
+    // A row break changes layout, but Badness retains the preceding atom when
+    // assigning the following operator's contextual role.
+    let semantic_atoms = semantic_math_atoms_in(elements.iter().cloned()).collect::<Vec<_>>();
+    if elements
+        .iter()
+        .any(|element| element.kind() == SyntaxKind::MATH_LINE_BREAK)
+    {
+        lower_authored_breaks(elements, semantic_atoms, scope, spacing)
+    } else {
+        lower_body_with_atoms(elements, semantic_atoms, scope, spacing)
+    }
+}
+
+fn lower_body_with_atoms(
+    elements: Vec<SyntaxElement>,
+    semantic_atoms: Vec<SemanticMathAtom>,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
     if elements
         .iter()
         .any(|element| element.kind() == SyntaxKind::MATH_COMMENT)
     {
-        lower_edge_comments(elements, scope, spacing)
+        lower_edge_comments(elements, semantic_atoms, scope, spacing)
     } else {
-        lower_elements(elements, scope, spacing)
+        lower_elements_with_atoms(elements, semantic_atoms, scope, spacing)
     }
+}
+
+fn lower_authored_breaks(
+    elements: Vec<SyntaxElement>,
+    semantic_atoms: Vec<SemanticMathAtom>,
+    scope: &SignatureScope,
+    spacing: Spacing,
+) -> Option<Ir> {
+    let mut documents = Vec::new();
+    let mut row = Vec::new();
+
+    for element in elements {
+        if element.kind() != SyntaxKind::MATH_LINE_BREAK {
+            row.push(element);
+            continue;
+        }
+
+        let line_break = element.into_node().and_then(MathLineBreak::cast)?;
+        if line_break.marker_token().as_ref().map(SyntaxToken::text) != Some(r"\\")
+            || line_break
+                .modifier()
+                .is_some_and(|modifier| !modifier.is_closed())
+        {
+            return None;
+        }
+
+        let authored_space = row.last().is_some_and(is_layout_trivia);
+        let row_atoms = semantic_atoms_for(&row, &semantic_atoms);
+        documents.push(lower_body_with_atoms(
+            std::mem::take(&mut row),
+            row_atoms,
+            scope,
+            spacing,
+        )?);
+        if authored_space {
+            documents.push(Ir::text(" "));
+        }
+        documents.extend([Ir::verbatim(line_break.syntax().to_string()), Ir::HardLine]);
+    }
+
+    let row_atoms = semantic_atoms_for(&row, &semantic_atoms);
+    documents.push(lower_body_with_atoms(row, row_atoms, scope, spacing)?);
+    Some(Ir::concat(documents))
 }
 
 /// Badness indents a comment-broken body by one column per bracket level,
@@ -51,12 +113,10 @@ fn hanging(width: usize, body: Ir) -> Ir {
 
 fn lower_edge_comments(
     elements: Vec<SyntaxElement>,
+    semantic_atoms: Vec<SemanticMathAtom>,
     scope: &SignatureScope,
     spacing: Spacing,
 ) -> Option<Ir> {
-    // Sequence once before splitting at comments so a following sign retains
-    // the operand, binary, or relation context authored before the hard break.
-    let semantic_atoms = semantic_math_atoms_in(elements.iter().cloned()).collect::<Vec<_>>();
     let mut documents = Vec::new();
     let mut segment_start = 0;
     for (index, comment) in elements.iter().enumerate() {
@@ -272,6 +332,12 @@ fn is_supported_element(element: &SyntaxElement, scope: &SignatureScope) -> bool
                     .is_some_and(|delimited| delimited_is_supported(&delimited, scope))
                 || MathScripted::cast(node.clone())
                     .is_some_and(|scripted| scripted_is_supported(&scripted, scope))
+                || MathLineBreak::cast(node.clone()).is_some_and(|line_break| {
+                    line_break.marker_token().as_ref().map(SyntaxToken::text) == Some(r"\\")
+                        && line_break
+                            .modifier()
+                            .is_none_or(|modifier| modifier.is_closed())
+                })
         }
     }
 }
@@ -1022,6 +1088,48 @@ mod tests {
     }
 
     #[test]
+    fn lowers_authored_line_breaks() {
+        let cases = [
+            ("a\\\\b", "a\\\\\nb"),
+            ("a \\\\*[2ex]\n-b", "a \\\\*[2ex]\n- b"),
+            ("a+b\\\\c-d", "a + b\\\\\nc - d"),
+            ("{a+b\\\\c-d}", "{a + b\\\\\n c - d}"),
+            ("\\frac{a+b\\\\c-d}{e}", "\\frac{a + b\\\\\n c - d}{e}"),
+            (
+                "\\left( a+b\\\\c-d \\right)",
+                "\\left( a + b\\\\\n       c - d \\right)",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(lower(input).as_deref(), Some(expected), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn lowers_comments_after_authored_line_breaks() {
+        let input = "a \\\\ % first row\nb";
+        assert_eq!(lower(input).as_deref(), Some("a \\\\\n% first row\nb"));
+    }
+
+    #[test]
+    fn authored_line_break_lowering_is_idempotent() {
+        for input in [
+            "a\\\\b",
+            "a \\\\*[2ex]\n-b",
+            "a+b\\\\c-d",
+            "{a+b\\\\c-d}",
+            "\\frac{a+b\\\\c-d}{e}",
+            "\\left( a+b\\\\c-d \\right)",
+            "a \\\\ % first row\nb",
+        ] {
+            let once = lower(input).expect("supported authored line break");
+            let twice = lower(&once).expect("formatted authored line break");
+            assert_eq!(once, twice, "not idempotent: {input:?}");
+        }
+    }
+
+    #[test]
     fn rejects_malformed_and_unsupported_scripts() {
         for input in [
             "x^",
@@ -1080,7 +1188,7 @@ mod tests {
             "x:=y",
             "a::=b",
             "a+b\n% own line",
-            r"a\\b",
+            r"a\\[1ex",
             "a&b",
             r"\begin{matrix}x\end{matrix}",
         ];

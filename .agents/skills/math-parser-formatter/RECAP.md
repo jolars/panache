@@ -30,6 +30,10 @@ rewrite those sections instead of accumulating history.
   `Bin` becomes `Ord` at list start, after an effective binary or relation, or
   after an atom with `DelimiterRole::Open`. `Punct`, `Op`, and an `Open` class
   without a genuine delimiter role remain operands for this purpose.
+- **Authored `\\` breaks layout rows but not the semantic atom stream.** Lower
+  each row separately while deriving every row's atoms from one source-ordered
+  stream; otherwise, a sign after `\\` is incorrectly coerced as though it
+  started a new math list.
 - **Composite relations expose a known Badness formatter defect.** It
   splits `:=` into punctuation plus relation (`x:=y` → `x: = y`) and splits a
   CST-severed head from its scripted tail (`:=_i` → `: =_i`, `<=_i` →
@@ -41,25 +45,25 @@ rewrite those sections instead of accumulating history.
 
 ## Latest session
 
-**Paired-delimiter body comments.** Extended typed comment lowering into
-`\left`/`\right` bodies, completing the inline comment slice for every
-bracketing construct already on the typed path.
+**Authored inline row breaks.** Lowered typed `MATH_LINE_BREAK` nodes through
+the document IR, completing the inline comment-and-break shapes already
+represented in the shared corpus.
 
-- `lower_delimited` now routes its body through the shared `lower_body`
-  dispatch, and `delimited_is_supported` accepts `MATH_COMMENT` body elements.
-  A comment outside the body, such as one between `\left` and its delimiter,
-  stays on the conservative fallback.
-- The existing opening-width alignment and body padding already reproduce
-  Badness's layout: continuation lines land at the opening width plus one
-  column, and a trailing comment pushes `\right` one column further out.
-- Added focused unit coverage, byte-exact parity for leading, trailing, mid,
-  empty, nested, scripted, and argument-embedded pairs, and extended the
-  idempotency guard.
-- Added two shared-corpus cases and regenerated the 107-case baseline; inline
-  parity increased from 74 to 76 cases.
+- Plain breaks, tight `*` and bracket modifiers, nested group/argument/pair
+  breaks, and comments after breaks now take the typed path. Unclosed bracket
+  modifiers remain on the conservative fallback.
+- Break layout preserves whether the author placed whitespace before `\\`,
+  reproducing Badness's distinction between `a\\b` and `a \\ b`.
+- Row lowering shares one semantic atom stream across every break. This
+  preserves Badness's contextual operator role after `\\`, while each row is
+  still formatted and indented independently.
+- Added focused lowering, malformed-input, idempotency, and byte-exact oracle
+  coverage. Regenerated the 107-case baseline; inline parity increased from 76
+  to 78 cases.
 
 ### Suggested next sub-targets
 
-1. Lower authored `\\` breaks, the last inline shape still on the fallback.
-2. Extend the comment and break slices beyond inline math into the display and
-   environment contexts, where `can_lower_nested_comments` still declines.
+1. Extend typed comments into display and environment contexts, where
+   `can_lower_nested_comments` still declines.
+2. Move display and environment authored-break layout onto the document IR,
+   including modifier and adjacent-comment behavior.

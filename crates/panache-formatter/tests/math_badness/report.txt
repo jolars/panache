@@ -3,9 +3,9 @@ Oracle: badness-formatter =0.6.0
 Corpus: tests/fixtures/math_corpus
 Cases: 107
 Context runs: 321
-Parity: 76 / 321
+Parity: 78 / 321
 Controlled wrapper rejection: 15 / 321
-Divergent: 230 / 321
+Divergent: 228 / 321
 
 Regenerate with:
   cargo test -p panache-formatter --test math_badness_oracle math_badness_full_report -- --ignored --nocapture
@@ -15,7 +15,7 @@ Selected first migration slice:
   Every other shape remains on the conservative legacy fallback.
 
 === Counts by context ===
-inline: parity 76, rejected 5, divergent 26
+inline: parity 78, rejected 5, divergent 24
 display: parity 0, rejected 5, divergent 102
 environment: parity 0, rejected 5, divergent 102
 
@@ -63,6 +63,8 @@ comments/trailing_comment.tex [inline]
 display/authored_newline.tex [inline]
 display/fraction_block.tex [inline]
 display/integral.tex [inline]
+display/line_break_comment.tex [inline]
+display/line_break_modifiers.tex [inline]
 display/long_chain.tex [inline]
 display/single_equation.tex [inline]
 display/sum_over_n.tex [inline]
@@ -561,11 +563,6 @@ Input: "\\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}\n"
 Badness: "  \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}\n"
 Panache: "  \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi}"
 
---- display/line_break_comment.tex [inline] ---
-Input: "a \\\\ % first row\nb\n"
-Badness: "a \\\\\n% first row\nb"
-Panache: "a \\\\ % first row b"
-
 --- display/line_break_comment.tex [display] ---
 Input: "a \\\\ % first row\nb\n"
 Badness: "  a \\\\\n  % first row\n  b\n"
@@ -575,11 +572,6 @@ Panache: "  a \\\\\n  % first row\n  b"
 Input: "a \\\\ % first row\nb\n"
 Badness: "  a \\\\ % first row\n  b\n"
 Panache: "  a \\\\\n  % first row\n  b"
-
---- display/line_break_modifiers.tex [inline] ---
-Input: "a \\\\*[2ex]\nb\n"
-Badness: "a \\\\*[2ex]\nb"
-Panache: "a \\\\*[2ex] b"
 
 --- display/line_break_modifiers.tex [display] ---
 Input: "a \\\\*[2ex]\nb\n"

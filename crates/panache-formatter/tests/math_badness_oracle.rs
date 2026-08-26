@@ -680,6 +680,21 @@ fn paired_delimiter_body_comment_migration_slice_matches_badness() {
     }
 }
 
+#[test]
+fn authored_line_break_migration_slice_matches_badness() {
+    for body in [
+        "a\\\\b",
+        "a \\\\*[2ex]\n-b",
+        "a+b\\\\c-d",
+        "{a+b\\\\c-d}",
+        "\\frac{a+b\\\\c-d}{e}",
+        "\\left( a+b\\\\c-d \\right)",
+        "a \\\\ % first row\nb",
+    ] {
+        assert_formatter_parity(body, OracleContext::Inline);
+    }
+}
+
 /// The hanging indent this slice emits re-enters the parser as `MATH_SPACE` on
 /// the next pass, so guard the round trip explicitly.
 #[test]

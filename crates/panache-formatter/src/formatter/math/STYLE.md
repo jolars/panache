@@ -80,9 +80,11 @@ Returned unchanged, never reflowed:
    model (`layout.rs`) preserves multiline fragments compositionally; it never
    uses string sentinels.
 
-4. **`\\` normalization.** A row's trailing hard break is emitted as `\\` (one
-   space before). A trailing `\\` on the final row is **preserved if present,
-   never synthesized**.
+4. **`\\` normalization.** Display and environment row layout emits a trailing
+   hard break as `\\` with one preceding space. Typed inline lowering follows
+   Badness and preserves whether the author placed whitespace before the break.
+   A trailing `\\` on the final row is **preserved if present, never
+   synthesized**.
 
 5. **`&`-column alignment.** Within an environment body, rows split into cells
    on **top-level** `&` (a `&` inside a group `{...}` or a nested environment is
