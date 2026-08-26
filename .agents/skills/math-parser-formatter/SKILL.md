@@ -35,8 +35,9 @@ are relative to the repository root.
 - **Badness is the parser model.** Match its lossless, error-tolerant CST and
   recovery through the pinned development-only oracle; do not substitute a
   lossy or throwing math parser.
-- **Diagnostics ride a side-channel** (`MathParseReport`), to be surfaced via
-  linter + LSP — not the CST.
+- **Diagnostics ride a side-channel.** Derive `MathDiagnostic` values through
+  `math_diagnostics()` for the formatter, linter, and LSP; do not encode errors
+  as CST structure.
 - **Host-only constructs stay outside TeX math where possible.** Markdown
   delimiters, Bookdown equation labels (`(\#eq:label)`), Pandoc attributes, and
   container prefixes belong to the host layer. Equation labels are host tokens
@@ -55,12 +56,12 @@ are relative to the repository root.
   projectors may mechanically rename kinds, remove wrapper offsets, and discard
   documented host trivia; they must never parse, infer attachment, or repair a
   tree.
-- **Known Badness formatter defect:** it splits the authored definition
-  relation `:=` into punctuation plus relation (`x:=y` → `x: = y`). It also
-  splits a relation head from its CST-separated scripted tail (`:=_i` →
-  `: =_i`, `<=_i` → `< =_i`). Panache preserves these composite relations.
-  Keep the cases on the Panache compatibility path and outside mandatory byte
-  parity unless the pinned oracle is corrected.
+- **Known pinned Badness formatter defect:** it still splits a non-colon
+  relation head from its CST-separated scripted tail (`<=_i` → `< =_i`, with
+  the same problem for `>=_i` and `==_i`). Panache preserves these composite
+  relations. Keep those cases on the compatibility path and outside mandatory
+  byte parity until the pinned oracle is corrected. Definition relations,
+  including `:=_i`, now have byte parity.
 
 Follow the math-parser, parser, and formatter invariants in the repository's
 root `AGENTS.md`.
@@ -73,12 +74,24 @@ root `AGENTS.md`.
 2. Pick one bounded sub-task. If the roadmap, recap, and repository disagree,
    verify the implementation and correct the stale document before proceeding.
 3. TDD: add the failing test first (parser golden / formatter golden / unit).
-4. Validate before landing:
-   - Run the workspace validation required by root `AGENTS.md`.
-   - Run the applicable focused parity suites:
-     - `cargo test -p panache-parser --test math_badness_parity`
-     - `cargo test -p panache-parser --test math_semantic_parity`
-     - `cargo test -p panache-formatter --test math_badness_oracle`
+4. Validate during development and before landing:
+   - During development, run the focused suite relevant to the changed layer:
+     - Parser CST: `cargo test -p panache-parser --test math_badness_parity`
+     - Semantic model:
+       `cargo test -p panache-parser --test math_semantic_parity`
+     - Formatter output:
+       `cargo test -p panache-formatter --test math_badness_oracle`
+   - If the formatter corpus or its parity classification changes, regenerate
+     and review the committed report with:
+
+     ```bash
+     cargo test -p panache-formatter --test math_badness_oracle \
+       math_badness_full_report -- --ignored --nocapture
+     ```
+
+   - Before landing, run the workspace validation required by root `AGENTS.md`.
+     Its `cargo test --workspace` gate subsumes the focused suites; do not rerun
+     a focused suite afterward when both exercised the same tree state.
    - For parser CST snapshot changes: review each diff (byte ranges must still
      reconstruct the input losslessly).
    - Flag-off regression: existing formatter goldens stay byte-identical.

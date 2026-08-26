@@ -34,12 +34,12 @@ rewrite those sections instead of accumulating history.
   each row separately while deriving every row's atoms from one source-ordered
   stream; otherwise, a sign after `\\` is incorrectly coerced as though it
   started a new math list.
-- **Composite relations expose a known Badness formatter defect.** It
-  splits `:=` into punctuation plus relation (`x:=y` → `x: = y`) and splits a
-  CST-severed head from its scripted tail (`:=_i` → `: =_i`, `<=_i` →
-  `< =_i`). Panache preserves authored composite relations through the
-  compatibility path; exclude these cases from mandatory byte parity until the
-  pinned oracle is corrected.
+- **Some scripted composite relations expose a pinned Badness defect.** Badness
+  still splits a non-colon relation head from its CST-separated scripted tail
+  (`<=_i` → `< =_i`, likewise `>=_i` and `==_i`). Panache preserves those
+  relations through the compatibility path; exclude them from mandatory byte
+  parity until the pinned oracle is corrected. Definition relations, including
+  `:=_i`, now have byte parity.
 
 --------------------------------------------------------------------------------
 
