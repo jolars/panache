@@ -1,10 +1,20 @@
-//! File watcher handler for bibliography files.
+//! Handler for `workspace/didChangeWatchedFiles`: keeps already-tracked file
+//! text in sync, releases deleted files' cached text, reloads config, and
+//! re-lints documents referencing a changed bibliography or manifest.
+//!
+//! The watch globs cover every JSON/YAML/TOML/bib/ris file in the workspace,
+//! so events arrive for far more files than any document references (a build
+//! writing artifacts, for one). This handler must therefore never *load* a
+//! file's contents into the database --- referenced files are loaded precisely
+//! by `reload_open_documents_referenced_files`; everything else stays an
+//! absent input, or unbounded watch traffic becomes unbounded memory.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use salsa::Durability;
 
-use lsp_types::{DidChangeWatchedFilesParams, MessageType, Uri};
+use lsp_types::{DidChangeWatchedFilesParams, FileChangeType, MessageType, Uri};
 
 use super::super::helpers;
 use crate::lsp::DocumentState;
@@ -12,15 +22,59 @@ use crate::lsp::global_state::GlobalState;
 use crate::lsp::uri_ext::UriExt;
 
 pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWatchedFilesParams) {
+    // The last event for a path decides its fate: an atomic save can deliver
+    // DELETED followed by CREATED for the same path within one batch.
+    let mut final_change: HashMap<PathBuf, FileChangeType> = HashMap::new();
+    let mut changed_paths: Vec<PathBuf> = Vec::new();
+    for change in &params.changes {
+        let Some(path) = change.uri.to_file_path().map(|p| p.into_owned()) else {
+            continue;
+        };
+        final_change.insert(path.clone(), change.typ);
+        changed_paths.push(path);
+    }
+
+    // Only files whose contents were already loaded when the event arrived get
+    // the cached-text sync and the deletion eviction below; everything else
+    // stays an absent input, or unbounded watch traffic becomes unbounded
+    // memory. The snapshot must precede
+    // `reload_open_documents_referenced_files`, which loads newly referenced
+    // files: taken afterwards it would fold those in and re-read from disk
+    // what that reload just read.
+    let loaded_paths: HashSet<PathBuf> = changed_paths
+        .iter()
+        .filter(|path| gs.salsa.file_text_is_loaded(path))
+        .cloned()
+        .collect();
+
     // Filesystem probes are not Salsa inputs, so intern changed paths to make
     // newly created references visible to `project_graph` through `FileSet`.
-    let changed_paths: Vec<PathBuf> = params
-        .changes
-        .iter()
-        .filter_map(|change| change.uri.to_file_path().map(|p| p.into_owned()))
-        .collect();
-    for path in &changed_paths {
-        gs.salsa.intern_file(Some(path.clone()));
+    for (path, change_type) in &final_change {
+        if *change_type != FileChangeType::DELETED {
+            gs.salsa.intern_file(Some(path.clone()));
+        }
+    }
+
+    // A deleted file's cached text is released so the database does not retain
+    // it for the life of the process; the path is then re-interned with a
+    // fresh absent input so `project_graph` observes the absence (mirroring
+    // `did_delete_files`). Only a loaded path is evicted: eviction tombstones
+    // the vfs slot and re-interning mints an input salsa never drops, so doing
+    // this for a merely interned path would leak a slot and an input per
+    // delete event --- and rewrite `FileSet` twice, invalidating
+    // `project_graph` for every open document --- to release nothing. An open
+    // document's buffer is authoritative, so its path is never evicted.
+    let open_paths = crate::lsp::documents::open_document_paths(gs);
+    for (path, change_type) in &final_change {
+        if *change_type != FileChangeType::DELETED
+            || open_paths.contains(path)
+            || !loaded_paths.contains(path)
+        {
+            continue;
+        }
+        if gs.salsa.evict_file_text(path) {
+            gs.salsa.intern_file(Some(path.clone()));
+        }
     }
 
     // A `panache.toml`/`.panache.toml` edit changes config for open documents
@@ -58,8 +112,13 @@ pub(crate) fn did_change_watched_files(gs: &mut GlobalState, params: DidChangeWa
             Some("bib") | Some("json") | Some("yaml") | Some("yml") | Some("ris")
         );
 
-        // Always keep salsa's cached file text in sync when possible.
-        if let Ok(contents) = std::fs::read_to_string(&path)
+        // Keep salsa's cached file text in sync --- but only for files whose
+        // contents were already tracked before this event (see `loaded_paths`
+        // above). Everything else stays an absent input: files a document
+        // actually references are loaded precisely by
+        // `reload_open_documents_referenced_files`, never by watch traffic.
+        if loaded_paths.contains(&path)
+            && let Ok(contents) = std::fs::read_to_string(&path)
             && gs.salsa.update_file_text_if_cached_with_durability(
                 &path,
                 contents,

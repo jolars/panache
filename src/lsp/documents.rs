@@ -41,6 +41,16 @@ pub(crate) fn load_project_files(
         .load_referenced_files(salsa_file, salsa_config, root_path)
 }
 
+/// The on-disk paths of all open documents. An open document's buffer is
+/// authoritative: its path must never be evicted from the database or re-read
+/// from disk, or an unsaved edit would be clobbered (or its text wiped).
+pub(crate) fn open_document_paths(gs: &GlobalState) -> HashSet<PathBuf> {
+    gs.document_map
+        .values()
+        .filter_map(|state| crate::salsa::Db::path_of_id(&gs.salsa, state.file_id))
+        .collect()
+}
+
 /// Reload every open document's project-referenced files on the writer.
 ///
 /// A filesystem change (watcher event, file operation) may have flipped a
@@ -57,11 +67,7 @@ pub(crate) fn reload_open_documents_referenced_files(gs: &mut GlobalState) {
         .collect();
     // A path open as a document has buffer-authoritative content; it must never
     // be re-read from disk below or an unsaved edit would be clobbered.
-    let open_paths: HashSet<PathBuf> = gs
-        .document_map
-        .values()
-        .filter_map(|state| crate::salsa::Db::path_of_id(&gs.salsa, state.file_id))
-        .collect();
+    let open_paths = open_document_paths(gs);
     let mut referenced: HashSet<PathBuf> = HashSet::new();
     for (salsa_file, salsa_config, path) in open_docs {
         referenced.extend(load_project_files(gs, salsa_file, salsa_config, path));

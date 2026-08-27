@@ -142,6 +142,13 @@ impl Vfs {
         self.snapshot().path_to_id.keys().cloned().collect()
     }
 
+    /// How many id slots the table holds, tombstones included. Only eviction
+    /// and interning move this number, so it is the direct measure of whether
+    /// a repeated event churns ids instead of reusing them.
+    pub(crate) fn slot_count(&self) -> usize {
+        self.snapshot().files.len()
+    }
+
     /// Register a fresh id for `path`/`input` and return it. Called only by the
     /// single writer. The id is `files.len()` (dense, append-only).
     pub(crate) fn register(&self, path: Option<PathBuf>, input: FileText) -> FileId {

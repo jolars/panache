@@ -2727,6 +2727,16 @@ impl SalsaDb {
         self.vfs.input_for_path(path)
     }
 
+    /// Whether `path`'s contents are loaded (`Some` text). A merely interned
+    /// path holds an absent (`None`) input and answers `false`, which
+    /// [`Self::file_text_if_cached`] cannot distinguish --- it returns the
+    /// input either way.
+    pub fn file_text_is_loaded(&self, path: &Path) -> bool {
+        self.vfs
+            .input_for_path(path)
+            .is_some_and(|file| file.text(self).is_some())
+    }
+
     /// The stable [`FileId`] backing a [`FileText`] input, if it is registered.
     /// The LSP keys an open document on this id instead of duplicating its path.
     pub fn file_id_for_input(&self, input: FileText) -> Option<FileId> {
@@ -2998,10 +3008,32 @@ impl SalsaDb {
         self.vfs.cached_paths()
     }
 
+    /// How many vfs id slots exist, tombstoned ones included. Ids are never
+    /// recycled and salsa never drops an input, so an evict/re-intern pair
+    /// grows this permanently --- which is what makes it a memory measure.
+    pub fn vfs_slot_count(&self) -> usize {
+        self.vfs.slot_count()
+    }
+
+    /// Forget `path`'s id/input mapping and release its cached text. Salsa
+    /// never drops an input, so without the explicit `None` write an evicted
+    /// file's contents would stay resident for the life of the process.
+    /// Callers must never evict a path open as a document: the open document
+    /// still reads its text through the `FileText` handle it retains.
     pub fn evict_file_text(&mut self, path: &Path) -> bool {
+        // Grab the input before the mapping goes; `remove_path` tombstones it.
+        let input = self.vfs.input_for_path(path);
         let Some(id) = self.vfs.remove_path(path) else {
             return false;
         };
+        if let Some(input) = input
+            && input.text(self).is_some()
+        {
+            input
+                .set_text(self)
+                .with_durability(Durability::MEDIUM)
+                .to(None);
+        }
         self.remove_file_from_set(id);
         true
     }

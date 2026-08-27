@@ -235,6 +235,176 @@ fn test_bib_change_without_watcher_event_is_picked_up_on_activity() {
 }
 
 #[test]
+fn test_watcher_does_not_load_unreferenced_files() {
+    // Regression for the LSP memory leak (#514): the watch globs cover every
+    // JSON/YAML/TOML file in the workspace, so a build writing artifacts
+    // floods the watcher with events for files no document references. Those
+    // events must not read the files' contents into the database.
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    let json_path = root.join("build-output.json");
+
+    fs::write(&doc_path, "# Heading\n").unwrap();
+    fs::write(&json_path, "{\"artifact\": true}\n").unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    server.initialize(&root_uri);
+    server.open_document(
+        &Uri::from_file_path(&doc_path).unwrap().to_string(),
+        "# Heading\n",
+        "quarto",
+    );
+
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&json_path).unwrap(),
+        typ: FileChangeType::CREATED,
+    }]);
+    assert!(
+        !server.file_text_is_loaded(&json_path),
+        "a watcher event for an unreferenced file must not load its contents"
+    );
+
+    // The first event interned the path; a second event must not mistake the
+    // now-present (absent) input for a tracked file and load it after all.
+    fs::write(&json_path, "{\"artifact\": false}\n").unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&json_path).unwrap(),
+        typ: FileChangeType::CHANGED,
+    }]);
+    assert!(
+        !server.file_text_is_loaded(&json_path),
+        "repeated watcher events must not load an unreferenced file's contents"
+    );
+}
+
+#[test]
+fn test_watcher_delete_releases_cached_text() {
+    // A referenced file's contents are loaded, but deleting it must release
+    // them: the database otherwise retains the text for the process lifetime.
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let bib_path = root.join("refs.bib");
+    let doc_path = root.join("doc.qmd");
+
+    fs::write(&bib_path, "@article{key, title={Title}}\n").unwrap();
+    fs::write(&doc_path, "---\nbibliography: refs.bib\n---\n\nText.\n").unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    server.initialize(&root_uri);
+    server.open_document(
+        &Uri::from_file_path(&doc_path).unwrap().to_string(),
+        &fs::read_to_string(&doc_path).unwrap(),
+        "quarto",
+    );
+    assert!(
+        server.file_text_is_loaded(&bib_path),
+        "a referenced bibliography should be loaded on open"
+    );
+
+    fs::remove_file(&bib_path).unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: Uri::from_file_path(&bib_path).unwrap(),
+        typ: FileChangeType::DELETED,
+    }]);
+    assert!(
+        !server.file_text_is_loaded(&bib_path),
+        "a DELETED watcher event must release the file's cached text"
+    );
+}
+
+#[test]
+fn test_repeated_delete_of_unreferenced_file_does_not_churn_ids() {
+    // Regression for #514: a build loop that writes and removes an artifact
+    // delivers a DELETED event per iteration. Evicting a path whose contents
+    // were never loaded releases nothing, yet tombstones its vfs slot and
+    // mints a fresh salsa input that is never dropped --- growth unbounded in
+    // the number of events, inside the very handler that bounds memory.
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    let json_path = root.join("build-output.json");
+    fs::write(&doc_path, "# Heading\n").unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    server.initialize(&root_uri);
+    server.open_document(
+        &Uri::from_file_path(&doc_path).unwrap().to_string(),
+        "# Heading\n",
+        "quarto",
+    );
+
+    let json_uri = Uri::from_file_path(&json_path).unwrap();
+    fs::write(&json_path, "{\"artifact\": true}\n").unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: json_uri.clone(),
+        typ: FileChangeType::CREATED,
+    }]);
+    fs::remove_file(&json_path).unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: json_uri.clone(),
+        typ: FileChangeType::DELETED,
+    }]);
+
+    // Baseline after one full cycle: the path is interned, nothing is loaded.
+    let baseline = server.vfs_slot_count();
+    for _ in 0..20 {
+        fs::write(&json_path, "{\"artifact\": true}\n").unwrap();
+        server.did_change_watched_files(vec![FileEvent {
+            uri: json_uri.clone(),
+            typ: FileChangeType::CREATED,
+        }]);
+        fs::remove_file(&json_path).unwrap();
+        server.did_change_watched_files(vec![FileEvent {
+            uri: json_uri.clone(),
+            typ: FileChangeType::DELETED,
+        }]);
+    }
+
+    assert_eq!(
+        server.vfs_slot_count(),
+        baseline,
+        "repeated create/delete events for a never-loaded file must reuse its id"
+    );
+    assert!(
+        !server.file_text_is_loaded(&json_path),
+        "the artifact's contents must still never be loaded"
+    );
+}
+
+#[test]
+fn test_watcher_delete_of_open_document_keeps_buffer_text() {
+    // An open document's buffer is authoritative: a DELETED watcher event for
+    // its path (a `git checkout`, an external clean) must not wipe the text
+    // the open buffer still serves from.
+    let temp_dir = TempDir::new().unwrap();
+    let root = temp_dir.path();
+    let doc_path = root.join("doc.qmd");
+    fs::write(&doc_path, "# Heading\n").unwrap();
+
+    let mut server = TestLspServer::new();
+    let root_uri = Uri::from_file_path(root).unwrap().to_string();
+    let doc_uri = Uri::from_file_path(&doc_path).unwrap().to_string();
+    server.initialize(&root_uri);
+    server.open_document(&doc_uri, "# Heading\n", "quarto");
+
+    fs::remove_file(&doc_path).unwrap();
+    server.did_change_watched_files(vec![FileEvent {
+        uri: doc_uri.parse().unwrap(),
+        typ: FileChangeType::DELETED,
+    }]);
+
+    assert_eq!(
+        server.get_document_content(&doc_uri).as_deref(),
+        Some("# Heading\n"),
+        "deleting an open document on disk must not clear its buffer text"
+    );
+}
+
+#[test]
 fn test_broken_quarto_yml_publishes_on_manifest_uri_not_document() {
     let temp_dir = TempDir::new().unwrap();
     let root = temp_dir.path();

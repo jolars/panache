@@ -682,6 +682,21 @@ impl LspTester {
         Some(file.content_or_empty(&self.gs.salsa).to_string())
     }
 
+    /// Whether `path`'s contents are loaded in the database. Sharper than
+    /// [`Self::get_cached_file_text`], which reports an interned-but-unloaded
+    /// file as `Some("")`: a merely interned path answers `false` here. Pins
+    /// the memory contract that watch traffic alone never loads file contents.
+    pub fn file_text_is_loaded(&self, path: &std::path::Path) -> bool {
+        self.gs.salsa.file_text_is_loaded(path)
+    }
+
+    /// How many vfs id slots exist, tombstoned ones included. Pins the bound
+    /// on watch traffic: repeated events for the same path must not mint a new
+    /// id (and with it a salsa input that is never dropped) each time.
+    pub fn vfs_slot_count(&self) -> usize {
+        self.gs.salsa.vfs_slot_count()
+    }
+
     // --- main-loop pumping (publishes + cancel) ---
 
     /// Drain any messages the server has emitted to the client since the

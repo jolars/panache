@@ -55,12 +55,17 @@ pub(crate) fn did_create_files(gs: &mut GlobalState, params: CreateFilesParams) 
 /// re-interns it so `project_graph` re-runs and its filesystem probes observe
 /// the absence — broken references in dependents surface on the next settle.
 pub(crate) fn did_delete_files(gs: &mut GlobalState, params: DeleteFilesParams) {
+    // An open document's buffer is authoritative; evicting it would wipe the
+    // text its `DocumentState` still reads. It stays untouched until `didClose`.
+    let open_paths = crate::lsp::documents::open_document_paths(gs);
     for file in &params.files {
         if let Ok(uri) = file.uri.parse::<Uri>() {
             gs.diagnostics
                 .drop_uri(&uri, &gs.sender, gs.supports_pull_diagnostics);
         }
-        if let Some(path) = op_uri_to_path(&file.uri) {
+        if let Some(path) = op_uri_to_path(&file.uri)
+            && !open_paths.contains(&path)
+        {
             gs.salsa.evict_file_text(&path);
             gs.salsa.intern_file(Some(path));
         }
@@ -76,12 +81,17 @@ pub(crate) fn did_delete_files(gs: &mut GlobalState, params: DeleteFilesParams) 
 /// `didClose(old)`/`didOpen(new)` pair; we only re-intern paths and re-lint so
 /// references to the old name break and references to the new name resolve.
 pub(crate) fn did_rename_files(gs: &mut GlobalState, params: RenameFilesParams) {
+    // Same open-document guard as `did_delete_files`: the editor's
+    // `didClose(old)`/`didOpen(new)` pair relocates open buffers.
+    let open_paths = crate::lsp::documents::open_document_paths(gs);
     for rename in &params.files {
         if let Ok(old_uri) = rename.old_uri.parse::<Uri>() {
             gs.diagnostics
                 .drop_uri(&old_uri, &gs.sender, gs.supports_pull_diagnostics);
         }
-        if let Some(old_path) = op_uri_to_path(&rename.old_uri) {
+        if let Some(old_path) = op_uri_to_path(&rename.old_uri)
+            && !open_paths.contains(&old_path)
+        {
             gs.salsa.evict_file_text(&old_path);
             gs.salsa.intern_file(Some(old_path));
         }
