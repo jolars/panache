@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.28.0](https://github.com/jolars/panache/compare/panache-parser-v0.27.2...panache-parser-v0.28.0) (2026-08-28)
+
+### Features
+- **msrv:** reduce MSRV to 1.89 ([`d285e6c`](https://github.com/jolars/panache/commit/d285e6c5117220eb16d6a33ed0f4ec058451b5ad))
+- **math:** structure and format TeX math (#513) ([`02aff73`](https://github.com/jolars/panache/commit/02aff73166a9a2e33b0d6d2e71a8024d9cf9f747))
+
+### Bug Fixes
+- **formatter:** preserve signed TeX dimensions ([`b576272`](https://github.com/jolars/panache/commit/b576272bd34ec99e63fa8a73e53ac7988d4eab75))
+- **formatter:** keep array arguments attached ([`ebb9ad2`](https://github.com/jolars/panache/commit/ebb9ad241d554a50c21202d4f7879770d529b78e))
+- **formatter:** preserve postfix limit signs ([`1d824c5`](https://github.com/jolars/panache/commit/1d824c535dae8b1cd7c11283dc453b54bd018a6f))
+- stabilize smoke-test formatting ([`0621456`](https://github.com/jolars/panache/commit/06214564c854e6ae7f399ea4977f1d207e45cc05)), fixes [#520](https://github.com/jolars/panache/issues/520)
+- **math:** format raw TeX environments idempotently ([`e8ea2f7`](https://github.com/jolars/panache/commit/e8ea2f7fb09cd0eb2c5b85c773c348385b80b04e)), fixes [#517](https://github.com/jolars/panache/issues/517)
+
 ## [0.27.2](https://github.com/jolars/panache/compare/panache-parser-v0.27.1...panache-parser-v0.27.2) (2026-08-20)
 
 ### Bug Fixes

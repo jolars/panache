@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.7.0](https://github.com/jolars/panache/compare/v3.6.1...v3.7.0) (2026-08-28)
 
 The experimental math formatting option has now been made stable and is activated by default:
 
@@ -10,6 +10,51 @@ math = "reflow" # or "preserve", "verbatim", "single-line"
 ```
 
 This means that Panache will now take care of formatting of math content for you, including line breaks, indentation, spacing, and alignment. Please read the documentation for the various options.
+
+### Features
+- put math formatting under `[format]\nmath = "reflow"` etc ([`308188f`](https://github.com/jolars/panache/commit/308188f6e49b6273afe3a82bc67b4f3fde7c6d41))
+- **formatter:** stabilize math formatting ([`c7f7256`](https://github.com/jolars/panache/commit/c7f72568acafed3a46dca15a119708da2107b996))
+- **formatter:** compose grouped environment prefixes ([`3704afd`](https://github.com/jolars/panache/commit/3704afd6e3daa36dbb0f7b8a8e20774d3fd7dd6c))
+- **formatter:** compose delimited environment prefixes ([`2e82b4b`](https://github.com/jolars/panache/commit/2e82b4b5e3109bb2f2ac358eb6fe210fb6f1970c))
+- **formatter:** compose operand environment prefixes ([`940b713`](https://github.com/jolars/panache/commit/940b713ab132a6b31d300b34b8cdc6eed70bc3c7))
+- **formatter:** compose unary environment prefixes ([`37ce18c`](https://github.com/jolars/panache/commit/37ce18c58f9146f43bec07ed22b6297cd490f3d0))
+- **formatter:** format scripted environments ([`8b0c333`](https://github.com/jolars/panache/commit/8b0c33389b0d4fec64c2603aa575d934b092a045))
+- **formatter:** compose environment suffix operators ([`5376765`](https://github.com/jolars/panache/commit/5376765281c1bad674846fb4073793d19edcc8d2))
+- **formatter:** format trailing environment content ([`8d754ef`](https://github.com/jolars/panache/commit/8d754ef74d737c4619ed5fe7441fd035da1f2ea9))
+- **formatter:** format relation-led environments ([`7a1d44c`](https://github.com/jolars/panache/commit/7a1d44c9181789ee90dd68f0898f5280845f65e4))
+- **formatter:** format commented display environments ([`bc26f1d`](https://github.com/jolars/panache/commit/bc26f1d99e8158087f94bdfa47e82a0563e56232))
+- **formatter:** format commented inline environments ([`615bbe9`](https://github.com/jolars/panache/commit/615bbe92e95f21714f19e02acdab7d2d536bc52c))
+- **math:** format punctuated environments ([`5e2adb7`](https://github.com/jolars/panache/commit/5e2adb77bcf288ce1375eb531b1bff11922599fd))
+- **math:** format mixed delimited environments ([`d95a857`](https://github.com/jolars/panache/commit/d95a8579f71d4b0aec8f713c3d18fe9da36bfd08))
+- **math:** lower display definition relations ([`03beb02`](https://github.com/jolars/panache/commit/03beb02ba31f2b7bc2ba326412b09cb01c976ab4))
+- **math:** lower definition relations ([`0cbd359`](https://github.com/jolars/panache/commit/0cbd359d3bf219e63ff0262cb33c85201304804a))
+- **math:** lower display wrapping ([`f7fdb7d`](https://github.com/jolars/panache/commit/f7fdb7db5c041dfae76f00853a3065c32efe7e1c))
+- **msrv:** reduce MSRV to 1.89 ([`d285e6c`](https://github.com/jolars/panache/commit/d285e6c5117220eb16d6a33ed0f4ec058451b5ad))
+- **math:** structure and format TeX math (#513) ([`02aff73`](https://github.com/jolars/panache/commit/02aff73166a9a2e33b0d6d2e71a8024d9cf9f747))
+
+### Bug Fixes
+- **formatter:** trim math line endings ([`42e1a2f`](https://github.com/jolars/panache/commit/42e1a2f5ab83a4fbd097727d4452e6828df6404c))
+- **formatter:** improve math display breaks ([`f834dfe`](https://github.com/jolars/panache/commit/f834dfe7f52456ea92186c2229b6f9c9c5410a1a))
+- **formatter:** preserve signed TeX dimensions ([`b576272`](https://github.com/jolars/panache/commit/b576272bd34ec99e63fa8a73e53ac7988d4eab75))
+- **formatter:** keep array arguments attached ([`ebb9ad2`](https://github.com/jolars/panache/commit/ebb9ad241d554a50c21202d4f7879770d529b78e))
+- **formatter:** preserve postfix limit signs ([`1d824c5`](https://github.com/jolars/panache/commit/1d824c535dae8b1cd7c11283dc453b54bd018a6f))
+- stabilize smoke-test formatting ([`0621456`](https://github.com/jolars/panache/commit/06214564c854e6ae7f399ea4977f1d207e45cc05)), fixes [#520](https://github.com/jolars/panache/issues/520)
+- **formatter:** normalize grid cell continuations ([`5ee03d5`](https://github.com/jolars/panache/commit/5ee03d524531f34b44b388d71869801ed48691fc)), fixes [#518](https://github.com/jolars/panache/issues/518)
+- **math:** format raw TeX environments idempotently ([`e8ea2f7`](https://github.com/jolars/panache/commit/e8ea2f7fb09cd0eb2c5b85c773c348385b80b04e)), fixes [#517](https://github.com/jolars/panache/issues/517)
+- **formatter:** preserve TeX control spaces ([`3f95fa9`](https://github.com/jolars/panache/commit/3f95fa9fe97476f84d7407c3dcb2c746f2d47935)), fixes [#516](https://github.com/jolars/panache/issues/516)
+- **ci:** pin math census to LF ([`a7bcd08`](https://github.com/jolars/panache/commit/a7bcd08ef9117865063262442ee73cca789faaf7))
+- **lsp:** stop watcher events from loading unreferenced files (#515) ([`e615f6a`](https://github.com/jolars/panache/commit/e615f6a21b1ca499c7d0f622565ef5822331ab8a))
+- **formatter:** format inline environment comments ([`afbe920`](https://github.com/jolars/panache/commit/afbe92021bfbd2a4d3c470b9547cfb28504e35ba))
+- **math:** reset tight-grid cell indents ([`d278aff`](https://github.com/jolars/panache/commit/d278aff9b7722939519f64ec380a429357e2785f))
+- **formatter:** stabilize mixed math fallback ([`dcd5fa0`](https://github.com/jolars/panache/commit/dcd5fa03e862e1e80bd2357c7fd45407d84b66ad)), fixes [#510](https://github.com/jolars/panache/issues/510)
+- apply formatter flavor in isolated mode ([`d0fce59`](https://github.com/jolars/panache/commit/d0fce59a197a802142e618b064085c7acc4eba61)), fixes [#509](https://github.com/jolars/panache/issues/509)
+
+### Performance Improvements
+- **lsp:** stop interning definition labels ([`15fbe12`](https://github.com/jolars/panache/commit/15fbe124a2ccbddd9f863fecf9d999314fda443f))
+
+### Dependencies
+- updated crates/panache-formatter to v0.22.0
+- updated crates/panache-parser to v0.28.0
 
 ## [3.6.1](https://github.com/jolars/panache/compare/v3.6.0...v3.6.1) (2026-08-20)
 

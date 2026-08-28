@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.0](https://github.com/jolars/panache/compare/panache-code-v3.6.1...panache-code-v3.7.0) (2026-08-28)
+
+### Bug Fixes
+- **editors:** pin `@types/vscode` ([`4dc5a17`](https://github.com/jolars/panache/commit/4dc5a17b355535b58923effcc5c7adf4ff46f173))
+
+### Dependencies
+- updated panache to v3.7.0
+
 ## [3.6.1](https://github.com/jolars/panache/compare/panache-code-v3.6.0...panache-code-v3.6.1) (2026-08-20)
 
 ### Dependencies

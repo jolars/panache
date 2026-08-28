@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.36.1](https://github.com/jolars/panache/compare/panache-zed-v2.36.0...panache-zed-v2.36.1) (2026-08-28)
+
+### Bug Fixes
+- **editors:** resolve zed assets more robustly ([`948969f`](https://github.com/jolars/panache/commit/948969fcb76cbc761cf34b7f242e7ce119d0fd0b))
+
 ## [2.36.0](https://github.com/jolars/panache/compare/panache-zed-v2.35.1...panache-zed-v2.36.0) (2026-06-17)
 
 ### Features
