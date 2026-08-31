@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.8.0](https://github.com/jolars/panache/compare/v3.7.0...v3.8.0) (2026-08-31)
+
+### Features
+- **lint:** flag inline math line breaks ([`d486e02`](https://github.com/jolars/panache/commit/d486e02355decbd9caa654039dce3ffe81bde254))
+- **math:** indent top-level environments ([`f222d44`](https://github.com/jolars/panache/commit/f222d448d74a53eb0d939108e244d560c9fc0e2e))
+- **lint:** flag display math blank lines ([`d5b6021`](https://github.com/jolars/panache/commit/d5b6021244aefc725695355ed88aaa2d7b6bd3e0))
+
+### Bug Fixes
+- **math:** report unescaped dollar ([`8083731`](https://github.com/jolars/panache/commit/80837318919cfe318eebd8c8b83a43db13ab2be6))
+- **formatter:** preserve math control spaces at line ends ([`b449e66`](https://github.com/jolars/panache/commit/b449e662644835ae8b62db99afa000e47be281ec))
+- **formatter:** preserve math control spaces ([`85dd96f`](https://github.com/jolars/panache/commit/85dd96f72ae3d924b2efde5c46baa8c70f7a2f60)), fixes [#522](https://github.com/jolars/panache/issues/522)
+- **formatter:** preserve control spaces in math rows ([`2c2e24f`](https://github.com/jolars/panache/commit/2c2e24fc087a6697f4f985d70c5e4478975cddb2)), fixes [#521](https://github.com/jolars/panache/issues/521)
+
+### Dependencies
+- updated crates/panache-formatter to v0.23.0
+- updated crates/panache-parser to v0.28.1
+
 ## [3.7.0](https://github.com/jolars/panache/compare/v3.6.1...v3.7.0) (2026-08-28)
 
 The experimental math formatting option has now been made stable and is activated by default:

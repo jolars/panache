@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.28.1](https://github.com/jolars/panache/compare/panache-parser-v0.28.0...panache-parser-v0.28.1) (2026-08-31)
+
+### Bug Fixes
+- **math:** report unescaped dollar ([`8083731`](https://github.com/jolars/panache/commit/80837318919cfe318eebd8c8b83a43db13ab2be6))
+
 ## [0.28.0](https://github.com/jolars/panache/compare/panache-parser-v0.27.2...panache-parser-v0.28.0) (2026-08-28)
 
 ### Features

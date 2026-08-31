@@ -1,11 +1,15 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "42e1a2f5ab83a4fbd097727d4452e6828df6404c",
+  "baseline-sha": "b10bdd9c4a1d8302fe15d14b2010e74287a214c7",
   "release-targets": [
     {
       "path": ".",
-      "version": "3.7.0",
-      "tag": "v3.7.0"
+      "version": "3.8.0",
+      "tag": "v3.8.0",
+      "dependencies": [
+        "crates/panache-formatter",
+        "crates/panache-parser"
+      ]
     },
     {
       "path": "crates/panache-dprint",
@@ -14,18 +18,24 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.22.0",
-      "tag": "panache-formatter-v0.22.0"
+      "version": "0.23.0",
+      "tag": "panache-formatter-v0.23.0",
+      "dependencies": [
+        "crates/panache-parser"
+      ]
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.28.0",
-      "tag": "panache-parser-v0.28.0"
+      "version": "0.28.1",
+      "tag": "panache-parser-v0.28.1"
     },
     {
       "path": "editors/code",
-      "version": "3.7.0",
-      "tag": "panache-code-v3.7.0"
+      "version": "3.8.0",
+      "tag": "panache-code-v3.8.0",
+      "dependencies": [
+        "."
+      ]
     },
     {
       "path": "editors/zed",
@@ -36,28 +46,33 @@
   "pending-release-targets": [
     {
       "path": ".",
-      "version": "3.7.0",
-      "tag": "v3.7.0"
+      "version": "3.8.0",
+      "tag": "v3.8.0",
+      "dependencies": [
+        "crates/panache-formatter",
+        "crates/panache-parser"
+      ]
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.22.0",
-      "tag": "panache-formatter-v0.22.0"
+      "version": "0.23.0",
+      "tag": "panache-formatter-v0.23.0",
+      "dependencies": [
+        "crates/panache-parser"
+      ]
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.28.0",
-      "tag": "panache-parser-v0.28.0"
+      "version": "0.28.1",
+      "tag": "panache-parser-v0.28.1"
     },
     {
       "path": "editors/code",
-      "version": "3.7.0",
-      "tag": "panache-code-v3.7.0"
-    },
-    {
-      "path": "editors/zed",
-      "version": "2.36.1",
-      "tag": "panache-zed-v2.36.1"
+      "version": "3.8.0",
+      "tag": "panache-code-v3.8.0",
+      "dependencies": [
+        "."
+      ]
     }
   ]
 }

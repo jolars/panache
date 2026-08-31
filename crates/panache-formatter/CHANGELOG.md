@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.0](https://github.com/jolars/panache/compare/panache-formatter-v0.22.0...panache-formatter-v0.23.0) (2026-08-31)
+
+### Features
+- **math:** indent top-level environments ([`f222d44`](https://github.com/jolars/panache/commit/f222d448d74a53eb0d939108e244d560c9fc0e2e))
+
+### Bug Fixes
+- **formatter:** preserve math control spaces at line ends ([`b449e66`](https://github.com/jolars/panache/commit/b449e662644835ae8b62db99afa000e47be281ec))
+- **formatter:** preserve math control spaces ([`85dd96f`](https://github.com/jolars/panache/commit/85dd96f72ae3d924b2efde5c46baa8c70f7a2f60)), fixes [#522](https://github.com/jolars/panache/issues/522)
+- **formatter:** preserve control spaces in math rows ([`2c2e24f`](https://github.com/jolars/panache/commit/2c2e24fc087a6697f4f985d70c5e4478975cddb2)), fixes [#521](https://github.com/jolars/panache/issues/521)
+
+### Dependencies
+- updated crates/panache-parser to v0.28.1
+
 ## [0.22.0](https://github.com/jolars/panache/compare/panache-formatter-v0.21.3...panache-formatter-v0.22.0) (2026-08-28)
 
 ### Features
