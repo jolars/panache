@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.8.1](https://github.com/jolars/panache/compare/v3.8.0...v3.8.1) (2026-09-03)
+
+### Dependencies
+- updated crates/panache-formatter to v0.23.1
+- updated crates/panache-parser to v0.28.2
+
 ## [3.8.0](https://github.com/jolars/panache/compare/v3.7.0...v3.8.0) (2026-08-31)
 
 ### Features

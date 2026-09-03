@@ -1,11 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "b10bdd9c4a1d8302fe15d14b2010e74287a214c7",
+  "baseline-sha": "9e7bf53d684bc84f1467fc78953414765af4cd68",
   "release-targets": [
     {
       "path": ".",
-      "version": "3.8.0",
-      "tag": "v3.8.0",
+      "version": "3.8.1",
+      "tag": "v3.8.1",
       "dependencies": [
         "crates/panache-formatter",
         "crates/panache-parser"
@@ -18,21 +18,21 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.23.0",
-      "tag": "panache-formatter-v0.23.0",
+      "version": "0.23.1",
+      "tag": "panache-formatter-v0.23.1",
       "dependencies": [
         "crates/panache-parser"
       ]
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.28.1",
-      "tag": "panache-parser-v0.28.1"
+      "version": "0.28.2",
+      "tag": "panache-parser-v0.28.2"
     },
     {
       "path": "editors/code",
-      "version": "3.8.0",
-      "tag": "panache-code-v3.8.0",
+      "version": "3.8.1",
+      "tag": "panache-code-v3.8.1",
       "dependencies": [
         "."
       ]
@@ -46,8 +46,8 @@
   "pending-release-targets": [
     {
       "path": ".",
-      "version": "3.8.0",
-      "tag": "v3.8.0",
+      "version": "3.8.1",
+      "tag": "v3.8.1",
       "dependencies": [
         "crates/panache-formatter",
         "crates/panache-parser"
@@ -55,21 +55,21 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.23.0",
-      "tag": "panache-formatter-v0.23.0",
+      "version": "0.23.1",
+      "tag": "panache-formatter-v0.23.1",
       "dependencies": [
         "crates/panache-parser"
       ]
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.28.1",
-      "tag": "panache-parser-v0.28.1"
+      "version": "0.28.2",
+      "tag": "panache-parser-v0.28.2"
     },
     {
       "path": "editors/code",
-      "version": "3.8.0",
-      "tag": "panache-code-v3.8.0",
+      "version": "3.8.1",
+      "tag": "panache-code-v3.8.1",
       "dependencies": [
         "."
       ]
