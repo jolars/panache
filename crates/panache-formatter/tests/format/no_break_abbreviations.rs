@@ -68,3 +68,41 @@ fn region_subtag_selects_primary_language_bucket() {
         "Erstens bzw. zweitens ist wichtig.\nZweiter Satz folgt.\n"
     );
 }
+
+#[test]
+fn document_language_overrides_config_across_paragraphs_and_lists() {
+    let input = "---\nlang: de-AT\n---\n\nAlpha foo. beta bzw. gamma. Delta.\n\n- Alpha foo. beta bzw. gamma. Delta.\n";
+    let abbreviations = BTreeMap::from([("de".to_string(), vec!["foo.".to_string()])]);
+
+    for wrap in [WrapMode::Sentence, WrapMode::Semantic] {
+        let mut config = cfg(Some("en"), abbreviations.clone());
+        config.wrap = Some(wrap);
+        let out = assert_idempotent(input, &config);
+        assert!(out.contains("\nAlpha foo. beta bzw. gamma.\nDelta.\n"));
+        assert!(out.contains("\n- Alpha foo. beta bzw. gamma.\n  Delta.\n"));
+    }
+}
+
+#[test]
+fn document_language_applies_when_table_caption_is_first() {
+    let input = "---\nlang: de\n---\n\n| A | B |\n|---|---|\n| C | D |\n\n: Alpha foo. beta bzw. gamma. Delta.\n\nAlpha foo. beta bzw. gamma. Delta.\n";
+    let abbreviations = BTreeMap::from([("de".to_string(), vec!["foo.".to_string()])]);
+    let out = assert_idempotent(input, &cfg(Some("en"), abbreviations));
+    assert!(out.contains("  : Alpha foo. beta bzw. gamma.\n    Delta.\n"));
+    assert!(out.contains("\nAlpha foo. beta bzw. gamma.\nDelta.\n"));
+}
+
+#[test]
+fn subtree_formatting_uses_ancestor_document_language() {
+    use panache_formatter::formatter::{FormattedCodeMap, Formatter};
+    use panache_formatter::syntax::{AstNode, Paragraph};
+
+    let config = cfg(Some("en"), BTreeMap::new());
+    let tree = panache_formatter::parser::parse(
+        "---\nlang: de\n---\n\nErstens bzw. zweitens. Danach.\n",
+        Some(config.parser_options()),
+    );
+    let paragraph = tree.children().find_map(Paragraph::cast).unwrap();
+    let out = Formatter::new(config, FormattedCodeMap::new(), None).format(paragraph.syntax());
+    assert_eq!(out, "Erstens bzw. zweitens.\nDanach.\n");
+}

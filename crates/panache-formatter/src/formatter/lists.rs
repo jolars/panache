@@ -1184,6 +1184,7 @@ impl Formatter {
                 .map(|source| {
                     inline_layout::wrapped_lines_for_node(
                         &self.config,
+                        &self.sentence_profile,
                         source,
                         &line_widths,
                         &|n| self.format_inline_node(n),
@@ -1235,6 +1236,7 @@ impl Formatter {
                         .map(|source| {
                             inline_layout::wrapped_lines_for_node(
                                 &self.config,
+                                &self.sentence_profile,
                                 source,
                                 &[],
                                 &|n| self.format_inline_node(n),
@@ -1587,10 +1589,18 @@ impl Formatter {
                             " ".repeat(list_indent.spaces_after),
                         );
                         let table_str = match child.kind() {
-                            SyntaxKind::PIPE_TABLE => {
-                                tables::format_pipe_table(&child, &self.config, content_indent)
-                            }
-                            _ => tables::format_grid_table(&child, &self.config, content_indent),
+                            SyntaxKind::PIPE_TABLE => tables::format_pipe_table(
+                                &child,
+                                &self.config,
+                                &self.sentence_profile,
+                                content_indent,
+                            ),
+                            _ => tables::format_grid_table(
+                                &child,
+                                &self.config,
+                                &self.sentence_profile,
+                                content_indent,
+                            ),
                         };
                         let first_line_indent = " ".repeat(content_indent);
                         self.output.push_str(&prefix);

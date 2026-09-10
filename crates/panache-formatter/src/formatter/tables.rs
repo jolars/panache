@@ -2,7 +2,7 @@ use crate::config::{Config, WrapMode};
 use crate::formatter::Formatter;
 use crate::formatter::inline::format_inline_node;
 use crate::formatter::inline_layout::wrap_text_first_fit;
-use crate::formatter::sentence_wrap::{ResolvedProfile, resolve_profile, split_sentence_text};
+use crate::formatter::sentence_wrap::{ResolvedProfile, SentenceProfileCache, split_sentence_text};
 use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken, text_without_line_prefixes};
 use panache_parser::analyze_grid;
 use rowan::NodeOrToken;
@@ -14,8 +14,12 @@ impl Formatter {
         match node.kind() {
             SyntaxKind::SIMPLE_TABLE => {
                 log::trace!("Formatting simple table");
-                self.output
-                    .push_str(&format_simple_table(node, &self.config, indent));
+                self.output.push_str(&format_simple_table(
+                    node,
+                    &self.config,
+                    &self.sentence_profile,
+                    indent,
+                ));
 
                 if let Some(next) = node.next_sibling()
                     && super::utils::is_block_element(next.kind())
@@ -24,14 +28,18 @@ impl Formatter {
                     self.output.push('\n');
                 }
             }
-            SyntaxKind::MULTILINE_TABLE => {
-                self.output
-                    .push_str(&format_multiline_table(node, &self.config, indent))
-            }
-            SyntaxKind::PIPE_TABLE => {
-                self.output
-                    .push_str(&format_pipe_table(node, &self.config, indent))
-            }
+            SyntaxKind::MULTILINE_TABLE => self.output.push_str(&format_multiline_table(
+                node,
+                &self.config,
+                &self.sentence_profile,
+                indent,
+            )),
+            SyntaxKind::PIPE_TABLE => self.output.push_str(&format_pipe_table(
+                node,
+                &self.config,
+                &self.sentence_profile,
+                indent,
+            )),
             SyntaxKind::GRID_TABLE => {
                 if let Some(next) = node.next_sibling()
                     && self.is_grid_table_continuation_paragraph(&next)
@@ -42,8 +50,12 @@ impl Formatter {
                     }
                     return;
                 }
-                self.output
-                    .push_str(&format_grid_table(node, &self.config, indent));
+                self.output.push_str(&format_grid_table(
+                    node,
+                    &self.config,
+                    &self.sentence_profile,
+                    indent,
+                ));
             }
             _ => unreachable!("format_table received a non-table node"),
         }
@@ -433,9 +445,13 @@ fn format_table_caption_with_language(
     }
 }
 
-fn format_table_caption(caption_text: &str, config: &Config, node: &SyntaxNode) -> String {
-    let mut extra_abbreviations = Vec::new();
-    let profile = resolve_profile(node, config, &mut extra_abbreviations);
+fn format_table_caption(
+    caption_text: &str,
+    config: &Config,
+    node: &SyntaxNode,
+    sentence_profile: &SentenceProfileCache,
+) -> String {
+    let profile = sentence_profile.for_wrap_mode(node, config);
     format_table_caption_with_language(caption_text, config, profile)
 }
 
@@ -735,7 +751,12 @@ fn calculate_grid_column_widths(rows: &[Vec<String>]) -> Vec<usize> {
 }
 
 /// Format a pipe table with consistent alignment and padding
-pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> String {
+pub(super) fn format_pipe_table(
+    node: &SyntaxNode,
+    config: &Config,
+    sentence_profile: &SentenceProfileCache,
+    indent: usize,
+) -> String {
     let mut table_data = extract_pipe_table_data(node, config);
     let mut output = String::new();
 
@@ -829,7 +850,7 @@ pub fn format_pipe_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
 
     if let Some(ref caption_text) = table_data.caption {
         output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
+        let formatted_caption = format_table_caption(caption_text, config, node, sentence_profile);
         output.push_str(&formatted_caption);
         output.push('\n');
     }
@@ -1462,10 +1483,14 @@ fn colspan_separator_segments(separator: &str) -> Vec<Alignment> {
 }
 
 /// Format a grid table with consistent alignment and padding
-pub fn format_grid_table(node: &SyntaxNode, config: &Config, indent: usize) -> String {
+pub(super) fn format_grid_table(
+    node: &SyntaxNode,
+    config: &Config,
+    sentence_profile: &SentenceProfileCache,
+    indent: usize,
+) -> String {
     let raw_table = text_without_line_prefixes(node);
-    let mut extra_abbreviations = Vec::new();
-    let profile = resolve_profile(node, config, &mut extra_abbreviations);
+    let profile = sentence_profile.for_wrap_mode(node, config);
 
     let is_spanning = raw_table.lines().any(|line| {
         (line.trim_start().starts_with('|') && line.contains('+'))
@@ -1613,7 +1638,7 @@ pub fn format_grid_table(node: &SyntaxNode, config: &Config, indent: usize) -> S
 
     if let Some(ref caption_text) = table_data.caption {
         output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
+        let formatted_caption = format_table_caption(caption_text, config, node, sentence_profile);
         output.push_str(&formatted_caption);
         output.push('\n');
     }
@@ -1827,7 +1852,12 @@ fn pad_simple_cell(cell: &str, width: usize, alignment: Alignment) -> String {
 /// single space, and cell text is aligned within its field. This makes the
 /// result independent of the incoming column spacing, so two documents that
 /// parse to the same table format identically and the output is idempotent.
-pub fn format_simple_table(node: &SyntaxNode, config: &Config, indent: usize) -> String {
+fn format_simple_table(
+    node: &SyntaxNode,
+    config: &Config,
+    sentence_profile: &SentenceProfileCache,
+    indent: usize,
+) -> String {
     let raw_table = text_without_line_prefixes(node);
     if !raw_table.is_ascii() {
         return indent_table_block(&raw_table, indent);
@@ -1910,7 +1940,7 @@ pub fn format_simple_table(node: &SyntaxNode, config: &Config, indent: usize) ->
 
     if let Some(ref caption_text) = table_data.caption {
         output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
+        let formatted_caption = format_table_caption(caption_text, config, node, sentence_profile);
         output.push_str(&formatted_caption);
         output.push('\n');
     }
@@ -2158,7 +2188,12 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
 }
 
 /// Format a multiline table preserving column widths and structure
-pub fn format_multiline_table(node: &SyntaxNode, config: &Config, indent: usize) -> String {
+fn format_multiline_table(
+    node: &SyntaxNode,
+    config: &Config,
+    sentence_profile: &SentenceProfileCache,
+    indent: usize,
+) -> String {
     let raw_table = text_without_line_prefixes(node);
     if !raw_table.is_ascii() {
         return indent_table_block(&raw_table, indent);
@@ -2329,7 +2364,7 @@ pub fn format_multiline_table(node: &SyntaxNode, config: &Config, indent: usize)
 
     if let Some(ref caption_text) = table_data.caption {
         output.push('\n');
-        let formatted_caption = format_table_caption(caption_text, config, node);
+        let formatted_caption = format_table_caption(caption_text, config, node, sentence_profile);
         output.push_str(&formatted_caption);
         output.push('\n');
     }

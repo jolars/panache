@@ -1,7 +1,7 @@
 use crate::config::{Config, Dialect};
 use crate::formatter::sentence_wrap::{
-    ResolvedProfile, SentenceBoundaryClass, SentenceLanguage, SentenceSegment,
-    is_sentence_boundary_segment, resolve_profile,
+    ResolvedProfile, SentenceBoundaryClass, SentenceLanguage, SentenceProfileCache,
+    SentenceSegment, is_sentence_boundary_segment,
 };
 use crate::formatter::smart::normalize_smart_punctuation;
 use crate::syntax::{LatexCommand, SyntaxKind, SyntaxNode};
@@ -1362,6 +1362,7 @@ fn process_node_recursive(
 
 pub(super) fn wrapped_lines_for_paragraph(
     config: &Config,
+    sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     width: usize,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -1372,6 +1373,7 @@ pub(super) fn wrapped_lines_for_paragraph(
     log::trace!("wrapped_lines_for_paragraph called with width={}", width);
     let out_lines = wrapped_lines_for_node(
         config,
+        sentence_profile,
         node,
         &[width],
         format_inline_fn,
@@ -1383,6 +1385,7 @@ pub(super) fn wrapped_lines_for_paragraph(
 
 pub(super) fn wrapped_lines_for_paragraph_with_widths(
     config: &Config,
+    sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -1393,6 +1396,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
     log::trace!("wrapped_lines_for_paragraph_with_widths called");
     let out_lines = wrapped_lines_for_node(
         config,
+        sentence_profile,
         node,
         widths,
         format_inline_fn,
@@ -1404,6 +1408,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
 
 pub(super) fn sentence_lines_for_paragraph(
     config: &Config,
+    sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
@@ -1413,6 +1418,7 @@ pub(super) fn sentence_lines_for_paragraph(
     log::trace!("sentence_lines_for_paragraph called");
     wrapped_lines_for_node(
         config,
+        sentence_profile,
         node,
         &[],
         format_inline_fn,
@@ -1422,6 +1428,7 @@ pub(super) fn sentence_lines_for_paragraph(
 
 pub(super) fn semantic_lines_for_paragraph(
     config: &Config,
+    sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
 ) -> Vec<String> {
@@ -1431,6 +1438,7 @@ pub(super) fn semantic_lines_for_paragraph(
     log::trace!("semantic_lines_for_paragraph called");
     wrapped_lines_for_node(
         config,
+        sentence_profile,
         node,
         &[],
         format_inline_fn,
@@ -1501,6 +1509,7 @@ fn east_asian_break_creates_subscript(config: &Config, node: &SyntaxNode) -> boo
 
 pub(super) fn wrapped_lines_for_node(
     config: &Config,
+    sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     widths: &[usize],
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -1513,8 +1522,11 @@ pub(super) fn wrapped_lines_for_node(
     } else {
         &[1]
     };
-    let mut extra_abbreviations = Vec::new();
-    let profile = resolve_profile(node, config, &mut extra_abbreviations);
+    let profile = if sentence_mode {
+        sentence_profile.resolve(node, config)
+    } else {
+        ResolvedProfile::builtin_only(SentenceLanguage::English)
+    };
     let escape_literal_tildes =
         !options.preserve_newlines && east_asian_break_creates_subscript(config, node);
     let mut builder = TraversalBuilder::new(

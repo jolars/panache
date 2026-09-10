@@ -13,12 +13,14 @@ use super::headings;
 use super::inline;
 use super::inline_layout;
 use super::paragraphs;
+use super::sentence_wrap::SentenceProfileCache;
 use super::tables;
 use super::utils::is_structural_block;
 
 pub struct Formatter {
     pub(super) output: String,
     pub(super) config: Config,
+    pub(super) sentence_profile: SentenceProfileCache,
     pub(super) consecutive_blank_lines: usize,
     pub(super) fenced_div_depth: usize,
     pub(super) formatted_code: FormattedCodeMap,
@@ -48,6 +50,7 @@ impl Formatter {
         Self {
             output: String::with_capacity(8192),
             config,
+            sentence_profile: SentenceProfileCache::default(),
             consecutive_blank_lines: 0,
             fenced_div_depth: 0,
             formatted_code,
@@ -99,9 +102,13 @@ impl Formatter {
         node: &SyntaxNode,
         width: usize,
     ) -> Vec<String> {
-        inline_layout::wrapped_lines_for_paragraph(&self.config, node, width, &|n| {
-            self.format_inline_node(n)
-        })
+        inline_layout::wrapped_lines_for_paragraph(
+            &self.config,
+            &self.sentence_profile,
+            node,
+            width,
+            &|n| self.format_inline_node(n),
+        )
     }
 
     pub(super) fn wrapped_lines_for_paragraph_with_widths(
@@ -109,21 +116,31 @@ impl Formatter {
         node: &SyntaxNode,
         widths: &[usize],
     ) -> Vec<String> {
-        inline_layout::wrapped_lines_for_paragraph_with_widths(&self.config, node, widths, &|n| {
-            self.format_inline_node(n)
-        })
+        inline_layout::wrapped_lines_for_paragraph_with_widths(
+            &self.config,
+            &self.sentence_profile,
+            node,
+            widths,
+            &|n| self.format_inline_node(n),
+        )
     }
 
     pub(super) fn sentence_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
-        inline_layout::sentence_lines_for_paragraph(&self.config, node, &|n| {
-            self.format_inline_node(n)
-        })
+        inline_layout::sentence_lines_for_paragraph(
+            &self.config,
+            &self.sentence_profile,
+            node,
+            &|n| self.format_inline_node(n),
+        )
     }
 
     pub(super) fn semantic_lines_for_paragraph(&self, node: &SyntaxNode) -> Vec<String> {
-        inline_layout::semantic_lines_for_paragraph(&self.config, node, &|n| {
-            self.format_inline_node(n)
-        })
+        inline_layout::semantic_lines_for_paragraph(
+            &self.config,
+            &self.sentence_profile,
+            node,
+            &|n| self.format_inline_node(n),
+        )
     }
 
     pub(super) fn format_heading(&self, node: &SyntaxNode) -> String {

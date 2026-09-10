@@ -1,5 +1,6 @@
-use crate::config::Config;
+use crate::config::{Config, WrapMode};
 use crate::syntax::{SyntaxKind, SyntaxNode};
+use std::sync::OnceLock;
 
 #[derive(Clone, Copy)]
 pub(super) enum SentenceLanguage {
@@ -421,7 +422,7 @@ fn sentence_language_for(lang: Option<&str>) -> SentenceLanguage {
 
 /// Merge the user-configured no-break abbreviations that apply to `lang`:
 /// the `default` bucket plus the bucket for the language's primary subtag,
-/// each normalized to a comparison candidate. Shared by [`resolve_profile`]
+/// each normalized to a comparison candidate. Shared by [`SentenceProfileCache`]
 /// (markdown path) and the YAML formatter bridge so both resolve the same
 /// set.
 pub(super) fn merge_no_break_list(config: &Config, lang: Option<&str>) -> Vec<String> {
@@ -459,24 +460,34 @@ pub(super) fn profile_from<'a>(
     }
 }
 
-/// Resolve the built-in profile plus any user-configured no-break abbreviations
-/// for `node`'s document language. `scratch` owns the normalized user entries
-/// for the lifetime of the returned profile. Built once per node-wrap; this
-/// could be hoisted to once-per-document if profiling ever warrants it.
-pub(super) fn resolve_profile<'a>(
-    node: &SyntaxNode,
-    config: &Config,
-    scratch: &'a mut Vec<String>,
-) -> ResolvedProfile<'a> {
-    let lang = resolve_lang_string(node, config.lang.as_deref());
-    let language = sentence_language_for(lang.as_deref());
+/// Each formatter owns one cache so wrapping many blocks only reads the
+/// document's metadata and normalizes its abbreviations once.
+#[derive(Default)]
+pub(super) struct SentenceProfileCache {
+    profile: OnceLock<(SentenceLanguage, Vec<String>)>,
+}
 
-    scratch.clear();
-    scratch.extend(merge_no_break_list(config, lang.as_deref()));
+impl SentenceProfileCache {
+    pub(super) fn resolve(&self, node: &SyntaxNode, config: &Config) -> ResolvedProfile<'_> {
+        let (language, extra_no_break) = self.profile.get_or_init(|| {
+            let lang = resolve_lang_string(node, config.lang.as_deref());
+            (
+                sentence_language_for(lang.as_deref()),
+                merge_no_break_list(config, lang.as_deref()),
+            )
+        });
+        ResolvedProfile {
+            builtin: language.profile(),
+            extra_no_break,
+        }
+    }
 
-    ResolvedProfile {
-        builtin: language.profile(),
-        extra_no_break: scratch.as_slice(),
+    pub(super) fn for_wrap_mode(&self, node: &SyntaxNode, config: &Config) -> ResolvedProfile<'_> {
+        if matches!(config.wrap, Some(WrapMode::Sentence | WrapMode::Semantic)) {
+            self.resolve(node, config)
+        } else {
+            ResolvedProfile::builtin_only(SentenceLanguage::English)
+        }
     }
 }
 
