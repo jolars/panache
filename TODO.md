@@ -306,6 +306,14 @@ Note any known parser issues here.
   would retain green trees across parses and would also flatter the
   benchmark, which reuses one process).
 
+- [ ] Fix the CST placement of a restricted ordered marker after an outdented
+  mixed-style list. Reproducer (with `\n` denoting newlines):
+  `+ outer\n  1. nested\n    1) deep\n  2. following\n`. Pandoc puts
+  `2. following` in a `Plain` block of the outer bullet item; Panache keeps
+  it inside the `1)` item. Found while checking the semantic-wrapping
+  reproduction against Pandoc. This separate parser-shape divergence remains
+  even when formatting is idempotent.
+
 ### Incremental Parsing
 
 The LSP splices its tree off the previous parse through a four-tier ladder ---
@@ -434,26 +442,6 @@ the spec files in `assets/pandoc-spec/`.
 - [x] Nested lists
 - [x] List item continuation
 - [x] Complex nested mixed lists
-- [x] Fix `wrap = "semantic"` idempotency for nested mixed ordered lists. Found
-  in [yamark's generated
-  Markdown](https://github.com/t-kalinowski/yamark/blob/b0bc600d1fb79a4d2b8bf6a1bd8a306da96b84c6/tools/bench/big.R)
-  (seed `20260602`): the first pass separates alphabetic markers (`a.`
-  through `e.`) from their content; the second rejoins them and changes
-  nested Roman numeral indentation. Reproduce by formatting twice via stdin
-  with `panache --isolated --no-cache format -o wrap=semantic` and comparing
-  outputs. Confirmed before (`2de3bd84`) and after (`4029e622`) the
-  sentence-profile caching fix, with identical first- and second-pass
-  outputs between versions. Fixed by keeping underindented markers in the
-  enclosing plain block and escaping literal fancy markers when semantic
-  wrapping normalizes their indentation. Regression fixtures cover both the
-  parser shape and formatter idempotency.
-- [ ] Fix the CST placement of a restricted ordered marker after an outdented
-  mixed-style list. Reproducer (with `\n` denoting newlines):
-  `+ outer\n  1. nested\n    1) deep\n  2. following\n`. Pandoc puts
-  `2. following` in a `Plain` block of the outer bullet item; Panache keeps
-  it inside the `1)` item. Found while checking the semantic-wrapping
-  reproduction against Pandoc. This separate parser-shape divergence remains
-  even when formatting is idempotent.
 - [x] Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
 - [ ] Extension: `startnum` - Start ordered lists at arbitrary number (low
   priority, if we even should support this)
