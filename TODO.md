@@ -240,47 +240,6 @@ the test projector.
 
 ## Parser
 
-### Downstream document consumers (Polydoc)
-
-Polydoc will use `panache-parser` as an in-process reader for supported GFM and
-QMD profiles, translate the result into its own document IR, optionally execute
-code cells, and render HTML itself. Panache should expose syntax and provenance
-conveniently without taking ownership of execution, document-model, or rendering
-policy.
-
-- [x] Add consumer-facing, typed `BlockNode` and `InlineNode` enums and
-  iterators over semantic children. Cover the supported Markdown containers
-  and leaves, distinguish trivia explicitly, and retain an
-  unknown/unsupported case carrying the original syntax kind, node, and
-  range so consumers cannot drop new syntax silently.
-- [x] Add typed child traversal for paragraphs, headings, block quotes, list
-  items, table cells, alerts/callouts, and fenced divs. A consumer should be
-  able to build a normalized document tree without matching raw `SyntaxKind`
-  values or depending on CST child layout.
-- [x] Complete the common semantic accessors needed by a document adapter:
-  decoded text, attributes, link and image targets, heading levels, table
-  alignment, and host-aligned ranges for both complete constructs and their
-  meaningful payloads. Keep these views lossless and policy-free.
-- [x] Add a consolidated executable-code-cell view over `CodeBlock`: language,
-  full cell and code ranges, executable source with hashpipe option lines
-  excluded, labels/classes/identifier, and every inline or hashpipe option
-  with its value, provenance, and source range. Preserve duplicate and
-  overridden declarations so a downstream validator can diagnose them;
-  provide a separate resolved view only when precedence is unambiguous.
-- [x] Provide a direct typed path from document frontmatter and hashpipe hosts
-  to their parsed YAML documents, cooked scalar values, and host ranges
-  while retaining the existing embedded-language syntax errors. Consumers
-  should not need to locate internal YAML wrapper nodes or parse YAML a
-  second time.
-- [x] Add a small downstream-consumer test corpus covering GFM prose, QMD cells,
-  hashpipe options, nested containers, tables, callouts, raw constructs, and
-  malformed embedded YAML. Assert typed traversal, source ranges, and
-  visible unsupported nodes rather than serialized Pandoc output.
-- [x] Document this API as a CST-to-consumer adapter surface. Do not make
-  `to_pandoc_ast` or `to_pandoc_json` its contract: those projectors remain
-  Pandoc-conformance tools, and downstream applications retain their own IR
-  and rendering policy.
-
 ### Issues
 
 Note any known parser issues here.
