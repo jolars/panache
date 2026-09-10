@@ -637,7 +637,7 @@ for initial implementation.
 
 ## Formatter
 
-- [ ] Fix duplicated blockquote prefixes in list content under
+- [x] Fix duplicated blockquote prefixes in list content under
   `wrap = "preserve"`. Minimal reproducer: `> - outer\n>   continuation\n`
   becomes `> - outer\n>   >   continuation\n` on the first pass and changes
   again on the second. Confirmed on `20c50f1e`, before the restricted-marker

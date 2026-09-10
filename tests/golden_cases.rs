@@ -168,6 +168,7 @@ golden_test_cases!(
     blockquote_in_fenced_div_idempotency_310,
     blockquote_list_blanks,
     blockquote_list_blockquote,
+    blockquote_list_preserve,
     blockquote_list_item_atx_heading,
     blockquote_list_item_html_block,
     blockquote_multiline_table,

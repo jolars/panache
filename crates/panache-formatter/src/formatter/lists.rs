@@ -8,7 +8,7 @@ use panache_parser::parser::blocks::headings::try_parse_atx_heading;
 use rowan::NodeOrToken;
 
 use super::Formatter;
-use super::preserve::{self, preserve_lines};
+use super::preserve::{preserve_lines, preserve_lines_unprefixed};
 use super::utils::is_block_element;
 
 impl Formatter {
@@ -573,7 +573,7 @@ impl Formatter {
         match wrap_mode {
             WrapMode::Preserve => {
                 let escaped = self.config.formatter_extensions.escaped_line_breaks;
-                for line in preserve::preserve_lines(node, escaped) {
+                for line in preserve_lines_unprefixed(node, escaped) {
                     self.output.push_str(&" ".repeat(indent));
                     self.output.push_str(line.trim_start());
                     self.output.push('\n');
@@ -1211,7 +1211,7 @@ impl Formatter {
                 Some(
                     content_node
                         .as_ref()
-                        .map(|content| preserve::preserve_lines(content, escaped))
+                        .map(|content| preserve_lines_unprefixed(content, escaped))
                         .unwrap_or_default(),
                 )
             }

@@ -1,4 +1,4 @@
-use panache_formatter::config::WrapMode;
+use panache_formatter::config::{Extensions, Flavor, FormatterExtensions, WrapMode};
 use panache_formatter::{Config, format};
 
 fn cfg_preserve() -> Config {
@@ -74,6 +74,35 @@ fn list_item_preserve_keeps_line_breaks() {
 5. **Spline model**:  Enhance the interaction model further with ten natural spline basis functions for a set of predictors.
 ";
     assert_eq!(out, expected);
+}
+
+#[test]
+fn quoted_list_preserve_rebuilds_container_prefixes() {
+    let cases = [
+        "> - outer\n>   continuation\n",
+        "> - outer\r\n>   continuation\r\n",
+        "> > - outer\n> >   continuation\n",
+        "> - outer\n>   continuation\n>   - inner\n>     continuation\n",
+        "- > - inner\n  >   continuation\n",
+        "> - outer\n>   continuation\n>\n>   second\n>   paragraph\n",
+        "> 1. outer\n>    continuation\n",
+        "> - outer\\\n>   continuation\n",
+        "> - outer\n>   \\> literal\n",
+    ];
+
+    for flavor in [Flavor::Pandoc, Flavor::CommonMark] {
+        let config = Config {
+            flavor,
+            parser_extensions: Extensions::for_flavor(flavor),
+            formatter_extensions: FormatterExtensions::for_flavor(flavor),
+            ..cfg_preserve()
+        };
+        for input in cases {
+            let output = format(input, Some(config.clone()), None);
+            assert_eq!(output, input, "flavor: {flavor:?}, input: {input:?}");
+            assert_eq!(format(&output, Some(config.clone()), None), output);
+        }
+    }
 }
 
 #[test]

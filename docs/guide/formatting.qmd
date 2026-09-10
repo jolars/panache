@@ -696,6 +696,14 @@ Output
     > This is a block quote. This paragraph has two lines.
     ```
 
+With `wrap = "preserve"`, line breaks within quoted list items are kept, and
+each continuation line receives the quote markers and list indentation once:
+
+```markdown
+> - outer
+>   continuation
+```
+
 ## Tables
 
 Panache supports all Pandoc table types and normalizes alignment and spacing
