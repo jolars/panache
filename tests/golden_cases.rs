@@ -556,6 +556,7 @@ golden_test_cases!(
     semantic_wrap_moser,
     semantic_wrap_preserve_clause_breaks,
     semantic_wrap_abbreviations,
+    semantic_wrap_underindented_fancy_markers,
     table_with_caption,
     table_caption_duplicate,
     tables_sequential,

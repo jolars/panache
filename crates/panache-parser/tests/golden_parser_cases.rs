@@ -107,6 +107,22 @@ fn run_golden_case(case_name: &str) {
 }
 
 #[test]
+fn list_underindented_fancy_markers_pandoc() {
+    use panache_parser::syntax::{AstNode, ListItem, Plain};
+
+    let input = include_str!("fixtures/cases/list_underindented_fancy_markers_pandoc/input.md");
+    let tree = parse(input, None);
+    for item in tree.descendants().filter_map(ListItem::cast) {
+        assert_eq!(
+            item.syntax().children().filter_map(Plain::cast).count(),
+            1,
+            "underindented markers must stay in the item's single plain block"
+        );
+    }
+    run_golden_case("list_underindented_fancy_markers_pandoc");
+}
+
+#[test]
 fn issue_195_canonical_shape_delta() {
     let once_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")

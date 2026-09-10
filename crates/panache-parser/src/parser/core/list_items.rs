@@ -601,11 +601,14 @@ impl<'a> Parser<'a> {
     /// code territory, and indented code cannot interrupt a paragraph — so
     /// pandoc folds the line in as a soft break instead. `A.`/`I.`/`(6)`/`c)`
     /// (corpus case 0116) is the shape that depends on this.
+    /// A marker indented at least four columns but short of the item's content
+    /// column is also lazy text: it cannot open either an outer or inner list.
     pub(super) fn restricted_sublist_interrupts(&self, content: &str) -> bool {
         let Some(indent_cols) = self.restricted_ordered_sublist_indent(content) else {
             return false;
         };
-        lists::innermost_content_col(&self.containers).is_none_or(|col| indent_cols < col + 4)
+        lists::innermost_content_col(&self.containers)
+            .is_none_or(|col| (indent_cols < 4 || indent_cols >= col) && indent_cols < col + 4)
     }
 
     /// Append `line` to whichever open text buffer is holding the current

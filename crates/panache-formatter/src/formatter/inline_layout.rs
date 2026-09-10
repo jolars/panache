@@ -4,7 +4,7 @@ use crate::formatter::sentence_wrap::{
     SentenceSegment, is_sentence_boundary_segment,
 };
 use crate::formatter::smart::normalize_smart_punctuation;
-use crate::syntax::{LatexCommand, SyntaxKind, SyntaxNode};
+use crate::syntax::{LatexCommand, ListItem, SyntaxKind, SyntaxNode};
 use panache_parser::parser::inlines::subscript::try_parse_subscript;
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -435,6 +435,26 @@ fn is_unsafe_list_line_start_piece(piece: &str) -> bool {
         || is_bullet_list_marker_piece(piece)
 }
 
+fn escape_fancy_list_marker(piece: &str) -> Option<String> {
+    let unescaped = match piece.rsplit_once('\\') {
+        Some((head, punctuation @ ("." | ")"))) => Cow::Owned(format!("{head}{punctuation}")),
+        _ => Cow::Borrowed(piece),
+    };
+    if !is_fancy_alpha_marker_piece(&unescaped)
+        && !is_fancy_roman_marker_piece(&unescaped)
+        && !is_fancy_paren_decimal_marker_piece(&unescaped)
+        && !is_fancy_paren_alpha_or_roman_marker_piece(&unescaped)
+    {
+        return None;
+    }
+    if matches!(unescaped, Cow::Owned(_)) {
+        return Some(piece.to_string());
+    }
+    let mut escaped = piece.to_string();
+    escaped.insert(piece.len() - 1, '\\');
+    Some(escaped)
+}
+
 fn is_atx_heading_marker_piece(piece: &str) -> bool {
     !piece.is_empty() && piece.len() <= 6 && piece.bytes().all(|b| b == b'#')
 }
@@ -460,6 +480,7 @@ struct StreamingCoreSink<'a> {
     avoid_definition_marker_line_start: bool,
     avoid_heading_line_start: bool,
     avoid_tilde_fence_line_start: bool,
+    escape_fancy_list_line_start: bool,
 }
 
 impl<'a> StreamingCoreSink<'a> {
@@ -492,6 +513,7 @@ impl<'a> StreamingCoreSink<'a> {
             avoid_definition_marker_line_start,
             avoid_heading_line_start,
             avoid_tilde_fence_line_start,
+            escape_fancy_list_line_start: false,
         }
     }
 
@@ -534,12 +556,24 @@ impl<'a> StreamingCoreSink<'a> {
             self.line.push(' ');
             self.line_width += 1;
         }
-        self.line.push_str(&segment.text);
-        self.line_width += piece_width;
+        // Reindenting lazy list-item text can turn a preserved line's literal
+        // marker into a sublist. Keep it literal and attached to its text on
+        // subsequent passes, when its punctuation is already escaped.
+        let escaped_marker = (self.escape_fancy_list_line_start && !self.line_has_piece)
+            .then(|| escape_fancy_list_marker(&segment.text))
+            .flatten();
+        if let Some(escaped) = &escaped_marker {
+            self.line.push_str(escaped);
+            self.line_width += UnicodeWidthStr::width(escaped.as_str());
+        } else {
+            self.line.push_str(&segment.text);
+            self.line_width += piece_width;
+        }
         self.line_has_piece = true;
         self.prev_ws_after = segment.has_whitespace_after;
 
         if self.sentence_mode
+            && escaped_marker.is_none()
             && is_sentence_boundary_segment(&segment, next_segment, is_last, self.profile)
             && !next_segment.is_some_and(|next| self.piece_would_start_unsafe_line(&next.text))
         {
@@ -1541,6 +1575,11 @@ pub(super) fn wrapped_lines_for_node(
         options.preserve_newlines,
         escape_literal_tildes,
     );
+    builder.sink.escape_fancy_list_line_start = options.preserve_newlines
+        && config.parser_extensions.fancy_lists
+        && node
+            .ancestors()
+            .any(|ancestor| ListItem::can_cast(ancestor.kind()));
     process_node_recursive(
         config,
         node,

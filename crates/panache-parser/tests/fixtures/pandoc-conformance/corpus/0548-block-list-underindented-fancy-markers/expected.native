@@ -1,0 +1,31 @@
+[ OrderedList
+    ( 1 , Decimal , TwoParens )
+    [ [ Plain
+          [ Str "nested"
+          , SoftBreak
+          , Str "a."
+          , Space
+          , Str "deep"
+          , SoftBreak
+          , Str "b."
+          , Space
+          , Str "next"
+          ]
+      ]
+    ]
+, OrderedList
+    ( 1 , LowerAlpha , Period )
+    [ [ Plain
+          [ Str "nested"
+          , SoftBreak
+          , Str "I)"
+          , Space
+          , Str "deep"
+          , SoftBreak
+          , Str "II)"
+          , Space
+          , Str "next"
+          ]
+      ]
+    ]
+]

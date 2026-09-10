@@ -70,6 +70,11 @@ formatting idempotent (`panache format` followed by `panache format --check`
 always succeeds). Genuine, well-formed lists are unaffected and continue to wrap
 normally.
 
+Within a list item, `semantic` wrapping escapes literal fancy-list markers such
+as `a.` and `II)` at the start of a line. This keeps underindented continuation
+text from becoming a nested list when its indentation is normalized, and keeps
+each marker attached to its following text.
+
 The abbreviation list follows the document language. When metadata provides
 `lang` (as in Quarto and Pandoc frontmatter), Panache selects a built-in profile
 for it; profiles ship for English, Czech, German, Spanish, and French, and

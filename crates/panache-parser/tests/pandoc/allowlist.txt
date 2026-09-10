@@ -847,3 +847,7 @@
 # paragraph, but it can begin immediately after a completed ATX heading. The
 # initial block probe now carries that semantic boundary into quote detection.
 547
+
+# Underindented fancy markers cannot interrupt the enclosing item's plain
+# block, including markers whose start number would be restricted in a sublist.
+548
