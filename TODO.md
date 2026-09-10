@@ -434,6 +434,17 @@ the spec files in `assets/pandoc-spec/`.
 - [x] Nested lists
 - [x] List item continuation
 - [x] Complex nested mixed lists
+- [ ] Fix `wrap = "semantic"` idempotency for nested mixed ordered lists. Found
+  in [yamark's generated
+  Markdown](https://github.com/t-kalinowski/yamark/blob/b0bc600d1fb79a4d2b8bf6a1bd8a306da96b84c6/tools/bench/big.R)
+  (seed `20260602`): the first pass separates alphabetic markers (`a.`
+  through `e.`) from their content; the second rejoins them and changes
+  nested Roman numeral indentation. Reproduce by formatting twice via stdin
+  with `panache --isolated --no-cache format -o wrap=semantic` and comparing
+  outputs. Confirmed before (`2de3bd84`) and after (`4029e622`) the
+  sentence-profile caching fix, with identical first- and second-pass
+  outputs between versions. Reduce to focused fixtures and inspect the CST
+  before changing the formatter.
 - [x] Extension: `fancy_lists` - Roman numerals, letters `(a)`, `A)`, etc.
 - [ ] Extension: `startnum` - Start ordered lists at arbitrary number (low
   priority, if we even should support this)
