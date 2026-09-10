@@ -197,47 +197,6 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
 - [ ] Auto-fix capability per rule (infrastructure exists, rules need
   implementation)
 
-## Math parser and formatter redesign
-
-Markdown and LaTeX math bodies use the same TeX-math grammar. Within a math
-body, Panache's CST should therefore be structurally isomorphic to Badness's:
-the same token boundaries, node hierarchy, attachment rules, recovery behavior,
-and semantic views, with only a mechanical `MATH_*` kind prefix where Panache's
-global kind namespace or host-byte filtering requires it. Badness's `MATH` node
-corresponds to Panache's native, lossless `MATH_CONTENT` subtree.
-
-Panache still owns its complete production implementation. There must be no
-runtime Badness dependency, shared crate, formatter delegation, foreign CST in
-Salsa, or projection step in the parser, formatter, linter, or language server.
-Pinned Badness crates are permitted as development-only differential oracles;
-their trees and formatted output exist only inside tests.
-
-Panache's host parser remains responsible for Pandoc/CommonMark delimiter rules,
-deciding which raw environments contain math, container-prefix handling,
-Bookdown equation labels, Pandoc attributes, source-range mapping, and
-delimiter-style policy. Keep these host constructs outside the TeX-math subtree
-where possible. Unavoidable interleaved host trivia, such as blockquote and list
-prefixes, is the only structural exception and must be ignored mechanically by
-the test projector.
-
-### Completed foundation
-
-- [x] Pin `badness-parser` and `badness-formatter` as development-only oracles;
-  add mechanical CST projectors, a parser differential report, and
-  controlled formatter wrappers. The shared parser corpus currently passes
-  82/82 cases.
-- [x] Match Badness's lexical and structural CST for the shared corpus,
-  including commands and arguments, scripts, environments, `\left`/`\right`,
-  and malformed-input recovery.
-- [x] Add Panache-owned built-in signatures, argument domains, raw-TeX
-  redefinition overlays, atom metadata, Unicode-scalar iteration, structural
-  atoms, and scripted-base inheritance.
-- [x] Keep `MATH_SPACE` and `MATH_NEWLINE` distinct from host trivia, strip
-  injected container prefixes in `math_content_text()`, and retain direct
-  host-document ranges.
-- [x] Surface `math-syntax` diagnostics through native CST walks shared by the
-  formatter, linter, and language server.
-
 ## Parser
 
 ### Issues
