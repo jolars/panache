@@ -107,6 +107,19 @@ fn run_golden_case(case_name: &str) {
 }
 
 #[test]
+fn list_restricted_marker_outdent() {
+    use panache_parser::syntax::{AstNode, ListItem, Plain};
+
+    let input = include_str!("fixtures/cases/list_restricted_marker_outdent/input.md");
+    let tree = parse(input, None);
+    let outer_item = tree.descendants().find_map(ListItem::cast).unwrap();
+    let trailing = outer_item.syntax().children().last().unwrap();
+    let plain = Plain::cast(trailing).expect("the outdented marker belongs to the outer item");
+    assert_eq!(plain.syntax().text().to_string().trim(), "2. following");
+    run_golden_case("list_restricted_marker_outdent");
+}
+
+#[test]
 fn list_underindented_fancy_markers_pandoc() {
     use panache_parser::syntax::{AstNode, ListItem, Plain};
 

@@ -902,6 +902,66 @@ fn ordered_sublist_must_start_at_one_under_pandoc_3_10() {
 }
 
 #[test]
+fn restricted_ordered_marker_outdent_returns_to_enclosing_item() {
+    for (input, expected_depth) in [
+        ("+ outer\n  1. nested\n    1) deep\n  2. following\n", 1),
+        ("+ outer\n  1. nested\n    1) deep\n     2. following\n", 1),
+        ("+ outer\n  1. nested\n    1) deep\n\n  2. following\n", 1),
+        (
+            "> + outer\n>   1. nested\n>     1) deep\n>   2. following\n",
+            1,
+        ),
+        (
+            "+ root\n  + outer\n    1. nested\n      1) deep\n    2. following\n",
+            2,
+        ),
+    ] {
+        let tree = parse_blocks(input);
+        let trailing = find_all(&tree, SyntaxKind::PLAIN)
+            .into_iter()
+            .find(|node| node.text().to_string().contains("2. following"))
+            .expect("the restricted marker should form a plain block");
+        assert!(!trailing.text().to_string().contains("deep"), "{input:?}");
+        assert_eq!(list_item_depth(&trailing), expected_depth, "{input:?}");
+        assert_eq!(tree.text().to_string(), input, "parse must stay lossless");
+    }
+}
+
+#[test]
+fn restricted_ordered_marker_outdent_can_open_a_top_level_list() {
+    let input = "+ outer\n  1. nested\n    1) deep\n2. following\n";
+    let tree = parse_blocks(input);
+    assert_eq!(count_children(&tree, SyntaxKind::LIST), 2);
+    let trailing = tree.children().last().unwrap();
+    assert_eq!(trailing.text().to_string(), "2. following\n");
+    assert_eq!(tree.text().to_string(), input, "parse must stay lossless");
+}
+
+#[test]
+fn ordered_marker_outdent_keeps_matching_outer_list_open() {
+    let input = "+ outer\n  1. nested\n     1) deep\n  2. following\n";
+    let tree = parse_blocks(input);
+    let lists = find_all(&tree, SyntaxKind::LIST);
+    assert_eq!(lists.len(), 3);
+    assert_eq!(count_children(&lists[1], SyntaxKind::LIST_ITEM), 2);
+    assert_eq!(tree.text().to_string(), input, "parse must stay lossless");
+}
+
+#[test]
+fn ordered_marker_outdent_without_sublist_start_restriction() {
+    let input = "+ outer\n  1. nested\n    1) deep\n  2. following\n";
+    let tree = parse_blocks_pandoc_3_9(input);
+    let lists = find_all(&tree, SyntaxKind::LIST);
+    assert_eq!(
+        lists.len(),
+        4,
+        "the outdented marker should open a new list"
+    );
+    assert_eq!(lists[3].text().to_string().trim(), "2. following");
+    assert_eq!(tree.text().to_string(), input, "parse must stay lossless");
+}
+
+#[test]
 fn ordered_sublist_start_rule_leaves_sibling_items_alone() {
     for (input, expected_lists) in [
         ("1. a\n2. b\n", 1),

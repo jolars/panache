@@ -518,6 +518,12 @@ Output:
 
 Ordered lists are handled similarly to [unordered lists].
 
+In Pandoc-based flavors targeting Pandoc 3.10 or later, a new ordered sublist
+must start at `1` or its equivalent in another numbering style. A marker
+rejected by this rule remains text. After an outdent, that text belongs to the
+enclosing item at the marker's indentation level, including when the preceding
+list uses a different marker style.
+
 ### Task Lists
 
 GitHub-style task lists use the standardized `-` marker. Nested items align with

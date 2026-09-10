@@ -306,13 +306,12 @@ Note any known parser issues here.
   would retain green trees across parses and would also flatter the
   benchmark, which reuses one process).
 
-- [ ] Fix the CST placement of a restricted ordered marker after an outdented
+- [x] Fix the CST placement of a restricted ordered marker after an outdented
   mixed-style list. Reproducer (with `\n` denoting newlines):
-  `+ outer\n  1. nested\n    1) deep\n  2. following\n`. Pandoc puts
-  `2. following` in a `Plain` block of the outer bullet item; Panache keeps
-  it inside the `1)` item. Found while checking the semantic-wrapping
-  reproduction against Pandoc. This separate parser-shape divergence remains
-  even when formatting is idempotent.
+  `+ outer\n  1. nested\n    1) deep\n  2. following\n`. The trailing
+  `2. following` now belongs to a `Plain` block of the outer bullet item,
+  matching Pandoc. Parser and formatter fixtures pin this placement, with
+  focused parser tests for quoted and deeper variants.
 
 ### Incremental Parsing
 
@@ -717,6 +716,14 @@ for initial implementation.
 ### Won't Implement
 
 - Format-specific output conventions (e.g., `gutenberg` for plain text output)
+
+## Formatter
+
+- [ ] Fix duplicated blockquote prefixes in list content under
+  `wrap = "preserve"`. Minimal reproducer: `> - outer\n>   continuation\n`
+  becomes `> - outer\n>   >   continuation\n` on the first pass and changes
+  again on the second. Confirmed on `20c50f1e`, before the restricted-marker
+  outdent fix.
 
 ## Additional Markdown flavors
 

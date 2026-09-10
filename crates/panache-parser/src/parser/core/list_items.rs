@@ -547,14 +547,14 @@ impl<'a> Parser<'a> {
     /// there `2.` matches the open list on the stack and continues it as a
     /// sibling item, which pandoc still accepts at any number. Only a marker
     /// with no matching open list would push a fresh `Container::List`.
-    /// Returns the marker's indent (columns) when restricted, so callers that
-    /// care about *where* the marker sits can apply their own column rules.
+    /// Returns the restricted marker and its indent (columns), so callers can
+    /// resolve the list level it interrupts before treating it as text.
     ///
     /// CommonMark is unaffected: `pandoc -f commonmark -t native` still nests
     /// `- item` / `2. sub` as an `OrderedList (2, ...)`. The 3.10 change is a
     /// pandoc-markdown reader rule, so it branches on dialect, not just on the
     /// compat target (which every flavor shares).
-    pub(super) fn restricted_ordered_sublist_indent(&self, content: &str) -> Option<usize> {
+    fn restricted_ordered_sublist_marker(&self, content: &str) -> Option<(usize, ListMarker)> {
         if self.config.dialect == crate::options::Dialect::CommonMark {
             return None;
         }
@@ -587,28 +587,40 @@ impl<'a> Parser<'a> {
             Some(level) => lists::open_item_content_col_in_list(&self.containers, level)
                 .is_some_and(|col| indent_cols >= col),
         };
-        opens_new_list.then_some(indent_cols)
+        opens_new_list.then_some((indent_cols, marker_match.marker))
     }
 
     pub(super) fn restricted_ordered_sublist(&self, content: &str) -> bool {
-        self.restricted_ordered_sublist_indent(content).is_some()
+        self.restricted_ordered_sublist_marker(content).is_some()
     }
 
-    /// Whether a restricted marker on this line still ends the block above it.
+    /// End the blocks interrupted by a restricted marker before buffering it as text.
     ///
-    /// It does everywhere a block could start, but 4+ columns past the
-    /// enclosing content column no block can start at all — that is indented
-    /// code territory, and indented code cannot interrupt a paragraph — so
-    /// pandoc folds the line in as a soft break instead. `A.`/`I.`/`(6)`/`c)`
-    /// (corpus case 0116) is the shape that depends on this.
-    /// A marker indented at least four columns but short of the item's content
-    /// column is also lazy text: it cannot open either an outer or inner list.
-    pub(super) fn restricted_sublist_interrupts(&self, content: &str) -> bool {
-        let Some(indent_cols) = self.restricted_ordered_sublist_indent(content) else {
-            return false;
+    /// A restricted marker still triggers Pandoc's list-start fence. Close the
+    /// lists selected by the same indentation bands as an accepted marker, so
+    /// an outdented line belongs to its enclosing item rather than the inner
+    /// list that the dispatcher will no longer visit.
+    ///
+    /// Without a list-start fence, a marker four or more columns past the
+    /// enclosing content column is lazy text: indented code cannot interrupt
+    /// a paragraph. `A.`/`I.`/`(6)`/`c)` (corpus case 0116) depends on this.
+    /// An underindented marker outside every band's tolerance is also lazy
+    /// text because it cannot open either an outer or inner list.
+    pub(super) fn interrupt_restricted_sublist(&mut self, content: &str) {
+        let Some((indent_cols, marker)) = self.restricted_ordered_sublist_marker(content) else {
+            return;
         };
-        lists::innermost_content_col(&self.containers)
-            .is_none_or(|col| (indent_cols < 4 || indent_cols >= col) && indent_cols < col + 4)
+        if let Some(band) =
+            lists::band_fence_level(&self.containers, &marker, indent_cols, self.config.dialect)
+        {
+            self.close_containers_to(band.level);
+        } else if lists::innermost_content_col(&self.containers)
+            .is_some_and(|col| (indent_cols >= 4 && indent_cols < col) || indent_cols >= col + 4)
+        {
+            return;
+        }
+        self.emit_list_item_buffer_if_needed();
+        self.close_paragraph_if_open();
     }
 
     /// Append `line` to whichever open text buffer is holding the current

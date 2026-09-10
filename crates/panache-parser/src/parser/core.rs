@@ -685,16 +685,11 @@ impl<'a> Parser<'a> {
         }
         let current_bq_depth = self.current_blockquote_depth();
 
-        if self.restricted_sublist_interrupts(if current_bq_depth > 0 {
+        self.interrupt_restricted_sublist(if current_bq_depth > 0 {
             inner_content
         } else {
             line
-        }) {
-            self.emit_list_item_buffer_if_needed();
-            if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
-                self.close_containers_to(self.containers.depth() - 1);
-            }
-        }
+        });
 
         let has_blank_before = self.pos == 0
             || is_blank_line(self.lines[self.pos - 1])
