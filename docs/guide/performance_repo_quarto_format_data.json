@@ -4,33 +4,38 @@
     "mode": "format",
     "track": "quarto",
     "panache_flavor": "quarto",
-    "generated_at": "2026-04-27T17:33:00Z",
-    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
+    "generated_at": "2026-09-10T17:10:48Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "Intel(R) Core(TM) Ultra 7 155U", "cores": 14},
     "min_runs": 3,
     "tools": {
-      "panache": {"version": "2.39.0"},
-      "prettier": {"version": "3.6.2"},
-      "rumdl": {"version": "0.1.67"},
+      "panache": {"version": "3.9.0"},
+      "prettier": {"version": "3.9.6"},
+      "rumdl": {"version": "0.2.52"},
       "mdformat": {"version": "1.0.0"},
-      "mado": {"version": "0.3.0"},
-      "markdownlint": {"version": "0.48.0"},
-      "markdownlint-cli2": {"version": "0.21.0"}
+      "yamark": {"version": "0.3.0"},
+      "mado": {"version": "0.3.1"},
+      "markdownlint": {"version": "0.49.1"},
+      "markdownlint-cli2": {"version": "0.23.2"}
     }
   },
   "repos": [
-    {"id":"quarto-dev__quarto-web","name":"quarto-dev/quarto-web","file_count":568,"total_bytes":2349853,"extension":"qmd"},
-    {"id":"mlr-org__mlr3book","name":"mlr-org/mlr3book","file_count":31,"total_bytes":974193,"extension":"qmd"},
+    {"id":"quarto-dev__quarto-web","name":"quarto-dev/quarto-web","file_count":578,"total_bytes":2387921,"extension":"qmd"},
+    {"id":"mlr-org__mlr3book","name":"mlr-org/mlr3book","file_count":31,"total_bytes":975557,"extension":"qmd"},
     {"id":"RohanAlexander__tswd","name":"RohanAlexander/tswd","file_count":34,"total_bytes":1475505,"extension":"qmd"},
-    {"id":"jolars__panache","name":"jolars/panache","file_count":108,"total_bytes":173620,"extension":"qmd"}
+    {"id":"jolars__panache","name":"jolars/panache","file_count":209,"total_bytes":396968,"extension":"qmd"}
   ],
   "results": [
-    {"repo":"quarto-dev__quarto-web","tool":"panache","mean_ms":30.7788,"stddev_ms":0.6498,"min_ms":29.9143,"max_ms":31.3514,"runs":4,"failed":false},
-    {"repo":"quarto-dev__quarto-web","tool":"rumdl","mean_ms":161.4376,"stddev_ms":3.6702,"min_ms":158.7596,"max_ms":166.7360,"runs":4,"failed":false},
-    {"repo":"mlr-org__mlr3book","tool":"panache","mean_ms":18.6612,"stddev_ms":1.0162,"min_ms":16.8948,"max_ms":21.6127,"runs":54,"failed":false},
-    {"repo":"mlr-org__mlr3book","tool":"rumdl","mean_ms":79.6221,"stddev_ms":3.1500,"min_ms":74.4277,"max_ms":85.0958,"runs":26,"failed":false},
-    {"repo":"RohanAlexander__tswd","tool":"panache","mean_ms":17.9682,"stddev_ms":1.2025,"min_ms":16.0756,"max_ms":21.3833,"runs":46,"failed":false},
-    {"repo":"RohanAlexander__tswd","tool":"rumdl","mean_ms":91.7142,"stddev_ms":2.8698,"min_ms":84.9473,"max_ms":97.2874,"runs":22,"failed":false},
-    {"repo":"jolars__panache","tool":"panache","mean_ms":8.3366,"stddev_ms":0.4533,"min_ms":7.5685,"max_ms":9.2110,"runs":25,"failed":false},
-    {"repo":"jolars__panache","tool":"rumdl","mean_ms":28.2831,"stddev_ms":1.4719,"min_ms":26.4271,"max_ms":32.4502,"runs":21,"failed":false}
+    {"repo":"quarto-dev__quarto-web","tool":"panache","mean_ms":105.2167,"stddev_ms":35.0541,"min_ms":78.9099,"max_ms":145.0113,"runs":3,"failed":false},
+    {"repo":"quarto-dev__quarto-web","tool":"rumdl","mean_ms":244.4750,"stddev_ms":13.2082,"min_ms":230.2952,"max_ms":256.4287,"runs":3,"failed":false},
+    {"repo":"quarto-dev__quarto-web","tool":"yamark","mean_ms":71.3734,"stddev_ms":48.9929,"min_ms":39.6703,"max_ms":143.6975,"runs":4,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"panache","mean_ms":55.9121,"stddev_ms":16.1090,"min_ms":40.1592,"max_ms":125.1797,"runs":30,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"rumdl","mean_ms":146.0486,"stddev_ms":17.5382,"min_ms":124.3602,"max_ms":178.6498,"runs":17,"failed":false},
+    {"repo":"mlr-org__mlr3book","tool":"yamark","mean_ms":16.5156,"stddev_ms":4.9116,"min_ms":10.1677,"max_ms":30.9946,"runs":49,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"panache","mean_ms":64.4004,"stddev_ms":7.3736,"min_ms":51.5869,"max_ms":81.6671,"runs":28,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"rumdl","mean_ms":197.0097,"stddev_ms":27.2601,"min_ms":168.6875,"max_ms":251.6810,"runs":10,"failed":false},
+    {"repo":"RohanAlexander__tswd","tool":"yamark","mean_ms":19.7259,"stddev_ms":4.2912,"min_ms":14.5733,"max_ms":36.3737,"runs":47,"failed":false},
+    {"repo":"jolars__panache","tool":"panache","mean_ms":38.4056,"stddev_ms":30.3406,"min_ms":23.0774,"max_ms":129.1100,"runs":11,"failed":false},
+    {"repo":"jolars__panache","tool":"rumdl","mean_ms":87.9713,"stddev_ms":7.1843,"min_ms":81.0266,"max_ms":105.0880,"runs":9,"failed":false},
+    {"repo":"jolars__panache","tool":"yamark","mean_ms":10.6414,"stddev_ms":0.9095,"min_ms":9.3268,"max_ms":12.1385,"runs":12,"failed":false}
   ]
 }

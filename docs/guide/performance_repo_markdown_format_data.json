@@ -4,36 +4,40 @@
     "mode": "format",
     "track": "markdown",
     "panache_flavor": "gfm",
-    "generated_at": "2026-04-27T17:32:33Z",
-    "host": {"os": "linux", "arch": "x86_64", "cpu": "AMD Ryzen 9 7900 12-Core Processor", "cores": 24},
+    "generated_at": "2026-09-10T17:10:06Z",
+    "host": {"os": "linux", "arch": "x86_64", "cpu": "Intel(R) Core(TM) Ultra 7 155U", "cores": 14},
     "min_runs": 3,
     "tools": {
-      "panache": {"version": "2.39.0"},
-      "prettier": {"version": "3.6.2"},
-      "rumdl": {"version": "0.1.67"},
+      "panache": {"version": "3.9.0"},
+      "prettier": {"version": "3.9.6"},
+      "rumdl": {"version": "0.2.52"},
       "mdformat": {"version": "1.0.0"},
-      "mado": {"version": "0.3.0"},
-      "markdownlint": {"version": "0.48.0"},
-      "markdownlint-cli2": {"version": "0.21.0"}
+      "yamark": {"version": "0.3.0"},
+      "mado": {"version": "0.3.1"},
+      "markdownlint": {"version": "0.49.1"},
+      "markdownlint-cli2": {"version": "0.23.2"}
     }
   },
   "repos": [
-    {"id":"jgm__pandoc","name":"jgm/pandoc","file_count":1113,"total_bytes":2782992,"extension":"md"},
-    {"id":"rust-lang__book","name":"rust-lang/book","file_count":478,"total_bytes":2762055,"extension":"md"},
-    {"id":"rust-lang__reference","name":"rust-lang/reference","file_count":153,"total_bytes":1139492,"extension":"md"}
+    {"id":"jgm__pandoc","name":"jgm/pandoc","file_count":1160,"total_bytes":2936175,"extension":"md"},
+    {"id":"rust-lang__book","name":"rust-lang/book","file_count":478,"total_bytes":2762648,"extension":"md"},
+    {"id":"rust-lang__reference","name":"rust-lang/reference","file_count":154,"total_bytes":1174972,"extension":"md"}
   ],
   "results": [
-    {"repo":"jgm__pandoc","tool":"panache","mean_ms":158.8289,"stddev_ms":1.4209,"min_ms":157.6646,"max_ms":160.4122,"runs":3,"failed":false},
-    {"repo":"jgm__pandoc","tool":"prettier","mean_ms":3654.7428,"stddev_ms":26.2482,"min_ms":3628.9094,"max_ms":3681.3870,"runs":3,"failed":false},
-    {"repo":"jgm__pandoc","tool":"rumdl","mean_ms":6561.1447,"stddev_ms":14.7551,"min_ms":6544.8095,"max_ms":6573.5056,"runs":3,"failed":false},
-    {"repo":"jgm__pandoc","tool":"mdformat","mean_ms":4020.4924,"stddev_ms":48.0338,"min_ms":3969.9779,"max_ms":4065.5856,"runs":3,"failed":false},
-    {"repo":"rust-lang__book","tool":"panache","mean_ms":36.5814,"stddev_ms":3.0205,"min_ms":34.8077,"max_ms":41.9577,"runs":5,"failed":false},
-    {"repo":"rust-lang__book","tool":"prettier","mean_ms":3370.8005,"stddev_ms":43.9841,"min_ms":3320.8961,"max_ms":3403.9237,"runs":3,"failed":false},
-    {"repo":"rust-lang__book","tool":"rumdl","mean_ms":179.4484,"stddev_ms":4.7610,"min_ms":174.1996,"max_ms":184.8043,"runs":4,"failed":false},
-    {"repo":"rust-lang__book","tool":"mdformat","mean_ms":3659.8319,"stddev_ms":8.9171,"min_ms":3650.1494,"max_ms":3667.7066,"runs":3,"failed":false},
-    {"repo":"rust-lang__reference","tool":"panache","mean_ms":15.5767,"stddev_ms":1.2280,"min_ms":14.0016,"max_ms":17.9302,"runs":17,"failed":false},
-    {"repo":"rust-lang__reference","tool":"prettier","mean_ms":1335.5719,"stddev_ms":20.8094,"min_ms":1318.0942,"max_ms":1358.5911,"runs":3,"failed":false},
-    {"repo":"rust-lang__reference","tool":"rumdl","mean_ms":122.0047,"stddev_ms":4.6030,"min_ms":116.7317,"max_ms":130.2394,"runs":10,"failed":false},
-    {"repo":"rust-lang__reference","tool":"mdformat","mean_ms":1900.4332,"stddev_ms":8.2795,"min_ms":1892.8503,"max_ms":1909.2669,"runs":3,"failed":false}
+    {"repo":"jgm__pandoc","tool":"panache","mean_ms":303.3462,"stddev_ms":50.2004,"min_ms":270.5770,"max_ms":361.1399,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"prettier","mean_ms":8263.1385,"stddev_ms":2583.9533,"min_ms":6267.6373,"max_ms":11181.9034,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"rumdl","mean_ms":2672.5384,"stddev_ms":118.7659,"min_ms":2597.5725,"max_ms":2809.4720,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"mdformat","mean_ms":6208.8839,"stddev_ms":1291.5149,"min_ms":5361.9174,"max_ms":7695.3801,"runs":3,"failed":false},
+    {"repo":"jgm__pandoc","tool":"yamark","mean_ms":64.6573,"stddev_ms":2.3309,"min_ms":62.5846,"max_ms":67.1805,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"panache","mean_ms":61.7038,"stddev_ms":3.0313,"min_ms":58.0003,"max_ms":64.7835,"runs":5,"failed":false},
+    {"repo":"rust-lang__book","tool":"prettier","mean_ms":5523.7707,"stddev_ms":619.2602,"min_ms":4959.6345,"max_ms":6186.3595,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"rumdl","mean_ms":234.9333,"stddev_ms":28.7616,"min_ms":208.5164,"max_ms":267.3638,"runs":4,"failed":false},
+    {"repo":"rust-lang__book","tool":"mdformat","mean_ms":4986.0466,"stddev_ms":214.5779,"min_ms":4806.3526,"max_ms":5223.6306,"runs":3,"failed":false},
+    {"repo":"rust-lang__book","tool":"yamark","mean_ms":44.5475,"stddev_ms":7.3032,"min_ms":38.4990,"max_ms":53.2240,"runs":5,"failed":false},
+    {"repo":"rust-lang__reference","tool":"panache","mean_ms":30.5292,"stddev_ms":2.9464,"min_ms":26.6816,"max_ms":38.8242,"runs":14,"failed":false},
+    {"repo":"rust-lang__reference","tool":"prettier","mean_ms":2116.2484,"stddev_ms":109.5317,"min_ms":2001.1167,"max_ms":2219.1542,"runs":3,"failed":false},
+    {"repo":"rust-lang__reference","tool":"rumdl","mean_ms":183.8481,"stddev_ms":32.4707,"min_ms":142.8754,"max_ms":237.6337,"runs":7,"failed":false},
+    {"repo":"rust-lang__reference","tool":"mdformat","mean_ms":2554.0009,"stddev_ms":44.6850,"min_ms":2507.3021,"max_ms":2596.3547,"runs":3,"failed":false},
+    {"repo":"rust-lang__reference","tool":"yamark","mean_ms":18.6539,"stddev_ms":3.8234,"min_ms":14.5276,"max_ms":27.3787,"runs":15,"failed":false}
   ]
 }

@@ -3,6 +3,27 @@
   ...
 }:
 
+let
+  yamark = pkgs.rustPlatform.buildRustPackage rec {
+    pname = "yamark";
+    version = "0.3.0";
+
+    src = pkgs.fetchFromGitHub {
+      owner = "t-kalinowski";
+      repo = "yamark";
+      tag = "v${version}";
+      hash = "sha256-xYTLtwPhtO+5CWC3YIL2d3azmeHduWwCmAlW2yVFw8g=";
+    };
+
+    cargoHash = "sha256-YJ2leB+bkC0l604ihk8PnDSz5rXKSfZaROM3kYYb3Yc=";
+
+    # Run formatter/parser tests; benchmark tests require Git checkout metadata.
+    cargoTestFlags = [
+      "--test=mark_formatting_specs"
+      "--test=yaml_scan"
+    ];
+  };
+in
 {
   packages = [
     pkgs.bashInteractive
@@ -18,6 +39,7 @@
     pkgs.jarl
     pkgs.llvmPackages.bintools
     pkgs.rumdl
+    yamark
     pkgs.mado
     pkgs.marksman
     pkgs.prettier
@@ -51,6 +73,9 @@
       ];
     })
   ];
+
+  # Yamark 0.3.0 does not expose a version command.
+  env.PANACHE_BENCH_YAMARK_VERSION = yamark.version;
 
   languages = {
     rust = {

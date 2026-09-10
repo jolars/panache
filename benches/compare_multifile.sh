@@ -7,6 +7,7 @@
 #   * panache format     (default worker parallelism)
 #   * prettier --write   (single Node process, internally serial)
 #   * rumdl fmt          (single process)
+#   * yamark format      (single process)
 #
 # Pandoc is excluded — it has no batch mode, so a fair comparison would mean
 # spawning N processes from a shell loop, which mostly measures the loop.
@@ -54,6 +55,9 @@ HAVE_HYPERFINE=$(command -v hyperfine >/dev/null 2>&1 && echo yes || echo no)
 HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo yes || echo no)
 HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo yes || echo no)
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo yes || echo no)
+HAVE_YAMARK=$(command -v yamark >/dev/null 2>&1 && echo yes || echo no)
+# Yamark 0.3.0 has no version command; callers can supply the installed version.
+YAMARK_VER="${PANACHE_BENCH_YAMARK_VERSION:-unknown}"
 
 if [[ "$HAVE_HYPERFINE" != yes || "$HAVE_JQ" != yes ]]; then
     log "compare_multifile.sh requires hyperfine and jq"
@@ -137,10 +141,12 @@ declare -A TOOL_CMD=(
     [panache]="$PANACHE format --isolated --no-cache '$CORPUS_DIR' >/dev/null"
     [prettier]="prettier --write --log-level silent '$CORPUS_DIR'/*.md >/dev/null 2>&1 || true"
     [rumdl]="rumdl fmt --isolated --no-cache '$CORPUS_DIR' >/dev/null 2>&1 || true"
+    [yamark]="yamark format --config /dev/null --skip-embedded-formatters '$CORPUS_DIR' >/dev/null"
 )
 TOOLS=(panache)
 [[ "$HAVE_PRETTIER" == yes ]] && TOOLS+=(prettier)
 [[ "$HAVE_RUMDL"   == yes ]] && TOOLS+=(rumdl)
+[[ "$HAVE_YAMARK"  == yes ]] && TOOLS+=(yamark)
 
 RESULTS_JSON=()
 for tool in "${TOOLS[@]}"; do
@@ -182,6 +188,7 @@ mkdir -p "$(dirname "$JSON_OUT")"
     printf '      "panache":  {"version": "%s"}' "$(json_escape "$PANACHE_VER")"
     [[ -n "$PRETTIER_VER" ]] && printf ',\n      "prettier": {"version": "%s"}' "$(json_escape "$PRETTIER_VER")"
     [[ -n "$RUMDL_VER"   ]] && printf ',\n      "rumdl":    {"version": "%s"}' "$(json_escape "$RUMDL_VER")"
+    [[ "$HAVE_YAMARK" == yes ]] && printf ',\n      "yamark":   {"version": "%s"}' "$(json_escape "$YAMARK_VER")"
     printf '\n    }\n'
     printf '  },\n'
     printf '  "corpus": {"file_count": %d, "total_bytes": %d, "extension": "md"},\n' \

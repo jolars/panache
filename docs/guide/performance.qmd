@@ -3,8 +3,8 @@ title: "Performance"
 description: >
   This page presents performance benchmarks for Panache, comparing its
   formatting and linting speed against popular alternatives like Prettier,
-  Pandoc, rumdl, mdformat, mado, markdownlint, and markdownlint-cli2 on real
-  Quarto and Markdown documents, and its language-server memory use against
+  Pandoc, rumdl, mdformat, Yamark, mado, markdownlint, and markdownlint-cli2 on
+  real Quarto and Markdown documents, and its language-server memory use against
   Marksman. The benchmarks highlight Panache's efficiency and suitability for
   editor and repository-wide work.
 engine: knitr
@@ -16,9 +16,9 @@ engine: knitr
 Rust and compiled to native code, it delivers fast formatting with zero startup
 overhead. In this document, we present benchmarks comparing Panache's formatting
 and linting performance against popular alternatives like Prettier, Pandoc,
-rumdl, mdformat, mado, markdownlint, and markdownlint-cli2 on a realistic corpus
-of Quarto and Markdown documents. We don't include R Markdown benchmarks here
-because no other tool supports that format.
+rumdl, mdformat, Yamark, mado, markdownlint, and markdownlint-cli2 on a
+realistic corpus of Quarto and Markdown documents. R Markdown is outside the
+current benchmark corpus.
 
 We have split the benchmarks into two suites: per-document benchmarks that run
 each formatter on each document in the corpus individually, and repository-wide
@@ -27,6 +27,12 @@ former highlights raw formatting speed on a variety of real-world documents; the
 latter captures the overhead of processing multiple files in a single run, which
 is more representative of on-save formatting or large-scale linting. Caches are
 disabled for all benchmarks to show worst-case performance.
+
+Yamark runs with an empty configuration and external code formatters disabled
+(`--config /dev/null --skip-embedded-formatters`). Its default wrapping and
+style settings apply. Tools differ in supported syntax and formatting policy, so
+these timings compare their respective workloads. Failed repository runs have
+null timings in the data and are excluded from the plots.
 
 The numbers on this page are produced by the scripts in
 [`benches/`](https://github.com/jolars/panache/tree/main/benches) and read from
@@ -118,7 +124,7 @@ html`<div class="callout-note">
     <li>Generated: ${new Date(data.meta.generated_at).toUTCString()}</li>
     <li>Host: ${data.meta.host.cpu} (${data.meta.host.os}/${data.meta.host.arch})</li>
     <li>Minimum runs: ${data.meta.min_runs}</li>
-    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}, mdformat ${data.meta.tools.mdformat?.version ?? "n/a"}, mado ${data.meta.tools.mado?.version ?? "n/a"}, markdownlint ${data.meta.tools.markdownlint?.version ?? "n/a"}, markdownlint-cli2 ${data.meta.tools["markdownlint-cli2"]?.version ?? "n/a"}</li>
+    <li>panache ${data.meta.tools.panache.version}, prettier ${data.meta.tools.prettier?.version ?? "n/a"}, pandoc ${data.meta.tools.pandoc?.version ?? "n/a"}, rumdl ${data.meta.tools.rumdl?.version ?? "n/a"}, mdformat ${data.meta.tools.mdformat?.version ?? "n/a"}, yamark ${data.meta.tools.yamark?.version ?? "n/a"}, mado ${data.meta.tools.mado?.version ?? "n/a"}, markdownlint ${data.meta.tools.markdownlint?.version ?? "n/a"}, markdownlint-cli2 ${data.meta.tools["markdownlint-cli2"]?.version ?? "n/a"}</li>
   </ul>
 </div>`;
 ```
@@ -128,17 +134,17 @@ html`<div class="callout-note">
 ### Single-Document
 
 In @fig-plot-results, we compare formatting time per document across panache,
-Prettier, Pandoc, rumdl, and mdformat. Each dot is one document; the y-axis
-shows time relative to panache (×, lower is faster). Panache sits at 1× by
-construction (dashed baseline) and other formatters land above it. Hover a point
-to see the absolute wall-clock time in milliseconds. Formatters are ordered
+Prettier, Pandoc, rumdl, mdformat, and Yamark. Each dot is one document; the
+y-axis shows time relative to panache (×, lower is faster). Panache sits at 1×
+by construction (dashed baseline); points above it are slower. Hover a point to
+see the absolute wall-clock time in milliseconds. Formatters are ordered
 left-to-right from fastest to slowest on average.
 
 ```{ojs}
 //| label: fig-plot-results
 //| echo: false
 //| fig-cap: "Formatting time per document, comparing panache to Prettier,
-//|   Pandoc, rumdl, and mdformat. Each dot is one document; the y-axis shows
+//|   Pandoc, rumdl, mdformat, and Yamark. Each dot is one document; the y-axis shows
 //|   time relative to panache (×, lower is faster)."
 
 Plot.plot({
@@ -244,6 +250,7 @@ repoMarkdownFormatResults = prepareRepoSuiteRows(repoMarkdownFormat, {
     prettier: "prettier",
     rumdl: "rumdl",
     mdformat: "mdformat",
+    yamark: "yamark",
 });
 repoMarkdownFormatTools = Array.from(
     d3.rollup(
@@ -261,14 +268,14 @@ repoMarkdownFormatRepoMeta = new Map(
 ```
 
 In @fig-repo-markdown-format, we compare formatting time across panache,
-Prettier, rumdl, and mdformat on tracked Markdown files from several
+Prettier, rumdl, mdformat, and Yamark on tracked Markdown files from several
 repositories.
 
 ```{ojs}
 //| label: fig-repo-markdown-format
 //| echo: false
 //| fig-cap: "Repository-wide formatting benchmarks on standard Markdown repos,
-//|   comparing panache to Prettier, rumdl, and mdformat. Each dot is one
+//|   comparing panache to Prettier, rumdl, mdformat, and Yamark. Each dot is one
 //|   repo/tool pair; the y-axis shows time relative to panache within that repo
 //|   (×, lower is faster)."
 
@@ -343,6 +350,7 @@ repoQuartoFormat = FileAttachment(
 repoQuartoFormatResults = prepareRepoSuiteRows(repoQuartoFormat, {
     panache: "panache",
     rumdl: "rumdl",
+    yamark: "yamark",
 });
 repoQuartoFormatTools = Array.from(
     d3.rollup(
@@ -359,8 +367,8 @@ repoQuartoFormatRepoMeta = new Map(
 );
 ```
 
-In @fig-repo-quarto-format, we compare formatting time across panache and rumdl
-on tracked `.qmd` files from several Quarto repositories.
+In @fig-repo-quarto-format, we compare formatting time across panache, rumdl,
+and Yamark on tracked `.qmd` files from several Quarto repositories.
 
 ```{ojs}
 //| label: fig-repo-quarto-format
@@ -881,6 +889,11 @@ are designed to be run from the repository root:
 ```bash
 # Download test documents (idempotent)
 cd benches/documents && ./download.sh && cd ../..
+
+# Outside devenv: install Yamark and record its version
+# The development environment already provides both.
+uv tool install yamark==0.3.0
+export PANACHE_BENCH_YAMARK_VERSION=0.3.0
 
 # Run comparison benchmark and write JSON
 bash benches/compare_all.sh --json --out docs/guide/performance_data.json

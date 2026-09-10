@@ -133,8 +133,9 @@ valgrind --tool=cachegrind cargo bench --bench formatting
     `PANACHE_CLI_CACHE_BENCH_ITERATIONS`
   - Optional JSON output via `PANACHE_CLI_CACHE_BENCH_OUTPUT_JSON`
 - **`benches/compare_all.sh`**: Multi-formatter comparison
-  - Compares panache vs Prettier vs Pandoc vs rumdl across six documents (small,
-    medium, tables, math, large, and the full Pandoc manual)
+  - Compares panache, Prettier, Pandoc, rumdl, mdformat, and Yamark across six
+    documents (Pandoc testsuite, tables, configuration, math, large, and the
+    full Pandoc manual)
   - **Text mode (default)**: prints colored results and appends to
     `benchmark_results.txt`
   - **JSON mode**: `bash benches/compare_all.sh --json [--out PATH]` writes
@@ -143,9 +144,16 @@ valgrind --tool=cachegrind cargo bench --bench formatting
   - Prefers [hyperfine](https://github.com/sharkdp/hyperfine) for stats when
     available (and `jq` for parsing); otherwise falls back to a simple shell
     timing loop emitting mean only (`stddev_ms`/`min_ms`/`max_ms` are `null`).
-  - Drives the data-driven `docs/guide/performance.qmd` page; `freeze: true` on
-    that doc means the benchmark only re-runs when you delete
-    `docs/_freeze/guide/performance/` and re-render.
+  - Drives `docs/guide/performance.qmd`. Refresh the JSON explicitly, then
+    delete `docs/_freeze/guide/performance/` and re-render to display it.
+- **`benches/compare_multifile.sh`**: Local Markdown corpus comparison
+  - Compares panache, Prettier, rumdl, and Yamark in a single process per tool.
+  - Restores the input files before every sample because tools format in place.
+- **`benches/compare_repo_suite.sh`**: Repository formatting and linting
+  comparisons
+  - The formatting suite includes Yamark on both the Markdown and Quarto tracks.
+  - Restores tracked documents before every sample. Failed runs are recorded
+    with null timings and excluded from the performance plots.
 - **`benches/compare_lsp_memory.sh`**: Linux language-server memory comparison
   - Checks out a pinned revision of the Rust Book into a gitignored directory.
   - Opens the five largest tracked Markdown files under `src/`, exercises
@@ -164,6 +172,33 @@ valgrind --tool=cachegrind cargo bench --bench formatting
   - Generates `benches/benchmark_results.json` (machine-readable)
   - Renders `docs/benchmarks.qmd` from JSON
   - Deterministic output for CI checks
+
+### Yamark
+
+The formatting comparison scripts include
+[Yamark](https://github.com/t-kalinowski/yamark) when `yamark` is on `PATH`. The
+development environment provides a pinned build and sets its benchmark version
+automatically. Outside `devenv`, install it before benchmarking:
+
+```bash
+uv tool install yamark==0.3.0
+export PANACHE_BENCH_YAMARK_VERSION=0.3.0
+
+bash benches/compare_all.sh --json
+bash benches/compare_multifile.sh
+bash benches/compare_repo_suite.sh --mode format --track markdown --out docs/guide/performance_repo_markdown_format_data.json
+bash benches/compare_repo_suite.sh --mode format --track quarto --out docs/guide/performance_repo_quarto_format_data.json
+```
+
+Yamark 0.3.0 has no version command, so the scripts record
+`PANACHE_BENCH_YAMARK_VERSION`, or `unknown` when it is unset.
+
+Timed commands invoke `yamark` directly. They use `--config /dev/null` to avoid
+ambient configuration and `--skip-embedded-formatters` to exclude external code
+formatters. Single-document runs use stdin with `--stdin-file-path`; batch runs
+format a fresh copy of the corpus in place. Yamark's default wrapping and style
+settings apply. These comparisons measure each tool's formatting policy and
+supported syntax, which differ across tools.
 
 ## What to Benchmark
 

@@ -56,6 +56,9 @@ HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_PANDOC=$(command -v pandoc >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_MDFORMAT=$(command -v mdformat >/dev/null 2>&1 && echo "yes" || echo "no")
+HAVE_YAMARK=$(command -v yamark >/dev/null 2>&1 && echo "yes" || echo "no")
+# Yamark 0.3.0 has no version command; callers can supply the installed version.
+YAMARK_VER="${PANACHE_BENCH_YAMARK_VERSION:-unknown}"
 HAVE_MADO=$(command -v mado >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_MARKDOWNLINT=$(command -v markdownlint >/dev/null 2>&1 && echo "yes" || echo "no")
 HAVE_MARKDOWNLINT_CLI2=$(command -v markdownlint-cli2 >/dev/null 2>&1 && echo "yes" || echo "no")
@@ -86,6 +89,7 @@ log "  panache: yes (building...)"
 [ "$HAVE_PANDOC" = "yes" ] && log "  pandoc: yes ($(pandoc --version | head -1 | cut -d' ' -f2))"
 [ "$HAVE_RUMDL" = "yes" ] && log "  rumdl: yes ($(rumdl --version | awk '{print $2}'))"
 [ "$HAVE_MDFORMAT" = "yes" ] && log "  mdformat: yes ($(mdformat --version | awk '{print $2}'))"
+[ "$HAVE_YAMARK" = "yes" ] && log "  yamark: yes ($YAMARK_VER)"
 [ "$HAVE_MADO" = "yes" ] && log "  mado: yes ($(mado --version | awk '{print $2}'))"
 [ "$HAVE_MARKDOWNLINT" = "yes" ] && log "  markdownlint: yes ($(markdownlint --version))"
 [ "$HAVE_MARKDOWNLINT_CLI2" = "yes" ] && log "  markdownlint-cli2: yes ($(markdownlint-cli2 --version 2>&1 | awk 'NR==1{gsub(/^v/,"",$2); print $2}'))"
@@ -223,8 +227,9 @@ benchmark_document() {
         [panache]="$PANACHE format --isolated --stdin-filename '$DOCS_DIR/$file' < '$DOCS_DIR/$file'"
         [prettier]="prettier --parser markdown $DOCS_DIR/$file"
         [pandoc]="pandoc $DOCS_DIR/$file -f markdown -t markdown"
-        [rumdl]="rumdl fmt --fix --stdin --no-cache --silent < $DOCS_DIR/$file"
+        [rumdl]="rumdl fmt --isolated --no-cache - < '$DOCS_DIR/$file'"
         [mdformat]="mdformat - < $DOCS_DIR/$file"
+        [yamark]="yamark format --config /dev/null --skip-embedded-formatters --stdin-file-path '$DOCS_DIR/$file' < '$DOCS_DIR/$file'"
     )
 
     local formatters=("panache")
@@ -232,6 +237,7 @@ benchmark_document() {
     [ "$HAVE_PANDOC" = "yes" ]   && formatters+=("pandoc")
     [ "$HAVE_RUMDL" = "yes" ]    && formatters+=("rumdl")
     [ "$HAVE_MDFORMAT" = "yes" ] && formatters+=("mdformat")
+    [ "$HAVE_YAMARK" = "yes" ]   && formatters+=("yamark")
 
     local panache_us=""
     local fmt cmd
@@ -313,6 +319,9 @@ if [ "$JSON_MODE" = "1" ]; then
         fi
         if [ "$HAVE_MDFORMAT" = "yes" ]; then
             printf ',\n      "mdformat": {"version": "%s"}' "$(json_escape "$MDFORMAT_VER")"
+        fi
+        if [ "$HAVE_YAMARK" = "yes" ]; then
+            printf ',\n      "yamark":   {"version": "%s"}' "$(json_escape "$YAMARK_VER")"
         fi
         if [ "$HAVE_MADO" = "yes" ]; then
             printf ',\n      "mado":     {"version": "%s"}' "$(json_escape "$MADO_VER")"

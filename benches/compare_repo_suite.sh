@@ -64,6 +64,9 @@ HAVE_JQ=$(command -v jq >/dev/null 2>&1 && echo yes || echo no)
 HAVE_PRETTIER=$(command -v prettier >/dev/null 2>&1 && echo yes || echo no)
 HAVE_RUMDL=$(command -v rumdl >/dev/null 2>&1 && echo yes || echo no)
 HAVE_MDFORMAT=$(command -v mdformat >/dev/null 2>&1 && echo yes || echo no)
+HAVE_YAMARK=$(command -v yamark >/dev/null 2>&1 && echo yes || echo no)
+# Yamark 0.3.0 has no version command; callers can supply the installed version.
+YAMARK_VER="${PANACHE_BENCH_YAMARK_VERSION:-unknown}"
 HAVE_MADO=$(command -v mado >/dev/null 2>&1 && echo yes || echo no)
 HAVE_MARKDOWNLINT=$(command -v markdownlint >/dev/null 2>&1 && echo yes || echo no)
 HAVE_MARKDOWNLINT_CLI2=$(command -v markdownlint-cli2 >/dev/null 2>&1 && echo yes || echo no)
@@ -246,6 +249,10 @@ for repo in "${REPOS[@]}"; do
             TOOL_CMD[mdformat]="mdformat '$corpus_dir'/*.md >/dev/null 2>&1 || true"
             TOOLS+=(mdformat)
         fi
+        if [[ "$HAVE_YAMARK" == yes ]]; then
+            TOOL_CMD[yamark]="yamark format --config /dev/null --skip-embedded-formatters '$corpus_dir' >/dev/null"
+            TOOLS+=(yamark)
+        fi
     else
         TOOL_CMD[panache]="$PANACHE lint $panache_iso_flag --no-cache --quiet '$corpus_dir' >/dev/null 2>&1"
         TOOLS=(panache)
@@ -304,6 +311,9 @@ mkdir -p "$(dirname "$JSON_OUT")"
     fi
     if [[ -n "$MDFORMAT_VER" ]]; then
         printf ',\n      "mdformat": {"version": "%s"}' "$(json_escape "$MDFORMAT_VER")"
+    fi
+    if [[ "$MODE" == "format" && "$HAVE_YAMARK" == yes ]]; then
+        printf ',\n      "yamark": {"version": "%s"}' "$(json_escape "$YAMARK_VER")"
     fi
     if [[ -n "$MADO_VER" ]]; then
         printf ',\n      "mado": {"version": "%s"}' "$(json_escape "$MADO_VER")"
