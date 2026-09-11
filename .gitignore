@@ -25,9 +25,6 @@ result-*
 /dist
 *.egg-info
 
-# Coverage files
-lcov.info
-
 # Profiler outputs
 /perf.data
 /perf.data.old
