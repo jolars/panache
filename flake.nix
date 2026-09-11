@@ -21,7 +21,7 @@
 
         panache = pkgs.rustPlatform.buildRustPackage {
           pname = "panache";
-          version = "3.9.0";
+          version = "3.10.0";
 
           src = ./.;
 
