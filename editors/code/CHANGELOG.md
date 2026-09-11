@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.11.0](https://github.com/jolars/panache/compare/panache-code-v3.10.0...panache-code-v3.11.0) (2026-09-11)
+
+### Features
+- **config:** support `PANACHE_CONFIG` fallback ([`4077915`](https://github.com/jolars/panache/commit/40779159c44c7a0824e3fa5d1762b4c5a5bb4f5b)), closes [#534](https://github.com/jolars/panache/issues/534)
+
+### Dependencies
+- updated panache to v3.11.0
+
 ## [3.10.0](https://github.com/jolars/panache/compare/panache-code-v3.9.0...panache-code-v3.10.0) (2026-09-11)
 
 ### Dependencies

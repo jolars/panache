@@ -1,15 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "3c63ae4e4b0c5194b966d6520dc02b9354b94c5a",
+  "baseline-sha": "939864bbf0197d03eadd2aeb6b23c735856cd461",
   "release-targets": [
     {
       "path": ".",
-      "version": "3.10.0",
-      "tag": "v3.10.0",
-      "dependencies": [
-        "crates/panache-formatter",
-        "crates/panache-parser"
-      ]
+      "version": "3.11.0",
+      "tag": "v3.11.0"
     },
     {
       "path": "crates/panache-dprint",
@@ -31,8 +27,8 @@
     },
     {
       "path": "editors/code",
-      "version": "3.10.0",
-      "tag": "panache-code-v3.10.0",
+      "version": "3.11.0",
+      "tag": "panache-code-v3.11.0",
       "dependencies": [
         "."
       ]
@@ -46,30 +42,13 @@
   "pending-release-targets": [
     {
       "path": ".",
-      "version": "3.10.0",
-      "tag": "v3.10.0",
-      "dependencies": [
-        "crates/panache-formatter",
-        "crates/panache-parser"
-      ]
-    },
-    {
-      "path": "crates/panache-formatter",
-      "version": "0.24.1",
-      "tag": "panache-formatter-v0.24.1",
-      "dependencies": [
-        "crates/panache-parser"
-      ]
-    },
-    {
-      "path": "crates/panache-parser",
-      "version": "0.29.1",
-      "tag": "panache-parser-v0.29.1"
+      "version": "3.11.0",
+      "tag": "v3.11.0"
     },
     {
       "path": "editors/code",
-      "version": "3.10.0",
-      "tag": "panache-code-v3.10.0",
+      "version": "3.11.0",
+      "tag": "panache-code-v3.11.0",
       "dependencies": [
         "."
       ]
