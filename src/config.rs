@@ -693,6 +693,12 @@ fn user_config_path() -> Option<PathBuf> {
     )
 }
 
+fn env_config_path() -> Option<PathBuf> {
+    env::var_os("PANACHE_CONFIG")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
 fn user_config_path_from<F>(
     xdg_config_home: Option<std::ffi::OsString>,
     home: Option<std::ffi::OsString>,
@@ -726,14 +732,16 @@ where
 /// Which configuration source [`load`] resolved, carrying its path.
 ///
 /// The directory of the carried path is where relative globs declared in that
-/// config anchor (see [`anchor_dir`]) — except for [`ConfigSource::Global`],
-/// the user config, which has no project location and therefore no anchor.
+/// config anchor (see [`anchor_dir`]) — except for [`ConfigSource::Env`] and
+/// [`ConfigSource::Global`], which have no project location and therefore no anchor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigSource {
     /// Loaded from an explicit `--config <path>`.
     Explicit(PathBuf),
     /// Discovered by walking up the directory tree from the input.
     Discovered(PathBuf),
+    /// The user config named by `PANACHE_CONFIG`, used after project discovery.
+    Env(PathBuf),
     /// The user config in the platform's configuration directory.
     Global(PathBuf),
     /// No config file found; built-in defaults are in use.
@@ -744,23 +752,24 @@ impl ConfigSource {
     /// Path of the resolved config file, if any.
     pub fn path(&self) -> Option<&Path> {
         match self {
-            ConfigSource::Explicit(p) | ConfigSource::Discovered(p) | ConfigSource::Global(p) => {
-                Some(p)
-            }
+            ConfigSource::Explicit(p)
+            | ConfigSource::Discovered(p)
+            | ConfigSource::Env(p)
+            | ConfigSource::Global(p) => Some(p),
             ConfigSource::None => None,
         }
     }
 
     /// The project directory that relative globs in this config anchor against
     /// (its own directory, with a `.config/` wrapper unwrapped to the project
-    /// root). `None` for the global user config and the no-config case, which
-    /// have no project location.
+    /// root). `None` for the environment/global user configs and the no-config
+    /// case, which have no project location.
     pub fn project_anchor(&self) -> Option<PathBuf> {
         match self {
             ConfigSource::Explicit(p) | ConfigSource::Discovered(p) => {
                 p.parent().map(unwrap_dot_config)
             }
-            ConfigSource::Global(_) | ConfigSource::None => None,
+            ConfigSource::Env(_) | ConfigSource::Global(_) | ConfigSource::None => None,
         }
     }
 }
@@ -803,6 +812,11 @@ pub fn load_with_chain(
         // `panache.toml` be ignored by both the CLI and the LSP.
         let (cfg, ext, chain) = read_config_with_chain(&p).map_err(io::Error::from)?;
         (cfg, ConfigSource::Discovered(p), ext, chain)
+    } else if let Some(p) = env_config_path() {
+        // An explicitly named fallback must report missing or invalid files
+        // so a typo in PANACHE_CONFIG cannot silently select other settings.
+        let (cfg, ext, chain) = read_config_with_chain(&p).map_err(io::Error::from)?;
+        (cfg, ConfigSource::Env(p), ext, chain)
     } else if let Some(p) = user_config_path()
         && let Ok((cfg, ext, chain)) = read_config_with_chain(&p)
     {
@@ -1105,10 +1119,10 @@ fn unwrap_dot_config(dir: &Path) -> PathBuf {
 ///
 /// A discovered or explicit config anchors at its own directory, with a
 /// `.config/` wrapper unwrapped to the project root so a `.config/panache.toml`
-/// behaves exactly like a `panache.toml` in the directory above it. The global
-/// XDG user config has no project location, so it (and the no-config case) fall
-/// back to `fallback` — the cwd for the CLI, or the input file's directory for
-/// the LSP.
+/// behaves exactly like a `panache.toml` in the directory above it. Environment
+/// and global user configs have no project location, so they (and the no-config
+/// case) fall back to `fallback` — the cwd for the CLI, or the input file's
+/// directory for the LSP.
 pub fn anchor_dir(source: &ConfigSource, fallback: &Path) -> PathBuf {
     source
         .project_anchor()

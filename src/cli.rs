@@ -39,8 +39,8 @@ pub struct Cli {
     #[arg(
         long_help = "Path to a custom configuration file. If not specified, Panache will \
         search for .panache.toml, panache.toml, or .config/panache.toml in the current \
-        directory and its parents, then fall back to config.toml under the platform's user \
-        configuration directory."
+        directory and its parents, then the file named by PANACHE_CONFIG, then config.toml \
+        under the platform's user configuration directory."
     )]
     pub config: Option<PathBuf>,
 

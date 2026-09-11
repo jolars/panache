@@ -15,7 +15,9 @@ Panache searches for a configuration file in the following order:
 1. **Explicit path**: `--config <path>` (errors if invalid)
 2. **Project config**: `.panache.toml`, `panache.toml`, or
    `.config/panache.toml` in current or parent directories
-3. **User config**: `panache/config.toml` in the platform's user configuration
+3. **Custom user config**: the file named by `PANACHE_CONFIG`, when set and
+   non-empty (errors if missing or invalid)
+4. **User config**: `panache/config.toml` in the platform's user configuration
    directory---`$XDG_CONFIG_HOME` or `~/.config` on Linux,
    `~/Library/Application Support` on macOS, and `%APPDATA%` on Windows
 
@@ -29,6 +31,26 @@ stray `panache.toml` in your home directory---are not inherited. The same rule
 applies to both the CLI and the LSP. If no `.git` ancestor exists (e.g. an
 untracked scratch file), the walk falls back to today's filesystem-root
 behavior.
+
+Set `PANACHE_CONFIG` to keep your user config at a custom location, such as a
+synced drive. It replaces the platform user config fallback. Project configs
+still take precedence, and files from different discovery steps are not merged.
+Use [`extend`](#extend) when you want a project to inherit your user config.
+Relative `PANACHE_CONFIG` paths resolve from the process's working directory; an
+absolute path is recommended for editor settings. An unset or empty value uses
+the normal user config location. `--isolated` ignores all config files,
+including `PANACHE_CONFIG`.
+
+In VS Code, add this to your user `settings.json`, then run **Panache: Restart
+Server**:
+
+```json
+{
+  "panache.serverEnv": {
+    "PANACHE_CONFIG": "P:/Softwares/panache.toml"
+  }
+}
+```
 
 Putting the file in `.config/` (the [dot-config](https://dot-config.github.io)
 convention) keeps the project root tidy. A `.config/panache.toml` behaves
@@ -377,8 +399,9 @@ Path matching base:
   like a `panache.toml` in the directory above `.config/`. The same rule applies
   to discovered configs and to an explicit `--config path/to/panache.toml`
   (anchored at `path/to/`, not the current working directory).
-- The global user config has no project location, so its globs resolve against
-  the directory being traversed (typically the current working directory).
+- The `PANACHE_CONFIG` and global user configs have no project location, so
+  their globs resolve against the directory being traversed (typically the
+  current working directory), or the document's directory in the LSP.
 - CLI path arguments (for example `panache format docs/`) limit traversal scope
   but do not change how globs are anchored.
 

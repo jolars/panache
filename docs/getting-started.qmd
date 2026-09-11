@@ -327,7 +327,8 @@ Panache looks for configuration files in this order:
 1. Explicit `--config` path
 2. `.panache.toml`, `panache.toml`, or `.config/panache.toml` in current/parent
    directories
-3. `panache/config.toml` in the user configuration directory (`~/.config` on
+3. The file named by `PANACHE_CONFIG`, if set and non-empty
+4. `panache/config.toml` in the user configuration directory (`~/.config` on
    Linux, `~/Library/Application Support` on macOS, or `%APPDATA%` on Windows)
 
 ## Ignore Directives

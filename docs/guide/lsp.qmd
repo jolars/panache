@@ -459,10 +459,27 @@ Kate supports LSP servers via its LSP client plugin:
 The LSP automatically discovers configuration files from your workspace:
 
 1. Searches for `.panache.toml`, `panache.toml`, or `.config/panache.toml` from
-   the workspace root
-2. Falls back to `panache/config.toml` in the platform's user configuration
+   the document's directory up to the project root
+2. Uses the file named by `PANACHE_CONFIG`, if set and non-empty
+3. Falls back to `panache/config.toml` in the platform's user configuration
    directory
-3. Uses built-in defaults if no config found
+4. Uses built-in defaults if no config found
+
+To use a custom user config in VS Code, set the environment variable in your
+user `settings.json`:
+
+```json
+{
+  "panache.serverEnv": {
+    "PANACHE_CONFIG": "P:/Softwares/panache.toml"
+  }
+}
+```
+
+Run **Panache: Restart Server** after changing `panache.serverEnv`. Project
+configs take precedence over this fallback. A missing or invalid
+`PANACHE_CONFIG` file is reported as a configuration error, and formatting is
+refused until it is fixed.
 
 ### When Configuration Is Re-Read
 

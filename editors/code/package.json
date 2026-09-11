@@ -150,7 +150,7 @@
             "type": "string"
           },
           "default": {},
-          "description": "Environment variables merged into the Panache language server process."
+          "markdownDescription": "Environment variables merged into the Panache language server process. Set `PANACHE_CONFIG` to an absolute config file path to use when no project config is found. Run **Panache: Restart Server** after changing this setting."
         },
         "panache.extraPath": {
           "type": "array",

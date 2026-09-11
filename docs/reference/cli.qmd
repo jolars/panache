@@ -10,7 +10,7 @@ Panache is a command-line formatter, linter, and language server (implementing t
 ## Options
 
 `--config <CONFIG>`
-:   Path to a custom configuration file. If not specified, Panache will search for .panache.toml, panache.toml, or .config/panache.toml in the current directory and its parents, then fall back to config.toml under the platform's user configuration directory.
+:   Path to a custom configuration file. If not specified, Panache will search for .panache.toml, panache.toml, or .config/panache.toml in the current directory and its parents, then the file named by PANACHE_CONFIG, then config.toml under the platform's user configuration directory.
 
 `--stdin-filename <PATH>`
 :   Synthetic filename to associate with stdin input. This is useful for editor integrations that pipe content via stdin but still need Panache to infer flavor/extensions from file extension (for example: `--stdin-filename doc.qmd`).

@@ -9,6 +9,7 @@
 
 mod cache;
 mod common;
+mod config;
 mod debug;
 mod format;
 mod lint;

@@ -95,6 +95,22 @@ Use `panache.releaseTag` only if you need an exact tag override:
 }
 ```
 
+Use a shared user config at a custom path:
+
+```json
+{
+  "panache.serverEnv": {
+    "PANACHE_CONFIG": "P:/Softwares/panache.toml"
+  }
+}
+```
+
+Run **Panache: Restart Server** after changing this setting. Panache uses this
+file when no project config is found, before checking the platform's user config
+directory. An empty value uses the normal user config location. A missing or
+invalid file reports a configuration error and prevents formatting. Use an
+absolute path so it works regardless of the server's working directory.
+
 ## Requirements and troubleshooting
 
 - **NixOS**: the bundled binary won't run because of the dynamic loader path.
@@ -131,7 +147,8 @@ Panache registers itself as the default formatter for `[quarto]` and
 - `panache.commandPath` *(deprecated)*: superseded by `panache.executablePath`
   (with `executableStrategy` set to `path`).
 - `panache.serverArgs`: extra args after `panache lsp`
-- `panache.serverEnv`: extra environment variables
+- `panache.serverEnv`: extra environment variables, including `PANACHE_CONFIG`
+  for a custom user config path. Requires a server restart.
 - `panache.extraPath`: extra PATH entries prepended for the language server
   process
 - `panache.logLevel`: log level for the language server, mapped to `RUST_LOG`
