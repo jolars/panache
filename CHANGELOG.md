@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+This release deprecates the `[flavor-overrides`\] section of the configuration,
+which was previously used to override the `flavor` setting on a per-document
+basis. Instead, we are introducing a new seciont `[flavors]`, which looks like
+this:
+
+```toml
+[flavors]
+gfm = ["TODO.md", "CONTRIBUTING.md"]
+pandoc = ["docs/index.md"]
+```
+
+Using the now-deprecated `[flavor-overrides]`, the config above would have
+looked like this:
+
+```toml
+[flavor-overrides]
+"TODO.md" = "gfm"
+"CONTRIBUTING.md" = "gfm"
+"docs/index.md" = "pandoc"
+```
+
 ## [3.9.0](https://github.com/jolars/panache/compare/v3.8.0...v3.9.0) (2026-09-06)
 
 ### Features
