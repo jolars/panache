@@ -30,7 +30,6 @@ in
     pkgs.google-lighthouse
     pkgs.perf
     pkgs.cargo-flamegraph
-    pkgs.cargo-llvm-cov
     pkgs.cargo-audit
     pkgs.cargo-deny
     pkgs.cargo-machete
