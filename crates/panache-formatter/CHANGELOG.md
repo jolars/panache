@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.24.1](https://github.com/jolars/panache/compare/panache-formatter-v0.24.0...panache-formatter-v0.24.1) (2026-09-11)
+
+### Bug Fixes
+- **formatter:** avoid duplicate quote prefixes ([`59fe1ce`](https://github.com/jolars/panache/commit/59fe1ce681cf657493b670473d05ba1638603aac))
+- **formatter:** stabilize semantic list wrapping ([`1346dfa`](https://github.com/jolars/panache/commit/1346dfaa31ca3915f61de2b3e7fa0e58d44a9953))
+- **formatter:** wrap separate math expressions ([`d7685b7`](https://github.com/jolars/panache/commit/d7685b7ee0d18c554814c95462c689d7c793f53a))
+
+### Performance Improvements
+- **formatter:** cache document sentence profiles ([`c7df8a3`](https://github.com/jolars/panache/commit/c7df8a367d2e38185075e9b06023733c82ff9de4))
+
+### Dependencies
+- updated crates/panache-parser to v0.29.1
+
 ## [0.24.0](https://github.com/jolars/panache/compare/panache-formatter-v0.23.0...panache-formatter-v0.24.0) (2026-09-06)
 
 ### Features

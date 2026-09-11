@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.29.1](https://github.com/jolars/panache/compare/panache-parser-v0.29.0...panache-parser-v0.29.1) (2026-09-11)
+
+### Bug Fixes
+- **parser:** place outdented restricted markers ([`8fe935f`](https://github.com/jolars/panache/commit/8fe935ff3f1d42a8217ffe03dc7021a8aec80397))
+- **formatter:** stabilize semantic list wrapping ([`1346dfa`](https://github.com/jolars/panache/commit/1346dfaa31ca3915f61de2b3e7fa0e58d44a9953))
+
 ## [0.29.0](https://github.com/jolars/panache/compare/panache-parser-v0.28.1...panache-parser-v0.29.0) (2026-09-06)
 
 ### Features

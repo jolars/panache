@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.10.0](https://github.com/jolars/panache/compare/v3.9.0...v3.10.0) (2026-09-11)
 
 This release deprecates the `[flavor-overrides`\] section of the configuration,
 which was previously used to override the `flavor` setting on a per-document
@@ -22,6 +22,20 @@ looked like this:
 "CONTRIBUTING.md" = "gfm"
 "docs/index.md" = "pandoc"
 ```
+
+### Features
+- **config:** group paths under flavors ([`2de3bd8`](https://github.com/jolars/panache/commit/2de3bd84802d0681d7d1a04c78be69345a15034c))
+- **linter:** warn on unspaced list markers ([`7ab22b5`](https://github.com/jolars/panache/commit/7ab22b5904f3f8684874845dad038a4851bf4797)), refs [#530](https://github.com/jolars/panache/issues/530)
+
+### Bug Fixes
+- **formatter:** avoid duplicate quote prefixes ([`59fe1ce`](https://github.com/jolars/panache/commit/59fe1ce681cf657493b670473d05ba1638603aac))
+- **parser:** place outdented restricted markers ([`8fe935f`](https://github.com/jolars/panache/commit/8fe935ff3f1d42a8217ffe03dc7021a8aec80397))
+- **formatter:** stabilize semantic list wrapping ([`1346dfa`](https://github.com/jolars/panache/commit/1346dfaa31ca3915f61de2b3e7fa0e58d44a9953))
+- **formatter:** wrap separate math expressions ([`d7685b7`](https://github.com/jolars/panache/commit/d7685b7ee0d18c554814c95462c689d7c793f53a))
+
+### Dependencies
+- updated crates/panache-formatter to v0.24.1
+- updated crates/panache-parser to v0.29.1
 
 ## [3.9.0](https://github.com/jolars/panache/compare/v3.8.0...v3.9.0) (2026-09-06)
 
