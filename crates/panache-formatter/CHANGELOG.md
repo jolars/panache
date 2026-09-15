@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.24.2](https://github.com/jolars/panache/compare/panache-formatter-v0.24.1...panache-formatter-v0.24.2) (2026-09-15)
+
+### Dependencies
+- updated crates/panache-parser to v0.29.2
+
 ## [0.24.1](https://github.com/jolars/panache/compare/panache-formatter-v0.24.0...panache-formatter-v0.24.1) (2026-09-11)
 
 ### Bug Fixes

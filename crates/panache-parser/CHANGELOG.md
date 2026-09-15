@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.29.2](https://github.com/jolars/panache/compare/panache-parser-v0.29.1...panache-parser-v0.29.2) (2026-09-15)
+
+### Bug Fixes
+- **parser:** keep `<div/>` bodies inside the div ([`04c9582`](https://github.com/jolars/panache/commit/04c9582314966adee5819fa43173dfce0e7a28a0))
+
 ## [0.29.1](https://github.com/jolars/panache/compare/panache-parser-v0.29.0...panache-parser-v0.29.1) (2026-09-11)
 
 ### Bug Fixes
