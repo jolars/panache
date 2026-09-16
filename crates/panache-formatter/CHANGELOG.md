@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.24.2](https://github.com/jolars/panache/compare/panache-formatter-v0.24.1...panache-formatter-v0.24.2) (2026-09-16)
+
+### Bug Fixes
+- **parser:** keep divs with invalid names raw ([`9a05435`](https://github.com/jolars/panache/commit/9a054356d677d29687a6185bd2888ab08ed0f1ed))
+- **formatter:** break sentences after footnotes ([`26fa0df`](https://github.com/jolars/panache/commit/26fa0dfd1fb4b9ef26acb97facd4a18eb4f2d569)), fixes [#536](https://github.com/jolars/panache/issues/536)
+
+### Dependencies
+- updated crates/panache-parser to v0.29.2
+
 ## [0.24.1](https://github.com/jolars/panache/compare/panache-formatter-v0.24.0...panache-formatter-v0.24.1) (2026-09-11)
 
 ### Bug Fixes

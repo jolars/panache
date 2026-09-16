@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.11.0](https://github.com/jolars/panache/compare/v3.10.0...v3.11.0) (2026-09-16)
+
+### Features
+- **config:** support `PANACHE_CONFIG` fallback ([`4077915`](https://github.com/jolars/panache/commit/40779159c44c7a0824e3fa5d1762b4c5a5bb4f5b)), closes [#534](https://github.com/jolars/panache/issues/534)
+
+### Bug Fixes
+- **parser:** keep divs with invalid names raw ([`9a05435`](https://github.com/jolars/panache/commit/9a054356d677d29687a6185bd2888ab08ed0f1ed))
+- **formatter:** break sentences after footnotes ([`26fa0df`](https://github.com/jolars/panache/commit/26fa0dfd1fb4b9ef26acb97facd4a18eb4f2d569)), fixes [#536](https://github.com/jolars/panache/issues/536)
+- **parser:** keep `<div/>` bodies inside the div ([`04c9582`](https://github.com/jolars/panache/commit/04c9582314966adee5819fa43173dfce0e7a28a0))
+
+### Dependencies
+- updated crates/panache-formatter to v0.24.2
+- updated crates/panache-parser to v0.29.2
+
 ## [3.10.0](https://github.com/jolars/panache/compare/v3.9.0...v3.10.0) (2026-09-11)
 
 This release deprecates the `[flavor-overrides`\] section of the configuration,
