@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.3](https://github.com/jolars/panache/compare/panache-parser-v0.29.2...panache-parser-v0.29.3) (2026-09-18)
+
+### Bug Fixes
+- **lint:** include executable inline expressions ([`88639f5`](https://github.com/jolars/panache/commit/88639f58d043c62591ebef19a561b5c877108655))
+
+### Performance Improvements
+- **parser:** gate blockquote precedence probes ([`d4c36b9`](https://github.com/jolars/panache/commit/d4c36b91694256506f1599fafe4a60a2d3fd04dd))
+
 ## [0.29.2](https://github.com/jolars/panache/compare/panache-parser-v0.29.1...panache-parser-v0.29.2) (2026-09-16)
 
 ### Bug Fixes
