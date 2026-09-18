@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.12.0](https://github.com/jolars/panache/compare/v3.11.0...v3.12.0) (2026-09-18)
+
+### Features
+- **lsp:** add table style conversions ([`5fecfae`](https://github.com/jolars/panache/commit/5fecfae01953218075176753fdd4574c0a2f194a))
+
+### Bug Fixes
+- **formatter:** preserve math indentation in lists ([`d45928d`](https://github.com/jolars/panache/commit/d45928d049b03bb2f7a918a01d97dc8a4c0d9673))
+- **formatter:** normalize nested table whitespace ([`b7d42be`](https://github.com/jolars/panache/commit/b7d42bea3b0113c0860cd8334aa87ed42c6312eb)), fixes [#538](https://github.com/jolars/panache/issues/538)
+- **lint:** include executable inline expressions ([`88639f5`](https://github.com/jolars/panache/commit/88639f58d043c62591ebef19a561b5c877108655))
+- **cli:** highlight diagnostic spans independently ([`ef82e79`](https://github.com/jolars/panache/commit/ef82e79c6bd0ef0bb9c208bd9650c5c1ae64f280))
+
+### Performance Improvements
+- **parser:** gate blockquote precedence probes ([`d4c36b9`](https://github.com/jolars/panache/commit/d4c36b91694256506f1599fafe4a60a2d3fd04dd))
+- optimize release code generation ([`5fd86b4`](https://github.com/jolars/panache/commit/5fd86b402250bf78a741c39c62a0e8944d77403f))
+- **formatter:** defer unnecessary text copies ([`da30065`](https://github.com/jolars/panache/commit/da3006595e3c3b4944c15b7d539852815bd811e5))
+
+### Dependencies
+- updated crates/panache-formatter to v0.25.0
+- updated crates/panache-parser to v0.29.3
+
 ## [3.11.0](https://github.com/jolars/panache/compare/v3.10.0...v3.11.0) (2026-09-16)
 
 ### Features
