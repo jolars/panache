@@ -2,6 +2,7 @@
 //!
 //! Provides hover information for:
 //! - Footnote references: `[^id]` → shows footnote content from `[^id]: content`
+//! - Reference links and images: shows the destination preview or definition source.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -9,11 +10,13 @@ use std::path::Path;
 use crate::lsp::uri_ext::UriExt;
 use lsp_types::*;
 
+use crate::lsp::context::OpenDocumentContext;
 use crate::lsp::global_state::StateSnapshot;
 use crate::lsp::symbols::{SymbolTarget, resolve_symbol_target_at_offset};
 use crate::metadata::inline_reference_contains;
 use crate::syntax::{
-    AstNode, DisplayMath, Document, FootnoteDefinition, Heading, Link, ReferenceDefinition,
+    AstNode, DisplayMath, Document, FootnoteDefinition, Heading, ImageAlt, ImageLink, Link,
+    LinkText, ReferenceDefinition, SyntaxNode, UnresolvedReference,
 };
 use crate::utils::{crossref_resolution_labels, normalize_label};
 
@@ -44,10 +47,40 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
 
     let metadata = crate::salsa::metadata(snap.db(), salsa_file, salsa_config).clone();
 
-    let target = {
+    let (target, reference_label) = {
         let root = ctx.syntax_root();
-        resolve_symbol_target_at_offset(&root, offset)
+        let target = resolve_symbol_target_at_offset(&root, offset);
+        // Symbols inside link text retain their own hover previews.
+        let reference_label = match &target {
+            None
+            | Some(SymbolTarget::HeadingLink(_))
+            | Some(SymbolTarget::Reference {
+                is_footnote: false, ..
+            }) => hovered_reference_label(&root, offset),
+            _ => None,
+        };
+        (target, reference_label)
     };
+
+    let reference_target = reference_label.as_deref().or(match target.as_ref() {
+        Some(SymbolTarget::Reference {
+            label,
+            is_footnote: false,
+        }) => Some(label.as_str()),
+        _ => None,
+    });
+    if let Some(label) = reference_target
+        && let Some(markdown) =
+            reference_hover_markdown(snap, &ctx, uri, label, reference_label.is_some())
+    {
+        return Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: markdown,
+            }),
+            range: None,
+        });
+    }
 
     if let Some(SymbolTarget::HeadingLink(label)) = target.as_ref() {
         let doc_indices = crate::lsp::navigation::project_symbol_documents(
@@ -68,37 +101,6 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
                     }),
                     range: None,
                 });
-            }
-        }
-    }
-    if let Some(SymbolTarget::Reference {
-        label,
-        is_footnote: false,
-    }) = target.as_ref()
-    {
-        let doc_indices = crate::lsp::navigation::project_symbol_documents(
-            snap.db(),
-            salsa_file,
-            salsa_config,
-            &doc_path,
-            uri,
-            &content_for_offset,
-        );
-
-        for doc in &doc_indices {
-            let Some(heading_label) = reference_definition_heading_target(doc, label) else {
-                continue;
-            };
-            for candidate_doc in &doc_indices {
-                if let Some(markdown) = section_hover_markdown(candidate_doc, &heading_label) {
-                    return Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: markdown,
-                        }),
-                        range: None,
-                    });
-                }
             }
         }
     }
@@ -318,18 +320,112 @@ fn section_hover_markdown(
     Some(markdown)
 }
 
-fn reference_definition_heading_target(
-    doc: &crate::lsp::navigation::IndexedDocument,
+fn hovered_reference_label(root: &SyntaxNode, offset: usize) -> Option<String> {
+    let mut node = helpers::find_node_at_offset(root, offset)?;
+    loop {
+        let (reference, text) = if let Some(link) = Link::cast(node.clone()) {
+            if link.dest().is_some() || node.parent().and_then(ReferenceDefinition::cast).is_some()
+            {
+                return None;
+            }
+            (
+                link.reference().map(|reference| reference.label()),
+                link.text().map(|text| text.raw_label()),
+            )
+        } else if let Some(image) = ImageLink::cast(node.clone()) {
+            if image.dest().is_some() {
+                return None;
+            }
+            (
+                image.reference_label(),
+                image.alt().map(|alt| alt.syntax().text().to_string()),
+            )
+        } else if let Some(unresolved) = UnresolvedReference::cast(node.clone()) {
+            // Definitions in included documents are absent from the local parse.
+            let text = node.children().find_map(|child| {
+                if let Some(text) = LinkText::cast(child.clone()) {
+                    Some(text.raw_label())
+                } else {
+                    ImageAlt::cast(child).map(|alt| alt.syntax().text().to_string())
+                }
+            });
+            (unresolved.label(), text)
+        } else {
+            node = node.parent()?;
+            continue;
+        };
+        let label = reference.filter(|label| !label.is_empty()).or(text)?;
+        let label = normalize_label(&label);
+        return (!label.is_empty()).then_some(label);
+    }
+}
+
+fn reference_hover_markdown(
+    snap: &StateSnapshot,
+    ctx: &OpenDocumentContext,
+    uri: &Uri,
     label: &str,
+    show_definition: bool,
 ) -> Option<String> {
-    let tree = crate::parse(&doc.text, None);
-    let normalized = normalize_label(label);
+    let doc_path = ctx.path.as_deref()?;
+    let docs = crate::lsp::navigation::project_symbol_documents(
+        snap.db(),
+        ctx.salsa_file,
+        ctx.salsa_config,
+        doc_path,
+        uri,
+        &ctx.content,
+    );
+    let (doc, range) = docs.iter().find_map(|doc| {
+        let range = doc.symbol_index.reference_definitions(label)?.first()?;
+        Some((doc, *range))
+    })?;
+    let definition_path = doc.uri.to_file_path()?;
+    let file = if doc.uri == *uri {
+        ctx.salsa_file
+    } else {
+        snap.db().file_text(definition_path.to_path_buf())?
+    };
+    let tree =
+        SyntaxNode::new_root(crate::salsa::parsed_tree(snap.db(), file, ctx.salsa_config).clone());
     let def = tree
         .descendants()
         .filter_map(ReferenceDefinition::cast)
-        .find(|def| normalize_label(&def.label()) == normalized)?;
-    let destination = def.destination()?;
-    heading_label_from_destination(&destination)
+        .find(|def| def.syntax().text_range() == range)?;
+
+    if let Some(destination) = def.destination() {
+        if let Some(heading_label) = heading_label_from_destination(&destination) {
+            for candidate in &docs {
+                if let Some(markdown) = section_hover_markdown(candidate, &heading_label) {
+                    return Some(markdown);
+                }
+            }
+        }
+        let raw_target =
+            crate::lsp::handlers::document_links::extract_first_destination_token(&destination);
+        if let Some(target_uri) = crate::lsp::handlers::document_links::resolve_link_target(
+            raw_target,
+            Some(&definition_path),
+            Some(&doc.uri),
+        ) && let Some(markdown) = linked_document_preview(&target_uri, doc_path)
+        {
+            return Some(markdown);
+        }
+    }
+
+    if !show_definition {
+        return None;
+    }
+    let source = doc.text.get(std::ops::Range::<usize>::from(range))?;
+    let source = source.trim_end_matches(['\r', '\n']);
+    // Titles can contain backticks, including a fence on its own line.
+    let longest_run = source
+        .split(|ch| ch != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let fence = "`".repeat(3.max(longest_run + 1));
+    Some(format!("{fence}markdown\n{source}\n{fence}"))
 }
 
 fn heading_label_from_destination(destination: &str) -> Option<String> {
@@ -457,8 +553,12 @@ fn linked_document_hover_markdown(
         uri,
         link_target,
     )?;
+    linked_document_preview(&target_uri, doc_path)
+}
+
+fn linked_document_preview(target_uri: &Uri, doc_path: &Path) -> Option<String> {
     let target_path = target_uri.to_file_path()?;
-    if target_path == doc_path {
+    if target_path == doc_path || !is_markdown_family_path(&target_path) {
         return None;
     }
     let target_text = std::fs::read_to_string(&target_path).ok()?;

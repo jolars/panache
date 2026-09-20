@@ -66,10 +66,9 @@ This document tracks implementation status for Panache's features.
 
 ### Navigation & Symbols
 
-- [ ] Reference-link hover - Show the reference definition when hovering over
-  the label in `[text][ref]`, including external destinations such as
-  `[ref]: https://example.com`. Panache currently returns `null` for this
-  external-link case; Marksman displays the definition as Markdown.
+- [x] Reference-link hover - Show the original definition for full, collapsed,
+  and shortcut reference links and images, including external destinations.
+  Preserve section and local-document previews when available.
 - [x] Find references - Find all uses of a reference link/footnote/citation
   - [x] Find references for citations - Find all `@cite` uses of a bibliography
     entry

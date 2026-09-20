@@ -805,8 +805,16 @@ Pull
 
 ### Hover Information
 
-Hover over elements to see contextual information (implementation varies by
-element type).
+Hover over footnotes and citations to see their contents. Links to headings and
+local Markdown documents show section or document previews, and equation
+cross-references show equation previews.
+
+Reference links (`[text][ref]`, `[ref][]`, and `[ref]`) and their image
+equivalents show the original definition in a Markdown code block when no
+section or document preview is available. This includes external destinations
+such as `[ref]: https://example.com "Title"`. The preview preserves the full
+destination, title, attributes, and line breaks. Definitions in included
+documents are also supported, and previews reflect unsaved definition edits.
 
 ### Auto-Completion
 
@@ -1007,7 +1015,7 @@ marked *out of scope*.
   | `textDocument/definition`                                                                                                   | ✅     | Links, footnotes, citations, crossrefs, headings            |
   | `textDocument/references`                                                                                                   | ✅     | Honors `includeDeclaration`                                 |
   | `textDocument/rename`, `prepareRename`                                                                                      | ✅     | Citations, refs, footnotes, crossrefs                       |
-  | `textDocument/hover`                                                                                                        | ✅     | Footnotes, citations, section/equation previews             |
+  | `textDocument/hover`                                                                                                        | ✅     | Footnotes, citations, reference definitions, link previews  |
   | `textDocument/completion`                                                                                                   | ✅     | Citations, crossrefs, file/shortcode paths                  |
   | `completionItem/resolve`                                                                                                    | ✅     | Lazy citation previews (bibliography entry)                 |
   | `textDocument/codeAction`                                                                                                   | ✅     | Lint fixes + list/footnote/link/heading/table conversions   |
