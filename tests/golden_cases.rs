@@ -466,6 +466,7 @@ golden_test_cases!(
     list_item_grid_table_colspan,
     grid_table_nordics,
     grid_table_reflow,
+    grid_table_conversion_safety,
     grid_table_planets,
     grid_table_rowspan_aligned,
     grid_table_rowspan_colspan_2d,

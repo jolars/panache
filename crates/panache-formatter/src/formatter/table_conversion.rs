@@ -3,11 +3,16 @@
 use crate::{
     Config,
     syntax::{
-        AstNode, LatexCommand, SyntaxKind, SyntaxNode, Table, TableAlignment,
-        text_without_line_prefixes,
+        AstNode, InlineHtml, LatexCommand, SyntaxKind, SyntaxNode, Table, TableAlignment,
+        display_column_slice as column_slice, text_without_line_prefixes,
     },
 };
-use panache_parser::parser::inlines::core::parse_inline_text_recursive;
+use panache_parser::{
+    grid_layout::grid_display_width,
+    parser::{
+        blocks::html_blocks::is_pandoc_block_tag_name, inlines::core::parse_inline_text_recursive,
+    },
+};
 use rowan::{GreenNodeBuilder, NodeOrToken};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -21,6 +26,7 @@ pub enum TableStyle {
     Pipe,
     Simple,
     Multiline,
+    Grid,
 }
 
 impl TableStyle {
@@ -29,6 +35,7 @@ impl TableStyle {
             Self::Pipe => SyntaxKind::PIPE_TABLE,
             Self::Simple => SyntaxKind::SIMPLE_TABLE,
             Self::Multiline => SyntaxKind::MULTILINE_TABLE,
+            Self::Grid => SyntaxKind::GRID_TABLE,
         }
     }
 }
@@ -39,6 +46,10 @@ pub enum TableConversionError {
     DisabledExtension,
     RaggedRows,
     MissingBody,
+    SpanningCells,
+    BlockContent,
+    MultipleHeaders,
+    Footer,
     HardLineBreak,
     MultilineLiteral,
     EastAsianLineBreak,
@@ -50,10 +61,14 @@ pub enum TableConversionError {
 impl std::fmt::Display for TableConversionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::UnsupportedSource => "Grid table conversion is not supported yet",
+            Self::UnsupportedSource => "The source table style is not supported",
             Self::DisabledExtension => "The destination table extension is disabled",
             Self::RaggedRows => "Rows do not all have the declared number of columns",
             Self::MissingBody => "The table has no body rows",
+            Self::SpanningCells => "The destination cannot preserve merged cells",
+            Self::BlockContent => "The conversion cannot preserve block structure inside cells",
+            Self::MultipleHeaders => "The destination cannot preserve multiple header rows",
+            Self::Footer => "The destination cannot preserve table footers",
             Self::HardLineBreak => "A cell contains a hard line break",
             Self::MultilineLiteral => "A cell contains an inline construct spanning multiple lines",
             Self::EastAsianLineBreak => "Conversion of East Asian line breaks is not supported yet",
@@ -79,6 +94,49 @@ struct Cell {
 }
 
 impl Cell {
+    fn parse_grid(text: &str, config: &Config) -> Result<Self, TableConversionError> {
+        // The fragment parser does not recognize every Pandoc list marker yet.
+        // Reject these forms before trusting its paragraph classification.
+        if text
+            .lines()
+            .any(|line| unparsed_grid_list_marker(line, config))
+        {
+            return Err(TableConversionError::BlockContent);
+        }
+        // Grid extraction omits the final newline, but a terminal backslash
+        // still creates a hard break in the cell's block content.
+        let text = format!("{text}\n");
+        if !text.trim().is_empty() {
+            let options = config.parser_options();
+            let tree = panache_parser::parser::Parser::new_fragment(&text, &options).parse();
+            let blocks: Vec<_> = tree
+                .children()
+                .filter(|node| node.kind() != SyntaxKind::BLANK_LINE)
+                .collect();
+            if blocks.len() != 1 || blocks[0].kind() != SyntaxKind::PARAGRAPH {
+                return Err(TableConversionError::BlockContent);
+            }
+            // The fragment parser can leave same-line HTML block interruptions
+            // inside a paragraph. Pandoc ends the paragraph at these tags.
+            if config.dialect() == panache_parser::Dialect::Pandoc
+                && blocks[0]
+                    .descendants()
+                    .filter_map(InlineHtml::cast)
+                    .any(|html| {
+                        let raw = html.verbatim();
+                        let tag = raw.trim_start_matches('<').trim_start_matches('/');
+                        let end = tag
+                            .find(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+                            .unwrap_or(tag.len());
+                        is_pandoc_block_tag_name(&tag[..end])
+                    })
+            {
+                return Err(TableConversionError::BlockContent);
+            }
+        }
+        Self::parse(&text, config)
+    }
+
     fn parse(text: &str, config: &Config) -> Result<Self, TableConversionError> {
         // With this extension, replacing a soft break between wide characters
         // with a space changes content. Preserve the source until the converter
@@ -138,15 +196,15 @@ impl Cell {
         self.pieces.join(" ")
     }
 
-    fn minimum_width(&self) -> usize {
-        self.pieces.iter().map(|s| s.width()).max().unwrap_or(0)
+    fn minimum_width(&self, measure: fn(&str) -> usize) -> usize {
+        self.pieces.iter().map(|s| measure(s)).max().unwrap_or(0)
     }
 
-    fn wrap(&self, width: usize) -> Vec<String> {
+    fn wrap(&self, width: usize, measure: fn(&str) -> usize) -> Vec<String> {
         let mut lines = Vec::new();
         let mut line = String::new();
         for piece in &self.pieces {
-            if !line.is_empty() && line.width() + 1 + piece.width() > width {
+            if !line.is_empty() && measure(&line) + 1 + measure(piece) > width {
                 lines.push(std::mem::take(&mut line));
             }
             if !line.is_empty() {
@@ -161,9 +219,29 @@ impl Cell {
     }
 }
 
+fn unparsed_grid_list_marker(line: &str, config: &Config) -> bool {
+    if config.dialect() != panache_parser::Dialect::Pandoc {
+        return false;
+    }
+    let marker = line
+        .trim_start()
+        .split_ascii_whitespace()
+        .next()
+        .unwrap_or("");
+    if marker == "#." || (config.parser_extensions.fancy_lists && matches!(marker, "#)" | "(#)")) {
+        return true;
+    }
+    config.parser_extensions.example_lists
+        && marker.starts_with('@')
+        && (marker.ends_with('.')
+            || (config.parser_extensions.fancy_lists && marker.ends_with(')')))
+}
+
 fn cell_pieces(node: &SyntaxNode, mode: CellText) -> Result<Vec<String>, TableConversionError> {
     let mut pieces = Vec::new();
     let mut current = String::new();
+    let mut pending_space = false;
+    let mut literal_delimiter = false;
     for element in node.children_with_tokens() {
         match element {
             NodeOrToken::Token(token)
@@ -174,14 +252,23 @@ fn cell_pieces(node: &SyntaxNode, mode: CellText) -> Result<Vec<String>, TableCo
             {
                 for ch in token.text().chars() {
                     if ch.is_ascii_whitespace() {
-                        if !current.is_empty() {
-                            pieces.push(std::mem::take(&mut current));
-                        }
+                        pending_space = true;
                     } else {
+                        // Pandoc can pair literal emphasis markers across a
+                        // newline even when they cannot pair across spaces.
+                        let next_delimiter =
+                            matches!(mode, CellText::Source) && matches!(ch, '*' | '_');
+                        flush_cell_space(
+                            &mut pieces,
+                            &mut current,
+                            &mut pending_space,
+                            literal_delimiter || next_delimiter,
+                        );
                         if ch == '|' && matches!(mode, CellText::Pipe) {
                             current.push('\\');
                         }
                         current.push(ch);
+                        literal_delimiter = next_delimiter;
                     }
                 }
             }
@@ -193,7 +280,14 @@ fn cell_pieces(node: &SyntaxNode, mode: CellText) -> Result<Vec<String>, TableCo
                 if text.contains(['\n', '\r']) {
                     return Err(TableConversionError::MultilineLiteral);
                 }
+                flush_cell_space(
+                    &mut pieces,
+                    &mut current,
+                    &mut pending_space,
+                    literal_delimiter,
+                );
                 current.push_str(&text);
+                literal_delimiter = false;
             }
         }
     }
@@ -201,6 +295,21 @@ fn cell_pieces(node: &SyntaxNode, mode: CellText) -> Result<Vec<String>, TableCo
         pieces.push(current);
     }
     Ok(pieces)
+}
+
+fn flush_cell_space(
+    pieces: &mut Vec<String>,
+    current: &mut String,
+    pending_space: &mut bool,
+    keep_together: bool,
+) {
+    if std::mem::take(pending_space) && !current.is_empty() {
+        if keep_together {
+            current.push(' ');
+        } else {
+            pieces.push(std::mem::take(current));
+        }
+    }
 }
 
 fn comparison_token_text(token: &crate::syntax::SyntaxToken, mode: CellText) -> String {
@@ -261,10 +370,11 @@ pub(super) fn reflow_inline_cell(
     lines: &[String],
     width: usize,
     config: &Config,
+    measure: fn(&str) -> usize,
 ) -> Option<Vec<String>> {
     Cell::parse(&lines.join("\n"), config)
         .ok()
-        .map(|cell| cell.wrap(width))
+        .map(|cell| cell.wrap(width, measure))
 }
 
 #[derive(Debug)]
@@ -273,25 +383,6 @@ struct LogicalTable {
     alignments: Vec<TableAlignment>,
     has_header: bool,
     caption: Option<(bool, String)>,
-}
-
-/// Separator positions are display columns, not byte or character offsets.
-fn column_slice(text: &str, start: usize, end: usize) -> &str {
-    let mut width = 0;
-    let mut first = None;
-    let mut last = text.len();
-    for (offset, ch) in text.char_indices() {
-        let char_width = ch.width().unwrap_or(0);
-        if first.is_none() && width >= start && (char_width > 0 || offset == 0) {
-            first = Some(offset);
-        }
-        if width >= end && char_width > 0 {
-            last = offset;
-            break;
-        }
-        width += char_width;
-    }
-    &text[first.unwrap_or(last)..last]
 }
 
 fn columns(separator: &SyntaxNode) -> Vec<(usize, usize)> {
@@ -326,9 +417,6 @@ fn alignment(text: &str, width: usize) -> TableAlignment {
 
 impl LogicalTable {
     fn read(table: &Table, config: &Config) -> Result<Self, TableConversionError> {
-        if matches!(table, Table::Grid(_)) {
-            return Err(TableConversionError::UnsupportedSource);
-        }
         let rows = table.rows();
         let mut has_header = rows.first().is_some_and(|row| row.is_header());
         if rows.len() <= usize::from(has_header) {
@@ -345,7 +433,39 @@ impl LogicalTable {
                     .to_string(),
             )
         });
-        let (cell_texts, alignments) = if let Table::Pipe(pipe) = table {
+        let (cell_texts, alignments) = if let Table::Grid(grid) = table {
+            if table
+                .syntax()
+                .children()
+                .any(|node| node.kind() == SyntaxKind::TABLE_FOOTER)
+            {
+                return Err(TableConversionError::Footer);
+            }
+            if rows.iter().filter(|row| row.is_header()).count() > 1 {
+                return Err(TableConversionError::MultipleHeaders);
+            }
+            let layout = grid.layout().ok_or(TableConversionError::InvalidOutput)?;
+            if layout
+                .cells
+                .iter()
+                .any(|cell| cell.row_span != 1 || cell.col_span != 1)
+            {
+                return Err(TableConversionError::SpanningCells);
+            }
+            let count = layout.cols_pos.len() - 1;
+            if layout.row_seps.len() != rows.len() + 1 || layout.cells.len() != rows.len() * count {
+                return Err(TableConversionError::RaggedRows);
+            }
+            let mut result = vec![vec![String::new(); count]; rows.len()];
+            for cell in layout.cells {
+                result[cell.start_row][cell.start_col] = cell.content;
+            }
+            let alignments = grid.alignments();
+            if alignments.len() != count {
+                return Err(TableConversionError::RaggedRows);
+            }
+            (result, alignments)
+        } else if let Table::Pipe(pipe) = table {
             let count = pipe
                 .column_count()
                 .ok_or(TableConversionError::RaggedRows)?;
@@ -409,7 +529,17 @@ impl LogicalTable {
         };
         let mut rows: Vec<Vec<Cell>> = cell_texts
             .into_iter()
-            .map(|row| row.iter().map(|cell| Cell::parse(cell, config)).collect())
+            .map(|row| {
+                row.iter()
+                    .map(|cell| {
+                        if matches!(table, Table::Grid(_)) {
+                            Cell::parse_grid(cell, config)
+                        } else {
+                            Cell::parse(cell, config)
+                        }
+                    })
+                    .collect()
+            })
             .collect::<Result<_, _>>()?;
         // Pandoc uses an empty pipe header as the spelling of a headerless
         // table. Keep that syntax in the CST, but compare its logical rows.
@@ -459,6 +589,9 @@ impl LogicalTable {
         if target == TableStyle::Pipe {
             return Ok(self.render_pipe());
         }
+        if target == TableStyle::Grid {
+            return Ok(self.render_grid(available_width));
+        }
         let cols = self.alignments.len();
         let mut widths = vec![2; cols];
         let mut minimum = vec![2; cols];
@@ -468,7 +601,7 @@ impl LogicalTable {
                 let min = if self.has_header && row_idx == 0 {
                     cell.text().width()
                 } else {
-                    cell.minimum_width()
+                    cell.minimum_width(str::width)
                 };
                 minimum[i] = minimum[i].max(min + 2);
             }
@@ -515,7 +648,7 @@ impl LogicalTable {
                     if target == TableStyle::Simple || is_header {
                         vec![cell.text()]
                     } else {
-                        cell.wrap(widths[i].saturating_sub(2))
+                        cell.wrap(widths[i].saturating_sub(2), str::width)
                     }
                 })
                 .collect();
@@ -560,6 +693,82 @@ impl LogicalTable {
             out.push('\n');
         }
         Ok(out)
+    }
+
+    fn render_grid(&self, available_width: usize) -> String {
+        let cols = self.alignments.len();
+        let mut widths = vec![1; cols];
+        let mut minimum = vec![1; cols];
+        for row in &self.rows {
+            for (i, cell) in row.iter().enumerate() {
+                widths[i] = widths[i].max(grid_display_width(&cell.text()));
+                minimum[i] = minimum[i].max(cell.minimum_width(grid_display_width));
+            }
+        }
+        let mut total = widths.iter().sum::<usize>() + 3 * cols + 1;
+        while total > available_width {
+            let Some(i) = (0..cols)
+                .filter(|&i| widths[i] > minimum[i])
+                .max_by_key(|&i| (widths[i], std::cmp::Reverse(i)))
+            else {
+                break;
+            };
+            widths[i] -= 1;
+            total -= 1;
+        }
+        let border = |fill: char, aligned: bool| {
+            let mut line = String::from("+");
+            for (i, &width) in widths.iter().enumerate() {
+                let (left, right) = if aligned {
+                    match self.alignments[i] {
+                        TableAlignment::Default => (false, false),
+                        TableAlignment::Left => (true, false),
+                        TableAlignment::Center => (true, true),
+                        TableAlignment::Right => (false, true),
+                    }
+                } else {
+                    (false, false)
+                };
+                line.push(if left { ':' } else { fill });
+                line.push_str(&fill.to_string().repeat(width));
+                line.push(if right { ':' } else { fill });
+                line.push('+');
+            }
+            line.push('\n');
+            line
+        };
+        let mut out = String::new();
+        if let Some((true, caption)) = &self.caption {
+            out.push_str(caption);
+            out.push_str("\n\n");
+        }
+        out.push_str(&border('-', !self.has_header));
+        for (row_idx, row) in self.rows.iter().enumerate() {
+            let cells: Vec<_> = row
+                .iter()
+                .enumerate()
+                .map(|(i, cell)| cell.wrap(widths[i], grid_display_width))
+                .collect();
+            for line_idx in 0..cells.iter().map(Vec::len).max().unwrap_or(1) {
+                out.push('|');
+                for (i, cell) in cells.iter().enumerate() {
+                    let text = cell.get(line_idx).map_or("", String::as_str);
+                    out.push(' ');
+                    out.push_str(text);
+                    out.push_str(&" ".repeat(widths[i].saturating_sub(grid_display_width(text))));
+                    out.push_str(" |");
+                }
+                out.push('\n');
+            }
+            let is_header = self.has_header && row_idx == 0;
+            out.push_str(&border(if is_header { '=' } else { '-' }, is_header));
+        }
+        if let Some((false, caption)) = &self.caption {
+            out.push('\n');
+            out.push_str(caption);
+            out.push('\n');
+        }
+        out
     }
 
     fn render_pipe(&self) -> String {
@@ -634,6 +843,8 @@ impl LogicalTable {
 /// Pipe tables join wrapped prose onto one line per row and use an empty
 /// header for headerless tables under the Pandoc dialect. Pipes in prose are
 /// escaped; literal content in code and math is preserved.
+/// Grid cells must be empty or contain one paragraph, without row or column
+/// spans. Multiple header rows and footers cannot be converted to other styles.
 /// The result has no container prefixes and uses LF line endings.
 pub fn convert_table(
     table: &Table,
@@ -645,6 +856,7 @@ pub fn convert_table(
         TableStyle::Pipe => config.parser_extensions.pipe_tables,
         TableStyle::Simple => config.parser_extensions.simple_tables,
         TableStyle::Multiline => config.parser_extensions.multiline_tables,
+        TableStyle::Grid => config.parser_extensions.grid_tables,
     };
     if !enabled {
         return Err(TableConversionError::DisabledExtension);

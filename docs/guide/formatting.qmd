@@ -782,6 +782,12 @@ to fit the content: Pandoc derives relative column widths from the source border
 widths and propagates them to output formats (e.g. HTML
 `<col style="width:…">`), so resizing a column would change the rendered layout.
 
+Column alignment is encoded by colons in the header separator, or in the opening
+border for a headerless table. Cell text receives trailing padding; leading
+alignment padding could turn prose into an indented code block. Existing cell
+indentation is preserved, including in cells that span rows or columns. Prose
+wrapping keeps inline constructs, such as code spans and math, intact.
+
 Input
 
 :   ```markdown
@@ -836,7 +842,8 @@ markers at the boundaries it crosses (a Pandoc colspan). Such cells are
 **preserved**: every spanned column is kept and the spanning cell is re-laid out
 across them, so no content is dropped. As with all grid tables the source border
 widths are preserved (only grown to fit content), and the spanning header keeps
-its span:
+its span. Punctuation-only cell contents, such as `-`, `:`, and `=`, remain
+content rather than becoming table separators:
 
 Input
 
@@ -852,15 +859,15 @@ Output
 
 :   ```markdown
     +----------+
-    |    a     |
+    | a        |
     +:==:+:===:+
-    | aa | ab  |
+    | aa |  ab |
     +----+-----+
     ```
 
-If a row's `|` markers don't line up with any column boundary the separators
-define, the table can't be placed on a single grid; it is then left untouched so
-nothing is lost.
+Pipes inside cell content are preserved as text. Only markers on column
+boundaries define cell edges. If the table cannot be placed on a single grid, it
+is left untouched so nothing is lost.
 
 #### Row-spanning cells
 
@@ -887,11 +894,11 @@ Output
 
 :   ```markdown
     +--------+--------+
-    |  Name  |  Value |
+    | Name   | Value  |
     +:======:+=======:+
-    | group  |    1.5 |
+    | group  | 1.5    |
     | spans  +--------+
-    |  rows  |   22.0 |
+    | rows   | 22.0   |
     +--------+--------+
     ```
 

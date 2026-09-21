@@ -736,6 +736,7 @@ golden_test_cases!(
     math_definition_colon,
     blockquote_list_item_grid_table_rowspan,
     grid_table,
+    grid_table_decomposed_hangul,
     grid_table_in_list_blockquote,
     grid_table_indented_is_paragraph,
     grid_table_rowspan_hybrid_sep,

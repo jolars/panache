@@ -18,33 +18,504 @@ fn assert_style(text: &str, kind: SyntaxKind) {
 }
 
 #[test]
-fn converts_all_supported_pairs_and_survives_formatting() {
-    let pipe = "| A | B |\n|---|---|\n| one | two |\n";
-    let simple = convert(pipe, TableStyle::Simple).unwrap();
-    let multiline = convert(pipe, TableStyle::Multiline).unwrap();
-    for (source, target, kind) in [
-        (pipe, TableStyle::Simple, SyntaxKind::SIMPLE_TABLE),
-        (pipe, TableStyle::Multiline, SyntaxKind::MULTILINE_TABLE),
-        (
-            simple.as_str(),
-            TableStyle::Multiline,
-            SyntaxKind::MULTILINE_TABLE,
-        ),
-        (
-            multiline.as_str(),
-            TableStyle::Simple,
-            SyntaxKind::SIMPLE_TABLE,
-        ),
-        (simple.as_str(), TableStyle::Pipe, SyntaxKind::PIPE_TABLE),
-        (multiline.as_str(), TableStyle::Pipe, SyntaxKind::PIPE_TABLE),
-    ] {
+fn converts_grid_sources_without_losing_wrapped_cells() {
+    let source = "+---------+-----+\n| A       | B   |\n+=========+=====+\n| one two | 界  |\n| three   |     |\n+---------+-----+\n\n: Caption {#tbl-id}\n";
+    for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
         let output = convert(source, target).unwrap();
-        assert_style(&output, kind);
-        let formatted = format(&output, None, None);
-        assert_style(&formatted, kind);
-        assert_eq!(format(&formatted, None, None), formatted);
-        assert!(formatted.contains("one"));
-        assert!(formatted.contains("two"));
+        assert_style(&output, target.syntax_kind());
+        assert!(output.contains("one two three"));
+        assert!(output.contains("界"));
+        assert!(output.contains(": Caption {#tbl-id}"));
+    }
+}
+
+#[test]
+fn grid_formatting_preserves_prose_in_aligned_columns() {
+    let source = "+-----------+\n| Header    |\n+==========:+\n| x         |\n+-----------+\n";
+    let output = format(source, None, None);
+    assert!(output.contains("| x         |"), "{output}");
+    assert_eq!(format(&output, None, None), output);
+    if std::process::Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
+        assert_eq!(pandoc(&output), pandoc(source));
+    }
+}
+
+#[test]
+fn spanning_grid_formatting_preserves_indented_code_with_literal_pipes() {
+    let source = "+------------+-----+\n| Header           |\n+============+=====+\n|     a|b    | x   |\n+------------+-----+\n";
+    let output = format(source, None, None);
+    assert!(output.contains("|     a|b    | x   |"), "{output}");
+    assert_eq!(format(&output, None, None), output);
+    if std::process::Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
+        assert_eq!(pandoc_document(&output), pandoc_document(source));
+    }
+}
+
+#[test]
+fn spanning_grid_formatting_preserves_prose_in_aligned_columns() {
+    for separator in ["===========:", ":==========:"] {
+        let source = format!(
+            "+------------+-----+\n| Header           |\n+{separator}+=====+\n| a|b        | x   |\n+------------+-----+\n"
+        );
+        let output = format(&source, None, None);
+        assert!(output.contains("| a|b        | x   |"), "{output}");
+        assert_eq!(format(&output, None, None), output);
+        if std::process::Command::new("pandoc")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
+            assert_eq!(pandoc_document(&output), pandoc_document(&source));
+        }
+    }
+}
+
+#[test]
+fn spanning_grid_formatting_preserves_punctuation_cells() {
+    for content in ["-", "--", ":", "=", "- = :"] {
+        let source = format!(
+            "+--------+--------+\n| A + B           |\n+========+========+\n| {content:<6} | ok     |\n+--------+--------+\n"
+        );
+        let output = format(&source, None, None);
+        assert_eq!(output, source);
+        assert_eq!(format(&output, None, None), output);
+        if std::process::Command::new("pandoc")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
+            assert_eq!(pandoc_document(&output), pandoc_document(&source));
+        }
+    }
+}
+
+#[test]
+fn spanning_grid_separator_fill_ignores_equals_in_cell_content() {
+    let source = "+--------+--------+\n| A      | B      |\n+========+========+\n| text   | one    |\n| =      +--------+\n| more   | two    |\n+--------+--------+\n";
+    assert_eq!(format(source, None, None), source);
+}
+
+#[test]
+fn grid_conversion_preserves_unicode_sequences() {
+    for content in [
+        "👩‍💻",
+        "❤️",
+        "e\u{301}",
+        "가",
+        "한",
+        "\u{1160}\u{11ff}",
+        "\u{d7b0}\u{d7ff}",
+        "👩‍💻 👩‍💻 👩‍💻 👩‍💻 👩‍💻 👩‍💻 👩‍💻 👩‍💻",
+    ] {
+        let source = format!("| A | B |\n|---|---|\n| {content} | ok |\n");
+        let grid = convert(&source, TableStyle::Grid).unwrap();
+        let output = format(&grid, None, None);
+        assert_eq!(format(&output, None, None), output);
+        assert_eq!(
+            convert(&output, TableStyle::Pipe),
+            convert(&source, TableStyle::Pipe)
+        );
+        if std::process::Command::new("pandoc")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
+            assert_eq!(pandoc(&grid), pandoc(&source));
+            assert_eq!(pandoc(&output), pandoc(&source));
+        }
+    }
+}
+
+#[test]
+fn spanning_grid_formatting_preserves_unicode_sequences() {
+    let source = "+--------+--------+\n| 👩‍💻 + B        |\n+========+========+\n| 👩‍💻   | ok     |\n+--------+--------+\n";
+    assert_eq!(format(source, None, None), source);
+}
+
+#[test]
+fn grid_conversion_rejects_unparsed_pandoc_list_markers() {
+    for content in [
+        "@. hi",
+        "@) hi",
+        "@label. hi",
+        "@label) hi",
+        "(#) hi",
+        "#) hi",
+    ] {
+        let pipe = format!("| A |\n|---|\n| {content} |\n");
+        assert_eq!(
+            convert(&pipe, TableStyle::Grid),
+            Err(TableConversionError::BlockContent),
+            "{content}"
+        );
+        let grid = grid_cell_source(content);
+        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+            assert_eq!(
+                convert(&grid, target),
+                Err(TableConversionError::BlockContent),
+                "{target:?}: {content}"
+            );
+        }
+    }
+}
+
+#[test]
+fn grid_conversion_allows_literal_list_markers() {
+    for content in [
+        r"\@. hi", r"(\#) hi", "@.hi", "(#)hi", "`@. hi`", "`(#) hi`",
+    ] {
+        let source = format!("| A |\n|---|\n| {content} |\n");
+        assert!(convert(&source, TableStyle::Grid).is_ok(), "{content}");
+    }
+    let mut config = Config::default();
+    config.parser_extensions.example_lists = false;
+    config.parser_extensions.fancy_lists = false;
+    for content in ["@. hi", "(#) hi"] {
+        let source = format!("| A |\n|---|\n| {content} |\n");
+        let tree = panache_formatter::parser::parse(&source, Some(config.parser_options()));
+        let table = tree.descendants().find_map(Table::cast).unwrap();
+        assert!(convert_table(&table, TableStyle::Grid, &config, 40).is_ok());
+    }
+}
+
+fn grid_cell_source(content: &str) -> String {
+    use unicode_width::UnicodeWidthStr;
+    let width = content.lines().map(str::width).max().unwrap_or(0).max(6);
+    let border = format!("+{}+\n", "-".repeat(width + 2));
+    let mut source = format!(
+        "{border}| Header{} |\n+{}+\n",
+        " ".repeat(width - 6),
+        "=".repeat(width + 2)
+    );
+    for line in content.lines() {
+        source.push_str(&format!("| {line}{} |\n", " ".repeat(width - line.width())));
+    }
+    source.push_str(&border);
+    source
+}
+
+#[test]
+fn rejects_grid_structures_that_destinations_cannot_represent() {
+    for (source, reason) in [
+        (
+            "+---+---+\n| A | B |\n+===+===+\n| x | y |\n|   +---+\n| z | w |\n+---+---+\n",
+            TableConversionError::SpanningCells,
+        ),
+        (
+            "+---+\n| A |\n+---+\n| B |\n+===+\n| x |\n+---+\n",
+            TableConversionError::MultipleHeaders,
+        ),
+        (
+            "+---+\n| A |\n+===+\n| x |\n+===+\n| f |\n+---+\n",
+            TableConversionError::Footer,
+        ),
+        (
+            "+---+---+\n| A | B |\n+===+===+\n| x | y\n+---+---+\n",
+            TableConversionError::MissingBody,
+        ),
+    ] {
+        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+            assert_eq!(convert(source, target), Err(reason), "{source}");
+        }
+    }
+    for content in [
+        "- item",
+        "# heading",
+        "> quote",
+        "    code",
+        "one\n\ntwo",
+        "```\ncode\n```",
+        "[ref]: url",
+    ] {
+        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+            assert_eq!(
+                convert(&grid_cell_source(content), target),
+                Err(TableConversionError::BlockContent),
+                "{content}"
+            );
+        }
+    }
+    assert_eq!(
+        convert(&grid_cell_source("one\\\ntwo"), TableStyle::Pipe),
+        Err(TableConversionError::HardLineBreak)
+    );
+    assert_eq!(
+        convert(&grid_cell_source("`one\ntwo`"), TableStyle::Pipe),
+        Err(TableConversionError::MultilineLiteral)
+    );
+}
+
+#[test]
+fn grid_conversion_rejects_block_reinterpretation() {
+    for content in ["- item", "# heading", "> quote", "---", "[ref]: url"] {
+        let source = format!("| A |\n|---|\n| {content} |\n");
+        assert_eq!(
+            convert(&source, TableStyle::Grid),
+            Err(TableConversionError::BlockContent),
+            "{content}"
+        );
+    }
+}
+
+#[test]
+fn grid_conversion_rejects_html_block_interruptions() {
+    for (content, block) in [
+        ("foo <div>bar</div>", "Div"),
+        ("foo <DIV class=\"note\">bar</DIV>", "Div"),
+        ("foo <section>bar</section>", "RawBlock"),
+        ("foo <p>bar</p>", "RawBlock"),
+    ] {
+        let source = grid_cell_source(content);
+        if std::process::Command::new("pandoc")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
+            let native = pandoc_output(&source, "native");
+            assert!(native.contains(block), "{native}");
+            assert!(native.contains("Str \"bar\""), "{native}");
+        }
+        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+            assert_eq!(
+                convert(&source, target),
+                Err(TableConversionError::BlockContent),
+                "{target:?}: {content}"
+            );
+        }
+        let pipe = format!("| Header |\n|---|\n| {content} |\n");
+        assert_eq!(
+            convert(&pipe, TableStyle::Grid),
+            Err(TableConversionError::BlockContent),
+            "{content}"
+        );
+    }
+}
+
+#[test]
+fn grid_conversion_preserves_inline_html_and_literal_block_tags() {
+    for content in [
+        "foo <span>bar</span>",
+        "foo `<div>bar</div>`",
+        r"foo \<div>bar\</div>",
+        "foo &lt;div>bar&lt;/div>",
+    ] {
+        let source = grid_cell_source(content);
+        let pipe = convert(&source, TableStyle::Pipe).unwrap();
+        if std::process::Command::new("pandoc")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
+            assert_eq!(pandoc(&pipe), pandoc(&source));
+        }
+    }
+}
+
+#[test]
+fn wrapping_preserves_literal_inline_delimiters() {
+    let config = Config::default();
+    for content in [
+        "foo * bar * baz",
+        "foo _ bar _ baz",
+        "foo ** bar ** baz",
+        "foo __ bar __ baz",
+        "foo* bar* baz",
+        "foo_ bar_ baz",
+    ] {
+        for (target, source) in [
+            (
+                TableStyle::Grid,
+                format!("| Header |\n|---|\n| {content} |\n"),
+            ),
+            (
+                TableStyle::Multiline,
+                format!("| Header | B |\n|---|---|\n| {content} | ok |\n"),
+            ),
+        ] {
+            let tree = panache_formatter::parser::parse(&source, Some(config.parser_options()));
+            let table = tree.descendants().find_map(Table::cast).unwrap();
+            let output = convert_table(&table, target, &config, 10)
+                .unwrap_or_else(|error| panic!("{content} to {target:?}: {error}"));
+            let formatted = format(&output, None, None);
+            assert_eq!(format(&formatted, None, None), formatted);
+            if std::process::Command::new("pandoc")
+                .arg("--version")
+                .output()
+                .is_ok()
+            {
+                assert_eq!(pandoc(&output), pandoc(&source), "{output}");
+                assert_eq!(pandoc(&formatted), pandoc(&source), "{formatted}");
+            }
+        }
+    }
+}
+
+#[test]
+fn grid_safety_fixture_preserves_pandoc_content_after_formatting() {
+    let source =
+        include_str!("../../../tests/fixtures/cases/grid_table_conversion_safety/input.md");
+    let output = format(source, None, None);
+    assert_eq!(format(&output, None, None), output);
+    if std::process::Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
+        assert_eq!(pandoc(&output), pandoc(source));
+    }
+}
+
+#[test]
+fn grid_conversion_rejects_terminal_hard_breaks() {
+    for content in ["path\\", "path\\\\\\", "one\npath\\"] {
+        let source = grid_cell_source(content);
+        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+            assert_eq!(
+                convert(&source, target),
+                Err(TableConversionError::HardLineBreak),
+                "{target:?}: {source}"
+            );
+        }
+    }
+}
+
+#[test]
+fn grid_conversion_rejects_introducing_terminal_hard_breaks() {
+    for content in ["path\\", "path\\\\\\"] {
+        let source = format!("| A |\n|---|\n| {content} |\n");
+        assert_eq!(
+            convert(&source, TableStyle::Grid),
+            Err(TableConversionError::HardLineBreak),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn grid_conversion_preserves_terminal_literal_backslashes() {
+    for content in [r"path\\", r"path\\\\", r"`path\`"] {
+        let source = format!("| A |\n|---|\n| {content} |\n");
+        let grid = convert(&source, TableStyle::Grid).unwrap();
+        let output = convert(&grid, TableStyle::Pipe).unwrap();
+        assert!(output.contains(content), "{output}");
+        if std::process::Command::new("pandoc")
+            .arg("--version")
+            .output()
+            .is_ok()
+        {
+            assert_eq!(pandoc(&grid), pandoc(&source));
+            assert_eq!(pandoc(&output), pandoc(&source));
+        }
+    }
+}
+
+#[test]
+fn grid_conversion_does_not_drop_text_outside_the_border() {
+    let source = "+---+---+\n| A | B |\n+===+===+\n| x | y | extra |\n+---+---+\n";
+    for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+        assert!(convert(source, target).is_err());
+    }
+    assert!(format(source, None, None).contains("extra"));
+}
+
+#[test]
+fn grid_conversion_preserves_inline_content_and_headerless_tables() {
+    let sources = [
+        "| A | B |\n|---|---|\n| one two three four five six seven eight nine | prefix `some long code span` suffix |\n",
+        "| Wide header | B |\n|---:|:---:|\n| x | 界 café e\u{301} 😀 |\n",
+        "| A | B |\n|---|---|\n| a\\|b **c\\|d** | `x|y` $x|y$ |\n",
+        "| A | B |\n|---|---|\n| | x |\n| y | |\n",
+        "----- -----\none   two\n----- -----\n",
+        "---\none\n---\n",
+        ": Caption *before* {#tbl-id}\n\n| A | B |\n|---|---|\n| x | y |\n",
+    ];
+    let oracle = std::process::Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .is_ok();
+    for source in sources {
+        let grid = convert(source, TableStyle::Grid).unwrap();
+        let formatted = format(
+            &grid,
+            Some(Config {
+                math: panache_formatter::MathMode::Verbatim,
+                ..Config::default()
+            }),
+            None,
+        );
+        assert_eq!(
+            format(
+                &formatted,
+                Some(Config {
+                    math: panache_formatter::MathMode::Verbatim,
+                    ..Config::default()
+                }),
+                None
+            ),
+            formatted
+        );
+        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+            let output =
+                convert(&grid, target).unwrap_or_else(|err| panic!("{target:?}: {err}\n{grid}"));
+            if oracle {
+                assert_eq!(pandoc(&output), pandoc(source), "{output}");
+            }
+        }
+        if oracle {
+            assert_eq!(pandoc(&grid), pandoc(source), "{grid}");
+            assert_eq!(pandoc(&formatted), pandoc(source), "{formatted}");
+        }
+    }
+}
+
+#[test]
+fn grid_conversion_honors_disabled_extension() {
+    let mut config = Config::default();
+    config.parser_extensions.grid_tables = false;
+    let tree =
+        panache_formatter::parser::parse("| A |\n|---|\n| x |\n", Some(config.parser_options()));
+    let table = tree.descendants().find_map(Table::cast).unwrap();
+    assert_eq!(
+        convert_table(&table, TableStyle::Grid, &config, 40),
+        Err(TableConversionError::DisabledExtension)
+    );
+}
+
+#[test]
+fn converts_all_supported_pairs_and_survives_formatting() {
+    let sources = [
+        (TableStyle::Pipe, "| A | B |\n|---|---|\n| one | two |\n"),
+        (TableStyle::Simple, "A     B\n----- -----\none   two\n"),
+        (
+            TableStyle::Multiline,
+            "-------------\nA      B\n------ ------\none    two\n\n-------------\n",
+        ),
+        (
+            TableStyle::Grid,
+            "+-----+-----+\n| A   | B   |\n+=====+=====+\n| one | two |\n+-----+-----+\n",
+        ),
+    ];
+    for (source_style, source) in sources {
+        for (target, _) in sources {
+            if source_style == target {
+                continue;
+            }
+            let output = convert(source, target).unwrap();
+            assert_style(&output, target.syntax_kind());
+            let formatted = format(&output, None, None);
+            assert_style(&formatted, target.syntax_kind());
+            assert_eq!(format(&formatted, None, None), formatted);
+            assert!(formatted.contains("one"));
+            assert!(formatted.contains("two"));
+        }
     }
 }
 
@@ -266,8 +737,8 @@ fn caption_without_final_newline_is_preserved() {
 fn rejects_unsupported_structures_without_replacements() {
     for (source, expected) in [
         (
-            "+---+---+\n| A | B |\n+===+===+\n| x | y |\n+---+---+\n",
-            TableConversionError::UnsupportedSource,
+            "+-------+\n| A B   |\n+===+===+\n| x | y |\n+---+---+\n",
+            TableConversionError::SpanningCells,
         ),
         (
             "| A | B |\n|---|---|\n| one | two | extra |\n",
@@ -474,7 +945,12 @@ fn matches_pandoc_content_and_structure() {
     ];
     for source in samples {
         let expected = pandoc(source);
-        for target in [TableStyle::Pipe, TableStyle::Simple, TableStyle::Multiline] {
+        for target in [
+            TableStyle::Pipe,
+            TableStyle::Simple,
+            TableStyle::Multiline,
+            TableStyle::Grid,
+        ] {
             let output = convert(source, target).unwrap();
             assert_eq!(
                 pandoc(&output),

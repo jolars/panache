@@ -11,7 +11,8 @@ fn actions(server: &TestLspServer, uri: &str, line: u32, character: u32) -> Vec<
             CodeActionOrCommand::CodeAction(action)
                 if action.title == "Convert to simple table"
                     || action.title == "Convert to pipe table"
-                    || action.title == "Convert to multiline table" =>
+                    || action.title == "Convert to multiline table"
+                    || action.title == "Convert to grid table" =>
             {
                 Some(action)
             }
@@ -58,12 +59,12 @@ fn apply(text: &str, action: &CodeAction) -> String {
 }
 
 #[test]
-fn offers_two_refactors_and_preserves_surroundings() {
+fn offers_three_refactors_and_preserves_surroundings() {
     let mut server = TestLspServer::new();
     let text = "Before 😀.\n\n| A | B |\n|---|---|\n| one | two |\n\nAfter.\n";
     server.open_document("file:///table.qmd", text, "quarto");
     let actions = actions(&server, "file:///table.qmd", 4, 4);
-    assert_eq!(actions.len(), 2);
+    assert_eq!(actions.len(), 3);
     for action in actions {
         assert_eq!(
             action.kind.as_ref(),
@@ -78,6 +79,8 @@ fn offers_two_refactors_and_preserves_surroundings() {
             table.syntax().kind(),
             if action.title.contains("multiline") {
                 SyntaxKind::MULTILINE_TABLE
+            } else if action.title.contains("grid") {
+                SyntaxKind::GRID_TABLE
             } else {
                 SyntaxKind::SIMPLE_TABLE
             }
@@ -91,7 +94,7 @@ fn preserves_nested_prefixes_and_crlf() {
     let text = "- > | A | B |\r\n  > |---|---|\r\n  > | 😀 | 界 |\r\n\nAfter.\n";
     server.open_document("file:///table.qmd", text, "quarto");
     let actions = actions(&server, "file:///table.qmd", 2, 8);
-    assert_eq!(actions.len(), 2);
+    assert_eq!(actions.len(), 3);
     for action in actions {
         let result = apply(text, &action);
         assert!(result.starts_with("- > "));
@@ -119,7 +122,7 @@ fn omits_unsupported_actions_and_current_style() {
     let mut server = TestLspServer::new();
     for (text, expected) in [
         ("| A | B |\n|---|---|\n| x |\n", 0),
-        ("A     B\n----- -----\none   two\n", 2),
+        ("A     B\n----- -----\none   two\n", 3),
     ] {
         server.open_document("file:///table.qmd", text, "quarto");
         assert_eq!(actions(&server, "file:///table.qmd", 0, 1).len(), expected);
@@ -142,7 +145,7 @@ fn converts_simple_and_multiline_tables_to_pipe() {
             .position(|line| line.starts_with(": Caption"))
             .unwrap();
         let actions = actions(&server, "file:///table.qmd", line as u32, 3);
-        assert_eq!(actions.len(), 2);
+        assert_eq!(actions.len(), 3);
         let action = actions
             .iter()
             .find(|action| action.title == "Convert to pipe table")
@@ -269,7 +272,7 @@ fn reports_unsupported_reasons_only_to_capable_clients() {
     server.initialize_disabled_code_actions("file:///workspace");
     server.open_document("file:///table.qmd", text, "quarto");
     let actions = actions(&server, "file:///table.qmd", 2, 1);
-    assert_eq!(actions.len(), 2);
+    assert_eq!(actions.len(), 3);
     for action in actions {
         assert!(action.edit.is_none());
         assert!(
@@ -295,7 +298,7 @@ fn reports_disabled_extensions_in_gfm() {
         "markdown",
     );
     let actions = actions(&server, uri.as_str(), 0, 2);
-    assert_eq!(actions.len(), 2);
+    assert_eq!(actions.len(), 3);
     for action in actions {
         assert!(action.edit.is_none());
         assert!(
@@ -327,7 +330,7 @@ fn converts_at_caption_and_document_boundaries() {
         let mut server = TestLspServer::new();
         server.open_document("file:///table.qmd", text, "quarto");
         let actions = actions(&server, "file:///table.qmd", line, col);
-        assert_eq!(actions.len(), 2, "{text}");
+        assert_eq!(actions.len(), 3, "{text}");
         for action in actions {
             let result = apply(text, &action);
             assert_eq!(result.ends_with('\n'), text.ends_with('\n'));
@@ -346,6 +349,11 @@ fn keeps_tables_in_their_containers() {
         "::: {.box}\n\n| A | B |\n|---|---|\n| one | two |\n\n:::\n",
         "[^note]:\n    | A | B |\n    |---|---|\n    | one | two |\n\nAfter.\n",
         "Term\n:   Description.\n\n    | A | B |\n    |---|---|\n    | one | two |\n\nAfter.\n",
+        "- Item.\n\n  +-----+-----+\n  | A   | B   |\n  +=====+=====+\n  | one | two |\n  +-----+-----+\n\n- Sibling.\n",
+        "> +-----+-----+\n> | A   | B   |\n> +=====+=====+\n> | one | two |\n> +-----+-----+\n\nAfter.\n",
+        "::: {.box}\n\n+-----+-----+\n| A   | B   |\n+=====+=====+\n| one | two |\n+-----+-----+\n\n:::\n",
+        "[^note]:\n    +-----+-----+\n    | A   | B   |\n    +=====+=====+\n    | one | two |\n    +-----+-----+\n\nAfter.\n",
+        "Term\n:   Description.\n\n    +-----+-----+\n    | A   | B   |\n    +=====+=====+\n    | one | two |\n    +-----+-----+\n\nAfter.\n",
     ];
     for text in samples {
         let mut server = TestLspServer::new();
@@ -361,7 +369,7 @@ fn keeps_tables_in_their_containers() {
             line as u32,
             content.find("one").unwrap() as u32,
         );
-        assert_eq!(actions.len(), 2, "{text}");
+        assert_eq!(actions.len(), 3, "{text}");
         for action in actions {
             let result = apply(text, &action);
             let original = panache::parse(text, None);
@@ -382,6 +390,111 @@ fn keeps_tables_in_their_containers() {
 }
 
 #[test]
+fn converts_grid_at_captions_preserving_crlf_and_document_boundaries() {
+    let grid = "+-----+-----+\n| A   | B   |\n+=====+=====+\n| 😀  | 界  |\n+-----+-----+\n";
+    for text in [
+        format!(": Caption 😀 {{#tbl-id}}\n\n{grid}"),
+        format!("Before.\n\n{grid}\n: Caption 😀 {{#tbl-id}}"),
+    ] {
+        let text = text.replace('\n', "\r\n");
+        let line = text
+            .lines()
+            .position(|line| line.starts_with(": Caption"))
+            .unwrap() as u32;
+        let mut server = TestLspServer::new();
+        server.open_document("file:///table.qmd", &text, "quarto");
+        let actions = actions(&server, "file:///table.qmd", line, 12);
+        assert_eq!(actions.len(), 3);
+        assert!(
+            actions
+                .iter()
+                .all(|action| action.title != "Convert to grid table")
+        );
+        for action in actions {
+            let output = apply(&text, &action);
+            assert_eq!(output.ends_with('\n'), text.ends_with('\n'));
+            assert!(!output.replace("\r\n", "").contains('\n'));
+            assert!(output.contains(": Caption 😀 {#tbl-id}"));
+            assert!(output.contains('😀') && output.contains('界'));
+            assert_eq!(
+                output.starts_with(": Caption"),
+                text.starts_with(": Caption")
+            );
+        }
+    }
+}
+
+#[test]
+fn reports_grid_restrictions_only_to_capable_clients() {
+    for supported in [false, true] {
+        let mut server = TestLspServer::new();
+        if supported {
+            server.initialize_disabled_code_actions("file:///workspace");
+        }
+        for (source, reason) in [
+            (
+                "+-------+\n| A B   |\n+===+===+\n| x | y |\n+---+---+\n",
+                "merged cells",
+            ),
+            (
+                "+--------+\n| A      |\n+========+\n| - item |\n+--------+\n",
+                "block structure",
+            ),
+            (
+                "+---+\n| A |\n+===+\n| x |\n+===+\n| f |\n+---+\n",
+                "footers",
+            ),
+        ] {
+            server.open_document("file:///table.qmd", source, "quarto");
+            let actions = actions(&server, "file:///table.qmd", 0, 1);
+            assert_eq!(actions.len(), if supported { 3 } else { 0 });
+            for action in actions {
+                assert!(action.edit.is_none());
+                assert!(action.disabled.unwrap().reason.contains(reason));
+            }
+            server.close_document("file:///table.qmd");
+        }
+    }
+}
+
+#[test]
+fn grid_conversion_honors_document_width_without_table_indent() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("panache.toml"),
+        "[format]\nline-width = 24\ntable-indent = 3\n",
+    )
+    .unwrap();
+    let uri = Uri::from_file_path(dir.path().join("table.qmd")).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(Uri::from_file_path(dir.path()).unwrap().as_str());
+    let text = "| A | B |\n|---|---|\n| one two three four five | six seven eight nine ten |\n";
+    server.open_document(uri.as_str(), text, "quarto");
+    let action = actions(&server, uri.as_str(), 0, 1)
+        .into_iter()
+        .find(|action| action.title == "Convert to grid table")
+        .unwrap();
+    let output = apply(text, &action);
+    assert_eq!(output.lines().next().unwrap().len(), 24);
+    assert!(output.lines().all(|line| line.len() <= 24));
+}
+
+#[test]
+fn offers_grid_conversion_for_joined_emoji() {
+    let mut server = TestLspServer::new();
+    let source = "| A | B |\n|---|---|\n| 👩‍💻 | ok |\n";
+    server.open_document("file:///table.qmd", source, "quarto");
+    let action = actions(&server, "file:///table.qmd", 2, 4)
+        .into_iter()
+        .find(|action| action.title == "Convert to grid table")
+        .expect("grid conversion should be available");
+    assert!(action.disabled.is_none());
+    let output = apply(source, &action);
+    assert!(output.contains("| 👩‍💻 | ok |"));
+    assert_eq!(panache::format(&output, None, None), output);
+}
+
+#[test]
 fn honors_code_action_kind_filter() {
     let mut server = TestLspServer::new();
     server.open_document(
@@ -391,8 +504,8 @@ fn honors_code_action_kind_filter() {
     );
     for (kind, expected) in [
         (CodeActionKind::QUICKFIX, 0),
-        (CodeActionKind::REFACTOR, 2),
-        (CodeActionKind::REFACTOR_REWRITE, 2),
+        (CodeActionKind::REFACTOR, 3),
+        (CodeActionKind::REFACTOR_REWRITE, 3),
     ] {
         let response = server
             .get_code_actions_with_context(
@@ -416,9 +529,15 @@ fn declines_marker_line_layouts_that_cannot_preserve_the_container() {
     let text = "- | A | B |\n  |---|---|\n  | one | two |\n\n- Sibling.\n";
     server.open_document("file:///table.qmd", text, "quarto");
     let actions = actions(&server, "file:///table.qmd", 0, 4);
-    assert_eq!(actions.len(), 2);
+    assert_eq!(actions.len(), 3);
     for action in actions {
-        assert!(action.edit.is_none());
-        assert!(action.disabled.unwrap().reason.contains("container"));
+        if action.title == "Convert to grid table" {
+            let output = apply(text, &action);
+            assert!(output.starts_with("- +"));
+            assert!(output.ends_with("\n- Sibling.\n"));
+        } else {
+            assert!(action.edit.is_none());
+            assert!(action.disabled.unwrap().reason.contains("container"));
+        }
     }
 }

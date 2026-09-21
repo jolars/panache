@@ -60,7 +60,7 @@ This document tracks implementation status for Panache's features.
 
 ### Code Actions
 
-- [ ] Convert to and from grid tables
+- [x] Convert to and from grid tables
 - [x] Convert between table styles (pipe, simple, multiline)
 - [x] Convert between inline/reference links
 

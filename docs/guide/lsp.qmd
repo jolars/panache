@@ -107,7 +107,7 @@ Code actions
     - Convert list spacing (loose ↔ compact)
     - Convert list markers (bullet ↔ ordered ↔ task)
     - Convert footnote styles (inline ↔ reference)
-    - Convert table styles (pipe ↔ simple ↔ multiline)
+    - Convert table styles (pipe, simple, multiline, and grid)
     - Convert link styles (inline ↔ reference)
     - Convert implicit heading references to explicit links
 
@@ -637,30 +637,41 @@ Convert footnote styles
 
 Convert table styles
 
-:   Convert between pipe, simple, and multiline tables. Place the cursor
+:   Convert between pipe, simple, multiline, and grid tables. Place the cursor
     anywhere in the table or its caption, or select within one table. The
     destination extension must be enabled for the document.
 
     Conversions preserve content and structure while allowing layout changes. Cell
     contents, rows, columns, headers, captions, attributes, and explicit alignment
     are preserved. Column widths and wrapping may change, and default alignment may
-    become left alignment. Converting a multiline table to a simple table discards
-    explicit column widths, which simple tables cannot represent.
+    become left alignment. Converting a multiline or grid table to a simple table
+    discards explicit column widths, which simple tables cannot represent.
 
     Pipe and simple tables use one source line per row, even when that exceeds
-    `line-width`. Multiline tables wrap prose to fit the available width while
-    keeping inline constructs intact. Converting to pipe joins wrapped prose,
-    escapes literal pipes in prose, and preserves pipes inside code spans and math
-    under the Pandoc dialect. Headerless tables use an empty pipe header.
+    `line-width`. Multiline and grid tables wrap prose to fit the available width
+    while keeping inline constructs intact. Literal emphasis markers stay with
+    neighboring words, even when this exceeds the available width. Grid sizing
+    counts Unicode character widths as Pandoc does, including decomposed Hangul and
+    the characters in joined emoji. Converting to pipe joins wrapped prose, escapes
+    literal pipes in prose, and preserves pipes inside code spans and math under the
+    Pandoc dialect. Headerless tables use an empty pipe header.
 
-    Grid tables are not supported yet. Conversions that would discard content or
-    structure are unavailable, including ragged rows, header-only tables, hard line
-    breaks, and inline constructs spanning multiple source lines. Some container
-    layouts, such as a table starting directly after a list marker, and significant
-    East Asian line breaks also prevent conversion. Pipes in unsupported inline
-    contexts, such as HTML attributes, prevent conversion to pipe tables. Raw TeX
-    `\verb` commands also prevent conversion until their delimiters and content can
-    be preserved together. Editors that support disabled actions can show the
+    Grid cells must be empty or contain a single paragraph. Merged cells, multiple
+    header rows, footers, and block content such as lists, code, or HTML block tags
+    within a paragraph prevent conversion to other styles. Conversion to grid is
+    also unavailable when it would turn plain text into block content, including
+    Pandoc list markers such as `@.`, `@)`, and `(#)` when their extensions are
+    enabled. A literal backslash at the end of a cell also prevents conversion to
+    grid if it would become a hard line break.
+
+    Other conversions that would discard content or structure are unavailable,
+    including ragged rows, header-only tables, hard line breaks, and inline
+    constructs spanning multiple source lines. Some container layouts, such as
+    converting a table directly after a list marker to simple or multiline, and
+    significant East Asian line breaks also prevent conversion. Pipes in unsupported
+    inline contexts, such as HTML attributes, prevent conversion to pipe tables. Raw
+    TeX `\verb` commands also prevent conversion until their delimiters and content
+    can be preserved together. Editors that support disabled actions can show the
     reason. Other editors omit unavailable actions. Ordinary formatting preserves
     the table style and [multiline-table column
     widths](formatting.qmd#multiline-tables).

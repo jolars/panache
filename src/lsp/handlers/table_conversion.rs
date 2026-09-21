@@ -47,7 +47,7 @@ pub(super) fn code_actions(
         return Vec::new();
     };
     let range = table.syntax().text_range();
-    if end < start || end > usize::from(range.end()) || matches!(table, Table::Grid(_)) {
+    if end < start || end > usize::from(range.end()) {
         return Vec::new();
     }
     let config = crate::formatter::to_formatter_config(config);
@@ -56,6 +56,7 @@ pub(super) fn code_actions(
         (TableStyle::Pipe, "Convert to pipe table"),
         (TableStyle::Simple, "Convert to simple table"),
         (TableStyle::Multiline, "Convert to multiline table"),
+        (TableStyle::Grid, "Convert to grid table"),
     ] {
         if table.syntax().kind() == target.syntax_kind() {
             continue;
@@ -107,20 +108,24 @@ fn conversion_edit(
         .take_while(|token| token.kind() == SyntaxKind::LINE_PREFIX)
         .map(|token| token.text().to_string())
         .collect();
-    let separator = table
+    // A grid's first separator may borrow the container marker from its
+    // parent. Find the first complete prefix owned by the table instead.
+    let prefix: String = table
         .syntax()
-        .children()
-        .find(|node| node.kind() == SyntaxKind::TABLE_SEPARATOR)
-        .ok_or(TableConversionError::InvalidOutput)?;
-    let prefix: String = separator
         .descendants_with_tokens()
         .filter_map(|el| el.into_token())
+        .skip_while(|token| token.kind() != SyntaxKind::LINE_PREFIX)
         .take_while(|token| token.kind() == SyntaxKind::LINE_PREFIX)
         .map(|token| token.text().to_string())
         .collect();
+    let table_indent = if target == TableStyle::Grid {
+        0
+    } else {
+        config.table_indent
+    };
     let width = config
         .line_width
-        .saturating_sub(prefix.width() + config.table_indent);
+        .saturating_sub(prefix.width() + table_indent);
     let converted = convert_table(table, target, config, width)?;
     let mut replacement = String::new();
     for (i, line) in converted.split_inclusive('\n').enumerate() {

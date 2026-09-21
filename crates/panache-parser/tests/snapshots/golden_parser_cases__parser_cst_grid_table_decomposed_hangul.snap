@@ -1,0 +1,93 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..175
+  GRID_TABLE@0..68
+    TABLE_SEPARATOR@0..13
+      TABLE_SEP_DELIM@0..1 "+"
+      TABLE_SEP_DASHES@1..6 "-----"
+      TABLE_SEP_DELIM@6..7 "+"
+      TABLE_SEP_DASHES@7..11 "----"
+      TABLE_SEP_DELIM@11..12 "+"
+      NEWLINE@12..13 "\n"
+    TABLE_HEADER@13..26
+      TEXT@13..14 "|"
+      WHITESPACE@14..15 " "
+      TABLE_CELL@15..16
+        TEXT@15..16 "A"
+      WHITESPACE@16..19 "   "
+      TEXT@19..20 "|"
+      WHITESPACE@20..21 " "
+      TABLE_CELL@21..22
+        TEXT@21..22 "B"
+      WHITESPACE@22..24 "  "
+      TEXT@24..25 "|"
+      NEWLINE@25..26 "\n"
+    TABLE_SEPARATOR@26..39
+      TABLE_SEP_DELIM@26..27 "+"
+      TABLE_SEP_EQUALS@27..32 "====="
+      TABLE_SEP_DELIM@32..33 "+"
+      TABLE_SEP_EQUALS@33..37 "===="
+      TABLE_SEP_DELIM@37..38 "+"
+      NEWLINE@38..39 "\n"
+    TABLE_ROW@39..55
+      TEXT@39..40 "|"
+      WHITESPACE@40..41 " "
+      TABLE_CELL@41..47
+        TEXT@41..47 "가"
+      WHITESPACE@47..48 " "
+      TEXT@48..49 "|"
+      WHITESPACE@49..50 " "
+      TABLE_CELL@50..52
+        TEXT@50..52 "ok"
+      WHITESPACE@52..53 " "
+      TEXT@53..54 "|"
+      NEWLINE@54..55 "\n"
+    TABLE_SEPARATOR@55..68
+      TABLE_SEP_DELIM@55..56 "+"
+      TABLE_SEP_DASHES@56..61 "-----"
+      TABLE_SEP_DELIM@61..62 "+"
+      TABLE_SEP_DASHES@62..66 "----"
+      TABLE_SEP_DELIM@66..67 "+"
+      NEWLINE@67..68 "\n"
+  BLANK_LINE@68..69
+    BLANK_LINE@68..69 "\n"
+  GRID_TABLE@69..175
+    TABLE_SEPARATOR@69..89
+      TABLE_SEP_DELIM@69..70 "+"
+      TABLE_SEP_DASHES@70..78 "--------"
+      TABLE_SEP_DELIM@78..79 "+"
+      TABLE_SEP_DASHES@79..87 "--------"
+      TABLE_SEP_DELIM@87..88 "+"
+      NEWLINE@88..89 "\n"
+    TABLE_HEADER@89..112
+      TEXT@89..111 "| 가 + B         |"
+      NEWLINE@111..112 "\n"
+    TABLE_SEPARATOR@112..132
+      TABLE_SEP_DELIM@112..113 "+"
+      TABLE_SEP_EQUALS@113..121 "========"
+      TABLE_SEP_DELIM@121..122 "+"
+      TABLE_SEP_EQUALS@122..130 "========"
+      TABLE_SEP_DELIM@130..131 "+"
+      NEWLINE@131..132 "\n"
+    TABLE_ROW@132..155
+      TEXT@132..133 "|"
+      WHITESPACE@133..134 " "
+      TABLE_CELL@134..140
+        TEXT@134..140 "가"
+      WHITESPACE@140..144 "    "
+      TEXT@144..145 "|"
+      WHITESPACE@145..146 " "
+      TABLE_CELL@146..148
+        TEXT@146..148 "ok"
+      WHITESPACE@148..153 "     "
+      TEXT@153..154 "|"
+      NEWLINE@154..155 "\n"
+    TABLE_SEPARATOR@155..175
+      TABLE_SEP_DELIM@155..156 "+"
+      TABLE_SEP_DASHES@156..164 "--------"
+      TABLE_SEP_DELIM@164..165 "+"
+      TABLE_SEP_DASHES@165..173 "--------"
+      TABLE_SEP_DELIM@173..174 "+"
+      NEWLINE@174..175 "\n"

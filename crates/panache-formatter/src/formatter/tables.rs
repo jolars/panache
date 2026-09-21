@@ -1,16 +1,17 @@
 use crate::config::{Config, Dialect, WrapMode};
 use crate::formatter::Formatter;
 use crate::formatter::inline::{collapse_spaces, format_inline_node_with_spacing};
-use crate::formatter::inline_layout::{expand_tabs_from_column, wrap_text_first_fit};
+use crate::formatter::inline_layout::expand_tabs_from_column;
 use crate::formatter::sentence_wrap::{ResolvedProfile, SentenceProfileCache, split_sentence_text};
 use crate::syntax::{
-    AstNode, PipeTable, SyntaxKind, SyntaxNode, SyntaxToken, TableCell, TableRowNode,
-    text_without_line_prefixes,
+    AstNode, GridTable, PipeTable, SyntaxKind, SyntaxNode, SyntaxToken, TableAlignment, TableCell,
+    TableRowNode, text_without_line_prefixes,
 };
 use panache_parser::analyze_grid;
+use panache_parser::grid_layout::{grid_char_width, grid_column_slice, grid_display_width};
 use rowan::NodeOrToken;
 use std::collections::BTreeSet;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthStr;
 
 impl Formatter {
     pub(super) fn format_table(&mut self, node: &SyntaxNode, indent: usize) {
@@ -171,52 +172,6 @@ fn wrap_words_with_widths(words: &[&str], first_width: usize, rest_width: usize)
     out
 }
 
-/// Reflow a multi-line table cell's lines to fit a fixed column width.
-///
-/// Column widths in grid/multiline tables are load-bearing (pandoc maps them to
-/// relative output widths), so multiline prose is re-packed to the existing
-/// width. A grid cell whose single source line grows during inline normalization
-/// may widen later rather than split inline syntax. Leading/trailing blank lines
-/// are dropped (pandoc discards them); runs of blank lines split the cell into
-/// paragraphs (an internal blank line in a grid cell is a paragraph break), each
-/// reflowed independently and rejoined with a single blank line. Multiline table
-/// cells never contain internal blanks, so this reduces to one paragraph.
-fn reflow_cell_lines(
-    lines: &[String],
-    width: usize,
-    allow_single_line_growth: bool,
-    normalize_paragraph: impl Fn(&str) -> String,
-) -> Vec<String> {
-    let mut paragraphs: Vec<Vec<&str>> = Vec::new();
-    let mut current: Vec<&str> = Vec::new();
-    for line in lines {
-        if line.trim().is_empty() {
-            if !current.is_empty() {
-                paragraphs.push(std::mem::take(&mut current));
-            }
-        } else {
-            current.push(line.trim());
-        }
-    }
-    if !current.is_empty() {
-        paragraphs.push(current);
-    }
-
-    let mut out = Vec::new();
-    for paragraph in paragraphs {
-        if !out.is_empty() {
-            out.push(String::new());
-        }
-        let joined = normalize_paragraph(&paragraph.join(" "));
-        if width == 0 || (allow_single_line_growth && paragraph.len() == 1) {
-            out.push(joined);
-        } else {
-            out.extend(wrap_text_first_fit(&joined, width));
-        }
-    }
-    out
-}
-
 fn format_grid_cell_paragraph(text: &str, config: &Config) -> String {
     let tree = crate::parser::parse(text, Some(config.parser_options()));
     let mut blocks = tree.children();
@@ -287,18 +242,80 @@ fn is_ordered_list_marker(token: &str) -> bool {
 /// leading/trailing blank lines. Column widths are load-bearing, so `width` is
 /// the target for multiline prose; normalized single lines may widen later.
 fn reflow_or_trim_grid_cell(lines: &[String], width: usize, config: &Config) -> Vec<String> {
+    let first = lines.iter().position(|l| !l.trim().is_empty());
+    let last = lines.iter().rposition(|l| !l.trim().is_empty());
+    let original = match (first, last) {
+        (Some(f), Some(l)) => lines[f..=l].to_vec(),
+        _ => return Vec::new(),
+    };
     if width > 0 && grid_cell_is_reflowable(lines) {
-        reflow_cell_lines(lines, width, true, |text| {
-            format_grid_cell_paragraph(text, config)
-        })
-    } else {
-        let first = lines.iter().position(|l| !l.trim().is_empty());
-        let last = lines.iter().rposition(|l| !l.trim().is_empty());
-        match (first, last) {
-            (Some(f), Some(l)) => lines[f..=l].to_vec(),
-            _ => Vec::new(),
+        let options = config.parser_options();
+        let text = original.join("\n");
+        let tree = panache_parser::parser::Parser::new_fragment(&text, &options).parse();
+        let paragraphs: Vec<_> = tree
+            .children()
+            .filter(|node| node.kind() != SyntaxKind::BLANK_LINE)
+            .collect();
+        if paragraphs
+            .iter()
+            .any(|node| node.kind() != SyntaxKind::PARAGRAPH)
+        {
+            return original;
+        }
+        let mut out = Vec::new();
+        for paragraph in &paragraphs {
+            let raw = paragraph.text().to_string();
+            let lines: Vec<_> = raw
+                .trim_end_matches('\n')
+                .lines()
+                .map(str::to_string)
+                .collect();
+            // A literal spanning source lines cannot safely be flattened.
+            if super::table_conversion::reflow_inline_cell(
+                &lines,
+                width,
+                config,
+                grid_display_width,
+            )
+            .is_none()
+            {
+                return original;
+            }
+            let normalized = format_grid_cell_paragraph(&lines.join(" "), config);
+            let wrapped = if lines.len() == 1 {
+                vec![normalized]
+            } else {
+                let Some(wrapped) = super::table_conversion::reflow_inline_cell(
+                    &[normalized],
+                    width,
+                    config,
+                    grid_display_width,
+                ) else {
+                    return original;
+                };
+                wrapped
+            };
+            if !out.is_empty() {
+                out.push(String::new());
+            }
+            out.extend(wrapped);
+        }
+        // Wrapping may place a block marker at the beginning of a line.
+        let candidate = out.join("\n");
+        let parsed = panache_parser::parser::Parser::new_fragment(&candidate, &options).parse();
+        let blocks: Vec<_> = parsed
+            .children()
+            .filter(|node| node.kind() != SyntaxKind::BLANK_LINE)
+            .collect();
+        if blocks.len() == paragraphs.len()
+            && blocks
+                .iter()
+                .all(|node| node.kind() == SyntaxKind::PARAGRAPH)
+        {
+            return out;
         }
     }
+    original
 }
 
 /// Re-pack grid table cells within each row group: drop blank padding lines and
@@ -727,7 +744,7 @@ fn calculate_grid_column_widths(rows: &[Vec<String>]) -> Vec<usize> {
     for row in rows {
         for (col_idx, cell) in row.iter().enumerate() {
             if col_idx < num_cols {
-                widths[col_idx] = widths[col_idx].max(cell.width());
+                widths[col_idx] = widths[col_idx].max(grid_display_width(cell));
             }
         }
     }
@@ -987,80 +1004,6 @@ pub(super) fn format_pipe_table(
     indent_table_block(&output, block_indent)
 }
 
-fn grid_inner_segments(separator: &SyntaxNode) -> Vec<Vec<SyntaxToken>> {
-    let mut segs: Vec<Vec<SyntaxToken>> = Vec::new();
-    let mut cur: Option<Vec<SyntaxToken>> = None;
-    for t in separator_marker_tokens(separator) {
-        if t.kind() == SyntaxKind::TABLE_SEP_DELIM {
-            if let Some(seg) = cur.take() {
-                segs.push(seg);
-            }
-            cur = Some(Vec::new());
-        } else if let Some(seg) = cur.as_mut() {
-            seg.push(t);
-        }
-    }
-    segs
-}
-
-fn extract_grid_alignments(separator: &SyntaxNode) -> Vec<Alignment> {
-    let mut alignments = Vec::new();
-
-    for segment in grid_inner_segments(separator) {
-        if segment.is_empty() {
-            continue;
-        }
-
-        let starts_colon = segment.first().unwrap().kind() == SyntaxKind::TABLE_SEP_COLON;
-        let ends_colon = segment.last().unwrap().kind() == SyntaxKind::TABLE_SEP_COLON;
-
-        let alignment = match (starts_colon, ends_colon) {
-            (true, true) => Alignment::Center,
-            (true, false) => Alignment::Left,
-            (false, true) => Alignment::Right,
-            (false, false) => Alignment::Default,
-        };
-
-        alignments.push(alignment);
-    }
-
-    alignments
-}
-
-/// Grid column widths (chars between `+`, minus 2) read from the separator's
-/// CST tokens. The raw spanning-grid path has no CST node and uses the
-/// string-based [`grid_separator_widths`] instead.
-fn grid_separator_widths_cst(separator: &SyntaxNode) -> Vec<usize> {
-    grid_inner_segments(separator)
-        .iter()
-        .map(|seg| {
-            seg.iter()
-                .map(|t| t.text().len())
-                .sum::<usize>()
-                .saturating_sub(2)
-        })
-        .collect()
-}
-
-fn split_grid_row(row_text: &str) -> Vec<String> {
-    let trimmed = row_text.trim();
-
-    let cells: Vec<&str> = trimmed.split('|').collect();
-
-    cells
-        .iter()
-        .enumerate()
-        .filter_map(|(i, cell)| {
-            let cell = cell.trim();
-            if (i == 0 || i == cells.len() - 1) && cell.is_empty() {
-                None
-            } else {
-                Some(cell.to_string())
-            }
-        })
-        .collect()
-}
-
 /// Format a grid table with row spans and/or column spans in one canonical
 /// layout pass. Replaces both the old rowspan passthrough (which emitted
 /// separators verbatim and *guessed* alignment with data-specific hacks) and
@@ -1149,10 +1092,14 @@ fn format_unified_spanning_grid_table(
 
     let line_markers = |line: &str| -> Option<Vec<(usize, char)>> {
         let mut markers = Vec::new();
-        for (ci, ch) in line.chars().enumerate() {
-            if ch == '+' || ch == '|' {
-                markers.push((idx_of(ci)?, ch));
+        let mut column = 0;
+        for ch in line.chars() {
+            if (ch == '+' || ch == '|')
+                && let Some(index) = idx_of(column)
+            {
+                markers.push((index, ch));
             }
+            column += grid_char_width(ch);
         }
         if markers.first().map(|&(k, _)| k) != Some(0)
             || markers.last().map(|&(k, _)| k) != Some(ncols)
@@ -1163,17 +1110,21 @@ fn format_unified_spanning_grid_table(
     };
 
     enum Seg {
-        Dash,
+        Dash(char),
         Blank,
         Content,
     }
-    let seg_role = |seg: &str| -> Seg {
-        if seg.chars().all(|c| matches!(c, '-' | '=' | ':' | ' ')) {
-            if seg.chars().any(|c| matches!(c, '-' | '=' | ':')) {
-                Seg::Dash
-            } else {
-                Seg::Blank
-            }
+    let seg_role = |seg: &str, left: char, right: char| -> Seg {
+        // Cell punctuation is content unless it forms an unbroken edge
+        // between corners, including on hybrid rowspan separator lines.
+        if left == '+'
+            && right == '+'
+            && !seg.is_empty()
+            && seg.chars().all(|c| matches!(c, '-' | '=' | ':'))
+        {
+            Seg::Dash(if seg.contains('=') { '=' } else { '-' })
+        } else if seg.chars().all(|c| c == ' ') {
+            Seg::Blank
         } else {
             Seg::Content
         }
@@ -1188,18 +1139,18 @@ fn format_unified_spanning_grid_table(
         .collect();
     let mut spanning: Vec<(usize, usize, usize)> = Vec::new();
     for line in &lines {
-        let chars: Vec<char> = line.chars().collect();
         let Some(markers) = line_markers(line) else {
             return colspan_verbatim(&raw_lines, common_indent, indent);
         };
         for win in markers.windows(2) {
-            let (ka, _) = win[0];
-            let (kb, _) = win[1];
-            let seg: String = chars[cols_pos[ka] + 1..cols_pos[kb]].iter().collect();
-            if !matches!(seg_role(&seg), Seg::Content) {
+            let (ka, ca) = win[0];
+            let (kb, cb) = win[1];
+            let seg = grid_column_slice(line, cols_pos[ka] + 1, cols_pos[kb]);
+            if !matches!(seg_role(seg, ca, cb), Seg::Content) {
                 continue;
             }
-            let w = UnicodeWidthStr::width(seg.trim());
+            let content = seg.strip_prefix(' ').unwrap_or(seg).trim_end();
+            let w = grid_display_width(content);
             if kb - ka == 1 {
                 widths[ka] = widths[ka].max(w);
             } else {
@@ -1251,21 +1202,18 @@ fn format_unified_spanning_grid_table(
 
     let mut out = String::new();
     for (p, line) in lines.iter().enumerate() {
-        let chars: Vec<char> = line.chars().collect();
         let Some(markers) = line_markers(line) else {
             return colspan_verbatim(&raw_lines, common_indent, indent);
         };
-        let is_header = line.contains('=');
-        let fill = if is_header { '=' } else { '-' };
         let emit_align = align_phys == Some(p);
         out.push(markers[0].1);
         for win in markers.windows(2) {
-            let (ka, _) = win[0];
+            let (ka, ca) = win[0];
             let (kb, cb) = win[1];
             let interior = colspan_interior(&widths[ka..kb]);
-            let seg: String = chars[cols_pos[ka] + 1..cols_pos[kb]].iter().collect();
-            match seg_role(&seg) {
-                Seg::Dash => out.push_str(&render_separator_segment(
+            let seg = grid_column_slice(line, cols_pos[ka] + 1, cols_pos[kb]);
+            match seg_role(seg, ca, cb) {
+                Seg::Dash(fill) => out.push_str(&render_separator_segment(
                     interior,
                     fill,
                     alignments[ka],
@@ -1273,9 +1221,12 @@ fn format_unified_spanning_grid_table(
                 )),
                 Seg::Blank => out.push_str(&" ".repeat(interior + 2)),
                 Seg::Content => {
-                    let padded = pad_colspan_cell(seg.trim(), interior, alignments[ka]);
+                    // Only the first space belongs to the grid margin. Keep
+                    // cell indentation and encode alignment in the border.
+                    let content = seg.strip_prefix(' ').unwrap_or(seg).trim_end();
                     out.push(' ');
-                    out.push_str(&padded);
+                    out.push_str(content);
+                    out.push_str(&" ".repeat(interior.saturating_sub(grid_display_width(content))));
                     out.push(' ');
                 }
             }
@@ -1313,189 +1264,65 @@ struct GridTableData {
     column_widths: Vec<usize>,
 }
 
-fn extract_grid_table_data(node: &SyntaxNode, config: &Config) -> GridTableData {
+fn extract_grid_table_data(
+    node: &SyntaxNode,
+    layout: &panache_parser::GridLayout,
+) -> Option<GridTableData> {
+    let grid = GridTable::cast(node.clone())?;
+    let sections: Vec<_> = node
+        .children()
+        .filter_map(|child| match child.kind() {
+            SyntaxKind::TABLE_HEADER => Some(GridRowSection::Header),
+            SyntaxKind::TABLE_ROW => Some(GridRowSection::Body),
+            SyntaxKind::TABLE_FOOTER => Some(GridRowSection::Footer),
+            _ => None,
+        })
+        .collect();
+    let count = layout.cols_pos.len() - 1;
+    if sections.len() + 1 != layout.row_seps.len() || layout.cells.len() != sections.len() * count {
+        return None;
+    }
+    let mut cells = vec![vec![Vec::new(); count]; sections.len()];
+    for cell in &layout.cells {
+        cells[cell.start_row][cell.start_col] = cell.content.lines().map(str::to_string).collect();
+    }
     let mut rows = Vec::new();
     let mut row_sections = Vec::new();
     let mut row_groups = Vec::new();
-    let mut alignments = Vec::new();
-    let mut caption = None;
-    let mut row_group_index = 0usize;
-    let mut separator_widths: Vec<usize> = Vec::new();
-
-    for child in node.children() {
-        match child.kind() {
-            SyntaxKind::TABLE_CAPTION => {
-                let caption_text = extract_table_caption_content(&child);
-                if caption.is_none() {
-                    caption = Some(caption_text);
-                }
-            }
-            SyntaxKind::TABLE_SEPARATOR => {
-                let widths = grid_separator_widths_cst(&child);
-                if separator_widths.len() < widths.len() {
-                    separator_widths.resize(widths.len(), 0);
-                }
-                for (col_idx, w) in widths.into_iter().enumerate() {
-                    separator_widths[col_idx] = separator_widths[col_idx].max(w);
-                }
-
-                let extracted = extract_grid_alignments(&child);
-                if !extracted.is_empty()
-                    && (alignments.is_empty() || extracted.iter().any(|a| *a != Alignment::Default))
-                {
-                    alignments = extracted;
-                }
-            }
-            SyntaxKind::TABLE_HEADER | SyntaxKind::TABLE_ROW | SyntaxKind::TABLE_FOOTER => {
-                let section = match child.kind() {
-                    SyntaxKind::TABLE_HEADER => GridRowSection::Header,
-                    SyntaxKind::TABLE_FOOTER => GridRowSection::Footer,
-                    _ => GridRowSection::Body,
-                };
-
-                let cells = extract_row_cells(&child, config, false);
-                let has_parsed_cells = !cells.is_empty();
-                let mut seeded_from_plain_line = false;
-                if !has_parsed_cells {
-                    let row_text = text_without_line_prefixes(&child);
-                    for line in row_text.lines() {
-                        let trimmed_start = line.trim_start();
-                        let trimmed_end = line.trim_end();
-                        if !(trimmed_start.starts_with('|')
-                            && trimmed_end.ends_with('|')
-                            && !trimmed_start.contains('+'))
-                        {
-                            continue;
-                        }
-                        let parsed = split_grid_row(line);
-                        if !parsed.is_empty() {
-                            rows.push(parsed);
-                            row_sections.push(section);
-                            row_groups.push(row_group_index);
-                            seeded_from_plain_line = true;
-                        }
-                        break;
-                    }
-                } else {
-                    rows.push(cells);
-                    row_sections.push(section);
-                    row_groups.push(row_group_index);
-                }
-
-                let mut seen_first_content_line = false;
-                let row_text = text_without_line_prefixes(&child);
-                for line in row_text.lines() {
-                    let trimmed_start = line.trim_start();
-                    let trimmed_end = line.trim_end();
-                    if !(trimmed_start.starts_with('|') && trimmed_end.ends_with('|')) {
-                        continue;
-                    }
-                    if trimmed_start.contains('+') {
-                        continue;
-                    }
-                    if !seen_first_content_line {
-                        seen_first_content_line = true;
-                        if has_parsed_cells || seeded_from_plain_line {
-                            continue;
-                        }
-                    }
-                    let parsed = split_grid_row(line);
-                    if !parsed.is_empty() {
-                        rows.push(parsed);
-                        row_sections.push(section);
-                        row_groups.push(row_group_index);
-                    }
-                }
-                row_group_index += 1;
-            }
-            _ => {}
+    for (group, cells) in cells.into_iter().enumerate() {
+        for line in 0..cells.iter().map(Vec::len).max().unwrap_or(0).max(1) {
+            rows.push(
+                cells
+                    .iter()
+                    .map(|cell| cell.get(line).cloned().unwrap_or_default())
+                    .collect(),
+            );
+            row_sections.push(sections[group]);
+            row_groups.push(group);
         }
     }
-
-    let target_cols = if !alignments.is_empty() {
-        alignments.len()
-    } else {
-        rows.iter().map(|r| r.len()).max().unwrap_or(0)
-    };
-
-    if target_cols > 0 {
-        for row in &mut rows {
-            if row.len() > target_cols {
-                row.truncate(target_cols);
-            } else if row.len() < target_cols {
-                row.resize(target_cols, String::new());
-            }
-        }
-        separator_widths.resize(target_cols, 0);
-    }
-
-    GridTableData {
+    Some(GridTableData {
         rows,
         row_sections,
         row_groups,
-        alignments,
-        caption,
-        column_widths: separator_widths,
-    }
-}
-
-/// Display-column positions of every `+`/`|` grid marker on a line, measured
-/// after stripping `common_indent` leading spaces. Grid markers line up by
-/// display column (not byte/char index), so wide characters are accounted for.
-fn grid_marker_columns(line: &str, common_indent: usize) -> BTreeSet<usize> {
-    let body = line
-        .char_indices()
-        .nth(common_indent)
-        .map(|(i, _)| &line[i..])
-        .unwrap_or("")
-        .trim_end();
-    let mut cols = BTreeSet::new();
-    let mut col = 0usize;
-    for ch in body.chars() {
-        if ch == '+' || ch == '|' {
-            cols.insert(col);
-        }
-        col += UnicodeWidthChar::width(ch).unwrap_or(0);
-    }
-    cols
-}
-
-/// Detect column-spanning grid tables: cells that straddle a column boundary
-/// present elsewhere in the table (the canonical pandoc colspan, written by
-/// omitting the `|`/`+` at that boundary on the spanning line). The structured
-/// formatter assumes every row carries the full set of columns and would
-/// truncate or pad spanning rows, dropping content. Such tables are preserved
-/// verbatim instead. Rowspan-style lines (a `|` row containing `+`) are handled
-/// earlier by `format_spanning_grid_table_raw`, so they never reach here.
-fn grid_table_has_column_spans(raw_table: &str) -> bool {
-    let grid_lines: Vec<&str> = raw_table
-        .lines()
-        .filter(|line| {
-            let t = line.trim_start();
-            let te = line.trim_end();
-            t.starts_with('+') || (t.starts_with('|') && te.ends_with('|'))
-        })
-        .collect();
-    if grid_lines.len() < 2 {
-        return false;
-    }
-
-    let per_line: Vec<BTreeSet<usize>> = grid_lines
-        .iter()
-        .map(|line| {
-            let indent = line.chars().take_while(|c| *c == ' ').count();
-            grid_marker_columns(line, indent)
-        })
-        .collect();
-    let union: BTreeSet<usize> = per_line.iter().flatten().copied().collect();
-
-    per_line.iter().any(|cols| {
-        let (Some(&min), Some(&max)) = (cols.iter().next(), cols.iter().next_back()) else {
-            return false;
-        };
-        union
-            .iter()
-            .any(|&b| b > min && b < max && !cols.contains(&b))
+        alignments: grid
+            .alignments()
+            .into_iter()
+            .map(|alignment| match alignment {
+                TableAlignment::Default => Alignment::Default,
+                TableAlignment::Left => Alignment::Left,
+                TableAlignment::Center => Alignment::Center,
+                TableAlignment::Right => Alignment::Right,
+            })
+            .collect(),
+        caption: grid
+            .caption()
+            .map(|caption| extract_table_caption_content(caption.syntax())),
+        column_widths: layout
+            .cols_pos
+            .windows(2)
+            .map(|cols| (cols[1] - cols[0]).saturating_sub(3))
+            .collect(),
     })
 }
 
@@ -1527,18 +1354,6 @@ fn render_separator_segment(
         }
     }
     seg.into_iter().collect()
-}
-
-fn pad_colspan_cell(text: &str, interior: usize, align: Alignment) -> String {
-    let pad = interior.saturating_sub(text.width());
-    match align {
-        Alignment::Right => format!("{}{}", " ".repeat(pad), text),
-        Alignment::Center => {
-            let left = pad / 2;
-            format!("{}{}{}", " ".repeat(left), text, " ".repeat(pad - left))
-        }
-        _ => format!("{}{}", text, " ".repeat(pad)),
-    }
 }
 
 /// Lossless fallback: re-emit the (already de-captioned) table lines with only
@@ -1617,15 +1432,20 @@ pub(super) fn format_grid_table(
     let raw_table = text_without_line_prefixes(node);
     let profile = sentence_profile.for_wrap_mode(node, config);
 
-    let is_spanning = raw_table.lines().any(|line| {
-        (line.trim_start().starts_with('|') && line.contains('+'))
-            || is_partial_grid_separator(line)
-    }) || grid_table_has_column_spans(&raw_table);
-    if is_spanning {
+    let Some(layout) = GridTable::cast(node.clone()).and_then(|grid| grid.layout()) else {
+        return indent_table_block(&raw_table, indent);
+    };
+    if layout
+        .cells
+        .iter()
+        .any(|cell| cell.row_span > 1 || cell.col_span > 1)
+    {
         return format_unified_spanning_grid_table(&raw_table, config, profile, indent);
     }
 
-    let mut table_data = extract_grid_table_data(node, config);
+    let Some(mut table_data) = extract_grid_table_data(node, &layout) else {
+        return indent_table_block(&raw_table, indent);
+    };
     let mut output = String::new();
 
     if table_data.rows.is_empty() {
@@ -1699,45 +1519,11 @@ pub(super) fn format_grid_table(
         for (col_idx, _) in widths.iter().enumerate() {
             let cell = row.get(col_idx).map_or("", String::as_str);
             let width = widths.get(col_idx).copied().unwrap_or(3);
-            let alignment = table_data
-                .alignments
-                .get(col_idx)
-                .copied()
-                .unwrap_or(Alignment::Default);
-
+            // Grid alignment lives in the border. Leading alignment padding
+            // can turn a paragraph into indented code inside the cell.
             output.push(' ');
-
-            let cell_width = cell.width();
-            let total_padding = width.saturating_sub(cell_width);
-            let effective_alignment = if current_section == GridRowSection::Header {
-                match alignment {
-                    Alignment::Center => Alignment::Center,
-                    _ => Alignment::Left,
-                }
-            } else {
-                alignment
-            };
-
-            let padded_cell = match effective_alignment {
-                Alignment::Left | Alignment::Default => {
-                    format!("{}{}", cell, " ".repeat(total_padding))
-                }
-                Alignment::Right => {
-                    format!("{}{}", " ".repeat(total_padding), cell)
-                }
-                Alignment::Center => {
-                    let left_padding = total_padding / 2;
-                    let right_padding = total_padding - left_padding;
-                    format!(
-                        "{}{}{}",
-                        " ".repeat(left_padding),
-                        cell,
-                        " ".repeat(right_padding)
-                    )
-                }
-            };
-
-            output.push_str(&padded_cell);
+            output.push_str(cell);
+            output.push_str(&" ".repeat(width.saturating_sub(grid_display_width(cell))));
             output.push_str(" |");
         }
 
@@ -2331,7 +2117,7 @@ fn format_multiline_table(
             for (col_idx, cell) in row.iter_mut().enumerate() {
                 let width = col_widths.get(col_idx).copied().unwrap_or(0);
                 if let Some(lines) =
-                    super::table_conversion::reflow_inline_cell(cell, width, config)
+                    super::table_conversion::reflow_inline_cell(cell, width, config, str::width)
                 {
                     *cell = lines;
                 }

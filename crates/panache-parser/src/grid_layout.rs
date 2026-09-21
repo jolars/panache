@@ -13,10 +13,31 @@
 //! take the canonical column boundaries as the union of `+` positions across
 //! every "sep-style" line and the canonical row boundaries as those lines'
 //! indices, then detect each cell as the smallest valid bounding rectangle.
-//! Positions are **character** indices (matching pandoc, which lays grid tables
-//! out on the source character grid), not display columns.
+//! Positions are display columns. Cell contents are sliced from the original
+//! source so wide characters and combining marks survive geometry analysis.
 
+use crate::syntax::tables::column_slice_with_width;
 use std::collections::BTreeSet;
+use unicode_width::UnicodeWidthChar;
+
+/// Pandoc measures Hangul vowel and trailing Jamo independently, even when
+/// terminals compose them with a leading Jamo into a single glyph.
+pub fn grid_char_width(ch: char) -> usize {
+    match ch {
+        '\u{1160}'..='\u{11ff}' | '\u{d7b0}'..='\u{d7ff}' => 1,
+        _ => ch.width().unwrap_or(0),
+    }
+}
+
+/// Match grid geometry even for characters joined into Hangul or emoji glyphs.
+pub fn grid_display_width(text: &str) -> usize {
+    text.chars().map(grid_char_width).sum()
+}
+
+/// Slice cell content using the same columns as grid geometry and rendering.
+pub fn grid_column_slice(text: &str, start: usize, end: usize) -> &str {
+    column_slice_with_width(text, start, end, grid_char_width)
+}
 
 /// One laid-out cell of a grid table over the canonical (row band × fine
 /// column) grid. `content` is the cell's interior text with one leading pad
@@ -34,7 +55,7 @@ pub struct GridCellRect {
 /// Canonical geometry of a grid table plus its detected cells.
 #[derive(Debug, Clone)]
 pub struct GridLayout {
-    /// Character columns of the canonical vertical boundaries (the union of
+    /// Display columns of the canonical vertical boundaries (the union of
     /// `+` positions across all sep-style lines). `cols_pos.len() - 1` fine
     /// columns.
     pub cols_pos: Vec<usize>,
@@ -58,19 +79,30 @@ pub struct GridLayout {
 /// column boundaries or fewer than two separator lines).
 #[allow(clippy::needless_range_loop)]
 pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
-    if lines.is_empty() {
+    // Tabs require a tab-stop-aware source map. Until geometry supports one,
+    // leave these tables to callers' preservation paths.
+    if lines.is_empty() || lines.iter().any(|line| line.contains('\t')) {
         return None;
     }
 
-    let max_width = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0);
-    let grid: Vec<Vec<char>> = lines
+    let mut grid: Vec<Vec<char>> = lines
         .iter()
         .map(|l| {
-            let mut chars: Vec<char> = l.chars().collect();
-            chars.resize(max_width, ' ');
+            let mut chars = Vec::new();
+            for ch in l.chars() {
+                let width = grid_char_width(ch);
+                if width > 0 {
+                    chars.push(ch);
+                    chars.resize(chars.len() + width - 1, '\0');
+                }
+            }
             chars
         })
         .collect();
+    let max_width = grid.iter().map(Vec::len).max().unwrap_or(0);
+    for row in &mut grid {
+        row.resize(max_width, ' ');
+    }
     let nlines = grid.len();
 
     let is_sep_line: Vec<bool> = grid
@@ -96,6 +128,16 @@ pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
     }
     let cols_pos: Vec<usize> = col_set.into_iter().collect();
     if cols_pos.len() < 2 {
+        return None;
+    }
+    let left = cols_pos[0];
+    let right = cols_pos[cols_pos.len() - 1];
+    if grid.iter().any(|row| {
+        row[..left]
+            .iter()
+            .chain(&row[right + 1..])
+            .any(|&ch| ch != ' ')
+    }) {
         return None;
     }
     let ncols = cols_pos.len() - 1;
@@ -152,7 +194,8 @@ pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
             if grid[i][j] != '+' {
                 continue;
             }
-            let Some((er, ec, content)) = find_grid_cell(&grid, i, j, sr, sc, &cols_pos, &row_seps)
+            let Some((er, ec, content)) =
+                find_grid_cell(&grid, lines, sr, sc, &cols_pos, &row_seps)
             else {
                 continue;
             };
@@ -182,13 +225,14 @@ pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
 #[allow(clippy::needless_range_loop)]
 fn find_grid_cell(
     grid: &[Vec<char>],
-    i: usize,
-    j: usize,
+    lines: &[&str],
     sr: usize,
     sc: usize,
     cols_pos: &[usize],
     row_seps: &[usize],
 ) -> Option<(usize, usize, String)> {
+    let i = row_seps[sr];
+    let j = cols_pos[sc];
     let nrows = row_seps.len() - 1;
     let ncols = cols_pos.len() - 1;
 
@@ -226,8 +270,8 @@ fn find_grid_cell(
 
             let mut content_lines: Vec<String> = Vec::new();
             for r in (i + 1)..l {
-                let slice: String = grid[r][j + 1..k].iter().collect();
-                let stripped = slice.strip_prefix(' ').unwrap_or(&slice).to_string();
+                let slice = grid_column_slice(lines[r], j + 1, k);
+                let stripped = slice.strip_prefix(' ').unwrap_or(slice);
                 content_lines.push(stripped.trim_end().to_string());
             }
             let first = content_lines.iter().position(|s| !s.is_empty());
@@ -252,6 +296,36 @@ mod tests {
             .iter()
             .find(|cell| cell.start_row == r && cell.start_col == c)
             .unwrap_or_else(|| panic!("no cell at ({r}, {c})"))
+    }
+
+    #[test]
+    fn unicode_cells_use_display_columns_without_losing_text() {
+        let lines = [
+            "+----------+----+",
+            "| 界 e\u{301} 😀  | x  |",
+            "+----------+----+",
+        ];
+        let layout = analyze_grid(&lines).unwrap();
+        assert_eq!(layout.cells.len(), 2);
+        assert_eq!(cell(&layout, 0, 0).content, "界 e\u{301} 😀");
+        assert_eq!(cell(&layout, 0, 1).content, "x");
+    }
+
+    #[test]
+    fn decomposed_hangul_uses_pandoc_columns() {
+        let lines = [
+            "+--------+--------+",
+            "| 가 + B         |",
+            "+========+========+",
+            "| 가    | ok     |",
+            "+--------+--------+",
+        ];
+        let layout = analyze_grid(&lines).unwrap();
+        assert_eq!(layout.cells.len(), 3);
+        assert_eq!(cell(&layout, 0, 0).col_span, 2);
+        assert_eq!(cell(&layout, 0, 0).content, "가 + B");
+        assert_eq!(cell(&layout, 1, 0).content, "가");
+        assert_eq!(cell(&layout, 1, 1).content, "ok");
     }
 
     /// A rowspan cell's text sharing a line with a sub-row separator

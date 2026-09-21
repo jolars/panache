@@ -2,6 +2,7 @@
 
 use super::ast::{AstChildren, support};
 use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode, SyntaxToken};
+use unicode_width::UnicodeWidthChar;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableAlignment {
@@ -9,6 +10,35 @@ pub enum TableAlignment {
     Left,
     Center,
     Right,
+}
+
+/// Slice table text at display-column boundaries, keeping combining marks
+/// with the character before them. Separators are ASCII, but cell text is not.
+pub fn display_column_slice(text: &str, start: usize, end: usize) -> &str {
+    column_slice_with_width(text, start, end, |ch| ch.width().unwrap_or(0))
+}
+
+pub(crate) fn column_slice_with_width(
+    text: &str,
+    start: usize,
+    end: usize,
+    char_width: fn(char) -> usize,
+) -> &str {
+    let mut width = 0;
+    let mut first = None;
+    let mut last = text.len();
+    for (offset, ch) in text.char_indices() {
+        let char_width = char_width(ch);
+        if first.is_none() && width >= start && (char_width > 0 || offset == 0) {
+            first = Some(offset);
+        }
+        if width >= end && char_width > 0 {
+            last = offset;
+            break;
+        }
+        width += char_width;
+    }
+    &text[first.unwrap_or(last)..last]
 }
 
 /// `node`'s text with each line's container-prefix tokens skipped.
@@ -254,6 +284,60 @@ impl AstNode for GridTable {
 }
 
 impl GridTable {
+    /// Recover cell geometry after removing captions and container prefixes.
+    pub fn layout(&self) -> Option<crate::GridLayout> {
+        let text: String = self
+            .0
+            .children()
+            .filter(|child| child.kind() != SyntaxKind::TABLE_CAPTION)
+            .map(|child| text_without_line_prefixes(&child))
+            .collect();
+        crate::analyze_grid(&text.lines().collect::<Vec<_>>())
+    }
+
+    /// The header separator controls alignment when present; otherwise the
+    /// opening border does. Colons on later body borders are not alignment.
+    pub fn alignment_separator(&self) -> Option<SyntaxNode> {
+        let mut separators = self
+            .0
+            .children()
+            .filter(|child| child.kind() == SyntaxKind::TABLE_SEPARATOR);
+        let first = separators.next()?;
+        Some(
+            separators
+                .find(|separator| {
+                    separator_marker_tokens(separator)
+                        .any(|token| token.kind() == SyntaxKind::TABLE_SEP_EQUALS)
+                })
+                .unwrap_or(first),
+        )
+    }
+
+    pub fn alignments(&self) -> Vec<TableAlignment> {
+        self.alignment_separator()
+            .map(|separator| {
+                separator_column_segments(&separator)
+                    .iter()
+                    .map(|segment| {
+                        match (
+                            segment
+                                .first()
+                                .is_some_and(|t| t.kind() == SyntaxKind::TABLE_SEP_COLON),
+                            segment
+                                .last()
+                                .is_some_and(|t| t.kind() == SyntaxKind::TABLE_SEP_COLON),
+                        ) {
+                            (true, true) => TableAlignment::Center,
+                            (true, false) => TableAlignment::Left,
+                            (false, true) => TableAlignment::Right,
+                            (false, false) => TableAlignment::Default,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Returns the table caption if present.
     pub fn caption(&self) -> Option<TableCaption> {
         support::child(&self.0)
