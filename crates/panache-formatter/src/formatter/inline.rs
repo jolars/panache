@@ -6,7 +6,7 @@ use crate::formatter::shortcodes::format_shortcode;
 use crate::formatter::smart::normalize_smart_punctuation;
 use crate::syntax::{
     DisplayMath, ImageAlt, InlineMath, InlineNode, LinkText, SyntaxKind, SyntaxNode, SyntaxToken,
-    code_span_payload,
+    UnresolvedReference, code_span_payload, text_without_line_prefixes,
 };
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -707,6 +707,10 @@ pub(super) fn format_inline_node_with_spacing(
         SyntaxKind::CITATION | SyntaxKind::CROSSREF => format_citation_like(node, config),
         SyntaxKind::LATEX_COMMAND => math::format_latex_math_environment(node, config)
             .unwrap_or_else(|| node.text().to_string()),
+        _ if UnresolvedReference::can_cast(node.kind()) => {
+            // Containers add their own prefixes to every physical output line.
+            text_without_line_prefixes(node)
+        }
         _ if collapse_ws && contains_inline_prose(node) => {
             let mut result = String::new();
             for child in node.children_with_tokens() {

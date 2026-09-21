@@ -89,6 +89,47 @@ fn unresolved_image_reference_round_trips() {
 }
 
 #[test]
+fn unresolved_reference_follows_wrapping_mode() {
+    use panache_formatter::{Config, WrapMode};
+
+    let input = "- [First sentence. Next\n  sentence.]\n";
+    for (mode, expected) in [
+        (WrapMode::Reflow, "- [First sentence. Next sentence.]\n"),
+        (
+            WrapMode::Sentence,
+            "- [First sentence.\n  Next sentence.]\n",
+        ),
+        (
+            WrapMode::Semantic,
+            "- [First sentence.\n  Next\n  sentence.]\n",
+        ),
+        (WrapMode::Preserve, input),
+    ] {
+        let config = Config {
+            wrap: Some(mode.clone()),
+            ..Default::default()
+        };
+        let output = format(input, Some(config.clone()), None);
+        assert_eq!(output, expected, "wrapping mode: {mode:?}");
+        assert_eq!(format(&output, Some(config), None), output);
+    }
+}
+
+#[test]
+fn unresolved_reference_preserves_explicit_space_before_closer() {
+    for (input, expected) in [
+        ("[note\n]\n", "[note]\n"),
+        ("[note \n]\n", "[note ]\n"),
+        ("[\nnote]\n", "[ note]\n"),
+        ("[note\\\n]\n", "[note\\\n]\n"),
+    ] {
+        let output = format(input, None, None);
+        assert_eq!(output, expected);
+        assert_eq!(format(&output, None, None), output);
+    }
+}
+
+#[test]
 fn literal_brackets_with_failed_emphasis_round_trip_under_single_backslash_math() {
     use panache_formatter::Config;
     use panache_formatter::config::{Extensions, Flavor};

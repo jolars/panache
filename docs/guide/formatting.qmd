@@ -1295,6 +1295,10 @@ For links, Panache preserves the original link text and URL but normalizes the
 spacing around attributes, quotes, and parentheses. Descriptions are wrapped if
 reflow wrapping is enabled.
 
+Text inside unresolved references follows the configured wrapping mode, just
+like other prose. Panache preserves the brackets and reference labels, along
+with inline markup such as emphasis and code spans.
+
 Input
 
 :   ```markdown

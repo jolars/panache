@@ -1,5 +1,5 @@
 In each of these spatial partitions, we run 50 models (`trm()`) while using
 randomly selected hyperparameter configurations (`tnr()`) within predefined
 limits (`seach_space`) to find the optimal hyperparameter\index{hyperparameter}
-combination
-[see also Section \@ref(svm) and https://mlr3book.mlr-org.com/chapters/chapter4/hyperparameter_optimization.html#sec-autotuner].
+combination [see also Section \@ref(svm) and
+https://mlr3book.mlr-org.com/chapters/chapter4/hyperparameter_optimization.html#sec-autotuner].

@@ -4,7 +4,10 @@ use crate::formatter::sentence_wrap::{
     SentenceSegment, is_sentence_boundary_segment,
 };
 use crate::formatter::smart::normalize_smart_punctuation;
-use crate::syntax::{LatexCommand, ListItem, SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    ImageAlt, LatexCommand, LinkRef, LinkText, ListItem, SyntaxKind, SyntaxNode,
+    UnresolvedReference, text_without_line_prefixes,
+};
 use panache_parser::parser::inlines::subscript::try_parse_subscript;
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -1060,6 +1063,18 @@ fn process_node_recursive(
                     if in_inline_footnote && sink.is_at_inline_footnote_open() {
                         continue;
                     }
+                    // Pandoc consumes a bare newline immediately before the closing
+                    // bracket. Any preceding explicit space still belongs to the text.
+                    if t.kind() == SyntaxKind::NEWLINE
+                        && children.peek().is_none()
+                        && !sink.preserve_newlines()
+                        && (LinkText::can_cast(node.kind()) || ImageAlt::can_cast(node.kind()))
+                        && node
+                            .parent()
+                            .is_some_and(|parent| UnresolvedReference::can_cast(parent.kind()))
+                    {
+                        continue;
+                    }
                     if sink.preserve_newlines() && t.kind() == SyntaxKind::NEWLINE {
                         sink.push_soft_break();
                     } else if t.kind() == SyntaxKind::NEWLINE
@@ -1219,6 +1234,32 @@ fn process_node_recursive(
                     sink.set_pending_space(false);
                     sink.push_piece("**");
                     sink.set_pending_space(had_pending_space);
+                }
+                _ if UnresolvedReference::can_cast(n.kind()) => {
+                    let reference =
+                        UnresolvedReference::cast(n.clone()).expect("checked unresolved reference");
+                    sink.push_piece(if reference.is_image() { "![" } else { "[" });
+                    let mut closing = String::from("]");
+                    for child in n.children() {
+                        if LinkText::can_cast(child.kind()) || ImageAlt::can_cast(child.kind()) {
+                            process_node_recursive(
+                                config,
+                                &child,
+                                sink,
+                                format_inline_fn,
+                                in_link_text,
+                                atomic_links,
+                                in_inline_footnote,
+                            );
+                        } else if let Some(label) = LinkRef::cast(child) {
+                            closing.push('[');
+                            closing.push_str(&normalize_inline_for_sentence(
+                                &text_without_line_prefixes(label.syntax()),
+                            ));
+                            closing.push(']');
+                        }
+                    }
+                    sink.push_piece(&closing);
                 }
                 SyntaxKind::LINK => {
                     if atomic_links {

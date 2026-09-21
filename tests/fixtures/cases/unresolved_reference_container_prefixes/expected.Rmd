@@ -1,0 +1,16 @@
+1. Text.[A note.]
+
+- [A note on two lines.]
+
+> [A note with *emphasis*.]
+
+1. ![An image
+   description][missing label]
+
+- [A longer note with *emphasis* and
+  `two  spaces` that should wrap across
+  several lines.]
+
+[ leading and trailing spaces ]
+
+[A collapsed reference][]
