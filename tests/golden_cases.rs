@@ -425,6 +425,7 @@ golden_test_cases!(
     html_block_strict_blockquote_messy_idempotent,
     html_block_video_matched_pair,
     html_inline_span_idempotent,
+    html_inline_span_container_prefixes,
     ignore_directives,
     images,
     implicit_figure_in_containers,

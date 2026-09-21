@@ -403,6 +403,9 @@ pub(super) fn format_inline_node_with_spacing(
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Token(t) => {
+                        if t.kind() == SyntaxKind::LINE_PREFIX {
+                            continue;
+                        }
                         result.push_str(&inline_token_text(&t, collapse_ws));
                     }
                     NodeOrToken::Node(n) => {
@@ -410,6 +413,9 @@ pub(super) fn format_inline_node_with_spacing(
                             for elem in n.children_with_tokens() {
                                 match elem {
                                     NodeOrToken::Token(t) => {
+                                        if t.kind() == SyntaxKind::LINE_PREFIX {
+                                            continue;
+                                        }
                                         result.push_str(&inline_token_text(&t, collapse_ws))
                                     }
                                     NodeOrToken::Node(nested) => {
@@ -422,7 +428,8 @@ pub(super) fn format_inline_node_with_spacing(
                                 }
                             }
                         } else {
-                            result.push_str(&n.text().to_string());
+                            // The enclosing container emits its own continuation prefixes.
+                            result.push_str(&text_without_line_prefixes(&n));
                         }
                     }
                 }

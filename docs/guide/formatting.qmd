@@ -1296,6 +1296,12 @@ compensate for a pinned oracle defect:
   Badness formatter treats their relations as one chain and can detach an
   equation's left-hand side from its relation.
 
+## Inline HTML Spans
+
+Panache preserves line breaks and attribute whitespace in inline `<span>` tags.
+Inside lists and block quotes, continuation lines receive the enclosing
+container's indentation and quote markers once, including within span content.
+
 ## Links
 
 For links, Panache preserves the original link text and URL but normalizes the
