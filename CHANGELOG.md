@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Highlights
+
+This release brings code actions for converting between table styles! You can now convert to and from pipe tables, simple tables, multiline tables, and grid tables. These conversions automatically detect unsafe conversions and will stop you from losing information. But please let me know if you find any edge cases that are not handled correctly.
+
 ## [3.11.0](https://github.com/jolars/panache/compare/v3.10.0...v3.11.0) (2026-09-16)
 
 ### Features
