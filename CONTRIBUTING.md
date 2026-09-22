@@ -99,7 +99,9 @@ A pull request must pass:
 
 - **Build and Test** --- `cargo test --workspace` on Linux, macOS, and Windows,
   plus a `wasm32-unknown-unknown` build of `panache-wasm` and a type-check and
-  bundle of the VS Code extension.
+  bundle of the VS Code extension. It also builds the WASM playground and
+  renders the documentation site without publishing. Releases require this
+  documentation build to pass.
 - **Lint** --- `cargo clippy -- -D warnings`, `cargo fmt -- --check`, and
   Panache formatting and linting its own `docs/` tree with the in-tree binary.
 - **Cargo Deny** --- license and advisory checks over the dependency tree.
