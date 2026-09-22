@@ -250,13 +250,13 @@ Document with multiple R code blocks:
 title: "Analysis"
 ---
 
-```{r}
+```{{r}}
 x <- 10
 ```
 
 Some text between blocks.
 
-```{r}
+```{{r}}
 y <- x + 5
 ```
 ````
