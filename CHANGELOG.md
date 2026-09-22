@@ -1,10 +1,36 @@
 # Changelog
 
-## Unreleased
+## [3.12.0](https://github.com/jolars/panache/compare/v3.11.0...v3.12.0) (2026-09-22)
 
 ### Highlights
 
 This release brings code actions for converting between table styles! You can now convert to and from pipe tables, simple tables, multiline tables, and grid tables. These conversions automatically detect unsafe conversions and will stop you from losing information. But please let me know if you find any edge cases that are not handled correctly.
+
+### Features
+- **lsp:** convert to and from grid tables ([`fce260b`](https://github.com/jolars/panache/commit/fce260b89749713ba34be4b0baa62da545d9832c))
+- **lsp:** preview reference link definitions ([`c232e63`](https://github.com/jolars/panache/commit/c232e63969db315eefffcdd3cfa98d5285bda235))
+- **lsp:** add conversion to pipe tables ([`39ce805`](https://github.com/jolars/panache/commit/39ce8053114801e5138027c6519dc7dcb34a8526))
+- **lsp:** add table style conversions ([`5fecfae`](https://github.com/jolars/panache/commit/5fecfae01953218075176753fdd4574c0a2f194a))
+
+### Bug Fixes
+- **formatter:** avoid duplicate HTML span prefixes ([`9fe51d8`](https://github.com/jolars/panache/commit/9fe51d80f749c88fd790a1e3984e028c3c236762)), fixes [#542](https://github.com/jolars/panache/issues/542)
+- **formatter:** wrap unresolved reference text ([`fae61b1`](https://github.com/jolars/panache/commit/fae61b1a409d02de94cf5b41b9e5ad0fe87d6918)), fixes [#540](https://github.com/jolars/panache/issues/540) and [#541](https://github.com/jolars/panache/issues/541), refs [#542](https://github.com/jolars/panache/issues/542)
+- **lsp:** rename reference link labels ([`89e828c`](https://github.com/jolars/panache/commit/89e828cc0f50f39d4ea59a4ddf3187d777300b4d))
+- **linter:** isolate displayed Quarto code examples ([`16ac6e0`](https://github.com/jolars/panache/commit/16ac6e09906244cfc97be7b361c47f7cc1795642))
+- **linter:** lint includes in execution context ([`ed7c731`](https://github.com/jolars/panache/commit/ed7c73194b171f75c7f32ca3de1b376f49a287b6))
+- **formatter:** preserve math indentation in lists ([`d45928d`](https://github.com/jolars/panache/commit/d45928d049b03bb2f7a918a01d97dc8a4c0d9673))
+- **formatter:** normalize nested table whitespace ([`b7d42be`](https://github.com/jolars/panache/commit/b7d42bea3b0113c0860cd8334aa87ed42c6312eb)), fixes [#538](https://github.com/jolars/panache/issues/538)
+- **lint:** include executable inline expressions ([`88639f5`](https://github.com/jolars/panache/commit/88639f58d043c62591ebef19a561b5c877108655))
+- **cli:** highlight diagnostic spans independently ([`ef82e79`](https://github.com/jolars/panache/commit/ef82e79c6bd0ef0bb9c208bd9650c5c1ae64f280))
+
+### Performance Improvements
+- **parser:** gate blockquote precedence probes ([`d4c36b9`](https://github.com/jolars/panache/commit/d4c36b91694256506f1599fafe4a60a2d3fd04dd))
+- optimize release code generation ([`5fd86b4`](https://github.com/jolars/panache/commit/5fd86b402250bf78a741c39c62a0e8944d77403f))
+- **formatter:** defer unnecessary text copies ([`da30065`](https://github.com/jolars/panache/commit/da3006595e3c3b4944c15b7d539852815bd811e5))
+
+### Dependencies
+- updated crates/panache-formatter to v0.25.0
+- updated crates/panache-parser to v0.30.0
 
 ## [3.11.0](https://github.com/jolars/panache/compare/v3.10.0...v3.11.0) (2026-09-16)
 

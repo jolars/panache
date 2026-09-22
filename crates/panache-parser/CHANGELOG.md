@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.30.0](https://github.com/jolars/panache/compare/panache-parser-v0.29.2...panache-parser-v0.30.0) (2026-09-22)
+
+### Features
+- **lsp:** convert to and from grid tables ([`fce260b`](https://github.com/jolars/panache/commit/fce260b89749713ba34be4b0baa62da545d9832c))
+- **lsp:** add conversion to pipe tables ([`39ce805`](https://github.com/jolars/panache/commit/39ce8053114801e5138027c6519dc7dcb34a8526))
+
+### Bug Fixes
+- **linter:** isolate displayed Quarto code examples ([`16ac6e0`](https://github.com/jolars/panache/commit/16ac6e09906244cfc97be7b361c47f7cc1795642))
+- **lint:** include executable inline expressions ([`88639f5`](https://github.com/jolars/panache/commit/88639f58d043c62591ebef19a561b5c877108655))
+
+### Performance Improvements
+- **parser:** gate blockquote precedence probes ([`d4c36b9`](https://github.com/jolars/panache/commit/d4c36b91694256506f1599fafe4a60a2d3fd04dd))
+
 ## [0.29.2](https://github.com/jolars/panache/compare/panache-parser-v0.29.1...panache-parser-v0.29.2) (2026-09-16)
 
 ### Bug Fixes

@@ -1,11 +1,11 @@
 {
   "manifest-version": 1,
-  "baseline-sha": "9a054356d677d29687a6185bd2888ab08ed0f1ed",
+  "baseline-sha": "ce39e331c842ce407c7303fc74b95f3e84102514",
   "release-targets": [
     {
       "path": ".",
-      "version": "3.11.0",
-      "tag": "v3.11.0",
+      "version": "3.12.0",
+      "tag": "v3.12.0",
       "dependencies": [
         "crates/panache-formatter",
         "crates/panache-parser"
@@ -18,21 +18,21 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.24.2",
-      "tag": "panache-formatter-v0.24.2",
+      "version": "0.25.0",
+      "tag": "panache-formatter-v0.25.0",
       "dependencies": [
         "crates/panache-parser"
       ]
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.29.2",
-      "tag": "panache-parser-v0.29.2"
+      "version": "0.30.0",
+      "tag": "panache-parser-v0.30.0"
     },
     {
       "path": "editors/code",
-      "version": "3.11.0",
-      "tag": "panache-code-v3.11.0",
+      "version": "3.12.0",
+      "tag": "panache-code-v3.12.0",
       "dependencies": [
         "."
       ]
@@ -46,8 +46,8 @@
   "pending-release-targets": [
     {
       "path": ".",
-      "version": "3.11.0",
-      "tag": "v3.11.0",
+      "version": "3.12.0",
+      "tag": "v3.12.0",
       "dependencies": [
         "crates/panache-formatter",
         "crates/panache-parser"
@@ -55,21 +55,21 @@
     },
     {
       "path": "crates/panache-formatter",
-      "version": "0.24.2",
-      "tag": "panache-formatter-v0.24.2",
+      "version": "0.25.0",
+      "tag": "panache-formatter-v0.25.0",
       "dependencies": [
         "crates/panache-parser"
       ]
     },
     {
       "path": "crates/panache-parser",
-      "version": "0.29.2",
-      "tag": "panache-parser-v0.29.2"
+      "version": "0.30.0",
+      "tag": "panache-parser-v0.30.0"
     },
     {
       "path": "editors/code",
-      "version": "3.11.0",
-      "tag": "panache-code-v3.11.0",
+      "version": "3.12.0",
+      "tag": "panache-code-v3.12.0",
       "dependencies": [
         "."
       ]
