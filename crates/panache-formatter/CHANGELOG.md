@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.25.0](https://github.com/jolars/panache/compare/panache-formatter-v0.24.2...panache-formatter-v0.25.0) (2026-09-22)
+
+### Features
+- **lsp:** convert to and from grid tables ([`fce260b`](https://github.com/jolars/panache/commit/fce260b89749713ba34be4b0baa62da545d9832c))
+- **lsp:** add conversion to pipe tables ([`39ce805`](https://github.com/jolars/panache/commit/39ce8053114801e5138027c6519dc7dcb34a8526))
+- **lsp:** add table style conversions ([`5fecfae`](https://github.com/jolars/panache/commit/5fecfae01953218075176753fdd4574c0a2f194a))
+
+### Bug Fixes
+- **formatter:** avoid duplicate HTML span prefixes ([`9fe51d8`](https://github.com/jolars/panache/commit/9fe51d80f749c88fd790a1e3984e028c3c236762)), fixes [#542](https://github.com/jolars/panache/issues/542)
+- **formatter:** wrap unresolved reference text ([`fae61b1`](https://github.com/jolars/panache/commit/fae61b1a409d02de94cf5b41b9e5ad0fe87d6918)), fixes [#540](https://github.com/jolars/panache/issues/540) and [#541](https://github.com/jolars/panache/issues/541), refs [#542](https://github.com/jolars/panache/issues/542)
+- **formatter:** preserve math indentation in lists ([`d45928d`](https://github.com/jolars/panache/commit/d45928d049b03bb2f7a918a01d97dc8a4c0d9673))
+- **formatter:** normalize nested table whitespace ([`b7d42be`](https://github.com/jolars/panache/commit/b7d42bea3b0113c0860cd8334aa87ed42c6312eb)), fixes [#538](https://github.com/jolars/panache/issues/538)
+- **lint:** include executable inline expressions ([`88639f5`](https://github.com/jolars/panache/commit/88639f58d043c62591ebef19a561b5c877108655))
+
+### Performance Improvements
+- **formatter:** defer unnecessary text copies ([`da30065`](https://github.com/jolars/panache/commit/da3006595e3c3b4944c15b7d539852815bd811e5))
+
+### Dependencies
+- updated crates/panache-parser to v0.30.0
+
 ## [0.24.2](https://github.com/jolars/panache/compare/panache-formatter-v0.24.1...panache-formatter-v0.24.2) (2026-09-16)
 
 ### Bug Fixes
