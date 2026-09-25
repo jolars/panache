@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.12.1](https://github.com/jolars/panache/compare/v3.12.0...v3.12.1) (2026-09-25)
+
+### Bug Fixes
+- **deps:** require `salsa` 0.28.5 ([`df19d46`](https://github.com/jolars/panache/commit/df19d46581fb948bd9c44cf33c654585239fbf78))
+
 ## [3.12.0](https://github.com/jolars/panache/compare/v3.11.0...v3.12.0) (2026-09-22)
 
 ### Highlights
