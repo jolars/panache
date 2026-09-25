@@ -4398,14 +4398,14 @@ mod tests {
 
     #[test]
     fn definition_index_does_not_intern_labels() {
-        let db = SalsaDb::default();
+        let mut db = SalsaDb::default();
         let file = FileText::from_str(&db, "[Transient Label]: /target\n");
         let config = FileConfig::new(&db, Config::default());
 
         let index = definition_index(&db, file, config);
         assert!(index.find_reference("transient label").is_some());
 
-        let memory = (&db as &dyn salsa::Database).memory_usage();
+        let memory = (&mut db as &mut dyn salsa::Database).memory_usage();
         assert!(
             memory
                 .structs
