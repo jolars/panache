@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.31.0](https://github.com/jolars/panache/compare/panache-parser-v0.30.0...panache-parser-v0.31.0) (2026-09-30)
+
+### Features
+- **lsp:** complete reference link labels ([`035a8b3`](https://github.com/jolars/panache/commit/035a8b3b65dc8bef0c8c4b5bcebb673ecc469f3a))
+
 ## [0.30.0](https://github.com/jolars/panache/compare/panache-parser-v0.29.2...panache-parser-v0.30.0) (2026-09-22)
 
 ### Features

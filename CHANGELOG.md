@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.13.0](https://github.com/jolars/panache/compare/v3.12.0...v3.13.0) (2026-09-30)
 
 ### Highlights
 
@@ -29,6 +29,22 @@ Setting code block options will override the document-level options, which in tu
 Currently only formatters Arity, Black, Prettier, and Ruff are supported, but eventually this will be extended to all formatters that support code style options.
 
 At the moment, this also supports only `line-width` and `indent-width`, but more options will be added in the future.
+
+### Features
+- support code style metadata ([`88dcc1e`](https://github.com/jolars/panache/commit/88dcc1eba4ea6801c0d4a726e86bf55417333977))
+- **lsp:** complete reference link labels ([`035a8b3`](https://github.com/jolars/panache/commit/035a8b3b65dc8bef0c8c4b5bcebb673ecc469f3a))
+
+### Bug Fixes
+- **linter:** resolve anchors in Quarto includes ([`160839c`](https://github.com/jolars/panache/commit/160839c1700a9715163be4f9a864a0df384ecb42))
+- **formatter:** preserve leading math sign spacing ([`7f3d427`](https://github.com/jolars/panache/commit/7f3d427772d19b66bee1a098af49c5ad91be5d76))
+- **deps:** require `salsa` 0.28.5 ([`df19d46`](https://github.com/jolars/panache/commit/df19d46581fb948bd9c44cf33c654585239fbf78))
+
+### Performance Improvements
+- **lsp:** avoid temporary schema subtree allocations ([`5bf406d`](https://github.com/jolars/panache/commit/5bf406d7aa3b305e8f18a5aec28b0c0578a3d3da))
+
+### Dependencies
+- updated crates/panache-formatter to v0.26.0
+- updated crates/panache-parser to v0.31.0
 
 ## [3.12.0](https://github.com/jolars/panache/compare/v3.11.0...v3.12.0) (2026-09-22)
 

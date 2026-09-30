@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.26.0](https://github.com/jolars/panache/compare/panache-formatter-v0.25.0...panache-formatter-v0.26.0) (2026-09-30)
+
+### Features
+- support code style metadata ([`88dcc1e`](https://github.com/jolars/panache/commit/88dcc1eba4ea6801c0d4a726e86bf55417333977))
+- **lsp:** complete reference link labels ([`035a8b3`](https://github.com/jolars/panache/commit/035a8b3b65dc8bef0c8c4b5bcebb673ecc469f3a))
+
+### Bug Fixes
+- **formatter:** preserve leading math sign spacing ([`7f3d427`](https://github.com/jolars/panache/commit/7f3d427772d19b66bee1a098af49c5ad91be5d76))
+
+### Dependencies
+- updated crates/panache-parser to v0.31.0
+
 ## [0.25.0](https://github.com/jolars/panache/compare/panache-formatter-v0.24.2...panache-formatter-v0.25.0) (2026-09-22)
 
 ### Features
