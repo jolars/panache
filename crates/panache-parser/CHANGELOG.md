@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.31.1](https://github.com/jolars/panache/compare/panache-parser-v0.31.0...panache-parser-v0.31.1) (2026-10-02)
+
+### Bug Fixes
+
+- remove needless borrow in parser ([`7a1ab36`](https://github.com/jolars/panache/commit/7a1ab3617fa3c33e561bf63b94850241aad78346))
+
 ## [0.31.0](https://github.com/jolars/panache/compare/panache-parser-v0.30.0...panache-parser-v0.31.0) (2026-09-30)
 
 ### Features

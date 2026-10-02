@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.14.0](https://github.com/jolars/panache/compare/v3.13.0...v3.14.0) (2026-10-02)
+
+### Features
+
+- **lsp:** honor excludes for diagnostics ([`1dd1bb5`](https://github.com/jolars/panache/commit/1dd1bb55e8bee39ffc587f41dd1978b7c301da4d)), closes [#546](https://github.com/jolars/panache/issues/546)
+
+### Bug Fixes
+
+- avoid forward symlink in source archives ([`479e9ad`](https://github.com/jolars/panache/commit/479e9ad63ab7f2ce5f268bbd4aff550d99e4f0ad))
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.26.1
+- updated crates/panache-parser to v0.31.1
+
 ## [3.13.0](https://github.com/jolars/panache/compare/v3.12.0...v3.13.0) (2026-09-30)
 
 ### Highlights
