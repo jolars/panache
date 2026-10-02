@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.15.0](https://github.com/jolars/panache/compare/v3.14.0...v3.15.0) (2026-10-02)
+
+### Features
+
+- **linter:** enable punctuation spacing lint by default ([`1bd1203`](https://github.com/jolars/panache/commit/1bd12039298c894f2cb01e77180ace60a3e9dca8)), closes [#549](https://github.com/jolars/panache/issues/549)
+- **linter:** add optional punctuation spacing rule ([`5af5a04`](https://github.com/jolars/panache/commit/5af5a0413afa0fe59c44688d81f5dc1b79a066be)), closes [#549](https://github.com/jolars/panache/issues/549)
+
 ## [3.14.0](https://github.com/jolars/panache/compare/v3.13.0...v3.14.0) (2026-10-02)
 
 ### Features
