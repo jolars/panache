@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.15.0](https://github.com/jolars/panache/compare/v3.14.0...v3.15.0) (2026-10-09)
+
+### Features
+
+- **parser:** support example-list counter resets ([`e28d49b`](https://github.com/jolars/panache/commit/e28d49b7c25d4d3cf3bc9ea5fa314969a24e180b))
+- **docs:** negotiate Markdown for agents ([`50dc1d0`](https://github.com/jolars/panache/commit/50dc1d0882a82b38e96c58b01023fde1f90a5749))
+- **linter:** enable punctuation spacing lint by default ([`1bd1203`](https://github.com/jolars/panache/commit/1bd12039298c894f2cb01e77180ace60a3e9dca8)), closes [#549](https://github.com/jolars/panache/issues/549)
+- **linter:** add optional punctuation spacing rule ([`5af5a04`](https://github.com/jolars/panache/commit/5af5a0413afa0fe59c44688d81f5dc1b79a066be)), closes [#549](https://github.com/jolars/panache/issues/549)
+
+### Bug Fixes
+
+- **formatter:** normalize fenced div attribute spacing ([`08599a2`](https://github.com/jolars/panache/commit/08599a2cf4afcaa1af72f10904e154620c8e845e))
+- **formatter:** normalize emphasis in preserve mode ([`8e184db`](https://github.com/jolars/panache/commit/8e184db83f2bdc64ac44774dc9b6d23d80d621a1))
+- **ci:** correct docs lint and Dependabot roots ([`dc980f4`](https://github.com/jolars/panache/commit/dc980f42b1eb0a2fe16611cf7565df60ac89599d))
+- normalize heading prose whitespace ([`7f429d7`](https://github.com/jolars/panache/commit/7f429d7b231c5cab335af49f6ea3e34efe835311)), fixes [#553](https://github.com/jolars/panache/issues/553)
+- **parser:** match native span closing boundaries ([`58466c4`](https://github.com/jolars/panache/commit/58466c403856f6f3ae9b8f52b9c00446eddee94e))
+- **parser:** reject invalid names on unclosed divs ([`5cf0108`](https://github.com/jolars/panache/commit/5cf0108593e6cc07faeaf7457f3891dff336a20c))
+- **parser:** reject invalid span attribute names ([`3c43614`](https://github.com/jolars/panache/commit/3c436145c81feb66b1adbcafe3272711e10a86da))
+- **parser:** update pandoc compatibility to 3.12 ([`3a87023`](https://github.com/jolars/panache/commit/3a87023f3651f98dbdc2ac9090629f0e5e2d6009))
+- **parser:** stop raw divs at quoted tag boundaries ([`e407d24`](https://github.com/jolars/panache/commit/e407d2411c3b2236f4554145d72aaa045c57a3b5))
+- **parser:** keep invalid self-closing divs raw ([`f5363d6`](https://github.com/jolars/panache/commit/f5363d6c293b4bead96e537082a064117b99b4ed))
+- **parser:** close fenced div after nested list ([`042dfbb`](https://github.com/jolars/panache/commit/042dfbbf7c0e1afecbf37f63756a8ea014b08ac5)), fixes [#551](https://github.com/jolars/panache/issues/551)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.27.0
+- updated crates/panache-parser to v0.32.0
+
 ## [3.14.0](https://github.com/jolars/panache/compare/v3.13.0...v3.14.0) (2026-10-02)
 
 ### Features

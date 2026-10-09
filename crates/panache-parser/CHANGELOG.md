@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.32.0](https://github.com/jolars/panache/compare/panache-parser-v0.31.1...panache-parser-v0.32.0) (2026-10-09)
+
+### Features
+
+- **parser:** support example-list counter resets ([`e28d49b`](https://github.com/jolars/panache/commit/e28d49b7c25d4d3cf3bc9ea5fa314969a24e180b))
+
+### Bug Fixes
+
+- **formatter:** normalize fenced div attribute spacing ([`08599a2`](https://github.com/jolars/panache/commit/08599a2cf4afcaa1af72f10904e154620c8e845e))
+- **parser:** match native span closing boundaries ([`58466c4`](https://github.com/jolars/panache/commit/58466c403856f6f3ae9b8f52b9c00446eddee94e))
+- **parser:** reject invalid names on unclosed divs ([`5cf0108`](https://github.com/jolars/panache/commit/5cf0108593e6cc07faeaf7457f3891dff336a20c))
+- **parser:** reject invalid span attribute names ([`3c43614`](https://github.com/jolars/panache/commit/3c436145c81feb66b1adbcafe3272711e10a86da))
+- **parser:** update pandoc compatibility to 3.12 ([`3a87023`](https://github.com/jolars/panache/commit/3a87023f3651f98dbdc2ac9090629f0e5e2d6009))
+- **parser:** stop raw divs at quoted tag boundaries ([`e407d24`](https://github.com/jolars/panache/commit/e407d2411c3b2236f4554145d72aaa045c57a3b5))
+- **parser:** keep invalid self-closing divs raw ([`f5363d6`](https://github.com/jolars/panache/commit/f5363d6c293b4bead96e537082a064117b99b4ed))
+- **parser:** close fenced div after nested list ([`042dfbb`](https://github.com/jolars/panache/commit/042dfbbf7c0e1afecbf37f63756a8ea014b08ac5)), fixes [#551](https://github.com/jolars/panache/issues/551)
+
 ## [0.31.1](https://github.com/jolars/panache/compare/panache-parser-v0.31.0...panache-parser-v0.31.1) (2026-10-02)
 
 ### Bug Fixes

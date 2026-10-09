@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.27.0](https://github.com/jolars/panache/compare/panache-formatter-v0.26.1...panache-formatter-v0.27.0) (2026-10-09)
+
+### Features
+
+- **parser:** support example-list counter resets ([`e28d49b`](https://github.com/jolars/panache/commit/e28d49b7c25d4d3cf3bc9ea5fa314969a24e180b))
+
+### Bug Fixes
+
+- **formatter:** normalize fenced div attribute spacing ([`08599a2`](https://github.com/jolars/panache/commit/08599a2cf4afcaa1af72f10904e154620c8e845e))
+- **formatter:** normalize emphasis in preserve mode ([`8e184db`](https://github.com/jolars/panache/commit/8e184db83f2bdc64ac44774dc9b6d23d80d621a1))
+- normalize heading prose whitespace ([`7f429d7`](https://github.com/jolars/panache/commit/7f429d7b231c5cab335af49f6ea3e34efe835311)), fixes [#553](https://github.com/jolars/panache/issues/553)
+
+### Dependencies
+
+- updated crates/panache-parser to v0.32.0
+
 ## [0.26.1](https://github.com/jolars/panache/compare/panache-formatter-v0.26.0...panache-formatter-v0.26.1) (2026-10-02)
 
 ### Dependencies

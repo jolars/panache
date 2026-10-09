@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.15.0](https://github.com/jolars/panache/compare/panache-code-v3.14.0...panache-code-v3.15.0) (2026-10-09)
+
+### Bug Fixes
+
+- update shell-quote ([`4cb5de7`](https://github.com/jolars/panache/commit/4cb5de7d58ead7fde2937276c576882972d6f131))
+
+### Dependencies
+
+- updated panache to v3.15.0
+
 ## [3.14.0](https://github.com/jolars/panache/compare/panache-code-v3.13.0...panache-code-v3.14.0) (2026-10-02)
 
 ### Dependencies
