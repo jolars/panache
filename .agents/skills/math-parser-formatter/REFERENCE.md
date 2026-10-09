@@ -65,6 +65,12 @@ formatter. User-visible formatting behavior belongs in
 
 ## Oracle and preservation cases
 
+- Badness 0.10's formatter keeps postfix signs tight, so `N(t-)` now has
+  byte parity even though its semantic atom stream still reports the sign as
+  binary. It also inserts an extra space after some wrapped relations with
+  authored operand whitespace. Keep this formatter defect pinned by
+  `panache_uses_one_space_after_wrapped_relations_where_badness_uses_two`;
+  Panache continues to emit one space.
 - The pinned Badness formatter splits CST-separated scripted tails from
   non-colon composite relations (`<=_i` becomes `< =_i`, likewise `>=_i` and
   `==_i`). Panache preserves these relations. Keep them outside mandatory byte

@@ -733,16 +733,14 @@ fn panache_tightens_unary_signs_where_badness_keeps_author_space() {
     }
 }
 
-/// Badness omits the right-context half of TeX's Bin-to-Ord rule and formats a
-/// postfix left-limit sign as a binary operator. Panache keeps the sign tight
-/// to the preceding operand.
+/// Badness 0.10 now keeps postfix signs tight, matching Panache's behavior.
 #[test]
-fn panache_tightens_postfix_signs_where_badness_treats_them_as_binary() {
+fn postfix_signs_match_badness() {
     for (body, expected) in [("N(t-)", "N(t-)"), ("S(T_i - )", "S(T_i-)")] {
         let panache = panache_body(body, OracleContext::Inline).expect("Panache formatter");
         let badness = badness_body(body, OracleContext::Inline).expect("Badness formatter");
         assert_eq!(panache, expected, "{body:?}");
-        assert_ne!(panache, badness, "known Badness defect: {body:?}");
+        assert_eq!(panache, badness, "{body:?}");
     }
 }
 
@@ -1364,11 +1362,7 @@ fn comment_bearing_embedded_display_environment_with_trailing_content_matches_ba
         "delimiter-owned edge newlines must remain on the typed path"
     );
 
-    let operator_suffixes = [
-        format!("x+{environment}+y"),
-        format!("x={environment}=y"),
-        format!("x\\gets{environment}\\leq y"),
-    ];
+    let operator_suffixes = [format!("x+{environment}+y"), format!("x={environment}=y")];
     for body in operator_suffixes {
         assert_formatter_parity(&body, OracleContext::Display);
         let once = panache_body(&body, OracleContext::Display).expect("first Panache pass");
@@ -1387,7 +1381,6 @@ fn scripted_comment_bearing_display_environment_matches_badness() {
         format!("x+{environment}^T,y"),
         format!("x+{environment}^T+y"),
         format!("x={environment}_i=y"),
-        format!("x\\gets{environment}^T\\leq y"),
     ] {
         assert_formatter_parity(&body, OracleContext::Display);
         let once = panache_body(&body, OracleContext::Display).expect("first Panache pass");
@@ -1671,8 +1664,6 @@ fn definition_relation_typed_contexts_match_badness() {
 #[test]
 fn free_display_definition_relations_match_badness() {
     let cases = [
-        ("A := bbbbbbbbbb = cccccccccc", 20),
-        ("A :=_i bbbbbbbbbb =_j cccccccccc", 20),
         ("A := bbbbbbbbbb := cccccccccc", 20),
         ("A :=_i bbbbbbbbbb :=_j cccccccccc", 20),
         (concat!(r"A := a \\", "\n", r":= b \\", "\n", "= c"), 80),
@@ -1691,6 +1682,56 @@ fn free_display_definition_relations_match_badness() {
             panache_body_with_preamble_and_width(&panache, None, OracleContext::Display, width)
                 .expect("second Panache pass");
         assert_eq!(twice, panache, "definition-relation display: {body:?}");
+    }
+}
+
+/// Badness 0.10 adds two spaces after a wrapped relation when its operand
+/// carries authored leading whitespace. Keep both outputs pinned so this
+/// oracle defect cannot change Panache's single-space policy.
+#[test]
+fn panache_uses_one_space_after_wrapped_relations_where_badness_uses_two() {
+    let environment = "\\begin{matrix}\na&={b % inner\n+c}\\\\\nd&=e\n\\end{matrix}";
+    let mut cases = vec![
+        (
+            "A := bbbbbbbbbb = cccccccccc".to_owned(),
+            20,
+            "  A := bbbbbbbbbb\n    = cccccccccc".to_owned(),
+            "  A := bbbbbbbbbb\n    =  cccccccccc".to_owned(),
+        ),
+        (
+            "A :=_i bbbbbbbbbb =_j cccccccccc".to_owned(),
+            20,
+            "  A :=_i bbbbbbbbbb\n    =_j cccccccccc".to_owned(),
+            "  A :=_i bbbbbbbbbb\n    =_j  cccccccccc".to_owned(),
+        ),
+    ];
+    for script in ["", "^T"] {
+        let prefix = format!(
+            "  x \\gets \\begin{{matrix}}\n            a & = {{b % inner\n                   + c}} \\\\\n            d & = e\n          \\end{{matrix}}{script}\n    \\leq"
+        );
+        cases.push((
+            format!("x\\gets{environment}{script}\\leq y"),
+            80,
+            format!("{prefix} y"),
+            format!("{prefix}  y"),
+        ));
+    }
+
+    for (body, width, expected_panache, expected_badness) in cases {
+        let panache =
+            panache_body_with_preamble_and_width(&body, None, OracleContext::Display, width)
+                .expect("Panache display-math formatter");
+        let badness = badness_body_with_width(&body, OracleContext::Display, width)
+            .expect("Badness display-math oracle");
+        assert_eq!(panache, expected_panache, "{body:?}");
+        assert_eq!(
+            badness, expected_badness,
+            "known Badness 0.10 defect: {body:?}"
+        );
+        let twice =
+            panache_body_with_preamble_and_width(&panache, None, OracleContext::Display, width)
+                .expect("second Panache pass");
+        assert_eq!(twice, panache, "{body:?}");
     }
 }
 
