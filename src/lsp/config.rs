@@ -5,7 +5,7 @@ use lsp_types::Uri;
 use crate::config::{ConfigError, ConfigSource};
 use crate::lsp::uri_ext::UriExt;
 
-/// Load config from workspace root, falling back to default
+/// Load config for the document, falling back to defaults.
 ///
 /// If `document_uri` is provided, the file extension will be used to auto-detect
 /// the flavor (.qmd → Quarto, .Rmd/.Rmarkdown → RMarkdown)
@@ -91,17 +91,20 @@ pub(crate) fn try_load_config_with_chain(
     // Multi-root: resolve against the folder that best contains the document,
     // so a document in a second workspace folder uses that folder's config.
     let workspace_root = select_workspace_root(workspace_folders, document_uri);
-    if let Some(root) = workspace_root.as_ref() {
-        // Start the config walk at the file's directory (so a `panache.toml`
-        // closer to the file shadows one at the workspace root). Project-root
-        // discovery via `.git` happens inside `config::load`, so CLI and LSP
-        // pick the same project boundary symmetrically.
-        let start_dir = input_file
-            .as_deref()
-            .and_then(|p| p.parent())
-            .filter(|p| p.starts_with(root))
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| root.clone());
+    // Standalone files still need project discovery and the environment/global
+    // fallbacks. Preserve workspace selection for files outside known roots.
+    let start_dir = input_file
+        .as_deref()
+        .and_then(|p| p.parent())
+        .filter(|p| {
+            workspace_root
+                .as_ref()
+                .is_none_or(|root| p.starts_with(root))
+        })
+        .map(Path::to_path_buf)
+        .or(workspace_root)
+        .or_else(|| std::env::current_dir().ok());
+    if let Some(start_dir) = start_dir {
         match crate::config::load_with_chain(None, &start_dir, input_file.as_deref(), None) {
             Ok((config, source, chain)) => {
                 if let Some(p) = source.path() {

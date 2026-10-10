@@ -45,7 +45,22 @@ impl Drop for LspProcess {
     }
 }
 
+#[derive(Clone, Copy)]
+enum ConfigLocation {
+    Environment,
+    Global,
+    Project,
+}
+
 fn format_with_panache_config(contents: Option<&str>) -> serde_json::Value {
+    format_with_config(contents, ConfigLocation::Environment, true)
+}
+
+fn format_with_config(
+    contents: Option<&str>,
+    location: ConfigLocation,
+    workspace: bool,
+) -> serde_json::Value {
     use panache::lsp::UriExt;
     use serde_json::json;
     use std::{
@@ -57,14 +72,26 @@ fn format_with_panache_config(contents: Option<&str>) -> serde_json::Value {
     let dir = tempfile::tempdir().unwrap();
     let project = dir.path().join("project");
     fs::create_dir_all(project.join(".git")).unwrap();
-    let config = dir.path().join("shared.toml");
+    let user = dir.path().join("user");
+    fs::create_dir_all(user.join("panache")).unwrap();
+    let config = match location {
+        ConfigLocation::Environment => dir.path().join("shared.toml"),
+        ConfigLocation::Global => user.join("panache/config.toml"),
+        ConfigLocation::Project => project.join("panache.toml"),
+    };
     if let Some(contents) = contents {
         fs::write(&config, contents).unwrap();
     }
-    let mut child = Command::new(assert_cmd::cargo::cargo_bin!("panache"))
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("panache"));
+    command
+        .env_remove("PANACHE_CONFIG")
+        .env("XDG_CONFIG_HOME", &user);
+    if matches!(location, ConfigLocation::Environment) {
+        command.env("PANACHE_CONFIG", &config);
+    }
+    let mut child = command
         .arg("lsp")
-        .current_dir(&project)
-        .env("PANACHE_CONFIG", config)
+        .current_dir(dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -79,7 +106,7 @@ fn format_with_panache_config(contents: Option<&str>) -> serde_json::Value {
         }
     });
     let mut server = LspProcess { child, messages };
-    let root = lsp_types::Uri::from_file_path(&project).unwrap();
+    let root = workspace.then(|| lsp_types::Uri::from_file_path(&project).unwrap());
     let doc = lsp_types::Uri::from_file_path(project.join("doc.md")).unwrap();
     server.send(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize",
         "params": {"capabilities": {}, "rootUri": root, "processId": null}}));
@@ -114,6 +141,53 @@ fn lsp_formatting_refuses_missing_panache_config() {
 #[test]
 fn lsp_formatting_refuses_malformed_panache_config() {
     assert!(format_with_panache_config(Some("[format]\nwrpa = \"preserve\"\n")).is_null());
+}
+
+#[test]
+fn lsp_standalone_formatting_uses_panache_config() {
+    let edits = format_with_config(
+        Some("[format]\nwrap = \"preserve\"\n"),
+        ConfigLocation::Environment,
+        false,
+    );
+    assert_eq!(edits[0]["newText"], "Alpha\nbravo.\n");
+}
+
+#[test]
+fn lsp_standalone_formatting_uses_global_config() {
+    let edits = format_with_config(
+        Some("[format]\nwrap = \"preserve\"\n"),
+        ConfigLocation::Global,
+        false,
+    );
+    assert_eq!(edits[0]["newText"], "Alpha\nbravo.\n");
+}
+
+#[test]
+fn lsp_standalone_formatting_uses_project_config() {
+    let edits = format_with_config(
+        Some("[format]\nwrap = \"preserve\"\n"),
+        ConfigLocation::Project,
+        false,
+    );
+    assert_eq!(edits[0]["newText"], "Alpha\nbravo.\n");
+}
+
+#[test]
+fn lsp_standalone_formatting_refuses_missing_panache_config() {
+    assert!(format_with_config(None, ConfigLocation::Environment, false).is_null());
+}
+
+#[test]
+fn lsp_standalone_formatting_refuses_malformed_panache_config() {
+    assert!(
+        format_with_config(
+            Some("[format]\nwrpa = \"preserve\"\n"),
+            ConfigLocation::Environment,
+            false,
+        )
+        .is_null()
+    );
 }
 
 #[test]
