@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.15.1](https://github.com/jolars/panache/compare/v3.15.0...v3.15.1) (2026-10-10)
+
+### Bug Fixes
+
+- **lsp:** load configuration for standalone files ([`8f82e9a`](https://github.com/jolars/panache/commit/8f82e9a476b36d8658dd3b555cd6cacd698700b7)), fixes [#555](https://github.com/jolars/panache/issues/555)
+
 ## [3.15.0](https://github.com/jolars/panache/compare/v3.14.0...v3.15.0) (2026-10-09)
 
 ### Features
