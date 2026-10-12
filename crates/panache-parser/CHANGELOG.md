@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.33.0](https://github.com/jolars/panache/compare/panache-parser-v0.32.0...panache-parser-v0.33.0) (2026-10-12)
+
+### Features
+
+- **lint:** detect malformed citations ([`b8598d1`](https://github.com/jolars/panache/commit/b8598d1d94c886f80bbac8867e1aae1ded404c85))
+
+### Bug Fixes
+
+- **parser:** keep headerless tables separate ([`835e8bb`](https://github.com/jolars/panache/commit/835e8bbd34a94689ab065118e742108c6d552258)), fixes [#557](https://github.com/jolars/panache/issues/557)
+
 ## [0.32.0](https://github.com/jolars/panache/compare/panache-parser-v0.31.1...panache-parser-v0.32.0) (2026-10-09)
 
 ### Features

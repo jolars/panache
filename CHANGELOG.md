@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.16.0](https://github.com/jolars/panache/compare/v3.15.0...v3.16.0) (2026-10-12)
 
 ### Highlights
 
@@ -13,6 +13,21 @@ The old `[lint.rules]` boolean tables still work but emit a deprecation
 warning. Use `extend-select = ["rule-name"]` instead of `rule-name = true` and
 `ignore = ["rule-name"]` instead of `rule-name = false`. Boolean tables will be
 removed in the next major release on or after April 12, 2027.
+
+### Features
+
+- **lint:** add rule selection settings ([`1bdefc3`](https://github.com/jolars/panache/commit/1bdefc3509ffef9ca559c567b558a5e64af911bf))
+- **lint:** detect malformed citations ([`b8598d1`](https://github.com/jolars/panache/commit/b8598d1d94c886f80bbac8867e1aae1ded404c85))
+
+### Bug Fixes
+
+- **parser:** keep headerless tables separate ([`835e8bb`](https://github.com/jolars/panache/commit/835e8bbd34a94689ab065118e742108c6d552258)), fixes [#557](https://github.com/jolars/panache/issues/557)
+- **lsp:** load configuration for standalone files ([`8f82e9a`](https://github.com/jolars/panache/commit/8f82e9a476b36d8658dd3b555cd6cacd698700b7)), fixes [#555](https://github.com/jolars/panache/issues/555)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.27.1
+- updated crates/panache-parser to v0.33.0
 
 ## [3.15.0](https://github.com/jolars/panache/compare/v3.14.0...v3.15.0) (2026-10-09)
 
