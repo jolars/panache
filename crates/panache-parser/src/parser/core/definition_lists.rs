@@ -456,6 +456,9 @@ impl<'a> Parser<'a> {
                         plain_open: *has_content,
                         plain_buffer,
                     });
+                    extras = self
+                        .try_buffer_definition_hugo_continuations(after_marker_and_spaces)
+                        .unwrap_or(0);
                 }
             }
             DefinitionPrepared::Term { blank_count } => {
@@ -486,6 +489,32 @@ impl<'a> Parser<'a> {
             }
         };
         extras
+    }
+
+    pub(super) fn try_buffer_definition_hugo_continuations(
+        &mut self,
+        first: &str,
+    ) -> Option<usize> {
+        if !self.config.extensions.hugo_shortcodes || !first.contains("{{") {
+            return None;
+        }
+        // Definition prose bypasses ordinary dispatch. Hold the entire call
+        // before its continuation lines can become Markdown blocks.
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, false, self.config);
+        let lines = StrippedLines::new(&self.lines, self.pos, &prefix)
+            .with_hugo_lookahead(&self.hugo_lookahead);
+        let prepared = super::super::blocks::hugo::prepare(&lines, true, Some(first))?;
+        let Some(Container::Definition { plain_buffer, .. }) = self.containers.stack.last_mut()
+        else {
+            return None;
+        };
+        for i in 1..prepared.line_count {
+            let raw = self.lines[self.pos + i];
+            let tail = lines.peek_prefix_at(self.pos + i);
+            plain_buffer.push_indent(&raw[..raw.len() - tail.len()]);
+            plain_buffer.push_text(tail);
+        }
+        Some(prepared.line_count - 1)
     }
 
     /// Emit the blank lines a definition-list term look-ahead skipped over.
@@ -657,6 +686,14 @@ pub(super) fn emit_definition_plain_or_heading(
     config: &ParserOptions,
     suppress_footnote_refs: bool,
 ) {
+    if let Some(tail) = buffer.try_emit_hugo_heading(builder, config) {
+        if !tail.is_empty() {
+            builder.start_node(SyntaxKind::PLAIN.into());
+            tail.emit_with_inlines(builder, config, suppress_footnote_refs);
+            builder.finish_node();
+        }
+        return;
+    }
     let text = buffer.raw_text();
     let text = text.as_str();
     let line_without_newline = text

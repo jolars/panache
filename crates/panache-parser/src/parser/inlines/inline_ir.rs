@@ -216,6 +216,8 @@ impl IrEvent {
 /// which parser to call to rebuild the CST subtree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstructKind {
+    /// An opaque Hugo call or paired shortcode region.
+    HugoShortcode,
     /// `\X` literal-character escape (CommonMark §2.4).
     Escape,
     /// `` `code` `` span (§6.1).
@@ -347,8 +349,22 @@ pub enum LinkKind {
 /// into a single [`IrEvent::Text`] event by the run-flush step.
 pub fn build_ir(text: &str, start: usize, end: usize, config: &ParserOptions) -> Vec<IrEvent> {
     let mut events = Vec::new();
-    build_ir_into(text, start, end, config, &mut events);
+    let hugo = build_hugo_index(text, start, end, config);
+    build_ir_into(text, start, end, config, &mut events, &hugo);
     events
+}
+
+fn build_hugo_index(
+    text: &str,
+    start: usize,
+    end: usize,
+    config: &ParserOptions,
+) -> super::hugo::HugoIndex {
+    if config.extensions.hugo_shortcodes {
+        super::hugo::HugoIndex::for_range(text, start, end)
+    } else {
+        super::hugo::HugoIndex::default()
+    }
 }
 
 /// Like [`build_ir`] but writes into a caller-provided `Vec<IrEvent>`,
@@ -360,6 +376,7 @@ pub(super) fn build_ir_into(
     end: usize,
     config: &ParserOptions,
     events: &mut Vec<IrEvent>,
+    hugo: &super::hugo::HugoIndex,
 ) {
     events.clear();
     let bytes = text.as_bytes();
@@ -440,6 +457,21 @@ pub(super) fn build_ir_into(
                 text_run_start = pos;
                 continue;
             }
+        }
+
+        if b == b'{'
+            && exts.hugo_shortcodes
+            && let Some(span) = hugo.scan_at(&text[..end], pos)
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + span.end,
+                kind: ConstructKind::HugoShortcode,
+            });
+            pos += span.end;
+            text_run_start = pos;
+            continue;
         }
 
         if b == b'`'
@@ -735,6 +767,7 @@ fn build_ir_byte_mask(config: &ParserOptions) -> [bool; 256] {
     mask[b'\r' as usize] = true;
     mask[b'\\' as usize] = true;
     mask[b'`' as usize] = true;
+    mask[b'{' as usize] = exts.hugo_shortcodes;
     mask[b'*' as usize] = true;
     mask[b'_' as usize] = true;
 
@@ -1627,6 +1660,7 @@ pub fn process_brackets(
     dialect: crate::options::Dialect,
     preserve_unresolved_references: bool,
     allow_spaced: bool,
+    hugo_shortcodes: bool,
 ) {
     let empty: HashSet<String> = HashSet::new();
     let labels: &HashSet<String> = match refdefs {
@@ -1663,7 +1697,9 @@ pub fn process_brackets(
         let text_end = close_pos;
         let after_close = close_pos + 1;
 
-        if let Some((suffix_end, dest, title)) = try_inline_suffix(text, after_close) {
+        if let Some((suffix_end, dest, title)) =
+            try_inline_suffix(text, after_close, hugo_shortcodes)
+        {
             if !is_image && is_commonmark {
                 deactivate_earlier_link_openers(events, o);
             }
@@ -1851,7 +1887,11 @@ fn commit_resolution(
     }
 }
 
-fn try_inline_suffix(text: &str, pos: usize) -> Option<(usize, String, Option<String>)> {
+fn try_inline_suffix(
+    text: &str,
+    pos: usize,
+    hugo_shortcodes: bool,
+) -> Option<(usize, String, Option<String>)> {
     let bytes = text.as_bytes();
     if pos >= bytes.len() || bytes[pos] != b'(' {
         return None;
@@ -1864,7 +1904,7 @@ fn try_inline_suffix(text: &str, pos: usize) -> Option<(usize, String, Option<St
         return Some((p + 1, String::new(), None));
     }
 
-    let (dest, dest_end) = parse_link_destination(text, p)?;
+    let (dest, dest_end) = parse_link_destination(text, p, hugo_shortcodes)?;
     p = dest_end;
 
     while p < bytes.len() && matches!(bytes[p], b' ' | b'\t' | b'\n') {
@@ -1887,7 +1927,11 @@ fn try_inline_suffix(text: &str, pos: usize) -> Option<(usize, String, Option<St
     Some((p + 1, dest, title))
 }
 
-fn parse_link_destination(text: &str, start: usize) -> Option<(String, usize)> {
+fn parse_link_destination(
+    text: &str,
+    start: usize,
+    hugo_shortcodes: bool,
+) -> Option<(String, usize)> {
     let bytes = text.as_bytes();
     if start >= bytes.len() {
         return None;
@@ -1896,6 +1940,13 @@ fn parse_link_destination(text: &str, start: usize) -> Option<(String, usize)> {
         let mut p = start + 1;
         let begin = p;
         while p < bytes.len() && bytes[p] != b'>' && bytes[p] != b'\n' && bytes[p] != b'<' {
+            if hugo_shortcodes
+                && bytes[p] == b'{'
+                && let Some(tag) = super::hugo::scan_tag(&text[p..]).filter(|tag| tag.complete)
+            {
+                p += tag.end;
+                continue;
+            }
             if bytes[p] == b'\\' && p + 1 < bytes.len() {
                 p += 2;
             } else {
@@ -1912,6 +1963,13 @@ fn parse_link_destination(text: &str, start: usize) -> Option<(String, usize)> {
         let mut paren_depth: i32 = 0;
         while p < bytes.len() {
             let b = bytes[p];
+            if hugo_shortcodes
+                && b == b'{'
+                && let Some(tag) = super::hugo::scan_tag(&text[p..]).filter(|tag| tag.complete)
+            {
+                p += tag.end;
+                continue;
+            }
             if b == b'\\' && p + 1 < bytes.len() {
                 p += 2;
                 continue;
@@ -2338,7 +2396,8 @@ pub fn build_full_plans(
     bundle.bracket_pairs.clear();
     bundle.excluded.clear();
 
-    build_ir_into(text, start, end, config, &mut bundle.events);
+    let hugo = build_hugo_index(text, start, end, config);
+    build_ir_into(text, start, end, config, &mut bundle.events, &hugo);
     process_brackets(
         &mut bundle.events,
         text,
@@ -2346,6 +2405,7 @@ pub fn build_full_plans(
         config.dialect,
         config.preserve_unresolved_references,
         config.extensions.spaced_reference_links,
+        config.extensions.hugo_shortcodes,
     );
 
     bundle.bracket_pairs.extend(
@@ -2428,6 +2488,7 @@ pub fn build_full_plans(
         emphasis: build_emphasis_plan(&bundle.events),
         brackets: build_bracket_plan(&bundle.events),
         constructs: build_construct_plan(&bundle.events),
+        hugo,
     }
 }
 
@@ -2520,6 +2581,7 @@ pub struct InlinePlans {
     pub emphasis: EmphasisPlan,
     pub brackets: BracketPlan,
     pub constructs: ConstructPlan,
+    pub(super) hugo: super::hugo::HugoIndex,
 }
 
 /// Convert the IR's delim-run match decisions into an [`EmphasisPlan`],
@@ -2711,7 +2773,15 @@ mod tests {
     fn brackets_resolve_inline_link() {
         let opts = cm_opts();
         let mut ir = build_ir("[foo](/url)", 0, 11, &opts);
-        process_brackets(&mut ir, "[foo](/url)", None, opts.dialect, false, false);
+        process_brackets(
+            &mut ir,
+            "[foo](/url)",
+            None,
+            opts.dialect,
+            false,
+            false,
+            false,
+        );
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
@@ -2731,7 +2801,7 @@ mod tests {
         let text = "[foo]";
         let map = refdefs(["foo"]);
         let mut ir = build_ir(text, 0, text.len(), &opts);
-        process_brackets(&mut ir, text, Some(&map), opts.dialect, false, false);
+        process_brackets(&mut ir, text, Some(&map), opts.dialect, false, false, false);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))
@@ -2749,7 +2819,7 @@ mod tests {
         let opts = cm_opts();
         let text = "[bar* baz]";
         let mut ir = build_ir(text, 0, text.len(), &opts);
-        process_brackets(&mut ir, text, None, opts.dialect, false, false);
+        process_brackets(&mut ir, text, None, opts.dialect, false, false, false);
         let open = ir
             .iter()
             .find(|e| matches!(e, IrEvent::OpenBracket { start: 0, .. }))

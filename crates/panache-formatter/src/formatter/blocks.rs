@@ -1,5 +1,5 @@
 use crate::config::WrapMode;
-use crate::formatter::preserve::preserve_lines_normalized;
+use crate::formatter::preserve::{preserve_lines_normalized, preserve_lines_unprefixed_normalized};
 use crate::formatter::smart::normalize_smart_punctuation;
 use crate::formatter::utils::is_block_element;
 use crate::formatter::{Formatter, paragraphs};
@@ -217,20 +217,29 @@ impl Formatter {
             && !self.output.ends_with(":   ");
         match wrap_mode {
             WrapMode::Preserve => {
-                for (i, line) in preserve_lines_normalized(node, &self.config)
-                    .iter()
-                    .enumerate()
-                {
+                let in_definition = self.output.ends_with(":   ");
+                let lines = if in_definition {
+                    // The normalized marker sets a new content column, so
+                    // rebuild container indentation around opaque payloads.
+                    preserve_lines_unprefixed_normalized(node, &self.config)
+                } else {
+                    preserve_lines_normalized(node, &self.config)
+                };
+                for (i, line) in lines.iter().enumerate() {
                     if needs_indent {
                         self.output.push_str(&" ".repeat(indent));
                     } else if i > 0 {
                         self.output.push('\n');
+                        if in_definition {
+                            self.output.push_str(&" ".repeat(indent));
+                        }
                     }
-                    self.output.push_str(if needs_indent {
-                        paragraphs::trim_prose_indent(node, line)
-                    } else {
-                        line
-                    });
+                    self.output
+                        .push_str(if needs_indent || (in_definition && i > 0) {
+                            paragraphs::trim_prose_indent(node, line)
+                        } else {
+                            line
+                        });
                     if needs_indent {
                         self.output.push('\n');
                     }

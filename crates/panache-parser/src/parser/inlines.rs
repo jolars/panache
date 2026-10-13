@@ -20,6 +20,7 @@ pub mod emoji;
 pub mod escapes;
 #[path = "inlines/hard_breaks.rs"]
 pub(crate) mod hard_breaks;
+pub(crate) mod hugo;
 #[path = "inlines/inline_executable.rs"]
 pub mod inline_executable;
 #[path = "inlines/inline_footnotes.rs"]

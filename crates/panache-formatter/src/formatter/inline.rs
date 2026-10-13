@@ -71,7 +71,7 @@ fn format_citation_like(node: &SyntaxNode, config: &Config) -> String {
     collapse_internal_newlines(&result).into_owned()
 }
 
-fn collapse_internal_newlines(text: &str) -> std::borrow::Cow<'_, str> {
+pub(super) fn collapse_internal_newlines(text: &str) -> std::borrow::Cow<'_, str> {
     if !text.contains('\n') {
         return std::borrow::Cow::Borrowed(text);
     }
@@ -136,12 +136,51 @@ pub(super) fn collapse_spaces(text: &str) -> String {
     result
 }
 
-fn inline_token_text(token: &SyntaxToken, collapse_ws: bool) -> Cow<'_, str> {
-    if collapse_ws && token.kind() == SyntaxKind::TEXT {
-        Cow::Owned(collapse_spaces(token.text()))
+#[derive(Clone, Copy)]
+struct InlineSpacing {
+    collapse_spaces: bool,
+    collapse_newlines: bool,
+}
+
+fn inline_token_text(token: &SyntaxToken, spacing: InlineSpacing) -> Cow<'_, str> {
+    let text = if spacing.collapse_newlines && token.kind() == SyntaxKind::NEWLINE {
+        Cow::Borrowed(" ")
+    } else if token.kind() == SyntaxKind::TEXT {
+        let text = if spacing.collapse_newlines && token.text().contains('\n') {
+            Cow::Owned(token.text().replace('\n', " "))
+        } else {
+            Cow::Borrowed(token.text())
+        };
+        if spacing.collapse_spaces {
+            Cow::Owned(collapse_spaces(&text))
+        } else {
+            text
+        }
     } else {
         Cow::Borrowed(token.text())
+    };
+    if spacing.collapse_spaces
+        && spacing.collapse_newlines
+        && matches!(token.kind(), SyntaxKind::TEXT | SyntaxKind::NEWLINE)
+        && text.starts_with([' ', '\t'])
+    {
+        let mut previous = token.prev_token();
+        while previous
+            .as_ref()
+            .is_some_and(|token| token.kind() == SyntaxKind::LINE_PREFIX)
+        {
+            previous = previous.and_then(|token| token.prev_token());
+        }
+        if previous.is_some_and(|token| {
+            matches!(token.kind(), SyntaxKind::TEXT | SyntaxKind::NEWLINE)
+                && token.text().ends_with([' ', '\t', '\r', '\n'])
+        }) {
+            // A prose break and its adjacent padding form one whitespace run.
+            // Inspect token kinds so literal payloads remain untouched.
+            return Cow::Owned(text.trim_start_matches([' ', '\t']).to_owned());
+        }
     }
+    text
 }
 
 fn contains_inline_prose(node: &SyntaxNode) -> bool {
@@ -169,6 +208,35 @@ pub(super) fn format_inline_node_with_spacing(
     config: &Config,
     collapse_ws: bool,
 ) -> String {
+    format_inline_node_with_options(
+        node,
+        config,
+        InlineSpacing {
+            collapse_spaces: collapse_ws,
+            collapse_newlines: false,
+        },
+    )
+}
+
+/// Normalize prose breaks before joining an atomic inline, so shortcode
+/// arguments never pass through a newline replacement on the complete string.
+pub(super) fn format_inline_node_for_sentence(node: &SyntaxNode, config: &Config) -> String {
+    format_inline_node_with_options(
+        node,
+        config,
+        InlineSpacing {
+            collapse_spaces: true,
+            collapse_newlines: true,
+        },
+    )
+}
+
+fn format_inline_node_with_options(
+    node: &SyntaxNode,
+    config: &Config,
+    spacing: InlineSpacing,
+) -> String {
+    let collapse_ws = spacing.collapse_spaces;
     match node.kind() {
         SyntaxKind::AUTO_LINK => {
             let mut result = String::new();
@@ -343,11 +411,7 @@ pub(super) fn format_inline_node_with_spacing(
                         if n.kind() == SyntaxKind::DISPLAY_MATH {
                             content.push_str(&n.text().to_string());
                         } else {
-                            content.push_str(&format_inline_node_with_spacing(
-                                &n,
-                                config,
-                                collapse_ws,
-                            ));
+                            content.push_str(&format_inline_node_with_options(&n, config, spacing));
                         }
                     }
                     NodeOrToken::Token(t) => {
@@ -357,7 +421,7 @@ pub(super) fn format_inline_node_with_spacing(
                         if t.kind() != SyntaxKind::EMPHASIS_MARKER {
                             content.push_str(
                                 normalize_smart_punctuation(
-                                    inline_token_text(&t, collapse_ws).as_ref(),
+                                    inline_token_text(&t, spacing).as_ref(),
                                     config.formatter_extensions.smart,
                                     config.formatter_extensions.smart_quotes,
                                 )
@@ -378,11 +442,7 @@ pub(super) fn format_inline_node_with_spacing(
                         if n.kind() == SyntaxKind::DISPLAY_MATH {
                             content.push_str(&n.text().to_string());
                         } else {
-                            content.push_str(&format_inline_node_with_spacing(
-                                &n,
-                                config,
-                                collapse_ws,
-                            ));
+                            content.push_str(&format_inline_node_with_options(&n, config, spacing));
                         }
                     }
                     NodeOrToken::Token(t) => {
@@ -390,7 +450,7 @@ pub(super) fn format_inline_node_with_spacing(
                             continue;
                         }
                         if t.kind() != SyntaxKind::STRONG_MARKER {
-                            content.push_str(&inline_token_text(&t, collapse_ws));
+                            content.push_str(&inline_token_text(&t, spacing));
                         }
                     }
                 }
@@ -406,7 +466,7 @@ pub(super) fn format_inline_node_with_spacing(
                         if t.kind() == SyntaxKind::LINE_PREFIX {
                             continue;
                         }
-                        result.push_str(&inline_token_text(&t, collapse_ws));
+                        result.push_str(&inline_token_text(&t, spacing));
                     }
                     NodeOrToken::Node(n) => {
                         if n.kind() == SyntaxKind::SPAN_CONTENT {
@@ -416,13 +476,11 @@ pub(super) fn format_inline_node_with_spacing(
                                         if t.kind() == SyntaxKind::LINE_PREFIX {
                                             continue;
                                         }
-                                        result.push_str(&inline_token_text(&t, collapse_ws))
+                                        result.push_str(&inline_token_text(&t, spacing))
                                     }
                                     NodeOrToken::Node(nested) => {
-                                        result.push_str(&format_inline_node_with_spacing(
-                                            &nested,
-                                            config,
-                                            collapse_ws,
+                                        result.push_str(&format_inline_node_with_options(
+                                            &nested, config, spacing,
                                         ));
                                     }
                                 }
@@ -446,7 +504,7 @@ pub(super) fn format_inline_node_with_spacing(
                         }
                         result.push_str(
                             normalize_smart_punctuation(
-                                inline_token_text(&t, collapse_ws).as_ref(),
+                                inline_token_text(&t, spacing).as_ref(),
                                 config.formatter_extensions.smart,
                                 config.formatter_extensions.smart_quotes,
                             )
@@ -463,7 +521,7 @@ pub(super) fn format_inline_node_with_spacing(
                                         }
                                         result.push_str(
                                             normalize_smart_punctuation(
-                                                inline_token_text(&t, collapse_ws).as_ref(),
+                                                inline_token_text(&t, spacing).as_ref(),
                                                 config.formatter_extensions.smart,
                                                 config.formatter_extensions.smart_quotes,
                                             )
@@ -471,10 +529,8 @@ pub(super) fn format_inline_node_with_spacing(
                                         );
                                     }
                                     NodeOrToken::Node(nested) => {
-                                        result.push_str(&format_inline_node_with_spacing(
-                                            &nested,
-                                            config,
-                                            collapse_ws,
+                                        result.push_str(&format_inline_node_with_options(
+                                            &nested, config, spacing,
                                         ));
                                     }
                                 }
@@ -677,12 +733,19 @@ pub(super) fn format_inline_node_with_spacing(
         }
         SyntaxKind::NONBREAKING_SPACE => "\\ ".to_string(),
         SyntaxKind::SHORTCODE => format_shortcode(node),
+        SyntaxKind::HUGO_SHORTCODE | SyntaxKind::INLINE_HTML => text_without_line_prefixes(node),
+        SyntaxKind::LINK_DEST if spacing.collapse_newlines => {
+            let mut result = String::new();
+            super::inline_layout::append_normalized_link_dest(node, &mut result);
+            result
+        }
+        SyntaxKind::LINK_DEST => text_without_line_prefixes(node),
         SyntaxKind::INLINE_FOOTNOTE => {
             let mut content = String::new();
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Node(n) => {
-                        content.push_str(&format_inline_node_with_spacing(&n, config, collapse_ws))
+                        content.push_str(&format_inline_node_with_options(&n, config, spacing))
                     }
                     NodeOrToken::Token(t) => {
                         if !matches!(
@@ -691,7 +754,7 @@ pub(super) fn format_inline_node_with_spacing(
                         ) {
                             content.push_str(
                                 normalize_smart_punctuation(
-                                    inline_token_text(&t, collapse_ws).as_ref(),
+                                    inline_token_text(&t, spacing).as_ref(),
                                     config.formatter_extensions.smart,
                                     config.formatter_extensions.smart_quotes,
                                 )
@@ -718,16 +781,16 @@ pub(super) fn format_inline_node_with_spacing(
             // Containers add their own prefixes to every physical output line.
             text_without_line_prefixes(node)
         }
-        _ if collapse_ws && contains_inline_prose(node) => {
+        _ if contains_inline_prose(node) => {
             let mut result = String::new();
             for child in node.children_with_tokens() {
                 match child {
                     NodeOrToken::Token(token) if token.kind() == SyntaxKind::LINE_PREFIX => {}
                     NodeOrToken::Token(token) => {
-                        result.push_str(&inline_token_text(&token, true));
+                        result.push_str(&inline_token_text(&token, spacing));
                     }
                     NodeOrToken::Node(child) => {
-                        result.push_str(&format_inline_node_with_spacing(&child, config, true));
+                        result.push_str(&format_inline_node_with_options(&child, config, spacing));
                     }
                 }
             }

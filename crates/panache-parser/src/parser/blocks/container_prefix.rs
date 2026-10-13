@@ -45,7 +45,7 @@ use super::lists::ListMarkerDetect;
 /// A single strip operation applied during the dispatcher's
 /// container-stack walk. Ops are applied in order; each consumes some
 /// leading bytes of the line and the next op operates on what remains.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StripOp {
     /// Advance N columns (tab-aware). Mirrors the legacy `list_content_col`
     /// strip.
@@ -1231,6 +1231,7 @@ pub(crate) struct StrippedLines<'a, 'p> {
     /// `line_pos`).
     dispatch: usize,
     prefix: &'p ContainerPrefix,
+    hugo_lookahead: Option<&'p std::cell::RefCell<super::hugo::LookaheadCache>>,
 }
 
 #[allow(dead_code)]
@@ -1241,6 +1242,7 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             base,
             dispatch: base,
             prefix,
+            hugo_lookahead: None,
         }
     }
 
@@ -1258,12 +1260,27 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             base,
             dispatch,
             prefix,
+            hugo_lookahead: None,
         }
     }
 
     /// Number of lines available from `base` onward (line 0 plus lookahead).
     pub fn remaining(&self) -> usize {
         self.raw.len().saturating_sub(self.base)
+    }
+
+    pub(crate) fn with_hugo_lookahead(
+        mut self,
+        cache: &'p std::cell::RefCell<super::hugo::LookaheadCache>,
+    ) -> Self {
+        self.hugo_lookahead = Some(cache);
+        self
+    }
+
+    pub(crate) fn hugo_lookahead(
+        &self,
+    ) -> Option<&'p std::cell::RefCell<super::hugo::LookaheadCache>> {
+        self.hugo_lookahead
     }
 
     /// Line 0 with emission-safe strip semantics (matches the legacy

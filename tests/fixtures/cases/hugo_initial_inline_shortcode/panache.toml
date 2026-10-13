@@ -1,0 +1,5 @@
+flavor = "hugo"
+
+[format]
+wrap = "reflow"
+line-width = 25

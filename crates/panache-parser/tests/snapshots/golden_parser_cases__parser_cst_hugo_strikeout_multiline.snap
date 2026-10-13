@@ -1,0 +1,54 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..101
+  LIST@0..50
+    LIST_ITEM@0..50
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..50
+        STRIKEOUT@2..49
+          STRIKEOUT_MARKER@2..4
+            STRIKEOUT_MARKER@2..4 "~~"
+          TEXT@4..11 "Before "
+          HUGO_SHORTCODE@11..40
+            HUGO_SHORTCODE_TAG@11..40
+              HUGO_SHORTCODE_MARKER_OPEN@11..14 "{{<"
+              HUGO_SHORTCODE_CONTENT@14..35
+                HUGO_SHORTCODE_TEXT@14..19 " foo\n"
+                LINE_PREFIX@19..21 "  "
+                HUGO_SHORTCODE_TEXT@21..30 "  arg=`a\n"
+                LINE_PREFIX@30..32 "  "
+                HUGO_SHORTCODE_TEXT@32..35 "b`\n"
+              LINE_PREFIX@35..37 "  "
+              HUGO_SHORTCODE_MARKER_CLOSE@37..40 ">}}"
+          TEXT@40..47 " after."
+          STRIKEOUT_MARKER@47..49
+            STRIKEOUT_MARKER@47..49 "~~"
+        NEWLINE@49..50 "\n"
+  BLANK_LINE@50..51
+    BLANK_LINE@50..51 "\n"
+  BLOCK_QUOTE@51..101
+    BLOCK_QUOTE_MARKER@51..52 ">"
+    WHITESPACE@52..53 " "
+    PARAGRAPH@53..101
+      STRIKEOUT@53..100
+        STRIKEOUT_MARKER@53..55
+          STRIKEOUT_MARKER@53..55 "~~"
+        TEXT@55..62 "Before "
+        HUGO_SHORTCODE@62..91
+          HUGO_SHORTCODE_TAG@62..91
+            HUGO_SHORTCODE_MARKER_OPEN@62..65 "{{%"
+            HUGO_SHORTCODE_CONTENT@65..86
+              HUGO_SHORTCODE_TEXT@65..70 " foo\n"
+              LINE_PREFIX@70..72 "> "
+              HUGO_SHORTCODE_TEXT@72..81 "  arg=`a\n"
+              LINE_PREFIX@81..83 "> "
+              HUGO_SHORTCODE_TEXT@83..86 "b`\n"
+            LINE_PREFIX@86..88 "> "
+            HUGO_SHORTCODE_MARKER_CLOSE@88..91 "%}}"
+        TEXT@91..98 " after."
+        STRIKEOUT_MARKER@98..100
+          STRIKEOUT_MARKER@98..100 "~~"
+      NEWLINE@100..101 "\n"

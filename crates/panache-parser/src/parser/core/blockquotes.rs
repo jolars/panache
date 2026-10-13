@@ -273,7 +273,8 @@ impl<'a> Parser<'a> {
         );
         for k in current_bq_depth.max(1)..bq_depth {
             let prefix = base.with_extra_blockquotes(k - current_bq_depth);
-            let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+            let stripped = StrippedLines::new(&self.lines, self.pos, &prefix)
+                .with_hugo_lookahead(&self.hugo_lookahead);
             let ctx = self.probe_block_context(k, current_bq_depth, stripped.first());
             if let Some(block_match) = self.block_registry.detect_prepared(&ctx, &stripped)
                 && self.block_registry.outranks_blockquote(&block_match)

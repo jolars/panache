@@ -144,6 +144,19 @@ pub enum SyntaxKind {
     SHORTCODE_MARKER_CLOSE, // >}} or >}}}
     SHORTCODE_CONTENT,      // content between markers
 
+    TOML_METADATA,
+    TOML_METADATA_DELIM,
+    TOML_METADATA_CONTENT,
+    TOML_METADATA_TEXT,
+    HUGO_SHORTCODE,
+    HUGO_SHORTCODE_BLOCK,
+    HUGO_SHORTCODE_TAG,
+    HUGO_SHORTCODE_MARKER_OPEN,
+    HUGO_SHORTCODE_MARKER_CLOSE,
+    HUGO_SHORTCODE_CONTENT,
+    HUGO_SHORTCODE_BODY,
+    HUGO_SHORTCODE_TEXT,
+
     SVELTE_BLOCK_LOGIC,  // {#if}, {:else}, {/each}, ...
     SVELTE_TAG,          // {@html ...}, {@const ...}, {@debug ...}
     SVELTE_EXPRESSION,   // {expr}

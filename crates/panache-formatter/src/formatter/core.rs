@@ -1,6 +1,6 @@
 use crate::config::{Config, HorizontalRuleStyle, WrapMode};
 use crate::directives::DirectiveTracker;
-use crate::syntax::{ExampleListMarker, SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, ExampleListMarker, SyntaxKind, SyntaxNode, TomlMetadata};
 use panache_parser::parser::blocks::definition_lists::try_parse_definition_marker;
 use panache_parser::parser::blocks::headings::try_parse_atx_heading;
 use panache_parser::parser::blocks::horizontal_rules::try_parse_horizontal_rule;
@@ -63,6 +63,18 @@ impl Formatter {
     }
     pub fn format(mut self, node: &SyntaxNode) -> String {
         self.format_node_sync(node, 0);
+        if node.kind() == SyntaxKind::DOCUMENT {
+            // An unfinished opaque block owns the document's final whitespace.
+            let preserve_ending = node
+                .children()
+                .last()
+                .and_then(TomlMetadata::cast)
+                .is_some_and(|metadata| !metadata.is_closed());
+            if !preserve_ending {
+                self.output.truncate(self.output.trim_end().len());
+                self.output.push('\n');
+            }
+        }
         self.output
     }
 
@@ -143,8 +155,13 @@ impl Formatter {
         )
     }
 
-    pub(super) fn format_heading(&self, node: &SyntaxNode) -> String {
-        headings::format_heading(node, &self.config)
+    pub(super) fn format_heading(&self, node: &SyntaxNode, continuation_indent: usize) -> String {
+        let heading = headings::format_heading(node, &self.config);
+        if continuation_indent == 0 || !heading.contains('\n') {
+            heading
+        } else {
+            heading.replace('\n', &format!("\n{}", " ".repeat(continuation_indent)))
+        }
     }
 
     pub(super) fn contains_latex_command(&self, node: &SyntaxNode) -> bool {
@@ -600,17 +617,13 @@ impl Formatter {
             let trimmed_line = line.trim_start();
             let starts_with_list_marker = Self::starts_with_list_marker(trimmed_line)
                 && !tables::is_partial_grid_separator(trimmed_line);
-            if trimmed_line.is_empty() {
+            // Rendered blank lines are empty. Whitespace in nonempty lines
+            // can belong to an opaque payload and must survive re-prefixing.
+            if line.is_empty() {
                 self.output.push_str(blank_prefix);
                 in_list_item_continuation = false;
             } else if line.starts_with("> ") {
                 let trimmed_rest = line.trim_start_matches("> ").trim_start();
-                if trimmed_rest.is_empty() {
-                    self.output.push_str(blank_prefix);
-                    in_list_item_continuation = false;
-                    self.output.push('\n');
-                    continue;
-                }
                 self.output.push_str(base_indent);
                 self.output.push_str(line);
                 in_list_item_continuation = Self::starts_with_list_marker(trimmed_rest)
@@ -898,7 +911,22 @@ impl Formatter {
             SyntaxKind::MYST_TARGET
             | SyntaxKind::MYST_COMMENT
             | SyntaxKind::MYST_BLOCK_BREAK
-            | SyntaxKind::SVELTE_BLOCK => self.format_raw_block(node),
+            | SyntaxKind::SVELTE_BLOCK
+            | SyntaxKind::TOML_METADATA => self.format_raw_block(node),
+
+            SyntaxKind::HUGO_SHORTCODE_BLOCK => {
+                let text = crate::syntax::text_without_line_prefixes(node);
+                for line in text.split_inclusive('\n') {
+                    if indent > 0 && (self.output.is_empty() || self.output.ends_with('\n')) {
+                        self.output.push_str(&" ".repeat(indent));
+                    }
+                    self.output.push_str(line);
+                }
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+                self.consecutive_blank_lines = 0;
+            }
 
             _ => {
                 self.output.push_str(&node.text().to_string());

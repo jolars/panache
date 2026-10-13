@@ -10,6 +10,8 @@ fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::DEFINITION_LIST
             | SyntaxKind::BLOCK_QUOTE
             | SyntaxKind::CODE_BLOCK
+            | SyntaxKind::TOML_METADATA
+            | SyntaxKind::HUGO_SHORTCODE_BLOCK
             | SyntaxKind::SIMPLE_TABLE
             | SyntaxKind::MULTILINE_TABLE
             | SyntaxKind::PIPE_TABLE

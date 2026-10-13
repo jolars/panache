@@ -1,0 +1,82 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..168
+  HEADING@0..33
+    HEADING_CONTENT@0..28
+      TEXT@0..8 "Heading "
+      HUGO_SHORTCODE@8..28
+        HUGO_SHORTCODE_TAG@8..28
+          HUGO_SHORTCODE_MARKER_OPEN@8..11 "{{<"
+          HUGO_SHORTCODE_CONTENT@11..25
+            HUGO_SHORTCODE_TEXT@11..25 " foo\n  arg=42\n"
+          HUGO_SHORTCODE_MARKER_CLOSE@25..28 ">}}"
+    NEWLINE@28..29 "\n"
+    SETEXT_HEADING_UNDERLINE@29..32
+      SETEXT_HEADING_UNDERLINE@29..32 "==="
+    NEWLINE@32..33 "\n"
+  BLANK_LINE@33..34
+    BLANK_LINE@33..34 "\n"
+  HEADING@34..84
+    HEADING_CONTENT@34..79
+      TEXT@34..44 "First line"
+      NEWLINE@44..45 "\n"
+      TEXT@45..53 "Heading "
+      HUGO_SHORTCODE@53..73
+        HUGO_SHORTCODE_TAG@53..73
+          HUGO_SHORTCODE_MARKER_OPEN@53..56 "{{%"
+          HUGO_SHORTCODE_CONTENT@56..70
+            HUGO_SHORTCODE_TEXT@56..70 " foo\n  arg=42\n"
+          HUGO_SHORTCODE_MARKER_CLOSE@70..73 "%}}"
+      TEXT@73..79 " after"
+    NEWLINE@79..80 "\n"
+    SETEXT_HEADING_UNDERLINE@80..83
+      SETEXT_HEADING_UNDERLINE@80..83 "---"
+    NEWLINE@83..84 "\n"
+  BLANK_LINE@84..85
+    BLANK_LINE@84..85 "\n"
+  LIST@85..126
+    LIST_ITEM@85..126
+      LIST_MARKER@85..86 "-"
+      WHITESPACE@86..87 " "
+      HEADING@87..126
+        HEADING_CONTENT@87..119
+          TEXT@87..95 "Heading "
+          HUGO_SHORTCODE@95..119
+            HUGO_SHORTCODE_TAG@95..119
+              HUGO_SHORTCODE_MARKER_OPEN@95..98 "{{<"
+              HUGO_SHORTCODE_CONTENT@98..114
+                HUGO_SHORTCODE_TEXT@98..103 " foo\n"
+                LINE_PREFIX@103..105 "  "
+                HUGO_SHORTCODE_TEXT@105..114 "  arg=42\n"
+              LINE_PREFIX@114..116 "  "
+              HUGO_SHORTCODE_MARKER_CLOSE@116..119 ">}}"
+        NEWLINE@119..120 "\n"
+        LINE_PREFIX@120..122 "  "
+        SETEXT_HEADING_UNDERLINE@122..125
+          SETEXT_HEADING_UNDERLINE@122..125 "==="
+        NEWLINE@125..126 "\n"
+  BLANK_LINE@126..127
+    BLANK_LINE@126..127 "\n"
+  BLOCK_QUOTE@127..168
+    BLOCK_QUOTE_MARKER@127..128 ">"
+    WHITESPACE@128..129 " "
+    HEADING@129..168
+      HEADING_CONTENT@129..161
+        TEXT@129..137 "Heading "
+        HUGO_SHORTCODE@137..161
+          HUGO_SHORTCODE_TAG@137..161
+            HUGO_SHORTCODE_MARKER_OPEN@137..140 "{{%"
+            HUGO_SHORTCODE_CONTENT@140..156
+              HUGO_SHORTCODE_TEXT@140..145 " foo\n"
+              LINE_PREFIX@145..147 "> "
+              HUGO_SHORTCODE_TEXT@147..156 "  arg=42\n"
+            LINE_PREFIX@156..158 "> "
+            HUGO_SHORTCODE_MARKER_CLOSE@158..161 "%}}"
+      NEWLINE@161..162 "\n"
+      LINE_PREFIX@162..163 ">"
+      LINE_PREFIX@163..164 " "
+      SETEXT_HEADING_UNDERLINE@164..167
+        SETEXT_HEADING_UNDERLINE@164..167 "==="
+      NEWLINE@167..168 "\n"

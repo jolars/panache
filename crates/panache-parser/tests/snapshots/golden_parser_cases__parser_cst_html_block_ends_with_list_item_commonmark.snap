@@ -52,9 +52,8 @@ DOCUMENT@0..82
         BLOCK_QUOTE_MARKER@56..57 ">"
         BLANK_LINE@57..58
           BLANK_LINE@57..58 "\n"
-        PLAIN@58..60
-          LINE_PREFIX@58..59 ">"
-          LINE_PREFIX@59..60 " "
+        LINE_PREFIX@58..59 ">"
+        LINE_PREFIX@59..60 " "
         HTML_BLOCK@60..69
           HTML_BLOCK_TAG@60..69
             TEXT@60..68 "   <div>"

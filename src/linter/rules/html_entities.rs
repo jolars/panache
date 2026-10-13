@@ -214,6 +214,8 @@ const EXCLUDED_ANCESTOR_KINDS: &[SyntaxKind] = &[
     SyntaxKind::INLINE_EXEC_CONTENT,
     SyntaxKind::SHORTCODE,
     SyntaxKind::SHORTCODE_CONTENT,
+    SyntaxKind::HUGO_SHORTCODE,
+    SyntaxKind::TOML_METADATA,
 ];
 
 fn has_excluded_ancestor(token: &panache_parser::syntax::SyntaxToken) -> bool {

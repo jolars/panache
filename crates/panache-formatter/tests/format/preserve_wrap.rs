@@ -106,6 +106,48 @@ fn quoted_list_preserve_rebuilds_container_prefixes() {
 }
 
 #[test]
+fn list_leading_blocks_preserve_multiline_literal_indentation() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm, Flavor::Pandoc] {
+        let config = Config {
+            flavor,
+            parser_extensions: Extensions::for_flavor(flavor),
+            formatter_extensions: FormatterExtensions::for_flavor(flavor),
+            ..cfg_preserve()
+        };
+        for leading in ["```\n  x\n  ```", "- nested", "> quote"] {
+            for literal in ["`a\n    b`", "<span title=\"a\n    b\">x</span>"] {
+                let input = format!("- {leading}\n\n  Before {literal} after.\n");
+                let output = format(&input, Some(config.clone()), None);
+                assert_eq!(output, input, "flavor: {flavor:?}");
+                assert_eq!(format(&output, Some(config.clone()), None), output);
+            }
+        }
+    }
+}
+
+#[test]
+fn list_leading_blocks_rebuild_multiline_html_prefixes() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm, Flavor::Pandoc] {
+        for wrap in [WrapMode::Reflow, WrapMode::Sentence, WrapMode::Semantic] {
+            let config = Config {
+                flavor,
+                parser_extensions: Extensions::for_flavor(flavor),
+                formatter_extensions: FormatterExtensions::for_flavor(flavor),
+                wrap: Some(wrap),
+                ..Default::default()
+            };
+            for leading in ["```\n  x\n  ```", "- nested", "> quote"] {
+                let input =
+                    format!("- {leading}\n\n  Before <span title=\"a\n    b\">x</span> after.\n");
+                let output = format(&input, Some(config.clone()), None);
+                assert_eq!(output, input, "flavor: {flavor:?}");
+                assert_eq!(format(&output, Some(config.clone()), None), output);
+            }
+        }
+    }
+}
+
+#[test]
 fn paragraph_sentence_wraps_per_sentence() {
     let input = "First sentence. Second sentence! Third sentence?\n";
     let expected = "First sentence.\nSecond sentence!\nThird sentence?\n";

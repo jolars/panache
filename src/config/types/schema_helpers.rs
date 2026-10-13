@@ -124,6 +124,7 @@ fn known_flavor_keys_json() -> Vec<serde_json::Value> {
         "multi-markdown",
         "mdsvex",
         "myst",
+        "hugo",
     ]
     .into_iter()
     .map(serde_json::Value::from)

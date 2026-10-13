@@ -1299,14 +1299,25 @@ pub(crate) fn try_parse_pipe_separator(line: &str) -> Option<Vec<Alignment>> {
 /// and math, whereas CommonMark table delimiters take precedence over inlines.
 fn pipe_delimiters(line: &str, config: &ParserOptions) -> Vec<usize> {
     use crate::parser::inlines::{
-        code_spans::try_parse_code_span, inline_ir::try_pandoc_math_opaque,
+        code_spans::try_parse_code_span, hugo::HugoIndex, inline_ir::try_pandoc_math_opaque,
         raw_inline::is_raw_inline,
     };
 
+    let hugo = config
+        .extensions
+        .hugo_shortcodes
+        .then(|| HugoIndex::new(line));
     let mut positions = Vec::new();
     let mut pos = 0;
     while pos < line.len() {
         let rest = &line[pos..];
+        if let Some(hugo) = &hugo
+            && let Some(span) = hugo.scan_at(line, pos)
+            && span.opening.complete
+        {
+            pos += span.end;
+            continue;
+        }
         if config.dialect == Dialect::Pandoc {
             if rest.starts_with('`')
                 && let Some((len, content, backticks, attributes)) = try_parse_code_span(rest)

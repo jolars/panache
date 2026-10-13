@@ -1,0 +1,53 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..94
+  BLOCK_QUOTE@0..42
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    PARAGRAPH@2..42
+      LINK@2..41
+        LINK_START@2..3
+          LINK_START@2..3 "["
+        LINK_TEXT@3..7
+          TEXT@3..7 "more"
+        LINK_TEXT_END@7..8 "]"
+        LINK_DEST_START@8..9 "("
+        LINK_DEST@9..40
+          LINK_DEST_URL@9..40
+            TEXT@9..20 "{{< relref\n"
+            LINE_PREFIX@20..22 "> "
+            TEXT@22..35 "  \"about.md\"\n"
+            LINE_PREFIX@35..37 "> "
+            TEXT@37..40 ">}}"
+        LINK_DEST_END@40..41 ")"
+      NEWLINE@41..42 "\n"
+  BLANK_LINE@42..43
+    BLANK_LINE@42..43 "\n"
+  LIST@43..94
+    LIST_ITEM@43..94
+      LIST_MARKER@43..44 "-"
+      WHITESPACE@44..45 " "
+      PLAIN@45..94
+        IMAGE_LINK@45..93
+          IMAGE_LINK_START@45..47
+            IMAGE_LINK_START@45..47 "!["
+          IMAGE_ALT@47..52
+            TEXT@47..52 "image"
+          IMAGE_ALT_END@52..53 "]"
+          IMAGE_DEST_START@53..54 "("
+          LINK_DEST@54..92
+            LINK_DEST_URL@54..84
+              TEXT@54..63 "{{%  ref\n"
+              LINE_PREFIX@63..65 "  "
+              TEXT@65..79 "  \"image.png\"\n"
+              LINE_PREFIX@79..81 "  "
+              TEXT@81..84 "%}}"
+            TEXT@84..85 " "
+            LINK_DEST_TITLE@85..92
+              LINK_DEST_TITLE_MARKER@85..86 "\""
+              TEXT@86..91 "Title"
+              LINK_DEST_TITLE_MARKER@91..92 "\""
+          IMAGE_DEST_END@92..93 ")"
+        NEWLINE@93..94 "\n"

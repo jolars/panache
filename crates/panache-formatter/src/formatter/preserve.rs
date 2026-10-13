@@ -4,8 +4,9 @@
 //! while normalizing emphasis markers and hard breaks and removing trailing
 //! prose whitespace. Verbatim content retains its original bytes.
 
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{LinkDestUrl, SyntaxKind, SyntaxNode, text_without_line_prefixes};
 use rowan::NodeOrToken;
+use rowan::ast::AstNode;
 
 /// Split a block into the lines `wrap = preserve` should emit, with trailing
 /// whitespace removed and emphasis markers and hard breaks normalized.
@@ -14,8 +15,8 @@ use rowan::NodeOrToken;
 /// verbatim constructs never reach us as either kind -- a code span keeps its
 /// whole body in one `INLINE_CODE_CONTENT` token, math uses `MATH_NEWLINE`, and
 /// inline HTML uses `WHITESPACE` -- so their bytes are copied untouched and
-/// this stays a prose-only trim. Executable expressions expose physical lines
-/// without trimming their code, so containers can prefix those lines too.
+/// this stays a prose-only trim. When callers rebuild container prefixes,
+/// every physical literal line is exposed without trimming its contents.
 ///
 /// A trailing run that genuinely *is* a hard break becomes `\` when
 /// `escaped_line_breaks` is on, matching what the inline formatter emits for
@@ -45,14 +46,31 @@ pub(super) fn preserve_lines_normalized(
     )
 }
 
-/// Like [`preserve_lines`], but drops the container `LINE_PREFIX` tokens. They
-/// are in the tree for losslessness; a caller that writes its own prefix on
-/// every line would otherwise emit them twice.
+/// Like [`preserve_lines`], but drops container prefixes and leading prose
+/// padding. Callers rebuild that spacing, while literal tokens retain their
+/// leading whitespace.
 pub(super) fn preserve_lines_unprefixed(
     node: &SyntaxNode,
     escaped_line_breaks: bool,
 ) -> Vec<String> {
     lines_with_prefix(node, escaped_line_breaks, LinePrefix::Drop, None)
+}
+
+/// Containers rebuild their own prefixes while literal content keeps its
+/// internal whitespace and prose receives the configured punctuation style.
+pub(super) fn preserve_lines_unprefixed_normalized(
+    node: &SyntaxNode,
+    config: &crate::config::Config,
+) -> Vec<String> {
+    lines_with_prefix(
+        node,
+        config.formatter_extensions.escaped_line_breaks,
+        LinePrefix::Drop,
+        Some((
+            config.formatter_extensions.smart,
+            config.formatter_extensions.smart_quotes,
+        )),
+    )
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -96,7 +114,19 @@ fn collect(
     for item in node.children_with_tokens() {
         match item {
             NodeOrToken::Node(child) => {
-                let smart = if child.kind() == SyntaxKind::INLINE_EXEC_SPAN {
+                if LinkDestUrl::can_cast(child.kind()) {
+                    let text = if prefix == LinePrefix::Drop {
+                        text_without_line_prefixes(&child)
+                    } else {
+                        child.text().to_string()
+                    };
+                    append_verbatim_lines(&text, lines, current);
+                    continue;
+                }
+                let smart = if matches!(
+                    child.kind(),
+                    SyntaxKind::INLINE_EXEC_SPAN | SyntaxKind::HUGO_SHORTCODE
+                ) {
                     None
                 } else {
                     smart
@@ -119,28 +149,41 @@ fn collect(
                     }
                     lines.push(std::mem::take(current));
                 }
-                SyntaxKind::INLINE_EXEC_CONTENT => {
-                    for part in token.text().split_inclusive('\n') {
-                        if let Some(line) = part.strip_suffix('\n') {
-                            current.push_str(line);
-                            lines.push(std::mem::take(current));
-                        } else {
-                            current.push_str(part);
-                        }
-                    }
+                SyntaxKind::INLINE_EXEC_CONTENT | SyntaxKind::HUGO_SHORTCODE_TEXT => {
+                    append_verbatim_lines(token.text(), lines, current);
                 }
                 _ => {
-                    if let Some((enabled, quotes)) = smart {
-                        current.push_str(&super::smart::normalize_smart_punctuation(
-                            token.text(),
-                            enabled,
-                            quotes,
-                        ));
+                    let text = if prefix == LinePrefix::Drop
+                        && current.is_empty()
+                        && matches!(token.kind(), SyntaxKind::TEXT | SyntaxKind::WHITESPACE)
+                    {
+                        token.text().trim_start()
                     } else {
-                        current.push_str(token.text());
+                        token.text()
+                    };
+                    let text = if let Some((enabled, quotes)) = smart {
+                        super::smart::normalize_smart_punctuation(text, enabled, quotes)
+                    } else {
+                        std::borrow::Cow::Borrowed(text)
+                    };
+                    if prefix == LinePrefix::Drop {
+                        append_verbatim_lines(&text, lines, current);
+                    } else {
+                        current.push_str(&text);
                     }
                 }
             },
+        }
+    }
+}
+
+fn append_verbatim_lines(text: &str, lines: &mut Vec<String>, current: &mut String) {
+    for part in text.split_inclusive('\n') {
+        if let Some(line) = part.strip_suffix('\n') {
+            current.push_str(line);
+            lines.push(std::mem::take(current));
+        } else {
+            current.push_str(part);
         }
     }
 }

@@ -2,6 +2,7 @@
 
 use crate::options::{Dialect, ParserOptions};
 use crate::parser::inlines::hard_breaks;
+use crate::parser::inlines::sink::InlineSink;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
@@ -77,7 +78,7 @@ fn split_trailing_line_break<'a>(
 /// the content, since then the backslash is not against the line ending and
 /// pandoc reads it as an ordinary escape.
 fn emit_heading_content(
-    builder: &mut GreenNodeBuilder<'static>,
+    builder: &mut impl InlineSink,
     text_content: &str,
     at_line_end: bool,
     config: &ParserOptions,
@@ -211,7 +212,7 @@ pub(crate) fn emit_setext_heading_body(
 /// two — the underline is a second source line, and only the dispatch line's
 /// prefix is emitted upstream by the parser core.
 pub(crate) fn emit_setext_heading_text(
-    builder: &mut GreenNodeBuilder<'static>,
+    builder: &mut impl InlineSink,
     text_line: &str,
     config: &ParserOptions,
 ) {
@@ -388,6 +389,9 @@ fn split_atx_tail<'a>(
     config: &ParserOptions,
 ) -> AtxTail<'a> {
     let mut tail = AtxTail::all_content(heading_text);
+    if config.extensions.hugo_shortcodes && ends_in_incomplete_shortcode(heading_text) {
+        return tail;
+    }
     let mut rest = heading_text;
 
     if config.extensions.header_attributes
@@ -438,6 +442,36 @@ fn split_atx_tail<'a>(
     tail
 }
 
+fn ends_in_incomplete_shortcode(text: &str) -> bool {
+    if !text.contains("{{<") && !text.contains("{{%") {
+        return false;
+    }
+    let index = crate::parser::inlines::hugo::HugoIndex::new(text);
+    let mut pos = 0;
+    while pos < text.len() {
+        if text.as_bytes()[pos] == b'\\' {
+            pos += 1;
+            if pos < text.len() {
+                pos += text[pos..].chars().next().unwrap().len_utf8();
+            }
+        } else if text.as_bytes()[pos] == b'`'
+            && let Some((len, _, _, _)) =
+                crate::parser::inlines::code_spans::try_parse_code_span(&text[pos..])
+        {
+            pos += len;
+        } else if let Some(span) = index.scan_at(text, pos) {
+            if !span.opening.complete {
+                // Decoration cannot begin inside a shortcode that consumes the suffix.
+                return true;
+            }
+            pos += span.end;
+        } else {
+            pos += text[pos..].chars().next().unwrap().len_utf8();
+        }
+    }
+    false
+}
+
 /// Whether re-emitting `content` as an ATX heading's content would read part of
 /// it back as trailing decoration rather than as content.
 ///
@@ -453,7 +487,7 @@ pub fn content_reads_as_decoration(content: &str, config: &ParserOptions) -> boo
 
 /// Emit an ATX heading node to the builder.
 pub(crate) fn emit_atx_heading(
-    builder: &mut GreenNodeBuilder<'static>,
+    builder: &mut impl InlineSink,
     content: &str,
     level: usize,
     config: &ParserOptions,

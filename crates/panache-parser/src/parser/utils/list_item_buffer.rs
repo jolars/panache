@@ -30,6 +30,8 @@ use rowan::{GreenNodeBuilder, TextSize};
 pub(crate) enum ListItemContent {
     /// Text content (includes newlines for losslessness)
     Text(String),
+    /// Container bytes held out of an opaque inline region.
+    Prefix(String),
     /// Structural blockquote marker emitted inside buffered list-item text.
     BlockquoteMarker {
         leading_spaces: usize,
@@ -96,6 +98,13 @@ impl ListItemBuffer {
             update_display_math_state(trim_end_newlines(line), &mut self.open_display_math, config);
         }
         self.segments.push(ListItemContent::Text(text));
+    }
+
+    pub(crate) fn push_prefix(&mut self, prefix: &str) {
+        if !prefix.is_empty() {
+            self.segments
+                .push(ListItemContent::Prefix(prefix.to_owned()));
+        }
     }
 
     /// Whether the buffered lines left a display-math region open.
@@ -172,7 +181,7 @@ impl ListItemBuffer {
     pub(crate) fn first_text(&self) -> Option<&str> {
         match self.segments.first()? {
             ListItemContent::Text(t) => Some(t.as_str()),
-            ListItemContent::BlockquoteMarker { .. } => None,
+            ListItemContent::BlockquoteMarker { .. } | ListItemContent::Prefix(_) => None,
         }
     }
 
@@ -204,7 +213,7 @@ impl ListItemBuffer {
                     leading_spaces,
                     has_trailing_space,
                 } => Some((*leading_spaces, *has_trailing_space)),
-                ListItemContent::Text(_) => None,
+                ListItemContent::Text(_) | ListItemContent::Prefix(_) => None,
             })
             .collect()
     }
@@ -222,6 +231,7 @@ impl ListItemBuffer {
         for segment in &self.segments {
             match segment {
                 ListItemContent::Text(text) => line += text.matches('\n').count(),
+                ListItemContent::Prefix(_) => {}
                 ListItemContent::BlockquoteMarker {
                     leading_spaces,
                     has_trailing_space,
@@ -423,7 +433,7 @@ impl ListItemBuffer {
     /// `gobble` is the whole enclosing container chain, not just this item's
     /// column: the buffered lines are raw source, so an enclosing footnote
     /// definition's or outer item's share has not been taken off them yet.
-    fn to_paragraph_buffer(&self, gobble: &[usize]) -> ParagraphBuffer {
+    pub(crate) fn to_paragraph_buffer(&self, gobble: &[usize]) -> ParagraphBuffer {
         let mut paragraph_buffer = ParagraphBuffer::new();
         let mut at_line_start = false;
         for segment in &self.segments {
@@ -443,6 +453,10 @@ impl ListItemBuffer {
                         }
                         at_line_start = line.ends_with('\n');
                     }
+                }
+                ListItemContent::Prefix(prefix) => {
+                    paragraph_buffer.push_indent(prefix);
+                    at_line_start = false;
                 }
                 ListItemContent::BlockquoteMarker {
                     leading_spaces,
@@ -484,6 +498,37 @@ impl ListItemBuffer {
             return;
         }
 
+        // Dispatch may buffer the next block's quote prefix before flushing
+        // this block. Those bytes belong outside the prose wrapper, including
+        // when a heading lift returns before ordinary inline emission.
+        let text_end = self
+            .segments
+            .iter()
+            .rposition(|segment| matches!(segment, ListItemContent::Text(_)))
+            .map_or(0, |i| i + 1);
+        if text_end < self.segments.len() {
+            if text_end > 0 {
+                let mut content = self.clone();
+                content.segments.truncate(text_end);
+                content.emit_as_block(
+                    builder,
+                    use_paragraph,
+                    config,
+                    gobble,
+                    suppress_footnote_refs,
+                    allow_unclosed_div,
+                );
+            }
+            let mut trivia = Self::new();
+            trivia.segments = self.segments[text_end..].to_vec();
+            trivia.to_paragraph_buffer(gobble).emit_with_inlines(
+                builder,
+                config,
+                suppress_footnote_refs,
+            );
+            return;
+        }
+
         let text = self.get_text_for_parsing();
 
         if !text.is_empty() && !self.has_task_checkbox {
@@ -507,6 +552,27 @@ impl ListItemBuffer {
 
             let bq_prefixes = self.blockquote_prefixes();
             let line0_has_bq = bq_prefixes.first().is_some_and(|p| !p.is_empty());
+
+            if !line0_has_bq
+                && config.extensions.hugo_shortcodes
+                && let Some(tail) = self
+                    .to_paragraph_buffer(gobble)
+                    .try_emit_hugo_heading(builder, config)
+            {
+                if !tail.is_empty() {
+                    builder.start_node(
+                        if use_paragraph {
+                            SyntaxKind::PARAGRAPH
+                        } else {
+                            SyntaxKind::PLAIN
+                        }
+                        .into(),
+                    );
+                    tail.emit_with_inlines(builder, config, suppress_footnote_refs);
+                    builder.finish_node();
+                }
+                return;
+            }
 
             if !line0_has_bq && let Some(first_nl) = text.find('\n') {
                 let first_line = &text[..first_nl];
@@ -632,6 +698,7 @@ impl ListItemBuffer {
                         trailing.push_text(&text[nl + 1..], config);
                     }
                 }
+                ListItemContent::Prefix(prefix) => trailing.push_prefix(prefix),
                 ListItemContent::BlockquoteMarker {
                     leading_spaces,
                     has_trailing_space,

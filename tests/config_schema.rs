@@ -192,6 +192,18 @@ quarto = ["docs/**/*.md"]
 }
 
 #[test]
+fn schema_accepts_hugo_scoped_configuration() {
+    let validator = build_validator();
+    for source in [
+        "[flavors]\nhugo = [\"content/**/*.md\"]\n",
+        "[extensions.hugo]\nhugo-shortcodes = false\n",
+    ] {
+        assert!(validator.is_valid(&toml_to_json(source)), "{source}");
+        toml::from_str::<Config>(source).expect("Hugo scoped configuration parses");
+    }
+}
+
+#[test]
 fn schema_rejects_unknown_flavor_in_flavors_table() {
     let validator = build_validator();
     let json = toml_to_json(

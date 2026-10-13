@@ -1,6 +1,41 @@
 use panache_formatter::format;
 
 #[test]
+fn atomic_links_collapse_multiline_titles() {
+    use panache_formatter::config::{Config, Extensions, Flavor, FormatterExtensions, WrapMode};
+
+    for flavor in [
+        Flavor::CommonMark,
+        Flavor::Gfm,
+        Flavor::Pandoc,
+        Flavor::Hugo,
+    ] {
+        for wrap in [WrapMode::Sentence, WrapMode::Semantic] {
+            let config = Config {
+                flavor,
+                parser_extensions: Extensions::for_flavor(flavor),
+                formatter_extensions: FormatterExtensions::for_flavor(flavor),
+                wrap: Some(wrap),
+                ..Default::default()
+            };
+            for image_marker in ["", "!"] {
+                for (prefix, continuation) in [("", ""), ("- ", "  "), ("> - ", ">   ")] {
+                    for gap in [" ".to_string(), format!("\n{continuation}")] {
+                        let input = format!(
+                            "{prefix}See {image_marker}[a](url{gap}\"a\n{continuation}  b\")\n"
+                        );
+                        let expected = format!("{prefix}See {image_marker}[a](url \"a b\")\n");
+                        let output = format(&input, Some(config.clone()), None);
+                        assert_eq!(output, expected, "flavor: {flavor:?}");
+                        assert_eq!(format(&output, Some(config.clone()), None), output);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn markdown_link_no_break() {
     let cfg = panache_formatter::ConfigBuilder::default()
         .line_width(30)

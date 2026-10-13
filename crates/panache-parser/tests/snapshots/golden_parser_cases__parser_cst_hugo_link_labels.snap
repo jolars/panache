@@ -1,0 +1,150 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..293
+  PARAGRAPH@0..36
+    LINK@0..35
+      LINK_START@0..1
+        LINK_START@0..1 "["
+      LINK_TEXT@1..25
+        TEXT@1..6 "Read "
+        HUGO_SHORTCODE@6..25
+          HUGO_SHORTCODE_TAG@6..25
+            HUGO_SHORTCODE_MARKER_OPEN@6..9 "{{<"
+            HUGO_SHORTCODE_CONTENT@9..22
+              HUGO_SHORTCODE_TEXT@9..22 " foo arg=\"]\" "
+            HUGO_SHORTCODE_MARKER_CLOSE@22..25 ">}}"
+      LINK_TEXT_END@25..26 "]"
+      LINK_DEST_START@26..27 "("
+      LINK_DEST@27..34
+        LINK_DEST_URL@27..34
+          TEXT@27..34 "page.md"
+      LINK_DEST_END@34..35 ")"
+    NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..76
+    IMAGE_LINK@37..75
+      IMAGE_LINK_START@37..39
+        IMAGE_LINK_START@37..39 "!["
+      IMAGE_ALT@39..63
+        TEXT@39..44 "Read "
+        HUGO_SHORTCODE@44..63
+          HUGO_SHORTCODE_TAG@44..63
+            HUGO_SHORTCODE_MARKER_OPEN@44..47 "{{%"
+            HUGO_SHORTCODE_CONTENT@47..60
+              HUGO_SHORTCODE_TEXT@47..60 " foo arg=`[` "
+            HUGO_SHORTCODE_MARKER_CLOSE@60..63 "%}}"
+      IMAGE_ALT_END@63..64 "]"
+      IMAGE_DEST_START@64..65 "("
+      LINK_DEST@65..74
+        LINK_DEST_URL@65..74
+          TEXT@65..74 "image.png"
+      IMAGE_DEST_END@74..75 ")"
+    NEWLINE@75..76 "\n"
+  BLANK_LINE@76..77
+    BLANK_LINE@76..77 "\n"
+  PARAGRAPH@77..129
+    LINK@77..128
+      LINK_START@77..78
+        LINK_START@77..78 "["
+      LINK_TEXT@78..118
+        TEXT@78..83 "Read "
+        HUGO_SHORTCODE@83..118
+          HUGO_SHORTCODE_TAG@83..118
+            HUGO_SHORTCODE_MARKER_OPEN@83..86 "{{<"
+            HUGO_SHORTCODE_CONTENT@86..115
+              HUGO_SHORTCODE_TEXT@86..115 " foo arg=\"[inner](oth ..."
+            HUGO_SHORTCODE_MARKER_CLOSE@115..118 ">}}"
+      LINK_TEXT_END@118..119 "]"
+      LINK_DEST_START@119..120 "("
+      LINK_DEST@120..127
+        LINK_DEST_URL@120..127
+          TEXT@120..127 "page.md"
+      LINK_DEST_END@127..128 ")"
+    NEWLINE@128..129 "\n"
+  BLANK_LINE@129..130
+    BLANK_LINE@129..130 "\n"
+  PARAGRAPH@130..189
+    LINK@130..188
+      LINK_START@130..131
+        LINK_START@130..131 "["
+      LINK_TEXT@131..178
+        TEXT@131..136 "Read "
+        HUGO_SHORTCODE@136..178
+          HUGO_SHORTCODE_TAG@136..147
+            HUGO_SHORTCODE_MARKER_OPEN@136..139 "{{<"
+            HUGO_SHORTCODE_CONTENT@139..144
+              HUGO_SHORTCODE_TEXT@139..144 " box "
+            HUGO_SHORTCODE_MARKER_CLOSE@144..147 ">}}"
+          HUGO_SHORTCODE_BODY@147..166
+            HUGO_SHORTCODE_TEXT@147..166 "] [inner](other.md)"
+          HUGO_SHORTCODE_TAG@166..178
+            HUGO_SHORTCODE_MARKER_OPEN@166..169 "{{<"
+            HUGO_SHORTCODE_CONTENT@169..175
+              HUGO_SHORTCODE_TEXT@169..175 " /box "
+            HUGO_SHORTCODE_MARKER_CLOSE@175..178 ">}}"
+      LINK_TEXT_END@178..179 "]"
+      LINK_DEST_START@179..180 "("
+      LINK_DEST@180..187
+        LINK_DEST_URL@180..187
+          TEXT@180..187 "page.md"
+      LINK_DEST_END@187..188 ")"
+    NEWLINE@188..189 "\n"
+  BLANK_LINE@189..190
+    BLANK_LINE@189..190 "\n"
+  LIST@190..228
+    LIST_ITEM@190..228
+      LIST_MARKER@190..191 "-"
+      WHITESPACE@191..192 " "
+      PLAIN@192..228
+        LINK@192..227
+          LINK_START@192..193
+            LINK_START@192..193 "["
+          LINK_TEXT@193..217
+            TEXT@193..198 "Read "
+            HUGO_SHORTCODE@198..217
+              HUGO_SHORTCODE_TAG@198..217
+                HUGO_SHORTCODE_MARKER_OPEN@198..201 "{{<"
+                HUGO_SHORTCODE_CONTENT@201..214
+                  HUGO_SHORTCODE_TEXT@201..214 " foo arg=\"]\" "
+                HUGO_SHORTCODE_MARKER_CLOSE@214..217 ">}}"
+          LINK_TEXT_END@217..218 "]"
+          LINK_DEST_START@218..219 "("
+          LINK_DEST@219..226
+            LINK_DEST_URL@219..226
+              TEXT@219..226 "page.md"
+          LINK_DEST_END@226..227 ")"
+        NEWLINE@227..228 "\n"
+  BLANK_LINE@228..229
+    BLANK_LINE@228..229 "\n"
+  BLOCK_QUOTE@229..293
+    BLOCK_QUOTE_MARKER@229..230 ">"
+    WHITESPACE@230..231 " "
+    PARAGRAPH@231..293
+      IMAGE_LINK@231..292
+        IMAGE_LINK_START@231..233
+          IMAGE_LINK_START@231..233 "!["
+        IMAGE_ALT@233..280
+          TEXT@233..238 "Read "
+          HUGO_SHORTCODE@238..280
+            HUGO_SHORTCODE_TAG@238..249
+              HUGO_SHORTCODE_MARKER_OPEN@238..241 "{{<"
+              HUGO_SHORTCODE_CONTENT@241..246
+                HUGO_SHORTCODE_TEXT@241..246 " box "
+              HUGO_SHORTCODE_MARKER_CLOSE@246..249 ">}}"
+            HUGO_SHORTCODE_BODY@249..268
+              HUGO_SHORTCODE_TEXT@249..268 "] [inner](other.md)"
+            HUGO_SHORTCODE_TAG@268..280
+              HUGO_SHORTCODE_MARKER_OPEN@268..271 "{{<"
+              HUGO_SHORTCODE_CONTENT@271..277
+                HUGO_SHORTCODE_TEXT@271..277 " /box "
+              HUGO_SHORTCODE_MARKER_CLOSE@277..280 ">}}"
+        IMAGE_ALT_END@280..281 "]"
+        IMAGE_DEST_START@281..282 "("
+        LINK_DEST@282..291
+          LINK_DEST_URL@282..291
+            TEXT@282..291 "image.png"
+        IMAGE_DEST_END@291..292 ")"
+      NEWLINE@292..293 "\n"

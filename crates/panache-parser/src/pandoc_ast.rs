@@ -98,7 +98,8 @@ fn smart_for_flavor(flavor: crate::Flavor) -> bool {
         | crate::Flavor::CommonMark
         | crate::Flavor::MultiMarkdown
         | crate::Flavor::Mdsvex
-        | crate::Flavor::Myst => false,
+        | crate::Flavor::Myst
+        | crate::Flavor::Hugo => false,
     }
 }
 

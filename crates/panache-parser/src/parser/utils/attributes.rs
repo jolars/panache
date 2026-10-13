@@ -39,6 +39,10 @@ pub fn try_parse_trailing_attributes_with_pos(text: &str) -> Option<(AttributeBl
     }
 
     let open_brace = find_matching_open_brace_for_trailing_block(trimmed)?;
+    // A shortcode's outer braces enclose arguments, not Markdown attributes.
+    if trimmed[open_brace..].starts_with("{{<") || trimmed[open_brace..].starts_with("{{%") {
+        return None;
+    }
 
     let before_brace = &trimmed[..open_brace];
     if before_brace.trim_end().ends_with(']') {
@@ -94,8 +98,11 @@ fn find_matching_open_brace_for_trailing_block(text: &str) -> Option<usize> {
     let mut in_quote: Option<char> = None;
     let mut escaped = false;
     let mut end_brace_open = None;
+    let hugo = (text.contains("{{<") || text.contains("{{%"))
+        .then(|| crate::parser::inlines::hugo::HugoIndex::new(text));
 
-    for (idx, ch) in text.char_indices() {
+    let mut chars = text.char_indices().peekable();
+    while let Some((idx, ch)) = chars.next() {
         if let Some(q) = in_quote {
             if escaped {
                 escaped = false;
@@ -107,6 +114,19 @@ fn find_matching_open_brace_for_trailing_block(text: &str) -> Option<usize> {
             }
             if ch == q {
                 in_quote = None;
+            }
+            continue;
+        }
+
+        if ch == '{'
+            && let Some(index) = &hugo
+            && let Some(span) = index.scan_at(text, idx)
+            && span.opening.complete
+        {
+            // Braces and quotes in shortcode payloads do not participate in
+            // the surrounding heading's trailing attribute syntax.
+            while chars.peek().is_some_and(|(pos, _)| *pos < idx + span.end) {
+                chars.next();
             }
             continue;
         }

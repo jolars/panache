@@ -40,7 +40,7 @@ pub fn try_parse_reference_definition(
     text: &str,
     dialect: crate::options::Dialect,
 ) -> Option<(usize, String, String, Option<String>)> {
-    try_parse_reference_definition_with_mode(text, true, dialect)
+    try_parse_reference_definition_with_mode(text, true, dialect, false)
 }
 
 /// Multimarkdown-flavored variant: tolerates trailing content after the title
@@ -50,15 +50,28 @@ pub fn try_parse_reference_definition_lax(
     text: &str,
     dialect: crate::options::Dialect,
 ) -> Option<(usize, String, String, Option<String>)> {
-    try_parse_reference_definition_with_mode(text, false, dialect)
+    try_parse_reference_definition_with_mode(text, false, dialect, false)
+}
+
+pub(crate) fn try_parse_reference_definition_with_options(
+    text: &str,
+    config: &crate::options::ParserOptions,
+) -> Option<(usize, String, String, Option<String>)> {
+    try_parse_reference_definition_with_mode(
+        text,
+        !config.extensions.mmd_link_attributes,
+        config.dialect,
+        config.extensions.hugo_shortcodes,
+    )
 }
 
 fn try_parse_reference_definition_with_mode(
     text: &str,
     strict_eol: bool,
     dialect: crate::options::Dialect,
+    hugo_shortcodes: bool,
 ) -> Option<(usize, String, String, Option<String>)> {
-    let spans = reference_definition_spans(text, strict_eol, dialect)?;
+    let spans = reference_definition_spans(text, strict_eol, dialect, hugo_shortcodes)?;
     let label = text[spans.indent + 1..spans.label_close].to_string();
     let url = if spans.url_is_angle {
         text[spans.url.start + 1..spans.url.end - 1].to_string()
@@ -108,6 +121,7 @@ pub(crate) fn reference_definition_spans(
     text: &str,
     strict_eol: bool,
     dialect: crate::options::Dialect,
+    hugo_shortcodes: bool,
 ) -> Option<ReferenceSpans> {
     let leading_spaces = text.chars().take_while(|&c| c == ' ').count();
     if leading_spaces > 3 {
@@ -194,6 +208,14 @@ pub(crate) fn reference_definition_spans(
         pos += 1;
         while pos < bytes.len() && bytes[pos] != b'>' && bytes[pos] != b'\n' && bytes[pos] != b'\r'
         {
+            if hugo_shortcodes
+                && bytes[pos] == b'{'
+                && let Some(tag) =
+                    crate::parser::inlines::hugo::scan_tag(&inner[pos..]).filter(|tag| tag.complete)
+            {
+                pos += tag.end;
+                continue;
+            }
             pos += 1;
         }
         if pos >= bytes.len() || bytes[pos] != b'>' {
@@ -202,6 +224,14 @@ pub(crate) fn reference_definition_spans(
         pos += 1; // Skip >
     } else {
         while pos < bytes.len() && !matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
+            if hugo_shortcodes
+                && bytes[pos] == b'{'
+                && let Some(tag) =
+                    crate::parser::inlines::hugo::scan_tag(&inner[pos..]).filter(|tag| tag.complete)
+            {
+                pos += tag.end;
+                continue;
+            }
             pos += 1;
         }
         if pos == url_start {

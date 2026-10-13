@@ -46,6 +46,7 @@ pub struct LinkScanContext {
     /// recognizes. Pandoc-markdown excludes bare declarations and CDATA
     /// from its inline raw HTML grammar.
     pub dialect: crate::options::Dialect,
+    pub hugo_shortcodes: bool,
 }
 
 /// Destination slots captured while the inline-link scanner already has the
@@ -69,6 +70,7 @@ impl Default for LinkScanContext {
             skip_autolinks: false,
             disallow_inner_links: false,
             dialect: crate::options::Dialect::Pandoc,
+            hugo_shortcodes: false,
         }
     }
 }
@@ -81,6 +83,7 @@ impl LinkScanContext {
             skip_autolinks: config.extensions.autolinks && is_commonmark,
             disallow_inner_links: is_commonmark,
             dialect: config.dialect,
+            hugo_shortcodes: config.extensions.hugo_shortcodes,
         }
     }
 }
@@ -97,6 +100,9 @@ impl LinkScanContext {
 /// unmatched `]` is reached.
 fn find_link_close_bracket(text: &str, start: usize, ctx: LinkScanContext) -> Option<usize> {
     let bytes = text.as_bytes();
+    let hugo = ctx
+        .hugo_shortcodes
+        .then(|| super::hugo::HugoIndex::new(text));
     let mut bracket_depth = 0;
     let mut escape_next = false;
     let mut i = start;
@@ -107,6 +113,14 @@ fn find_link_close_bracket(text: &str, start: usize, ctx: LinkScanContext) -> Op
         if escape_next {
             escape_next = false;
             i += step(text, i);
+            continue;
+        }
+
+        if b == b'{'
+            && let Some(index) = &hugo
+            && let Some(span) = index.scan_at(text, i).filter(|span| span.opening.complete)
+        {
+            i += span.end;
             continue;
         }
 
@@ -157,7 +171,7 @@ fn find_link_close_bracket(text: &str, start: usize, ctx: LinkScanContext) -> Op
 /// destinations (`<...>` may legitimately contain unbalanced parens — see
 /// spec example #499). Returns the byte offset of the closing `)` within the
 /// passed slice, or `None` if not found.
-fn find_dest_close_paren(remaining: &str) -> Option<usize> {
+fn find_dest_close_paren(remaining: &str, hugo_shortcodes: bool) -> Option<usize> {
     let bytes = remaining.as_bytes();
     let mut paren_depth = 0;
     let mut escape_next = false;
@@ -171,6 +185,14 @@ fn find_dest_close_paren(remaining: &str) -> Option<usize> {
         if escape_next {
             escape_next = false;
             i += step(remaining, i);
+            continue;
+        }
+
+        if hugo_shortcodes
+            && b == b'{'
+            && let Some(tag) = super::hugo::scan_tag(&remaining[i..]).filter(|tag| tag.complete)
+        {
+            i += tag.end;
             continue;
         }
 
@@ -230,6 +252,9 @@ fn step(s: &str, i: usize) -> usize {
 /// stack-based pass.
 fn link_text_contains_inner_link(text: &str, ctx: LinkScanContext, strict_dest: bool) -> bool {
     let bytes = text.as_bytes();
+    let hugo = ctx
+        .hugo_shortcodes
+        .then(|| super::hugo::HugoIndex::new(text));
     let mut i = 0;
     let mut escape_next = false;
     while i < bytes.len() {
@@ -237,6 +262,13 @@ fn link_text_contains_inner_link(text: &str, ctx: LinkScanContext, strict_dest: 
         if escape_next {
             escape_next = false;
             i += step(text, i);
+            continue;
+        }
+        if b == b'{'
+            && let Some(index) = &hugo
+            && let Some(span) = index.scan_at(text, i).filter(|span| span.opening.complete)
+        {
+            i += span.end;
             continue;
         }
         match b {
@@ -321,11 +353,12 @@ pub(super) fn try_parse_inline_image_parts(
     let dest_start = after_bracket + 1;
     let remaining = &text[dest_start..];
 
-    let close_paren = find_dest_close_paren(remaining)?;
+    let close_paren = find_dest_close_paren(remaining, ctx.hugo_shortcodes)?;
     let dest_content = &remaining[..close_paren];
     let destination = parse_link_destination_parts(
         dest_content,
         ctx.dialect == crate::options::Dialect::CommonMark,
+        ctx.hugo_shortcodes,
     )?;
 
     let after_paren = dest_start + close_paren + 1;
@@ -357,9 +390,12 @@ pub fn emit_inline_image(
     config: &ParserOptions,
     suppress_footnote_refs: bool,
 ) {
-    let destination =
-        parse_link_destination_parts(dest, config.dialect == crate::options::Dialect::CommonMark)
-            .unwrap_or_else(|| parse_pandoc_destination_parts(dest));
+    let destination = parse_link_destination_parts(
+        dest,
+        config.dialect == crate::options::Dialect::CommonMark,
+        config.extensions.hugo_shortcodes,
+    )
+    .unwrap_or_else(|| parse_pandoc_destination_parts(dest));
     emit_inline_image_parts(
         builder,
         text,
@@ -561,6 +597,13 @@ fn is_known_bare_uri_scheme(scheme: &str) -> bool {
 }
 
 pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
+    try_parse_bare_uri_with_hugo(text, false)
+}
+
+pub(super) fn try_parse_bare_uri_with_hugo(
+    text: &str,
+    hugo_shortcodes: bool,
+) -> Option<(usize, &str)> {
     let mut chars = text.char_indices();
     let (_, first) = chars.next()?;
     if !first.is_ascii_alphabetic() {
@@ -590,6 +633,12 @@ pub fn try_parse_bare_uri(text: &str) -> Option<(usize, &str)> {
     let bytes = text.as_bytes();
     while end < text.len() {
         let b = bytes[end];
+        if hugo_shortcodes
+            && b == b'{'
+            && (bytes[end..].starts_with(b"{{<") || bytes[end..].starts_with(b"{{%"))
+        {
+            break;
+        }
         if b.is_ascii_whitespace() {
             break;
         }
@@ -667,9 +716,9 @@ pub(super) fn try_parse_inline_link_parts(
     let dest_start = after_bracket + 1;
     let remaining = &text[dest_start..];
 
-    let close_paren = find_dest_close_paren(remaining)?;
+    let close_paren = find_dest_close_paren(remaining, ctx.hugo_shortcodes)?;
     let dest_content = &remaining[..close_paren];
-    let destination = parse_link_destination_parts(dest_content, strict_dest)?;
+    let destination = parse_link_destination_parts(dest_content, strict_dest, ctx.hugo_shortcodes)?;
 
     if ctx.disallow_inner_links && link_text_contains_inner_link(link_text, ctx, strict_dest) {
         return None;
@@ -701,15 +750,22 @@ pub(super) fn try_parse_inline_link_parts(
 /// - bracketed destination is `<...>` with no newlines and no unescaped `<>`;
 /// - the optional title is delimited by `"..."`, `'...'`, or `(...)`;
 /// - any text outside that structure invalidates the link.
-fn parse_link_destination_parts(content: &str, strict: bool) -> Option<ParsedLinkDestination<'_>> {
+fn parse_link_destination_parts(
+    content: &str,
+    strict: bool,
+    hugo_shortcodes: bool,
+) -> Option<ParsedLinkDestination<'_>> {
     if strict {
-        parse_commonmark_destination_parts(content)
+        parse_commonmark_destination_parts(content, hugo_shortcodes)
     } else {
         Some(parse_pandoc_destination_parts(content))
     }
 }
 
-fn parse_commonmark_destination_parts(content: &str) -> Option<ParsedLinkDestination<'_>> {
+fn parse_commonmark_destination_parts(
+    content: &str,
+    hugo_shortcodes: bool,
+) -> Option<ParsedLinkDestination<'_>> {
     let bytes = content.as_bytes();
     let mut p = link_ws_end(bytes, 0);
     if p == bytes.len() {
@@ -732,6 +788,13 @@ fn parse_commonmark_destination_parts(content: &str) -> Option<ParsedLinkDestina
             if escape {
                 escape = false;
                 p += 1;
+                continue;
+            }
+            if hugo_shortcodes
+                && byte == b'{'
+                && let Some(tag) = super::hugo::scan_tag(&content[p..]).filter(|tag| tag.complete)
+            {
+                p += tag.end;
                 continue;
             }
             match byte {
@@ -758,6 +821,13 @@ fn parse_commonmark_destination_parts(content: &str) -> Option<ParsedLinkDestina
             if escape {
                 escape = false;
                 p += 1;
+                continue;
+            }
+            if hugo_shortcodes
+                && byte == b'{'
+                && let Some(tag) = super::hugo::scan_tag(&content[p..]).filter(|tag| tag.complete)
+            {
+                p += tag.end;
                 continue;
             }
             match byte {
@@ -1009,9 +1079,12 @@ pub fn emit_inline_link(
     config: &ParserOptions,
     suppress_footnote_refs: bool,
 ) {
-    let destination =
-        parse_link_destination_parts(dest, config.dialect == crate::options::Dialect::CommonMark)
-            .unwrap_or_else(|| parse_pandoc_destination_parts(dest));
+    let destination = parse_link_destination_parts(
+        dest,
+        config.dialect == crate::options::Dialect::CommonMark,
+        config.extensions.hugo_shortcodes,
+    )
+    .unwrap_or_else(|| parse_pandoc_destination_parts(dest));
     emit_inline_link_parts(
         builder,
         text,

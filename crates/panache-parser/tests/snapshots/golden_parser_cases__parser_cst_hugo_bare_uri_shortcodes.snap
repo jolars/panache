@@ -1,0 +1,46 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..139
+  PARAGRAPH@0..44
+    AUTO_LINK@0..20
+      TEXT@0..20 "https://example.com/"
+    HUGO_SHORTCODE@20..43
+      HUGO_SHORTCODE_TAG@20..43
+        HUGO_SHORTCODE_MARKER_OPEN@20..23 "{{<"
+        HUGO_SHORTCODE_CONTENT@23..40
+          HUGO_SHORTCODE_TEXT@23..40 " foo arg=\"a   b\" "
+        HUGO_SHORTCODE_MARKER_CLOSE@40..43 ">}}"
+    NEWLINE@43..44 "\n"
+  BLANK_LINE@44..45
+    BLANK_LINE@44..45 "\n"
+  PARAGRAPH@45..89
+    AUTO_LINK@45..65
+      TEXT@45..65 "https://example.com/"
+    HUGO_SHORTCODE@65..88
+      HUGO_SHORTCODE_TAG@65..88
+        HUGO_SHORTCODE_MARKER_OPEN@65..68 "{{%"
+        HUGO_SHORTCODE_CONTENT@68..85
+          HUGO_SHORTCODE_TEXT@68..85 " foo arg=`a   b` "
+        HUGO_SHORTCODE_MARKER_CLOSE@85..88 "%}}"
+    NEWLINE@88..89 "\n"
+  BLANK_LINE@89..90
+    BLANK_LINE@89..90 "\n"
+  PARAGRAPH@90..139
+    AUTO_LINK@90..110
+      TEXT@90..110 "https://example.com/"
+    HUGO_SHORTCODE@110..138
+      HUGO_SHORTCODE_TAG@110..121
+        HUGO_SHORTCODE_MARKER_OPEN@110..113 "{{<"
+        HUGO_SHORTCODE_CONTENT@113..118
+          HUGO_SHORTCODE_TEXT@113..118 " box "
+        HUGO_SHORTCODE_MARKER_CLOSE@118..121 ">}}"
+      HUGO_SHORTCODE_BODY@121..126
+        HUGO_SHORTCODE_TEXT@121..126 "a   b"
+      HUGO_SHORTCODE_TAG@126..138
+        HUGO_SHORTCODE_MARKER_OPEN@126..129 "{{<"
+        HUGO_SHORTCODE_CONTENT@129..135
+          HUGO_SHORTCODE_TEXT@129..135 " /box "
+        HUGO_SHORTCODE_MARKER_CLOSE@135..138 ">}}"
+    NEWLINE@138..139 "\n"

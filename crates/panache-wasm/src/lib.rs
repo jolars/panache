@@ -14,7 +14,37 @@ fn parse_flavor(value: &str) -> Option<Flavor> {
         "commonmark" | "common-mark" => Some(Flavor::CommonMark),
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
         "mdsvex" => Some(Flavor::Mdsvex),
+        "hugo" => Some(Flavor::Hugo),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod hugo_tests {
+    #[test]
+    fn accepts_hugo_flavor() {
+        assert_eq!(super::parse_flavor("hugo"), Some(super::Flavor::Hugo));
+    }
+
+    #[test]
+    fn formats_with_hugo_defaults() {
+        let input = "+++\ntitle = 'Keep   this'\n+++\n\n{{< foo\n>}}\n\nNormal   prose.\n";
+        let output = super::format_qmd_with_options(
+            input,
+            None,
+            Some("hugo".to_owned()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(output, input.replace("Normal   prose.", "Normal prose."));
     }
 }
 

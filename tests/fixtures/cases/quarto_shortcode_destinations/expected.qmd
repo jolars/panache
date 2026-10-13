@@ -1,0 +1,14 @@
+[Read more]({{< var "url" >}})
+
+[Single quote]({{< var 'url' >}})
+
+A link [Read more]({{< var "url" >}} "Title") in prose.
+
+An image ![Logo]({{< var "logo" >}}) in prose.
+
+> [Quoted]({{< var "url" >}})
+
+> [Multiline]({{< var "url"
+> >}})
+
+- [Listed]({{< var "url" >}})

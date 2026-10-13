@@ -80,7 +80,8 @@
         "commonmark",
         "multimarkdown",
         "mdsvex",
-        "myst"
+        "myst",
+        "hugo"
       ],
       "type": "string"
     },
@@ -671,6 +672,7 @@
                 "grid-tables",
                 "hard-line-breaks",
                 "header-attributes",
+                "hugo-shortcodes",
                 "implicit-figures",
                 "implicit-header-references",
                 "inline-code-attributes",
@@ -725,6 +727,7 @@
                 "tex-math-double-backslash",
                 "tex-math-gfm",
                 "tex-math-single-backslash",
+                "toml-metadata-block",
                 "wikilinks-title-after-pipe",
                 "wikilinks-title-before-pipe",
                 "yaml-metadata-block"
@@ -769,6 +772,8 @@
           "grid-tables",
           "hard-line-breaks",
           "header-attributes",
+          "hugo",
+          "hugo-shortcodes",
           "implicit-figures",
           "implicit-header-references",
           "inline-code-attributes",
@@ -831,6 +836,7 @@
           "tex-math-double-backslash",
           "tex-math-gfm",
           "tex-math-single-backslash",
+          "toml-metadata-block",
           "wikilinks-title-after-pipe",
           "wikilinks-title-before-pipe",
           "yaml-metadata-block"
@@ -882,7 +888,8 @@
           "multimarkdown",
           "multi-markdown",
           "mdsvex",
-          "myst"
+          "myst",
+          "hugo"
         ]
       },
       "type": "object"

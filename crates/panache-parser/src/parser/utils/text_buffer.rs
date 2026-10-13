@@ -171,6 +171,17 @@ impl ParagraphBuffer {
         tail
     }
 
+    pub(crate) fn split_off_trailing_markers(&mut self) -> ParagraphBuffer {
+        let start = self
+            .segments
+            .iter()
+            .rposition(|segment| matches!(segment, ParagraphSegment::Text(_)))
+            .map_or(0, |i| i + 1);
+        ParagraphBuffer {
+            segments: self.segments.split_off(start),
+        }
+    }
+
     fn get_marker_positions(&self) -> Vec<(usize, InjectedMarker<'_>)> {
         let mut positions = Vec::new();
         let mut byte_offset = 0;
@@ -230,6 +241,60 @@ impl ParagraphBuffer {
                 suppress_footnote_refs,
             );
         }
+    }
+
+    /// Buffered container content must hold a heading's shortcode arguments
+    /// together, just as ordinary block dispatch does.
+    pub(crate) fn try_emit_hugo_heading(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        config: &ParserOptions,
+    ) -> Option<ParagraphBuffer> {
+        if !config.extensions.hugo_shortcodes {
+            return None;
+        }
+        let text = self.get_text_for_parsing();
+        let first = text.split_inclusive('\n').next()?;
+        let level = crate::parser::blocks::headings::try_parse_atx_heading(first)?;
+        let raw_lines: Vec<_> = text.split_inclusive('\n').collect();
+        let prefix = crate::parser::blocks::container_prefix::ContainerPrefix::default();
+        let lines =
+            crate::parser::blocks::container_prefix::StrippedLines::new(&raw_lines, 0, &prefix);
+        let prepared = crate::parser::blocks::hugo::prepare(&lines, true, None)?;
+        let cutoff = prepared.text.len();
+        let mut markers = self.get_marker_positions();
+        markers.retain(|(offset, _)| *offset < cutoff);
+        let mut sink = MarkerInjectingSink::new(builder, &markers);
+        crate::parser::blocks::headings::emit_atx_heading(&mut sink, &prepared.text, level, config);
+        sink.finish();
+
+        let mut raw_end = 0;
+        let mut text_end = 0;
+        for segment in &self.segments {
+            if text_end >= cutoff {
+                break;
+            }
+            if let ParagraphSegment::Text(text) = segment {
+                let len = text.len().min(cutoff - text_end);
+                text_end += len;
+                raw_end += len;
+            } else {
+                raw_end += segment.raw_len();
+            }
+        }
+        Some(self.split_at_raw(raw_end))
+    }
+
+    pub(crate) fn emit_setext_heading_text(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        config: &ParserOptions,
+    ) {
+        let text = self.get_text_for_parsing();
+        let markers = self.get_marker_positions();
+        let mut sink = MarkerInjectingSink::new(builder, &markers);
+        crate::parser::blocks::headings::emit_setext_heading_text(&mut sink, &text, config);
+        sink.finish();
     }
 
     fn emit_with_markers(

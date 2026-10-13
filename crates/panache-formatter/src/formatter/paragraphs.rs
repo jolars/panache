@@ -1,14 +1,24 @@
-use crate::syntax::{AstNode, InlineExecutable, SyntaxKind, SyntaxNode};
+use crate::syntax::{
+    AstNode, HugoShortcode, InlineExecutable, LinkDestUrl, SyntaxKind, SyntaxNode,
+};
 
-/// Container indentation is separate from whitespace inside executable code.
-/// Layout already removes `LINE_PREFIX` tokens, so trimming an expression's
-/// continuation line can change string values or language syntax.
+/// Container indentation is separate from whitespace inside opaque content.
+/// Layout already removes `LINE_PREFIX` tokens, so trimming continuation
+/// lines can change string values, language syntax, or template input.
 pub(super) fn trim_prose_indent<'a>(node: &SyntaxNode, line: &'a str) -> &'a str {
     if line.starts_with(char::is_whitespace)
-        && node
+        && (node
             .descendants()
             .filter_map(InlineExecutable::cast)
             .any(|inline| inline.code_source().contains('\n'))
+            || node
+                .descendants()
+                .filter_map(HugoShortcode::cast)
+                .any(|shortcode| shortcode.syntax().text().to_string().contains('\n'))
+            || node
+                .descendants()
+                .filter_map(LinkDestUrl::cast)
+                .any(|url| url.syntax().text().to_string().contains('\n')))
     {
         line
     } else {

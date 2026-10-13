@@ -7,7 +7,7 @@ pub use panache_parser::parser::utils;
 pub use panache_parser::parser::yaml;
 pub use panache_parser::parser::{Diagnostics, SyntaxError, SyntaxErrorSource};
 pub use panache_parser::parser::{Edit, ReparseStrategy, Reparsed, diff_edit};
-pub use panache_parser::{RefdefMap, collect_refdef_labels};
+pub use panache_parser::{RefdefMap, collect_refdef_labels, collect_refdef_labels_with_options};
 pub use panache_parser::{
     to_pandoc_ast, to_pandoc_ast_with_options, to_pandoc_json, to_pandoc_json_with_options,
 };

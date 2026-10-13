@@ -5,6 +5,63 @@ use lsp_types::Uri;
 use std::fs;
 use tempfile::TempDir;
 
+#[test]
+fn hugo_workspace_formatting_preserves_opaque_syntax() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("panache.toml"), "flavor = 'hugo'\n").unwrap();
+    let file = dir.path().join("post.md");
+    let content =
+        "+++\ntitle = 'Keep   this'\n+++\n\n{{< foo\n  value=42\n>}}\n\nNormal   prose.\n";
+    fs::write(&file, content).unwrap();
+    let root_uri = Uri::from_file_path(dir.path()).unwrap();
+    let doc_uri = Uri::from_file_path(&file).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "markdown");
+    let edits = server.format_document(doc_uri.as_str()).unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(
+        edits[0].new_text,
+        content.replace("Normal   prose.", "Normal prose.")
+    );
+}
+
+#[test]
+fn hugo_range_formatting_replaces_complete_opaque_blocks() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("panache.toml"), "flavor = 'hugo'\n").unwrap();
+    let file = dir.path().join("post.md");
+    let content = "+++\ntitle = 'Keep   this'\n+++\n\nBefore   prose.\n\n{{< box >}}\nKeep   this body.\n{{< /box >}}\n\nAfter   prose.\n";
+    fs::write(&file, content).unwrap();
+    let root_uri = Uri::from_file_path(dir.path()).unwrap();
+    let doc_uri = Uri::from_file_path(&file).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "markdown");
+
+    for (line, start_line, end_line) in [(1, 0, 3), (7, 6, 9)] {
+        for end_character in [0, 4] {
+            let edits = server
+                .format_range(doc_uri.as_str(), line, 0, line, end_character)
+                .unwrap();
+            assert_eq!(edits.len(), 1);
+            let edit = &edits[0];
+            assert_eq!(edit.range.start, lsp_types::Position::new(start_line, 0));
+            assert_eq!(edit.range.end, lsp_types::Position::new(end_line, 0));
+            let offset = |line: u32| {
+                content
+                    .split_inclusive('\n')
+                    .take(line as usize)
+                    .map(str::len)
+                    .sum::<usize>()
+            };
+            let mut applied = content.to_owned();
+            applied.replace_range(offset(start_line)..offset(end_line), &edit.new_text);
+            assert_eq!(applied, content);
+        }
+    }
+}
+
 /// Files matching `extend-exclude` (or `exclude`) in the discovered
 /// `panache.toml` must be skipped by `textDocument/formatting`. Without this,
 /// editors with format-on-save will keep rewriting files the project owner

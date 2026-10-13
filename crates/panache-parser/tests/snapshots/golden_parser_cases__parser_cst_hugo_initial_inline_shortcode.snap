@@ -1,0 +1,88 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..184
+  FOOTNOTE_DEFINITION@0..53
+    FOOTNOTE_LABEL_START@0..2 "[^"
+    FOOTNOTE_LABEL_ID@2..3 "n"
+    FOOTNOTE_LABEL_END@3..4 "]"
+    FOOTNOTE_LABEL_COLON@4..5 ":"
+    WHITESPACE@5..6 " "
+    PARAGRAPH@6..53
+      HUGO_SHORTCODE@6..17
+        HUGO_SHORTCODE_TAG@6..17
+          HUGO_SHORTCODE_MARKER_OPEN@6..9 "{{<"
+          HUGO_SHORTCODE_CONTENT@9..14
+            HUGO_SHORTCODE_TEXT@9..14 " foo "
+          HUGO_SHORTCODE_MARKER_CLOSE@14..17 ">}}"
+      TEXT@17..52 " followingtext. More  ..."
+      NEWLINE@52..53 "\n"
+  BLANK_LINE@53..54
+    BLANK_LINE@53..54 "\n"
+  BLOCK_QUOTE@54..89
+    BLOCK_QUOTE_MARKER@54..55 ">"
+    WHITESPACE@55..56 " "
+    FOOTNOTE_DEFINITION@56..89
+      FOOTNOTE_LABEL_START@56..58 "[^"
+      FOOTNOTE_LABEL_ID@58..59 "q"
+      FOOTNOTE_LABEL_END@59..60 "]"
+      FOOTNOTE_LABEL_COLON@60..61 ":"
+      WHITESPACE@61..62 " "
+      PARAGRAPH@62..89
+        HUGO_SHORTCODE@62..73
+          HUGO_SHORTCODE_TAG@62..73
+            HUGO_SHORTCODE_MARKER_OPEN@62..65 "{{%"
+            HUGO_SHORTCODE_CONTENT@65..70
+              HUGO_SHORTCODE_TEXT@65..70 " foo "
+            HUGO_SHORTCODE_MARKER_CLOSE@70..73 "%}}"
+        TEXT@73..88 " followingtext."
+        NEWLINE@88..89 "\n"
+  BLANK_LINE@89..90
+    BLANK_LINE@89..90 "\n"
+  LIST@90..119
+    LIST_ITEM@90..119
+      LIST_MARKER@90..91 "-"
+      WHITESPACE@91..92 " "
+      PLAIN@92..119
+        HUGO_SHORTCODE@92..103
+          HUGO_SHORTCODE_TAG@92..103
+            HUGO_SHORTCODE_MARKER_OPEN@92..95 "{{<"
+            HUGO_SHORTCODE_CONTENT@95..100
+              HUGO_SHORTCODE_TEXT@95..100 " foo "
+            HUGO_SHORTCODE_MARKER_CLOSE@100..103 ">}}"
+        TEXT@103..118 " followingtext."
+        NEWLINE@118..119 "\n"
+  BLANK_LINE@119..120
+    BLANK_LINE@119..120 "\n"
+  BLOCK_QUOTE@120..149
+    BLOCK_QUOTE_MARKER@120..121 ">"
+    WHITESPACE@121..122 " "
+    PARAGRAPH@122..149
+      HUGO_SHORTCODE@122..133
+        HUGO_SHORTCODE_TAG@122..133
+          HUGO_SHORTCODE_MARKER_OPEN@122..125 "{{<"
+          HUGO_SHORTCODE_CONTENT@125..130
+            HUGO_SHORTCODE_TEXT@125..130 " foo "
+          HUGO_SHORTCODE_MARKER_CLOSE@130..133 ">}}"
+      TEXT@133..148 " followingtext."
+      NEWLINE@148..149 "\n"
+  BLANK_LINE@149..150
+    BLANK_LINE@149..150 "\n"
+  DEFINITION_LIST@150..184
+    DEFINITION_ITEM@150..184
+      TERM@150..155
+        TEXT@150..154 "Term"
+        NEWLINE@154..155 "\n"
+      DEFINITION@155..184
+        DEFINITION_MARKER@155..156 ":"
+        WHITESPACE@156..157 " "
+        PLAIN@157..184
+          HUGO_SHORTCODE@157..168
+            HUGO_SHORTCODE_TAG@157..168
+              HUGO_SHORTCODE_MARKER_OPEN@157..160 "{{<"
+              HUGO_SHORTCODE_CONTENT@160..165
+                HUGO_SHORTCODE_TEXT@160..165 " foo "
+              HUGO_SHORTCODE_MARKER_CLOSE@165..168 ">}}"
+          TEXT@168..183 " followingtext."
+          NEWLINE@183..184 "\n"

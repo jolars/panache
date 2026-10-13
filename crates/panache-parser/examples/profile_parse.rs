@@ -1,17 +1,27 @@
-use panache_parser::parse;
+use panache_parser::{Flavor, ParserOptions, parse};
 use std::env;
 use std::fs;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let path = args.get(1).expect("usage: profile_parse <doc> [iters]");
+    let path = args
+        .get(1)
+        .expect("usage: profile_parse <doc> [iters] [flavor]");
     let iters: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(200);
     let input = fs::read_to_string(path).expect("read input");
+    let options = args.get(3).map(|flavor| {
+        ParserOptions::for_flavor(match flavor.as_str() {
+            "hugo" => Flavor::Hugo,
+            "commonmark" => Flavor::CommonMark,
+            "pandoc" => Flavor::Pandoc,
+            other => panic!("unsupported profiling flavor: {other}"),
+        })
+    });
 
     let start = std::time::Instant::now();
     let mut total_nodes: usize = 0;
     for _ in 0..iters {
-        let tree = parse(&input, None);
+        let tree = parse(&input, options.clone());
         total_nodes = total_nodes.wrapping_add(std::hint::black_box(tree).descendants().count());
     }
     let elapsed = start.elapsed();

@@ -4,7 +4,7 @@
 //! Quarto documents.
 
 use crate::options::ParserOptions;
-use crate::parser::inlines::refdef_map::{RefdefMap, collect_refdef_labels};
+use crate::parser::inlines::refdef_map::{RefdefMap, collect_refdef_labels_with_options};
 use crate::syntax::{AstNode, Document, SyntaxNode};
 
 pub mod blocks;
@@ -52,7 +52,7 @@ impl ParsedDocument {
 /// Single-pass architecture: blocks emit inline structure during parsing.
 ///
 /// Convenience wrapper that scans the input for reference-definition
-/// labels via [`collect_refdef_labels`] before parsing. Callers that
+/// labels via [`collect_refdef_labels_with_options`] before parsing. Callers that
 /// already have a precomputed [`RefdefMap`] (e.g. salsa-cached) should
 /// use [`parse_with_refdefs`] instead to skip the scan.
 ///
@@ -98,7 +98,7 @@ pub fn parse_with_errors(
 
 /// Parse with a caller-supplied refdef set.
 ///
-/// Skips the [`collect_refdef_labels`] scan that [`parse`] performs.
+/// Skips the [`collect_refdef_labels_with_options`] scan that [`parse`] performs.
 /// Use this when the caller already has a cached [`RefdefMap`] for
 /// `input` — e.g. from a salsa-tracked query — to avoid a redundant
 /// document-level scan on every parse.
@@ -146,5 +146,5 @@ fn populate_refdef_labels(input: &str, config: &mut ParserOptions) {
     if config.refdef_labels.is_some() {
         return;
     }
-    config.refdef_labels = Some(collect_refdef_labels(input, config.dialect));
+    config.refdef_labels = Some(collect_refdef_labels_with_options(input, config));
 }

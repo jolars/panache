@@ -100,8 +100,10 @@ pub fn resolve_path(db: &dyn Db, path: InternedPath<'_>) -> PathBuf {
 /// invalidation pulse.
 #[salsa::tracked(returns(ref), lru = 512)]
 pub fn refdef_set(db: &dyn Db, file: FileText, config: FileConfig) -> crate::parser::RefdefMap {
-    let dialect = panache_parser::Dialect::for_flavor(config.config(db).flavor);
-    crate::parser::collect_refdef_labels(file.content_or_empty(db), dialect)
+    crate::parser::collect_refdef_labels_with_options(
+        file.content_or_empty(db),
+        &config.config(db).parser_options(),
+    )
 }
 
 /// Parse a `(file, config)` pair to a CST exactly once per `SalsaDb`. All

@@ -17,8 +17,8 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 /// identically regardless of where the heading appears. The `#` prefix means
 /// the rendered line can never collide with a thematic break.
 pub(super) fn format_heading(node: &SyntaxNode, config: &Config) -> String {
-    // GitHub derives anchors from each source space, so collapsing them can break links.
-    let collapse_ws = config.flavor != Flavor::Gfm;
+    // GitHub and Hugo derive anchors from each source space, so collapsing them can break links.
+    let collapse_ws = !matches!(config.flavor, Flavor::Gfm | Flavor::Hugo);
     let mut level = 1;
     let mut attributes = String::new();
     let mut content = String::new();

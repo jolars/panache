@@ -9,6 +9,7 @@
 //! - Tildes cannot have whitespace immediately inside
 
 use super::core::parse_inline_text;
+use super::hugo::HugoIndex;
 use super::sink::InlineSink;
 use crate::options::ParserOptions;
 use crate::syntax::SyntaxKind;
@@ -16,7 +17,15 @@ use crate::syntax::SyntaxKind;
 /// Try to parse strikeout (~~text~~)
 /// Returns: (total_len, inner_content)
 pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
-    let bytes = text.as_bytes();
+    try_parse_strikeout_with_hugo(text, 0, None)
+}
+
+pub(super) fn try_parse_strikeout_with_hugo<'a>(
+    text: &'a str,
+    start: usize,
+    hugo: Option<&HugoIndex>,
+) -> Option<(usize, &'a str)> {
+    let bytes = &text.as_bytes()[start..];
 
     if bytes.len() < 4 || bytes[0] != b'~' || bytes[1] != b'~' {
         return None;
@@ -30,6 +39,13 @@ pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
     let mut found_close = false;
 
     while pos + 1 < bytes.len() {
+        if bytes[pos] == b'{'
+            && let Some(hugo) = hugo
+            && let Some(span) = hugo.scan_at(text, start + pos)
+        {
+            pos += span.end;
+            continue;
+        }
         if bytes[pos] == b'~' && bytes[pos + 1] == b'~' {
             if pos + 2 < bytes.len() && bytes[pos + 2] == b'~' {
                 pos += 1;
@@ -46,7 +62,7 @@ pub fn try_parse_strikeout(text: &str) -> Option<(usize, &str)> {
         return None;
     }
 
-    let content = &text[2..pos];
+    let content = &text[start + 2..start + pos];
 
     if content.trim().is_empty() {
         return None;

@@ -208,7 +208,7 @@ impl Formatter {
                         }
                     }
                     SyntaxKind::HEADING => {
-                        self.output.push_str(&self.format_heading(n));
+                        self.output.push_str(&self.format_heading(n, def_indent));
                         self.output.push('\n');
 
                         let has_following_blocks =
@@ -576,7 +576,7 @@ impl Formatter {
                 let escaped = self.config.formatter_extensions.escaped_line_breaks;
                 for line in preserve_lines_unprefixed(node, escaped) {
                     self.output.push_str(&" ".repeat(indent));
-                    self.output.push_str(trim_prose_indent(node, &line));
+                    self.output.push_str(&line);
                     self.output.push('\n');
                 }
             }
@@ -872,7 +872,11 @@ impl Formatter {
                 }
                 pending_blank = false;
             }
-            self.format_node_sync(&child, hanging);
+            if Self::is_item_content_block(child.kind()) {
+                self.format_list_continuation_paragraph(&child, hanging);
+            } else {
+                self.format_node_sync(&child, hanging);
+            }
         }
     }
 
@@ -980,7 +984,8 @@ impl Formatter {
                 self.output.push_str(cb);
                 self.output.push(' ');
             }
-            self.output.push_str(&self.format_heading(leading_heading));
+            self.output
+                .push_str(&self.format_heading(leading_heading, text_continuation));
             self.output.push('\n');
 
             let has_following_blocks = node
@@ -1050,6 +1055,7 @@ impl Formatter {
             && matches!(
                 leading_block.kind(),
                 SyntaxKind::FENCED_DIV
+                    | SyntaxKind::HUGO_SHORTCODE_BLOCK
                     | SyntaxKind::CODE_BLOCK
                     | SyntaxKind::LINE_BLOCK
                     | SyntaxKind::DEFINITION_LIST
@@ -1295,7 +1301,12 @@ impl Formatter {
                 } else {
                     self.output.push_str(&" ".repeat(text_continuation));
                 }
-                self.output.push_str(trim_prose_indent(node, line));
+                self.output
+                    .push_str(if matches!(wrap_mode, WrapMode::Preserve) {
+                        line
+                    } else {
+                        trim_prose_indent(node, line)
+                    });
                 if !has_only_empty_nested_list {
                     self.output.push('\n');
                 }

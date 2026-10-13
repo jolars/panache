@@ -23,6 +23,7 @@ pub mod headings;
 pub mod horizontal_rules;
 #[path = "blocks/html_blocks.rs"]
 pub mod html_blocks;
+pub(crate) mod hugo;
 #[path = "blocks/indented_code.rs"]
 pub mod indented_code;
 #[path = "blocks/line_blocks.rs"]

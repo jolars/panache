@@ -29,10 +29,12 @@ pub enum Flavor {
     /// MyST (CommonMark + Sphinx/MyST directives, roles, and targets)
     #[cfg_attr(feature = "serde", serde(rename = "myst"))]
     Myst,
+    /// Hugo Markdown (CommonMark + Goldmark defaults and Hugo syntax).
+    Hugo,
 }
 
-/// Pandoc/Markdown extensions configuration.
-/// Each field represents a specific Pandoc extension.
+/// Markdown extensions configuration.
+/// Each field controls support for a syntax feature.
 /// Extensions marked with a comment indicate implementation status.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -152,6 +154,10 @@ pub struct Extensions {
 
     /// YAML metadata block
     pub yaml_metadata_block: bool,
+    /// TOML front matter delimited by `+++`, preserved verbatim.
+    pub toml_metadata_block: bool,
+    /// Hugo shortcode calls and paired bodies, preserved verbatim.
+    pub hugo_shortcodes: bool,
     /// Pandoc title block (Title/Author/Date)
     pub pandoc_title_block: bool,
     /// [NON-DEFAULT] MultiMarkdown metadata/title block (Key: Value ...)
@@ -328,6 +334,8 @@ impl Extensions {
             wikilinks_title_before_pipe: false,
             spaced_reference_links: false,
             yaml_metadata_block: false,
+            toml_metadata_block: false,
+            hugo_shortcodes: false,
         }
     }
 
@@ -342,6 +350,7 @@ impl Extensions {
             Flavor::MultiMarkdown => Self::multimarkdown_defaults(),
             Flavor::Mdsvex => Self::mdsvex_defaults(),
             Flavor::Myst => Self::myst_defaults(),
+            Flavor::Hugo => Self::hugo_defaults(),
         }
     }
 
@@ -410,6 +419,8 @@ impl Extensions {
             mmd_title_block: false,
             pandoc_title_block: true,
             yaml_metadata_block: true,
+            toml_metadata_block: false,
+            hugo_shortcodes: false,
 
             markdown_in_html_blocks: false,
             raw_attribute: true,
@@ -566,6 +577,23 @@ impl Extensions {
         ext
     }
 
+    fn hugo_defaults() -> Self {
+        let mut ext = Self::commonmark_defaults();
+        ext.pipe_tables = true;
+        ext.strikeout = true;
+        ext.task_lists = true;
+        ext.autolink_bare_uris = true;
+        ext.definition_lists = true;
+        ext.footnotes = true;
+        ext.header_attributes = true;
+        ext.auto_identifiers = true;
+        ext.gfm_auto_identifiers = true;
+        ext.yaml_metadata_block = true;
+        ext.toml_metadata_block = true;
+        ext.hugo_shortcodes = true;
+        ext
+    }
+
     fn myst_defaults() -> Self {
         let mut ext = Self::commonmark_defaults();
 
@@ -700,6 +728,8 @@ known_extensions! {
     "bracketed-spans" => bracketed_spans,
     "native-spans" => native_spans,
     "yaml-metadata-block" => yaml_metadata_block,
+    "toml-metadata-block" => toml_metadata_block,
+    "hugo-shortcodes" => hugo_shortcodes,
     "pandoc-title-block" => pandoc_title_block,
     "mmd-title-block" => mmd_title_block,
     "raw-html" => raw_html,
@@ -1026,7 +1056,7 @@ pub enum Dialect {
     /// MultiMarkdown.
     #[default]
     Pandoc,
-    /// CommonMark family. Default for CommonMark and GFM.
+    /// CommonMark family. Default for CommonMark, GFM, mdsvex, MyST, and Hugo.
     CommonMark,
 }
 
@@ -1034,7 +1064,9 @@ impl Dialect {
     /// Default dialect for a given user-facing flavor.
     pub fn for_flavor(flavor: Flavor) -> Self {
         match flavor {
-            Flavor::CommonMark | Flavor::Gfm | Flavor::Mdsvex | Flavor::Myst => Dialect::CommonMark,
+            Flavor::CommonMark | Flavor::Gfm | Flavor::Mdsvex | Flavor::Myst | Flavor::Hugo => {
+                Dialect::CommonMark
+            }
             Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown | Flavor::MultiMarkdown => {
                 Dialect::Pandoc
             }
@@ -1131,7 +1163,8 @@ impl schemars::JsonSchema for Flavor {
                 "commonmark",
                 "multimarkdown",
                 "mdsvex",
-                "myst"
+                "myst",
+                "hugo"
             ]
         })
     }

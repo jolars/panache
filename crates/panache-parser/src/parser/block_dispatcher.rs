@@ -65,7 +65,7 @@ use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{
     ReferenceSpans, line_is_mmd_link_attribute_continuation, reference_definition_spans,
-    try_parse_footnote_marker, try_parse_reference_definition, try_parse_reference_definition_lax,
+    try_parse_footnote_marker, try_parse_reference_definition_with_options,
 };
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -352,6 +352,11 @@ impl BlockParser for HorizontalRuleParser {
 /// ATX heading parser (# Heading)
 pub(crate) struct AtxHeadingParser;
 
+struct AtxHeadingPrepared {
+    level: usize,
+    shortcode: Option<super::blocks::hugo::PreparedShortcode>,
+}
+
 impl BlockParser for AtxHeadingParser {
     fn detect_prepared(
         &self,
@@ -363,12 +368,20 @@ impl BlockParser for AtxHeadingParser {
         }
 
         let level = try_parse_atx_heading(lines.first())?;
+        let shortcode = if ctx.config.extensions.hugo_shortcodes {
+            super::blocks::hugo::prepare(lines, true, None)
+        } else {
+            None
+        };
         let detection = if ctx.config.extensions.blank_before_header {
             BlockDetectionResult::Yes
         } else {
             BlockDetectionResult::YesCanInterrupt
         };
-        Some((detection, Some(Box::new(level))))
+        Some((
+            detection,
+            Some(Box::new(AtxHeadingPrepared { level, shortcode })),
+        ))
     }
 
     fn parse_prepared(
@@ -379,12 +392,15 @@ impl BlockParser for AtxHeadingParser {
         payload: Option<&dyn Any>,
     ) -> usize {
         let content = lines.first();
-        let heading_level = payload
-            .and_then(|p| p.downcast_ref::<usize>().copied())
-            .or_else(|| try_parse_atx_heading(content))
-            .unwrap_or(1);
+        let prepared = payload
+            .and_then(|p| p.downcast_ref::<AtxHeadingPrepared>())
+            .expect("ATX detection carries its heading and continuations");
+        if let Some(shortcode) = &prepared.shortcode {
+            shortcode.emit_heading(builder, prepared.level, ctx.config);
+            return shortcode.line_count;
+        }
         emit_content_indent(builder, ctx);
-        emit_atx_heading(builder, content, heading_level, ctx.config);
+        emit_atx_heading(builder, content, prepared.level, ctx.config);
         1
     }
 
@@ -1090,17 +1106,10 @@ impl BlockParser for ReferenceDefinitionParser {
             }
         }
 
-        type RefDefParseFn =
-            fn(&str, crate::options::Dialect) -> Option<(usize, String, String, Option<String>)>;
-        let parse_fn: RefDefParseFn = if ctx.config.extensions.mmd_link_attributes {
-            try_parse_reference_definition_lax
-        } else {
-            try_parse_reference_definition
-        };
-        let dialect = ctx.config.dialect;
+        let parse_fn = |text: &str| try_parse_reference_definition_with_options(text, ctx.config);
 
         let consumed = if ctx.blockquote_depth > 0 {
-            parse_fn(content, dialect)?;
+            parse_fn(content)?;
             1usize
         } else {
             let mut multi = String::new();
@@ -1116,7 +1125,7 @@ impl BlockParser for ReferenceDefinitionParser {
                 return None;
             }
 
-            let (bytes_consumed, _label, _url, _title) = parse_fn(&multi, dialect)?;
+            let (bytes_consumed, _label, _url, _title) = parse_fn(&multi)?;
 
             let mut consumed = 0usize;
             let mut byte_cursor = 0usize;
@@ -1185,7 +1194,12 @@ impl BlockParser for ReferenceDefinitionParser {
 
         if ctx.blockquote_depth > 0 {
             let single = [content];
-            let spans = reference_definition_spans(content, strict_eol, dialect);
+            let spans = reference_definition_spans(
+                content,
+                strict_eol,
+                dialect,
+                ctx.config.extensions.hugo_shortcodes,
+            );
             emit_reference_definition_lines(builder, &single, spans);
         } else {
             let target_lines: Vec<&str> = lines
@@ -1195,7 +1209,12 @@ impl BlockParser for ReferenceDefinitionParser {
                 .copied()
                 .collect();
             let joined: String = target_lines.concat();
-            let spans = reference_definition_spans(&joined, strict_eol, dialect);
+            let spans = reference_definition_spans(
+                &joined,
+                strict_eol,
+                dialect,
+                ctx.config.extensions.hugo_shortcodes,
+            );
             emit_reference_definition_lines(builder, &target_lines, spans);
         }
 
@@ -3112,6 +3131,7 @@ impl BlockParser for SetextHeadingParser {
         ctx: &BlockContext,
         lines: &StrippedLines<'_, '_>,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
+        let stripped = lines;
         let content = lines.first();
         let line_pos = lines.pos();
         let lines = lines.raw();
@@ -3151,6 +3171,13 @@ impl BlockParser for SetextHeadingParser {
 
         let lines = [content, next_line];
 
+        // An underline inside a held shortcode belongs to its opaque payload.
+        if ctx.config.extensions.hugo_shortcodes
+            && super::blocks::hugo::prepare(stripped, true, None).is_some()
+        {
+            return None;
+        }
+
         if try_parse_setext_heading(&lines, 0).is_some() {
             if ctx.config.dialect == crate::options::Dialect::CommonMark
                 && try_parse_horizontal_rule(content).is_some()
@@ -3159,7 +3186,7 @@ impl BlockParser for SetextHeadingParser {
             }
             if ctx.config.dialect == crate::options::Dialect::CommonMark
                 && ctx.config.extensions.reference_links
-                && try_parse_reference_definition(content, ctx.config.dialect).is_some()
+                && try_parse_reference_definition_with_options(content, ctx.config).is_some()
             {
                 return None;
             }
@@ -3319,6 +3346,8 @@ impl BlockParserRegistry {
             Box::new(MystDirectiveOpenParser),
             Box::new(FencedCodeBlockParser),
             Box::new(YamlMetadataParser),
+            // Front matter wins over MyST block breaks only at document start.
+            Box::new(super::blocks::hugo::TomlMetadataParser),
             Box::new(MystBlockBreakParser),
             Box::new(ListParser),
             Box::new(FencedDivCloseParser),
@@ -3329,6 +3358,8 @@ impl BlockParserRegistry {
             Box::new(AtxHeadingParser),
             Box::new(HtmlBlockParser),
             Box::new(SvelteBlockParser),
+            // Hugo calls protect their closing lines and arbitrary template bodies.
+            Box::new(super::blocks::hugo::HugoShortcodeParser),
             Box::new(TableParser),
             Box::new(AdmonitionOpenParser),
             Box::new(IndentedCodeBlockParser),

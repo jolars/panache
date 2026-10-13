@@ -350,6 +350,7 @@ const KNOWN_FLAVOR_KEYS: &[&str] = &[
     "multi-markdown",
     "mdsvex",
     "myst",
+    "hugo",
 ];
 
 /// Suggest the closest valid name from `candidates` for an unknown `input`
@@ -910,6 +911,7 @@ fn parse_flavor_key(s: &str) -> Option<Flavor> {
         "common-mark" | "commonmark" => Some(Flavor::CommonMark),
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
         "mdsvex" => Some(Flavor::Mdsvex),
+        "hugo" => Some(Flavor::Hugo),
         "myst" => Some(Flavor::Myst),
         _ => None,
     }

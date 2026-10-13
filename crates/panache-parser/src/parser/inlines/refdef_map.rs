@@ -37,11 +37,11 @@
 //!   would shadow real text — that case is also wrong under CommonMark
 //!   semantics, so the approximation is fine.
 
-use crate::options::Dialect;
+use crate::options::{Dialect, ParserOptions};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use crate::parser::blocks::reference_links::try_parse_reference_definition;
+use crate::parser::blocks::reference_links::reference_definition_spans;
 
 /// Set of normalised refdef labels collected from the document. Wrapped
 /// in `Arc` so the (immutable) set can be cheaply cloned into every
@@ -102,6 +102,18 @@ pub fn normalize_label(label: &str) -> String {
 /// parser reports a multi-line consumption the cursor advances past the
 /// whole refdef in one step.
 pub fn collect_refdef_labels(input: &str, dialect: Dialect) -> RefdefMap {
+    collect_refdef_labels_with_options(
+        input,
+        &ParserOptions {
+            dialect,
+            ..ParserOptions::default()
+        },
+    )
+}
+
+/// Collect reference labels using the document's extensions, including opaque
+/// Hugo shortcode destinations.
+pub fn collect_refdef_labels_with_options(input: &str, config: &ParserOptions) -> RefdefMap {
     let mut set: HashSet<String> = HashSet::new();
     let bytes = input.as_bytes();
     let mut pos = 0;
@@ -113,19 +125,31 @@ pub fn collect_refdef_labels(input: &str, dialect: Dialect) -> RefdefMap {
         }
         let gate_byte = bytes.get(gate).copied();
         if gate_byte == Some(b'[') {
-            if let Some((consumed, label, _url, _title)) =
-                try_parse_reference_definition(&input[pos..], dialect)
-            {
-                set.insert(normalize_label(&label));
-                pos += consumed.max(1);
+            if let Some(spans) = reference_definition_spans(
+                &input[pos..],
+                true,
+                config.dialect,
+                config.extensions.hugo_shortcodes,
+            ) {
+                set.insert(normalize_label(
+                    &input[pos + spans.indent + 1..pos + spans.label_close],
+                ));
+                pos += spans.consumed.max(1);
                 continue;
             }
         } else if gate_byte == Some(b'>')
             && let Some(stripped) =
                 strip_blockquote_line(&input[pos..], MAX_BLOCKQUOTE_REFDEF_LINES)
-            && let Some((_, label, _, _)) = try_parse_reference_definition(&stripped, dialect)
+            && let Some(spans) = reference_definition_spans(
+                &stripped,
+                true,
+                config.dialect,
+                config.extensions.hugo_shortcodes,
+            )
         {
-            set.insert(normalize_label(&label));
+            set.insert(normalize_label(
+                &stripped[spans.indent + 1..spans.label_close],
+            ));
         }
 
         match memchr_newline(&bytes[pos..]) {

@@ -5,8 +5,8 @@ use crate::formatter::sentence_wrap::{
 };
 use crate::formatter::smart::normalize_smart_punctuation;
 use crate::syntax::{
-    ExampleListMarker, ImageAlt, LatexCommand, LinkRef, LinkText, ListItem, SyntaxKind, SyntaxNode,
-    UnresolvedReference, text_without_line_prefixes,
+    ExampleListMarker, ImageAlt, LatexCommand, LinkDest, LinkRef, LinkText, ListItem, SyntaxKind,
+    SyntaxNode, UnresolvedReference, text_without_line_prefixes,
 };
 use panache_parser::parser::inlines::subscript::try_parse_subscript;
 use rowan::NodeOrToken;
@@ -160,36 +160,39 @@ fn ends_with_ascii_whitespace(text: &str) -> bool {
         .is_some_and(|c| c.is_ascii_whitespace())
 }
 
-fn append_normalized_link_dest(dest: &str, out: &mut String) {
-    let dest_trimmed = dest.trim();
-    let mut split_at = None;
-    for (i, ch) in dest_trimmed.char_indices() {
-        if ch.is_whitespace() {
-            split_at = Some(i);
-            break;
+pub(super) fn append_normalized_link_dest(node: &SyntaxNode, out: &mut String) {
+    let dest = LinkDest::cast(node.clone()).expect("link destination");
+    // Significant text outside the URL and title can be part of a Quarto
+    // shortcode. Its quoted arguments are not safe to normalize as a title.
+    if dest
+        .syntax()
+        .children_with_tokens()
+        .filter_map(NodeOrToken::into_token)
+        .any(|token| {
+            token.kind() != SyntaxKind::LINE_PREFIX
+                && token.text().chars().any(|ch| !ch.is_ascii_whitespace())
+        })
+    {
+        out.push_str(&text_without_line_prefixes(dest.syntax()));
+        return;
+    }
+
+    // Whitespace inside a shortcode belongs to the URL, not the title gap.
+    // Containers rebuild the structural prefixes outside that payload.
+    if let Some(url) = dest.url_node() {
+        out.push_str(&text_without_line_prefixes(url.syntax()));
+    }
+    if let Some(title) = dest.title_node() {
+        let title = text_without_line_prefixes(title.syntax());
+        let title = super::inline::collapse_internal_newlines(&title);
+        out.push(' ');
+        if title.starts_with('\'') && title.ends_with('\'') && title.len() >= 2 {
+            out.push('"');
+            out.push_str(&title[1..title.len() - 1]);
+            out.push('"');
+        } else {
+            out.push_str(&title);
         }
-    }
-
-    let Some(split_at) = split_at else {
-        out.push_str(dest_trimmed);
-        return;
-    };
-
-    let (url, rest) = dest_trimmed.split_at(split_at);
-    let title = rest.trim();
-    if title.is_empty() {
-        out.push_str(url);
-        return;
-    }
-
-    out.push_str(url);
-    out.push(' ');
-    if title.starts_with('\'') && title.ends_with('\'') && title.len() >= 2 {
-        out.push('"');
-        out.push_str(&title[1..title.len() - 1]);
-        out.push('"');
-    } else {
-        out.push_str(title);
     }
 }
 
@@ -481,6 +484,7 @@ struct StreamingCoreSink<'a> {
     avoid_definition_marker_line_start: bool,
     avoid_heading_line_start: bool,
     avoid_tilde_fence_line_start: bool,
+    avoid_hugo_shortcode_line_start: bool,
     escape_fancy_list_line_start: bool,
 }
 
@@ -514,6 +518,7 @@ impl<'a> StreamingCoreSink<'a> {
             avoid_definition_marker_line_start,
             avoid_heading_line_start,
             avoid_tilde_fence_line_start,
+            avoid_hugo_shortcode_line_start: false,
             escape_fancy_list_line_start: false,
         }
     }
@@ -525,6 +530,8 @@ impl<'a> StreamingCoreSink<'a> {
             || (self.avoid_heading_line_start
                 && (is_atx_heading_marker_piece(text) || is_setext_or_thematic_marker_piece(text)))
             || (self.avoid_tilde_fence_line_start && is_tilde_fence_piece(text))
+            || (self.avoid_hugo_shortcode_line_start
+                && (text.starts_with("{{<") || text.starts_with("{{%")))
     }
 
     fn consume(
@@ -711,8 +718,7 @@ fn append_link_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
                     if past_link_text =>
                 {
                     if link_child.kind() == SyntaxKind::LINK_DEST {
-                        let raw = link_child.text().to_string();
-                        append_normalized_link_dest(&raw, out);
+                        append_normalized_link_dest(&link_child, out);
                     } else {
                         let _ = write!(out, "{}", link_child.text());
                     }
@@ -771,8 +777,7 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
                     if past_image_alt =>
                 {
                     if img_child.kind() == SyntaxKind::LINK_DEST {
-                        let raw = img_child.text().to_string();
-                        append_normalized_link_dest(&raw, out);
+                        append_normalized_link_dest(&img_child, out);
                     } else {
                         let _ = write!(out, "{}", img_child.text());
                     }
@@ -806,6 +811,7 @@ struct TraversalBuilder<'a> {
     current_piece: Option<String>,
     current_piece_boundary_text: Option<String>,
     current_piece_boundary_class: SentenceBoundaryClass,
+    keep_initial_shortcode_with_next_piece: bool,
     pending_space: bool,
     /// `Some(c)` when the prior pending space came from a soft break
     /// (`NEWLINE`) under `east_asian_line_breaks`: suppresses the
@@ -852,6 +858,7 @@ impl<'a> TraversalBuilder<'a> {
             current_piece: None,
             current_piece_boundary_text: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
+            keep_initial_shortcode_with_next_piece: false,
             pending_space: false,
             pending_soft_break_ea_prev: None,
             last_emitted_char: None,
@@ -873,13 +880,17 @@ impl<'a> TraversalBuilder<'a> {
         {
             self.pending_space = false;
         }
-        if self.pending_space {
+        if self.pending_space && !self.keep_initial_shortcode_with_next_piece {
             self.flush_current(true);
             self.current_piece = Some(text.to_string());
             self.current_piece_boundary_text = None;
             self.current_piece_boundary_class = boundary_class;
             self.pending_space = false;
         } else if let Some(current) = &mut self.current_piece {
+            if self.pending_space {
+                current.push(' ');
+                self.pending_space = false;
+            }
             current.push_str(text);
             self.current_piece_boundary_text = None;
             self.current_piece_boundary_class = boundary_class;
@@ -888,6 +899,7 @@ impl<'a> TraversalBuilder<'a> {
             self.current_piece_boundary_text = None;
             self.current_piece_boundary_class = boundary_class;
         }
+        self.keep_initial_shortcode_with_next_piece = false;
         if let Some(last) = text.chars().last() {
             self.last_emitted_char = Some(last);
         }
@@ -962,6 +974,7 @@ impl<'a> TraversalBuilder<'a> {
     }
 
     fn flush_current(&mut self, ws_after: bool) {
+        self.keep_initial_shortcode_with_next_piece = false;
         if let Some(piece) = self.current_piece.take() {
             self.sink.emit_piece_with_boundary_text(
                 piece,
@@ -1264,9 +1277,8 @@ fn process_node_recursive(
                 }
                 SyntaxKind::LINK => {
                     if atomic_links {
-                        let formatted = format_inline_fn(&n);
-                        let text = normalize_inline_for_sentence(&formatted);
-                        sink.push_piece(text.as_ref());
+                        let text = super::inline::format_inline_node_for_sentence(&n, config);
+                        sink.push_piece(&text);
                     } else {
                         sink.push_piece("[");
                         for child in n.children_with_tokens() {
@@ -1291,9 +1303,8 @@ fn process_node_recursive(
                 }
                 SyntaxKind::IMAGE_LINK => {
                     if atomic_links {
-                        let formatted = format_inline_fn(&n);
-                        let text = normalize_inline_for_sentence(&formatted);
-                        sink.push_piece(text.as_ref());
+                        let text = super::inline::format_inline_node_for_sentence(&n, config);
+                        sink.push_piece(&text);
                     } else {
                         sink.push_piece("![");
                         for child in n.children_with_tokens() {
@@ -1322,6 +1333,20 @@ fn process_node_recursive(
                 | SyntaxKind::INLINE_EXEC_CONTENT => {
                     let text = format_inline_fn(&n);
                     sink.push_piece_with_boundary(&text, SentenceBoundaryClass::NonBoundary);
+                }
+                SyntaxKind::HUGO_SHORTCODE => {
+                    let is_initial_shortcode = !sink.sink.sentence_mode
+                        && (sink.keep_initial_shortcode_with_next_piece
+                            || (sink.current_piece.is_none()
+                                && !sink.sink.has_content_or_pending()));
+                    sink.push_piece_with_boundary(
+                        &crate::syntax::text_without_line_prefixes(&n),
+                        SentenceBoundaryClass::NonBoundary,
+                    );
+                    // Width wrapping must not leave an initial inline call alone: the next
+                    // parse would treat it as a block. Sentence wrapping already keeps
+                    // shortcode pieces with the following word.
+                    sink.keep_initial_shortcode_with_next_piece = is_initial_shortcode;
                 }
                 SyntaxKind::WIKI_LINK | SyntaxKind::IMAGE_WIKI_LINK => {
                     sink.push_piece(&n.text().to_string());
@@ -1631,6 +1656,8 @@ pub(super) fn wrapped_lines_for_node(
         options.preserve_newlines,
         escape_literal_tildes,
     );
+    // A shortcode on its own physical line interrupts Markdown inlines.
+    builder.sink.avoid_hugo_shortcode_line_start = config.parser_extensions.hugo_shortcodes;
     builder.sink.escape_fancy_list_line_start = options.preserve_newlines
         && config.parser_extensions.fancy_lists
         && node

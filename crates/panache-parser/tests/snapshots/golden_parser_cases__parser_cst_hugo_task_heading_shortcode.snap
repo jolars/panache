@@ -1,0 +1,22 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..44
+  LIST@0..44
+    LIST_ITEM@0..44
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      TASK_CHECKBOX@2..5 "[ ]"
+      PLAIN@5..44
+        TEXT@5..16 " # Heading "
+        HUGO_SHORTCODE@16..43
+          HUGO_SHORTCODE_TAG@16..43
+            HUGO_SHORTCODE_MARKER_OPEN@16..19 "{{<"
+            HUGO_SHORTCODE_CONTENT@19..38
+              HUGO_SHORTCODE_TEXT@19..31 " foo arg=`a\n"
+              LINE_PREFIX@31..33 "  "
+              HUGO_SHORTCODE_TEXT@33..38 "  b`\n"
+            LINE_PREFIX@38..40 "  "
+            HUGO_SHORTCODE_MARKER_CLOSE@40..43 ">}}"
+        NEWLINE@43..44 "\n"

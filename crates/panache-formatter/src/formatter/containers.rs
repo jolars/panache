@@ -1,7 +1,7 @@
 use crate::config::WrapMode;
 use crate::formatter::Formatter;
 use crate::formatter::paragraphs::trim_prose_indent;
-use crate::formatter::preserve::preserve_lines_normalized;
+use crate::formatter::preserve::preserve_lines_unprefixed_normalized;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -64,10 +64,12 @@ impl Formatter {
                     let para_start = self.output.len();
                     let available_width = self.config.line_width.saturating_sub(child_indent);
                     let lines = match wrap_mode {
-                        WrapMode::Preserve => preserve_lines_normalized(child, &self.config)
-                            .iter()
-                            .map(|line| trim_prose_indent(child, line).to_string())
-                            .collect(),
+                        WrapMode::Preserve => {
+                            preserve_lines_unprefixed_normalized(child, &self.config)
+                                .iter()
+                                .map(|line| trim_prose_indent(child, line).to_string())
+                                .collect()
+                        }
                         WrapMode::Reflow => {
                             self.wrapped_lines_for_paragraph(child, available_width)
                         }
@@ -142,7 +144,9 @@ impl Formatter {
                     let rest_width = self.config.line_width.saturating_sub(child_indent);
                     let widths = [first_width, rest_width];
                     let lines = match wrap_mode {
-                        WrapMode::Preserve => preserve_lines_normalized(child, &self.config),
+                        WrapMode::Preserve => {
+                            preserve_lines_unprefixed_normalized(child, &self.config)
+                        }
                         WrapMode::Reflow => {
                             self.wrapped_lines_for_paragraph_with_widths(child, &widths)
                         }
@@ -180,7 +184,7 @@ impl Formatter {
                     let available_width = self.config.line_width.saturating_sub(child_indent);
                     match wrap_mode {
                         WrapMode::Preserve => {
-                            for line in preserve_lines_normalized(child, &self.config) {
+                            for line in preserve_lines_unprefixed_normalized(child, &self.config) {
                                 self.output.push_str(&" ".repeat(child_indent));
                                 self.output.push_str(trim_prose_indent(child, &line));
                                 self.output.push('\n');

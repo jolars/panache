@@ -124,6 +124,57 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// The marker line bypasses block dispatch, so claim shortcode regions
+    /// before their continuation lines can open Markdown blocks.
+    pub(super) fn maybe_open_hugo_in_new_list_item(&mut self) -> Option<usize> {
+        if !self.config.extensions.hugo_shortcodes {
+            return None;
+        }
+        let Some(Container::ListItem { buffer, .. }) = self.containers.last() else {
+            return None;
+        };
+        let first = buffer.sole_text_segment()?.to_owned();
+        if leading_indent(&first).0 >= 4
+            || code_blocks::try_parse_fence_open(&first, self.config.dialect).is_some()
+        {
+            return None;
+        }
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config);
+        let lines = StrippedLines::new(&self.lines, self.pos, &prefix)
+            .with_hugo_lookahead(&self.hugo_lookahead);
+        let prepared = super::super::blocks::hugo::prepare(&lines, false, Some(&first))?;
+        let standalone = prepared.text[..prepared.start].trim().is_empty()
+            && prepared.text[prepared.start + prepared.span.end..]
+                .trim()
+                .is_empty();
+        if !standalone && prepared.line_count == 1 {
+            return None;
+        }
+        if standalone {
+            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                buffer.clear();
+            }
+            super::super::blocks::hugo::emit_prepared_after_marker(&mut self.builder, &prepared);
+        } else {
+            let continuation: Vec<_> = (1..prepared.line_count)
+                .map(|i| {
+                    let raw = self.lines[self.pos + i];
+                    let tail = lines.peek_prefix_at(self.pos + i);
+                    (&raw[..raw.len() - tail.len()], tail)
+                })
+                .collect();
+            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                for (held, tail) in continuation {
+                    buffer.push_prefix(held);
+                    buffer.push_text(tail, self.config);
+                }
+            }
+        }
+        let underline =
+            !standalone && self.try_fold_held_shortcode_into_setext(&prefix, prepared.line_count);
+        Some(prepared.line_count + usize::from(underline) - 1)
+    }
+
     /// CommonMark §5.2: when a list item's first line (after the marker) is a
     /// fenced code block opener, the content of the item *is* the code block —
     /// not buffered text. The list-item open path normally pushes the
@@ -857,6 +908,58 @@ impl<'a> Parser<'a> {
         Some(LineDispatch::consumed(1))
     }
 
+    /// A held shortcode can span the text line that ordinary Setext lookahead
+    /// would inspect. Fold the buffered logical line before consuming it.
+    pub(super) fn try_fold_held_shortcode_into_setext(
+        &mut self,
+        prefix: &ContainerPrefix,
+        line_count: usize,
+    ) -> bool {
+        if self.config.dialect != crate::options::Dialect::CommonMark {
+            return false;
+        }
+        let underline_pos = self.pos + line_count;
+        let Some(&raw) = self.lines.get(underline_pos) else {
+            return false;
+        };
+        if !prefix.resolve(raw).reaches_frame() {
+            return false;
+        }
+        let lines = StrippedLines::new(&self.lines, self.pos, prefix);
+        let underline = lines.peek_prefix_at(underline_pos);
+        if try_parse_setext_heading(&[lines.first_unconditional(), underline], 0).is_none() {
+            return false;
+        }
+
+        match self.containers.last() {
+            Some(Container::Paragraph {
+                buffer,
+                start_checkpoint,
+                ..
+            }) => {
+                let buffer = buffer.clone();
+                let checkpoint = *start_checkpoint;
+                self.containers.stack.pop();
+                self.builder
+                    .start_node_at(checkpoint, SyntaxKind::HEADING.into());
+                buffer.emit_setext_heading_text(&mut self.builder, self.config);
+            }
+            Some(Container::ListItem { buffer, .. }) => {
+                let buffer = buffer.to_paragraph_buffer(&self.containers.gobble_chain());
+                if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                    buffer.clear();
+                }
+                self.builder.start_node(SyntaxKind::HEADING.into());
+                buffer.emit_setext_heading_text(&mut self.builder, self.config);
+            }
+            _ => return false,
+        }
+        let underline = lines.emit_prefix_at(&mut self.builder, underline_pos);
+        emit_setext_underline(&mut self.builder, underline);
+        self.builder.finish_node();
+        true
+    }
+
     /// CommonMark spec example #312: handle a detected list marker that's
     /// actually lazy continuation rather than a new list item. Returns true
     /// when the line was consumed as continuation (caller should advance pos
@@ -1158,6 +1261,9 @@ impl<'a> Parser<'a> {
                             self.config,
                         )
                     };
+                    if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+                        return extras;
+                    }
                     if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
                         return extras;
                     }
@@ -1193,6 +1299,9 @@ impl<'a> Parser<'a> {
                 indent_to_emit,
                 self.config,
             );
+            if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+                return extras;
+            }
             if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
                 return extras;
             }
@@ -1247,6 +1356,9 @@ impl<'a> Parser<'a> {
                     self.config,
                 )
             };
+            if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+                return extras;
+            }
             if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
                 return extras;
             }
@@ -1311,6 +1423,9 @@ impl<'a> Parser<'a> {
                 self.config,
             )
         };
+        if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+            return extras;
+        }
         if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
             return extras;
         }

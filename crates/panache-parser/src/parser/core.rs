@@ -99,6 +99,7 @@ pub struct Parser<'a> {
     dispatch_list_marker_consumed: bool,
     diagnostics: Diagnostics,
     origin: ParseOrigin,
+    hugo_lookahead: std::cell::RefCell<super::blocks::hugo::LookaheadCache>,
 }
 
 /// Whether a parse covers a whole document or a fragment lifted out of one.
@@ -133,6 +134,7 @@ impl<'a> Parser<'a> {
             dispatch_list_marker_consumed: false,
             diagnostics: Diagnostics::new(),
             origin,
+            hugo_lookahead: std::cell::RefCell::default(),
         }
     }
 
@@ -314,11 +316,18 @@ impl<'a> Parser<'a> {
         }) = self.containers.stack.last()
             && !plain_buffer.is_empty()
         {
-            let buffer = plain_buffer.clone();
+            let mut buffer = plain_buffer.clone();
+            // A prefix buffered for the next block must stay outside the plain text.
+            let trailing_markers = buffer.split_off_trailing_markers();
             let suppress_footnote_refs = self.in_footnote_definition();
             emit_definition_plain_or_heading(
                 &mut self.builder,
                 &buffer,
+                self.config,
+                suppress_footnote_refs,
+            );
+            trailing_markers.emit_with_inlines(
+                &mut self.builder,
                 self.config,
                 suppress_footnote_refs,
             );
@@ -468,6 +477,10 @@ impl<'a> Parser<'a> {
             return extras;
         }
 
+        if let Some(extras) = self.try_dispatch_footnote_hugo(first_line_content) {
+            return extras;
+        }
+
         paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
         paragraphs::append_paragraph_line(
             &mut self.containers,
@@ -476,6 +489,53 @@ impl<'a> Parser<'a> {
             self.config,
         );
         0
+    }
+
+    fn try_dispatch_footnote_hugo(&mut self, first: &str) -> Option<usize> {
+        if !self.config.extensions.hugo_shortcodes
+            || leading_indent(first).0 >= 4
+            || code_blocks::try_parse_fence_open(first, self.config.dialect).is_some()
+        {
+            return None;
+        }
+        // The note marker bypasses ordinary dispatch. Claim the same prepared
+        // span as a list marker before its closing line can become a quote.
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, false, self.config);
+        let lines = StrippedLines::new(&self.lines, self.pos, &prefix)
+            .with_hugo_lookahead(&self.hugo_lookahead);
+        let prepared = super::blocks::hugo::prepare(&lines, false, Some(first))?;
+        let standalone = prepared.text[..prepared.start].trim().is_empty()
+            && prepared.text[prepared.start + prepared.span.end..]
+                .trim()
+                .is_empty();
+        if !standalone && prepared.line_count == 1 {
+            return None;
+        }
+        if standalone {
+            super::blocks::hugo::emit_prepared_after_marker(&mut self.builder, &prepared);
+        } else {
+            let continuation: Vec<_> = (1..prepared.line_count)
+                .map(|i| {
+                    let raw = self.lines[self.pos + i];
+                    let tail = lines.peek_prefix_at(self.pos + i);
+                    (&raw[..raw.len() - tail.len()], tail)
+                })
+                .collect();
+            paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+            paragraphs::append_paragraph_line(
+                &mut self.containers,
+                &mut self.builder,
+                first,
+                self.config,
+            );
+            if let Some(Container::Paragraph { buffer, .. }) = self.containers.stack.last_mut() {
+                for (held, tail) in continuation {
+                    buffer.push_indent(held);
+                    buffer.push_text(tail);
+                }
+            }
+        }
+        Some(prepared.line_count.saturating_sub(1))
     }
 
     /// CommonMark spec example #312: handle a detected list marker that's
@@ -746,7 +806,8 @@ impl<'a> Parser<'a> {
         let mut registry_claims_raw_line = false;
         let mut blockquote_payload = if let Some(dispatcher_ctx) = dispatcher_ctx.as_ref() {
             let prefix = ContainerPrefix::from_ctx(dispatcher_ctx);
-            let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+            let stripped = StrippedLines::new(&self.lines, self.pos, &prefix)
+                .with_hugo_lookahead(&self.hugo_lookahead);
             self.block_registry
                 .detect_prepared(dispatcher_ctx, &stripped)
                 .and_then(|prepared| {
@@ -1048,7 +1109,8 @@ impl<'a> Parser<'a> {
                 (dispatcher_ctx.as_ref(), blockquote_match.as_ref())
             {
                 let prefix = ContainerPrefix::from_ctx(dispatcher_ctx);
-                let stripped = StrippedLines::new(&self.lines, self.pos, &prefix);
+                let stripped = StrippedLines::new(&self.lines, self.pos, &prefix)
+                    .with_hugo_lookahead(&self.hugo_lookahead);
                 let _ = self.block_registry.parse_prepared(
                     prepared,
                     dispatcher_ctx,
@@ -1445,7 +1507,9 @@ impl<'a> Parser<'a> {
                         &list_item,
                         self.config,
                     );
-                    let extras = if let Some(extras) = self.maybe_open_html_block_in_new_list_item()
+                    let extras = if let Some(extras) = self
+                        .maybe_open_hugo_in_new_list_item()
+                        .or_else(|| self.maybe_open_html_block_in_new_list_item())
                     {
                         extras
                     } else if let Some(extras) = self.maybe_open_fenced_code_in_new_list_item() {
@@ -1911,7 +1975,10 @@ impl<'a> Parser<'a> {
                         *plain_open = true;
                     }
 
-                    return LineDispatch::consumed(1);
+                    let extras = self
+                        .try_buffer_definition_hugo_continuations(stripped_content)
+                        .unwrap_or(0);
+                    return LineDispatch::consumed(1 + extras);
                 }
             }
         }
@@ -2160,7 +2227,8 @@ impl<'a> Parser<'a> {
         }
 
         let dispatcher_match = {
-            let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
+            let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
+                .with_hugo_lookahead(&self.hugo_lookahead);
             self.block_registry
                 .detect_prepared(&dispatcher_ctx, &stripped)
         };
@@ -2187,7 +2255,12 @@ impl<'a> Parser<'a> {
                 || !self.previous_block_requires_blank_before_new_block()
         };
 
-        let at_line_zero = self.pos == 0 && current_bq_depth == 0;
+        let at_line_zero = (self.pos == 0
+            || (self.config.extensions.toml_metadata_block
+                && self.lines[..self.pos]
+                    .iter()
+                    .all(|line| line.trim_start_matches('\u{feff}').trim().is_empty())))
+            && current_bq_depth == 0;
         let at_document_start = self.origin_allows_document_start() && at_line_zero;
 
         let prev_line_blank = if self.pos > 0 {
@@ -2205,7 +2278,8 @@ impl<'a> Parser<'a> {
 
         let dispatcher_match =
             if dispatcher_ctx.has_blank_before || dispatcher_ctx.at_document_start {
-                let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
+                let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
+                    .with_hugo_lookahead(&self.hugo_lookahead);
                 self.block_registry
                     .detect_prepared(&dispatcher_ctx, &stripped)
             } else {
@@ -2235,6 +2309,7 @@ impl<'a> Parser<'a> {
                 match detection {
                     BlockDetectionResult::YesCanInterrupt => {
                         self.emit_list_item_buffer_if_needed();
+                        self.emit_buffered_plain_if_needed();
                         if self.is_paragraph_open() {
                             self.close_containers_to(self.containers.depth() - 1);
                         }
@@ -2260,7 +2335,8 @@ impl<'a> Parser<'a> {
                 self.note_block_in_list_item();
 
                 let lines_consumed = {
-                    let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
+                    let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
+                        .with_hugo_lookahead(&self.hugo_lookahead);
                     self.block_registry.parse_prepared(
                         block_match,
                         &dispatcher_ctx,
@@ -2271,7 +2347,7 @@ impl<'a> Parser<'a> {
 
                 if matches!(
                     self.block_registry.parser_name(block_match),
-                    "yaml_metadata" | "pandoc_title_block" | "mmd_title_block"
+                    "yaml_metadata" | "toml_metadata" | "pandoc_title_block" | "mmd_title_block"
                 ) {
                     self.after_metadata_block = true;
                 }
@@ -2414,6 +2490,7 @@ impl<'a> Parser<'a> {
                     }
 
                     self.emit_list_item_buffer_if_needed();
+                    self.emit_buffered_plain_if_needed();
                     if self.is_paragraph_open() {
                         if self.html_block_demotes_paragraph_to_plain(block_match) {
                             self.close_paragraph_as_plain_if_open();
@@ -2494,7 +2571,8 @@ impl<'a> Parser<'a> {
                 self.note_block_in_list_item();
 
                 let lines_consumed = {
-                    let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix);
+                    let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
+                        .with_hugo_lookahead(&self.hugo_lookahead);
                     self.block_registry.parse_prepared(
                         block_match,
                         &dispatcher_ctx,
@@ -2570,6 +2648,63 @@ impl<'a> Parser<'a> {
         if self.definition_marker_breaks_open_list_item_block(content) {
             self.emit_list_item_buffer_if_needed();
             self.close_lists_above_indent(leading_indent(content).0);
+        }
+
+        if self.config.extensions.hugo_shortcodes && content.contains("{{") {
+            let prefix = ContainerPrefix::from_stack(
+                &self.containers.stack,
+                self.dispatch_list_marker_consumed,
+                self.config,
+            );
+            let stripped = StrippedLines::new(&self.lines, self.pos, &prefix)
+                .with_hugo_lookahead(&self.hugo_lookahead);
+            if let Some(prepared) = super::blocks::hugo::prepare(&stripped, true, None)
+                && prepared.line_count > 1
+            {
+                let continuation: Vec<_> = (1..prepared.line_count)
+                    .map(|i| {
+                        let raw = self.lines[self.pos + i];
+                        let tail = stripped.peek_prefix_at(self.pos + i);
+                        (&raw[..raw.len() - tail.len()], tail)
+                    })
+                    .collect();
+                let first = line_to_append.unwrap_or(self.lines[self.pos]);
+                if let Some(Container::ListItem {
+                    buffer,
+                    marker_only,
+                    ..
+                }) = self.containers.stack.last_mut()
+                {
+                    let tail = stripped.first_unconditional();
+                    buffer.push_prefix(&first[..first.len() - tail.len()]);
+                    buffer.push_text(tail, self.config);
+                    for (held, tail) in continuation {
+                        buffer.push_prefix(held);
+                        buffer.push_text(tail, self.config);
+                    }
+                    *marker_only = false;
+                } else {
+                    paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
+                    paragraphs::append_paragraph_line_gobbling(
+                        &mut self.containers,
+                        &mut self.builder,
+                        first,
+                        paragraph_held,
+                        self.config,
+                    );
+                    if let Some(Container::Paragraph { buffer, .. }) =
+                        self.containers.stack.last_mut()
+                    {
+                        for (held, tail) in continuation {
+                            buffer.push_indent(held);
+                            buffer.push_text(tail);
+                        }
+                    }
+                }
+                let underline = (!self.config.extensions.blank_before_header || has_blank_before)
+                    && self.try_fold_held_shortcode_into_setext(&prefix, prepared.line_count);
+                return LineDispatch::consumed(prepared.line_count + usize::from(underline));
+            }
         }
 
         if matches!(self.containers.last(), Some(Container::ListItem { .. })) {

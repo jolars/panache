@@ -716,7 +716,7 @@ fn reparse_ranges(
     // Fence pairing is global: an edit in the suffix can pair with (or
     // orphan) a fence-capable line retained in the prefix, flipping the
     // prefix's interpretation.
-    if !prefix_fence_state_is_stable(&input[..new_restart]) {
+    if !prefix_fence_state_is_stable(&input[..new_restart], config) {
         return None;
     }
 
@@ -968,7 +968,26 @@ fn floor_char_boundary(text: &str, mut pos: usize) -> usize {
 /// parsed as a closed fence delimiter --- is still unwritten; `TODO.md` tracks it
 /// under "Incremental Parsing -> Tier coverage", together with the same
 /// coarseness in `long_range_pairing_lines`.
-fn prefix_fence_state_is_stable(prefix: &str) -> bool {
+fn prefix_fence_state_is_stable(prefix: &str, config: &ParserOptions) -> bool {
+    // A standalone call can acquire a closing tag in a later window. Until
+    // its pairing is proven local, retaining that prefix is unsafe.
+    if config.extensions.hugo_shortcodes {
+        let mut pos = 0;
+        while let Some(offset) = prefix[pos..].find("{{") {
+            pos += offset;
+            if let Some(span) = super::inlines::hugo::scan(&prefix[pos..]) {
+                let tag = &span.opening;
+                if !tag.complete
+                    || (!tag.escaped && !tag.closing && !tag.self_closing && span.closing.is_none())
+                {
+                    return false;
+                }
+                pos += span.end;
+            } else {
+                pos += 2;
+            }
+        }
+    }
     let mut backtick = 0usize;
     let mut tilde = 0usize;
     let mut colon = 0usize;
@@ -1119,7 +1138,7 @@ fn first_nonblank_line_is_container_marker(text: &str) -> bool {
 /// document's *first* line can produce.
 ///
 /// A window is parsed as a standalone document, so `at_document_start` is true
-/// at its first line. Three constructs test that flag with no
+/// at its first line. These constructs test that flag with no
 /// `|| ctx.has_blank_before` escape, and each would therefore be manufactured
 /// where a full parse refuses:
 ///
@@ -1129,6 +1148,7 @@ fn first_nonblank_line_is_container_marker(text: &str) -> bool {
 ///   recognize YAML only as frontmatter, and read a body `---` as a thematic
 ///   break. This one also manufactures *syntax errors*, malformed YAML being
 ///   the only source of them.
+/// - a Hugo TOML metadata block.
 ///
 /// Every other `at_document_start` consumer is `||`-ed with `has_blank_before`,
 /// which the seam guard already guarantees, so they agree either way. Textual
@@ -1144,6 +1164,14 @@ fn window_start_manufactures_document_start_construct(
     let Some(first) = window.lines().next() else {
         return false;
     };
+    if config.extensions.toml_metadata_block
+        && window
+            .lines()
+            .find(|line| !line.trim_start_matches('\u{feff}').trim().is_empty())
+            .is_some_and(|line| line.trim_start_matches('\u{feff}').trim() == "+++")
+    {
+        return true;
+    }
     if config.extensions.pandoc_title_block && first.trim_start().starts_with('%') {
         return true;
     }
@@ -1312,7 +1340,7 @@ fn reparse_section_window(
 
     if !seam_is_decoupled(input, section_window.new_start)
         || !prefix_ends_structurally_decoupled(old_tree, section_window.old_start)
-        || !prefix_fence_state_is_stable(&input[..section_window.new_start])
+        || !prefix_fence_state_is_stable(&input[..section_window.new_start], config)
     {
         return None;
     }
@@ -1576,8 +1604,9 @@ fn parse_fragment_at(
 /// edit that actually adds, removes, or alters a delimiter. It costs O(region)
 /// and, unlike the prefix scan it replaces, nothing at all in the document's
 /// size, which is what keeps a keystroke's cost independent of where it lands.
-fn long_range_pairing_lines(text: &str) -> Vec<&str> {
-    text.lines()
+fn long_range_pairing_lines(text: &str, hugo_shortcodes: bool) -> Vec<&str> {
+    let mut lines: Vec<_> = text
+        .lines()
         .filter(|line| {
             let trimmed = line.trim_start_matches([' ', '\t']);
             if line.len() - trimmed.len() <= 3
@@ -1596,7 +1625,23 @@ fn long_range_pairing_lines(text: &str) -> Vec<&str> {
                 && body.chars().all(|c| matches!(c, '-' | '=' | ' ' | '\t'))
                 && body.chars().any(|c| matches!(c, '-' | '='))
         })
-        .collect()
+        .collect();
+    if !hugo_shortcodes {
+        return lines;
+    }
+    // Include entire tags so an edit to a name on a continuation line also
+    // invalidates pairing outside the region.
+    let mut pos = 0;
+    while let Some(offset) = text[pos..].find("{{") {
+        pos += offset;
+        if let Some(tag) = super::inlines::hugo::scan_tag(&text[pos..]) {
+            lines.push(&text[pos..pos + tag.end]);
+            pos += tag.end;
+        } else {
+            pos += 2;
+        }
+    }
+    lines
 }
 
 /// Merge the previous errors with a bounded region reparse's own.
@@ -1722,7 +1767,7 @@ fn reparse_region(
         return None;
     }
 
-    let region = select_region(old_tree, old_edit)?;
+    let mut region = select_region(old_tree, old_edit)?;
 
     debug_assert!(region.start <= old_edit.0, "region starts past the edit");
     if region.start > old_edit.0 {
@@ -1738,6 +1783,18 @@ fn reparse_region(
         return None;
     }
 
+    // TOML front matter can follow blank lines or a BOM. Include that prefix
+    // so the fragment retains the document origin needed to recognize it.
+    if config.extensions.toml_metadata_block
+        && region.start > 0
+        && input[..region.start]
+            .lines()
+            .all(|line| line.trim_start_matches('\u{feff}').trim().is_empty())
+    {
+        region.start = 0;
+        region.prev = None;
+    }
+
     let context_len = region.prev.map_or(0, |(s, e)| e - s) + region.next.map_or(0, |(s, e)| e - s);
     if region_is_too_wide(
         cost_guards,
@@ -1749,8 +1806,20 @@ fn reparse_region(
 
     let old_text = old_tree.text().to_string();
     let fragment = &input[region.start..new_region_end];
-    if long_range_pairing_lines(&old_text[region.start..region.end])
-        != long_range_pairing_lines(fragment)
+    // Markdown edits can expose a table or code block's tags to a distant
+    // closer without changing the tags themselves. Bounded seam parses cannot
+    // prove that pairing is stable, so leave these regions to the window tiers.
+    if config.extensions.hugo_shortcodes
+        && [&old_text[region.start..region.end], fragment]
+            .iter()
+            .any(|text| text.contains("{{<") || text.contains("{{%"))
+    {
+        return None;
+    }
+    if long_range_pairing_lines(
+        &old_text[region.start..region.end],
+        config.extensions.hugo_shortcodes,
+    ) != long_range_pairing_lines(fragment, config.extensions.hugo_shortcodes)
     {
         return None;
     }
@@ -2890,6 +2959,7 @@ mod tests {
             ("multimarkdown", Flavor::MultiMarkdown),
             ("mdsvex", Flavor::Mdsvex),
             ("myst", Flavor::Myst),
+            ("hugo", Flavor::Hugo),
         ]
         .into_iter()
         .map(|(name, flavor)| (name, flavor_options(flavor)))
@@ -3290,31 +3360,34 @@ mod tests {
     #[test]
     fn long_range_pairing_lines_ignore_prose_and_catch_delimiters() {
         assert_eq!(
-            long_range_pairing_lines("just prose\nmore prose\n"),
+            long_range_pairing_lines("just prose\nmore prose\n", false),
             Vec::<&str>::new()
         );
-        assert_eq!(long_range_pairing_lines("a\n```\nb\n"), vec!["```"]);
-        assert_eq!(long_range_pairing_lines("a\n::: note\n"), vec!["::: note"]);
-        assert_eq!(long_range_pairing_lines("a\n----\n"), vec!["----"]);
+        assert_eq!(long_range_pairing_lines("a\n```\nb\n", false), vec!["```"]);
         assert_eq!(
-            long_range_pairing_lines("a\n<!-- c -->\n"),
+            long_range_pairing_lines("a\n::: note\n", false),
+            vec!["::: note"]
+        );
+        assert_eq!(long_range_pairing_lines("a\n----\n", false), vec!["----"]);
+        assert_eq!(
+            long_range_pairing_lines("a\n<!-- c -->\n", false),
             vec!["<!-- c -->"]
         );
         assert_eq!(
-            long_range_pairing_lines("a\n| - | - |\n"),
+            long_range_pairing_lines("a\n| - | - |\n", false),
             Vec::<&str>::new()
         );
         assert_eq!(
-            long_range_pairing_lines("a\n+----+----+\n"),
+            long_range_pairing_lines("a\n+----+----+\n", false),
             Vec::<&str>::new()
         );
         assert_eq!(
-            long_range_pairing_lines("```\nlet x = 1;\n```\n"),
-            long_range_pairing_lines("```\nlet x = 12;\n```\n")
+            long_range_pairing_lines("```\nlet x = 1;\n```\n", false),
+            long_range_pairing_lines("```\nlet x = 12;\n```\n", false)
         );
         assert_ne!(
-            long_range_pairing_lines("prose\n"),
-            long_range_pairing_lines("```\n")
+            long_range_pairing_lines("prose\n", false),
+            long_range_pairing_lines("```\n", false)
         );
     }
 

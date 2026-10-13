@@ -1,0 +1,93 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..187
+  DEFINITION_LIST@0..55
+    DEFINITION_ITEM@0..55
+      TERM@0..5
+        TEXT@0..4 "Term"
+        NEWLINE@4..5 "\n"
+      DEFINITION@5..55
+        DEFINITION_MARKER@5..6 ":"
+        WHITESPACE@6..7 " "
+        PLAIN@7..55
+          TEXT@7..13 "Intro."
+          NEWLINE@13..14 "\n"
+          LINE_PREFIX@14..16 "  "
+          TEXT@16..23 "Before "
+          HUGO_SHORTCODE@23..47
+            HUGO_SHORTCODE_TAG@23..47
+              HUGO_SHORTCODE_MARKER_OPEN@23..26 "{{<"
+              HUGO_SHORTCODE_CONTENT@26..42
+                HUGO_SHORTCODE_TEXT@26..31 " foo\n"
+                LINE_PREFIX@31..33 "  "
+                HUGO_SHORTCODE_TEXT@33..42 "  arg=42\n"
+              LINE_PREFIX@42..44 "  "
+              HUGO_SHORTCODE_MARKER_CLOSE@44..47 ">}}"
+          TEXT@47..54 " after."
+          NEWLINE@54..55 "\n"
+  BLANK_LINE@55..56
+    BLANK_LINE@55..56 "\n"
+  BLOCK_QUOTE@56..121
+    BLOCK_QUOTE_MARKER@56..57 ">"
+    WHITESPACE@57..58 " "
+    DEFINITION_LIST@58..121
+      DEFINITION_ITEM@58..121
+        TERM@58..63
+          TEXT@58..62 "Term"
+          NEWLINE@62..63 "\n"
+        BLOCK_QUOTE_MARKER@63..64 ">"
+        WHITESPACE@64..65 " "
+        DEFINITION@65..121
+          DEFINITION_MARKER@65..66 ":"
+          WHITESPACE@66..67 " "
+          PLAIN@67..121
+            TEXT@67..73 "Intro."
+            NEWLINE@73..74 "\n"
+            LINE_PREFIX@74..75 ">"
+            LINE_PREFIX@75..76 " "
+            LINE_PREFIX@76..78 "  "
+            TEXT@78..85 "Before "
+            HUGO_SHORTCODE@85..113
+              HUGO_SHORTCODE_TAG@85..113
+                HUGO_SHORTCODE_MARKER_OPEN@85..88 "{{<"
+                HUGO_SHORTCODE_CONTENT@88..106
+                  HUGO_SHORTCODE_TEXT@88..93 " foo\n"
+                  LINE_PREFIX@93..97 ">   "
+                  HUGO_SHORTCODE_TEXT@97..106 "  arg=42\n"
+                LINE_PREFIX@106..110 ">   "
+                HUGO_SHORTCODE_MARKER_CLOSE@110..113 ">}}"
+            TEXT@113..120 " after."
+            NEWLINE@120..121 "\n"
+  BLANK_LINE@121..122
+    BLANK_LINE@121..122 "\n"
+  LIST@122..187
+    LIST_ITEM@122..187
+      LIST_MARKER@122..123 "-"
+      WHITESPACE@123..124 " "
+      DEFINITION_LIST@124..187
+        DEFINITION_ITEM@124..187
+          TERM@124..129
+            TEXT@124..128 "Term"
+            NEWLINE@128..129 "\n"
+          DEFINITION@129..187
+            WHITESPACE@129..131 "  "
+            DEFINITION_MARKER@131..132 ":"
+            WHITESPACE@132..133 " "
+            PLAIN@133..187
+              TEXT@133..139 "Intro."
+              NEWLINE@139..140 "\n"
+              LINE_PREFIX@140..144 "    "
+              TEXT@144..151 "Before "
+              HUGO_SHORTCODE@151..179
+                HUGO_SHORTCODE_TAG@151..179
+                  HUGO_SHORTCODE_MARKER_OPEN@151..154 "{{<"
+                  HUGO_SHORTCODE_CONTENT@154..172
+                    HUGO_SHORTCODE_TEXT@154..159 " foo\n"
+                    LINE_PREFIX@159..163 "    "
+                    HUGO_SHORTCODE_TEXT@163..172 "  arg=42\n"
+                  LINE_PREFIX@172..176 "    "
+                  HUGO_SHORTCODE_MARKER_CLOSE@176..179 ">}}"
+              TEXT@179..186 " after."
+              NEWLINE@186..187 "\n"

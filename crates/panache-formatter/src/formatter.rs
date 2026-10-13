@@ -121,7 +121,7 @@ pub fn format_tree_with_formatted_code(
 
     log::debug!("Formatting complete: {} bytes output", output.len());
 
-    output.trim_end().to_string() + "\n"
+    output
 }
 
 fn apply_formatted_yaml_at_range(

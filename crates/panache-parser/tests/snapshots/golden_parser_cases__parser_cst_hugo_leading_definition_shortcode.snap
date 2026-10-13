@@ -1,0 +1,67 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..67
+  DEFINITION_LIST@0..19
+    DEFINITION_ITEM@0..19
+      TERM@0..5
+        TEXT@0..4 "Term"
+        NEWLINE@4..5 "\n"
+      DEFINITION@5..19
+        DEFINITION_MARKER@5..6 ":"
+        WHITESPACE@6..7 " "
+        PLAIN@7..19
+          HUGO_SHORTCODE@7..18
+            HUGO_SHORTCODE_TAG@7..18
+              HUGO_SHORTCODE_MARKER_OPEN@7..10 "{{<"
+              HUGO_SHORTCODE_CONTENT@10..15
+                HUGO_SHORTCODE_TEXT@10..15 " foo "
+              HUGO_SHORTCODE_MARKER_CLOSE@15..18 ">}}"
+          NEWLINE@18..19 "\n"
+  BLANK_LINE@19..20
+    BLANK_LINE@19..20 "\n"
+  BLOCK_QUOTE@20..43
+    BLOCK_QUOTE_MARKER@20..21 ">"
+    WHITESPACE@21..22 " "
+    DEFINITION_LIST@22..43
+      DEFINITION_ITEM@22..43
+        TERM@22..27
+          TEXT@22..26 "Term"
+          NEWLINE@26..27 "\n"
+        BLOCK_QUOTE_MARKER@27..28 ">"
+        WHITESPACE@28..29 " "
+        DEFINITION@29..43
+          DEFINITION_MARKER@29..30 ":"
+          WHITESPACE@30..31 " "
+          PLAIN@31..43
+            HUGO_SHORTCODE@31..42
+              HUGO_SHORTCODE_TAG@31..42
+                HUGO_SHORTCODE_MARKER_OPEN@31..34 "{{%"
+                HUGO_SHORTCODE_CONTENT@34..39
+                  HUGO_SHORTCODE_TEXT@34..39 " bar "
+                HUGO_SHORTCODE_MARKER_CLOSE@39..42 "%}}"
+            NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  LIST@44..67
+    LIST_ITEM@44..67
+      LIST_MARKER@44..45 "-"
+      WHITESPACE@45..46 " "
+      DEFINITION_LIST@46..67
+        DEFINITION_ITEM@46..67
+          TERM@46..51
+            TEXT@46..50 "Term"
+            NEWLINE@50..51 "\n"
+          DEFINITION@51..67
+            WHITESPACE@51..53 "  "
+            DEFINITION_MARKER@53..54 ":"
+            WHITESPACE@54..55 " "
+            PLAIN@55..67
+              HUGO_SHORTCODE@55..66
+                HUGO_SHORTCODE_TAG@55..66
+                  HUGO_SHORTCODE_MARKER_OPEN@55..58 "{{<"
+                  HUGO_SHORTCODE_CONTENT@58..63
+                    HUGO_SHORTCODE_TEXT@58..63 " baz "
+                  HUGO_SHORTCODE_MARKER_CLOSE@63..66 ">}}"
+              NEWLINE@66..67 "\n"

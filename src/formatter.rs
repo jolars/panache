@@ -228,7 +228,7 @@ pub fn format_tree(tree: &SyntaxNode, config: &Config, range: Option<(usize, usi
     }
 
     log::debug!("Formatting complete: {} bytes output", output.len());
-    output.trim_end().to_string() + "\n"
+    output
 }
 
 fn apply_formatted_yaml_at_range(

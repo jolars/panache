@@ -34,6 +34,7 @@ impl From<CliFlavor> for Flavor {
             CliFlavor::MultiMarkdown => Flavor::MultiMarkdown,
             CliFlavor::Mdsvex => Flavor::Mdsvex,
             CliFlavor::Myst => Flavor::Myst,
+            CliFlavor::Hugo => Flavor::Hugo,
         }
     }
 }

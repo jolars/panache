@@ -41,7 +41,7 @@ use super::latex::{parse_latex_command, try_parse_latex_command, try_parse_raw_m
 use super::links::{
     LinkScanContext, emit_autolink, emit_bare_uri_link, emit_inline_image_parts,
     emit_inline_link_parts, emit_reference_image, emit_reference_link, emit_unresolved_reference,
-    try_parse_autolink, try_parse_bare_uri, try_parse_inline_image_parts,
+    try_parse_autolink, try_parse_bare_uri_with_hugo, try_parse_inline_image_parts,
     try_parse_inline_link_parts, try_parse_reference_image, try_parse_reference_link,
 };
 use super::mark::{emit_mark, try_parse_mark};
@@ -58,7 +58,7 @@ use super::myst_substitutions::{emit_substitution, try_parse_substitution};
 use super::native_spans::{emit_native_span, try_parse_native_span};
 use super::raw_inline::is_raw_inline;
 use super::shortcodes::{emit_shortcode, try_parse_shortcode};
-use super::strikeout::{emit_strikeout, try_parse_strikeout};
+use super::strikeout::{emit_strikeout, try_parse_strikeout_with_hugo};
 use super::subscript::{emit_subscript, try_parse_subscript};
 use super::superscript::{emit_superscript, try_parse_superscript};
 use super::svelte::{emit_svelte_template, try_parse_svelte_template};
@@ -110,6 +110,7 @@ pub fn parse_inline_text_recursive(
         &plans.emphasis,
         &plans.brackets,
         &plans.constructs,
+        &plans.hugo,
         false,
         suppress_footnote_refs,
         &mask,
@@ -161,6 +162,7 @@ pub fn parse_inline_text(
         &plans.emphasis,
         &plans.brackets,
         &plans.constructs,
+        &plans.hugo,
         suppress_inner_links,
         suppress_footnote_refs,
         &mask,
@@ -349,6 +351,7 @@ fn parse_inline_range_impl(
     plan: &EmphasisPlan,
     bracket_plan: &BracketPlan,
     construct_plan: &ConstructPlan,
+    hugo: &super::hugo::HugoIndex,
     suppress_inner_links: bool,
     suppress_footnote_refs: bool,
     mask: &[bool; 256],
@@ -862,6 +865,20 @@ fn parse_inline_range_impl(
         }
 
         if byte == b'{'
+            && config.extensions.hugo_shortcodes
+            && let Some(span) = hugo.scan_at(&text[..end], pos)
+            && pos + span.end <= end
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            super::hugo::emit(builder, &text[pos..end], &span);
+            pos += span.end;
+            text_start = pos;
+            continue;
+        }
+
+        if byte == b'{'
             && config.extensions.svelte_template
             && let Some((len, kind, content)) = try_parse_svelte_template(&text[pos..])
         {
@@ -1077,7 +1094,11 @@ fn parse_inline_range_impl(
 
         if byte == b'~'
             && config.extensions.strikeout
-            && let Some((len, content)) = try_parse_strikeout(&text[pos..])
+            && let Some((len, content)) = try_parse_strikeout_with_hugo(
+                &text[..end],
+                pos,
+                config.extensions.hugo_shortcodes.then_some(hugo),
+            )
         {
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -1226,7 +1247,8 @@ fn parse_inline_range_impl(
         if !nested_in_link
             && config.extensions.autolink_bare_uris
             && bare_uri_has_left_boundary(text, pos)
-            && let Some((len, url)) = try_parse_bare_uri(&text[pos..])
+            && let Some((len, url)) =
+                try_parse_bare_uri_with_hugo(&text[pos..end], config.extensions.hugo_shortcodes)
         {
             if pos > text_start {
                 builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
@@ -1403,6 +1425,7 @@ fn parse_inline_range_impl(
                         plan,
                         bracket_plan,
                         construct_plan,
+                        hugo,
                         suppress_inner_links,
                         suppress_footnote_refs,
                         mask,

@@ -1,6 +1,6 @@
 use crate::directives::extract_directive_from_node;
 use crate::formatter::Formatter;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, SyntaxKind, SyntaxNode, TomlMetadata};
 use rowan::NodeOrToken;
 
 use super::math;
@@ -257,9 +257,13 @@ impl Formatter {
     }
 
     pub(super) fn format_raw_block(&mut self, node: &SyntaxNode) {
-        self.output
-            .push_str(node.text().to_string().trim_end_matches('\n'));
-        self.output.push('\n');
+        let text = node.text().to_string();
+        if TomlMetadata::cast(node.clone()).is_some_and(|metadata| !metadata.is_closed()) {
+            self.output.push_str(&text);
+        } else {
+            self.output.push_str(text.trim_end_matches('\n'));
+            self.output.push('\n');
+        }
         self.consecutive_blank_lines = 0;
     }
 }

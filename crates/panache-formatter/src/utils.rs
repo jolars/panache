@@ -19,6 +19,7 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::MULTILINE_TABLE
             | SyntaxKind::PIPE_TABLE
             | SyntaxKind::LINE_BLOCK
+            | SyntaxKind::HUGO_SHORTCODE_BLOCK
     )
 }
 
@@ -43,6 +44,8 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
             | SyntaxKind::GRID_TABLE
             | SyntaxKind::FENCED_DIV
             | SyntaxKind::HORIZONTAL_RULE
+            | SyntaxKind::HUGO_SHORTCODE_BLOCK
+            | SyntaxKind::TOML_METADATA
             | SyntaxKind::YAML_METADATA
             | SyntaxKind::PANDOC_TITLE_BLOCK
             | SyntaxKind::MMD_TITLE_BLOCK

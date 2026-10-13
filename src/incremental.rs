@@ -324,10 +324,8 @@ pub fn assert_reuse_matches_full_parse(
         return;
     }
 
-    let fresh_refdefs = crate::parser::collect_refdef_labels(
-        text,
-        panache_parser::Dialect::for_flavor(config.flavor),
-    );
+    let fresh_refdefs =
+        crate::parser::collect_refdef_labels_with_options(text, &config.parser_options());
     assert_eq!(
         refdefs, &fresh_refdefs,
         "reused parse carried a stale reference-definition set",
@@ -367,9 +365,9 @@ mod tests {
             text: Arc::from(text),
             green: tree.green().to_owned(),
             errors: Vec::new(),
-            refdefs: crate::parser::collect_refdef_labels(
+            refdefs: crate::parser::collect_refdef_labels_with_options(
                 text,
-                panache_parser::Dialect::for_flavor(Config::default().flavor),
+                &Config::default().parser_options(),
             ),
             config: Config::default(),
         }

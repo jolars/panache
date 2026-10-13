@@ -154,7 +154,7 @@ impl Formatter {
                     self.output.push('\n');
                 }
                 SyntaxKind::HEADING => {
-                    let heading_text = self.format_heading(child);
+                    let heading_text = self.format_heading(child, 0);
                     for line in heading_text.lines() {
                         self.output.push_str(&content_prefix);
                         self.output.push_str(line);
@@ -208,6 +208,16 @@ impl Formatter {
                     );
                     if let Some(ctx) = self.blockquote_context.as_mut() {
                         ctx.in_list_continuation = false;
+                    }
+                }
+                SyntaxKind::HUGO_SHORTCODE_BLOCK => {
+                    let rendered = crate::syntax::text_without_line_prefixes(child);
+                    for line in rendered.split_inclusive('\n') {
+                        self.output.push_str(&content_prefix);
+                        self.output.push_str(line);
+                    }
+                    if !self.output.ends_with('\n') {
+                        self.output.push('\n');
                     }
                 }
                 SyntaxKind::TEX_BLOCK => {

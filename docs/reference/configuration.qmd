@@ -262,6 +262,13 @@ The available flavors are:
 `gfm`
 :   GitHub-Flavored Markdown
 
+`hugo`
+:   [Hugo](https://gohugo.io)-flavored Markdown, using the CommonMark dialect
+    with Goldmark's default tables, strikethrough, task lists, bare autolinks,
+    definition lists, reference footnotes, heading attributes, and heading
+    identifiers. Enables YAML front matter, `toml-metadata-block`, and
+    `hugo-shortcodes`.
+
 `commonmark`
 :   CommonMark
 
@@ -610,7 +617,11 @@ wrap = "reflow"
     line breaks](https://sembr.org/)). Ignores line width.
 
 `preserve`
-:   Keep existing line breaks
+:   Keep existing line breaks and literal indentation, including in list
+    continuation paragraphs.
+
+In `reflow`, `sentence`, and `semantic` modes, multiline link titles are joined
+with spaces. Newlines inside shortcode URLs remain intact.
 
 The `-o wrap=<MODE>` flag on `panache format` can override this setting for a
 single invocation, e.g. `panache format -o wrap=sentence`.
@@ -1246,11 +1257,20 @@ yaml-metadata-block = true
 pandoc-title-block = true
 ```
 
+`toml-metadata-block`
+:   Recognize `+++` TOML front matter at the beginning of a document, allowing
+    initial blank lines and a byte order mark. Preserve contents verbatim,
+    including invalid TOML and unterminated blocks. Unterminated blocks retain
+    trailing spaces and blank lines, even at the end of the document. Does not
+    recognize metadata inside lists or blockquotes, or later in the document.
+    Enabled by default for `hugo`; disabled for other flavors.
+
 `yaml-metadata-block`
 :   YAML frontmatter with `---` delimiters (default: enabled). Pandoc-family
     flavors also accept metadata blocks mid-document when preceded by a blank
-    line; CommonMark-family flavors (`gfm`, `commonmark`, `mdsvex`, `myst`) only
-    recognize document-start frontmatter, matching pandoc's `gfm` reader.
+    line; CommonMark-family flavors (`gfm`, `commonmark`, `mdsvex`, `myst`,
+    `hugo`) only recognize document-start frontmatter, matching pandoc's `gfm`
+    reader.
 
 `pandoc-title-block`
 :   Pandoc title block `% Title`, `% Author`, `% Date` (default: enabled)
@@ -1338,6 +1358,19 @@ mark = false
 :   Highlighted text `==highlighted==` (default: disabled, non-default
     extension)
 
+### Hugo-Specific Extensions
+
+```toml
+[extensions]
+hugo-shortcodes = true
+```
+
+`hugo-shortcodes`
+:   Preserve Hugo shortcode calls and paired bodies verbatim. Supports both
+    `{{< ... >}}` and `{{% ... %}}`, multiline arguments, quoted and raw
+    strings, closing and self-closing tags, nesting, inline shortcode templates,
+    and escaped calls such as `{{</* foo */>}}`.
+
 ### Quarto-Specific Extensions
 
 ```toml
@@ -1357,7 +1390,8 @@ quarto-shortcodes = true
 
 `quarto-shortcodes`
 :   Quarto shortcodes `{{{< name args >}}}` (default: disabled, enabled for
-    Quarto flavor)
+    Quarto flavor). Shortcodes in link and image destinations retain their
+    closing delimiters, including when arguments are quoted.
 
 ### Bookdown Extensions
 

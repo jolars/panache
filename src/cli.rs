@@ -531,4 +531,6 @@ pub enum CliFlavor {
     /// MyST (CommonMark + Sphinx/MyST directives, roles, and targets)
     #[value(name = "myst")]
     Myst,
+    /// Hugo Markdown (Goldmark defaults, front matter, and shortcodes)
+    Hugo,
 }

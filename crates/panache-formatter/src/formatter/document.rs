@@ -1,4 +1,4 @@
-use crate::formatter::{Formatter, headings};
+use crate::formatter::Formatter;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::NodeOrToken;
 
@@ -34,8 +34,7 @@ impl Formatter {
         }
 
         self.output.push_str(&" ".repeat(indent));
-        self.output
-            .push_str(&headings::format_heading(node, &self.config));
+        self.output.push_str(&self.format_heading(node, indent));
         self.output.push('\n');
 
         if let Some(next) = node.next_sibling()
