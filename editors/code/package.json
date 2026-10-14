@@ -239,8 +239,8 @@
     "vscode-languageclient": "^10.1.2"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.8",
-    "@types/node": "^26.6.4",
+    "@types/adm-zip": "^0.6.0",
+    "@types/node": "^26.6.5",
     "@types/vscode": "1.91.0",
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
