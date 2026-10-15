@@ -142,18 +142,19 @@ This line hygiene does not otherwise normalize or reflow the preserved content.
    preceding relation instead stays in the flat head with the environment when
    it fits; the body hangs from that later `\begin` column. A unary `+` or `-`
    after either break head remains tight to the environment, and the body hangs
-   from the resulting `\begin` column. Safe trailing content with no top-level
-   binary or relation stays on the environment's `\end` line; punctuation
-   remains tight when the oracle keeps it tight. The environment participates as
-   a typed multiline operand: a following binary operator starts flush on a new
-   display line, while a following relation aligns with the leading relation.
+   from the resulting `\begin` column. In `preserve` and `single-line` modes,
+   safe trailing content with no top-level binary or relation stays on the
+   environment's `\end` line. In `reflow` mode, content after a multiline
+   environment starts on a new line at the display indent; a following relation
+   begins its own chain rather than inheriting the preceding relation's column.
+   Punctuation and closing delimiters remain attached to the environment.
    Scripts on that operand stay attached to the closing marker
    (`\end{matrix}^T`); their width determines where any same-line suffix begins,
-   while a following operator still takes its normal display break. Inline math
-   follows Badness's distinct layout: the environment's continuation lines
-   return to the math body's base column when the body prints flat. If a nested
-   `%` comment pins the inline breaks, the environment instead hangs from its
-   actual `\begin` source column, including the host `$` opener's column.
+   while a following operator takes its display break. Inline math follows
+   Badness's distinct layout: the environment's continuation lines return to the
+   math body's base column when the body prints flat. If a nested `%` comment
+   pins the inline breaks, the environment instead hangs from its actual
+   `\begin` source column, including the host `$` opener's column.
 
    A single environment inside a closed `\left`/`\right` body composes the same
    environment layout with the structured delimiter's hanging column, whether it

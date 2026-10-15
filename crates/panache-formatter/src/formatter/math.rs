@@ -1031,7 +1031,7 @@ mod tests {
     fn scripted_relation_after_environment_is_spaced() {
         let input = "\\begin{pmatrix}a \\\\ b\\end{pmatrix}=_ic";
         let once = fmt(input, MathContext::Display);
-        assert!(once.contains("\\end{pmatrix} =_i c"), "got: {once}");
+        assert!(once.contains("\\end{pmatrix}\n=_i c"), "got: {once}");
         assert_idempotent(input, MathContext::Display);
     }
 

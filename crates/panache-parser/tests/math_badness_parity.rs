@@ -424,7 +424,11 @@ fn math_badness_full_report() {
     let total = passing.len() + divergent.len() + rejected.len();
     let mut report = String::new();
     writeln!(report, "Badness math parser parity report").unwrap();
-    writeln!(report, "Oracle: badness-parser =0.6.0").unwrap();
+    let manifest: toml::Value = toml::from_str(include_str!("../Cargo.toml")).unwrap();
+    let oracle_version = manifest["dev-dependencies"]["badness-parser"]
+        .as_str()
+        .unwrap();
+    writeln!(report, "Oracle: badness-parser {oracle_version}").unwrap();
     writeln!(
         report,
         "Corpus: ../panache-formatter/tests/fixtures/math_corpus"

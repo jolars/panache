@@ -1,5 +1,5 @@
 Panache/Badness math formatter audit
-Oracle: badness-formatter =0.7.0
+Oracle: badness-formatter =0.10.2
 Corpus: tests/fixtures/math_corpus
 Cases: 108
 Context runs: 324

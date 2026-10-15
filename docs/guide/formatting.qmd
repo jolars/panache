@@ -433,9 +433,11 @@ Output
     ```
 
 By default, long display equations wrap at relations and operators to fit
-`line-width`. Use `math = "preserve"` to keep your line breaks, or
-`math = "verbatim"` to leave the math content untouched. Panache leaves
-malformed math and command arguments it cannot interpret unchanged. See [Math
+`line-width`. Content after a multiline environment starts on a new line at the
+display indent, with scripts and punctuation attached to the closing marker. Use
+`math = "preserve"` to keep your line breaks, or `math = "verbatim"` to leave
+the math content untouched. Panache leaves malformed math and command arguments
+it cannot interpret unchanged. See [Math
 Formatting](../reference/configuration.qmd#math-formatting) for modes, delimiter
 styles, and indentation settings.
 

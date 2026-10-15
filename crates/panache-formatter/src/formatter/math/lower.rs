@@ -255,10 +255,38 @@ pub(super) fn try_lower_display_environment(
     line_width: usize,
 ) -> Option<Ir> {
     let pieces = try_lower_environment_pieces(elements, opts)?;
-    Some(
-        layout_enclosed_environment(&pieces)
-            .unwrap_or_else(|| layout_display_pieces(&pieces, line_width, Spacing::Normal)),
-    )
+    if let Some(document) = layout_enclosed_environment(&pieces) {
+        return Some(document);
+    }
+    if opts.mode == MathMode::Reflow
+        && let Some(boundary) = expression_after_environment(&pieces)
+    {
+        // An environment's suffix stays attached, but the next expression
+        // starts at the display indent with its own relation alignment.
+        return Some(Ir::join(
+            Ir::HardLine,
+            [&pieces[..boundary], &pieces[boundary..]]
+                .map(|chain| layout_display_pieces(chain, line_width, Spacing::Normal)),
+        ));
+    }
+    Some(layout_display_pieces(&pieces, line_width, Spacing::Normal))
+}
+
+fn expression_after_environment(pieces: &[Piece]) -> Option<usize> {
+    let environment = pieces.iter().position(|piece| {
+        piece.multiline_tail_width.is_some() && piece.document.contains_forced_break()
+    })?;
+    pieces[environment + 1..]
+        .iter()
+        .position(|piece| {
+            !piece.punctuation
+                && piece.delimiter != Some(DelimiterRole::Close)
+                && !matches!(
+                    &piece.document,
+                    Ir::Text(text) | Ir::Verbatim(text) if text.as_ref() == "."
+                )
+        })
+        .map(|offset| environment + 1 + offset)
 }
 
 /// Make ordinary delimiters participate in the forced layout of an enclosed

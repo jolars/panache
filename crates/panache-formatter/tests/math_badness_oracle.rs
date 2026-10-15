@@ -460,7 +460,11 @@ fn render_report(mut records: Vec<AuditRecord>, corpus_count: usize) -> String {
     let unclassified = total - parity - intentional - preserved;
     let mut report = String::new();
     writeln!(report, "Panache/Badness math formatter audit").unwrap();
-    writeln!(report, "Oracle: badness-formatter =0.7.0").unwrap();
+    let manifest: toml::Value = toml::from_str(include_str!("../Cargo.toml")).unwrap();
+    let oracle_version = manifest["dev-dependencies"]["badness-formatter"]
+        .as_str()
+        .unwrap();
+    writeln!(report, "Oracle: badness-formatter {oracle_version}").unwrap();
     writeln!(report, "Corpus: tests/fixtures/math_corpus").unwrap();
     writeln!(report, "Cases: {corpus_count}").unwrap();
     writeln!(report, "Context runs: {total}").unwrap();
@@ -1345,7 +1349,7 @@ fn comment_bearing_embedded_display_environment_with_trailing_content_matches_ba
 
     assert_eq!(
         badness,
-        "  x\n  + \\begin{matrix}\n      a & = {b % inner\n             + c} \\\\\n      d & = e\n    \\end{matrix},y"
+        "  x\n  + \\begin{matrix}\n      a & = {b % inner\n             + c} \\\\\n      d & = e\n    \\end{matrix},\n  y"
     );
 
     assert_formatter_parity(&punctuation, OracleContext::Display);
@@ -1389,6 +1393,24 @@ fn scripted_comment_bearing_display_environment_matches_badness() {
             once, twice,
             "scripted display environment is not idempotent: {body:?}"
         );
+    }
+}
+
+#[test]
+fn relations_after_multiline_display_environments_match_badness() {
+    let environment = "\\begin{matrix}\na&={b % inner\n+c}\\\\\nd&=e\n\\end{matrix}";
+    for script in ["", "^T"] {
+        let body = format!("x\\gets{environment}{script}\\leq y");
+        let expected = format!(
+            "  x \\gets \\begin{{matrix}}\n            a & = {{b % inner\n                   + c}} \\\\\n            d & = e\n          \\end{{matrix}}{script}\n  \\leq y"
+        );
+        assert_eq!(
+            badness_body(&body, OracleContext::Display).expect("Badness formatter"),
+            expected,
+        );
+        assert_formatter_parity(&body, OracleContext::Display);
+        let twice = panache_body(&expected, OracleContext::Display).expect("second Panache pass");
+        assert_eq!(twice, expected, "{body:?}");
     }
 }
 
@@ -1685,13 +1707,12 @@ fn free_display_definition_relations_match_badness() {
     }
 }
 
-/// Badness 0.10 adds two spaces after a wrapped relation when its operand
+/// Badness 0.10.2 adds two spaces after a wrapped relation when its operand
 /// carries authored leading whitespace. Keep both outputs pinned so this
 /// oracle defect cannot change Panache's single-space policy.
 #[test]
 fn panache_uses_one_space_after_wrapped_relations_where_badness_uses_two() {
-    let environment = "\\begin{matrix}\na&={b % inner\n+c}\\\\\nd&=e\n\\end{matrix}";
-    let mut cases = vec![
+    let cases = [
         (
             "A := bbbbbbbbbb = cccccccccc".to_owned(),
             20,
@@ -1705,17 +1726,6 @@ fn panache_uses_one_space_after_wrapped_relations_where_badness_uses_two() {
             "  A :=_i bbbbbbbbbb\n    =_j  cccccccccc".to_owned(),
         ),
     ];
-    for script in ["", "^T"] {
-        let prefix = format!(
-            "  x \\gets \\begin{{matrix}}\n            a & = {{b % inner\n                   + c}} \\\\\n            d & = e\n          \\end{{matrix}}{script}\n    \\leq"
-        );
-        cases.push((
-            format!("x\\gets{environment}{script}\\leq y"),
-            80,
-            format!("{prefix} y"),
-            format!("{prefix}  y"),
-        ));
-    }
 
     for (body, width, expected_panache, expected_badness) in cases {
         let panache =
@@ -1726,7 +1736,7 @@ fn panache_uses_one_space_after_wrapped_relations_where_badness_uses_two() {
         assert_eq!(panache, expected_panache, "{body:?}");
         assert_eq!(
             badness, expected_badness,
-            "known Badness 0.10 defect: {body:?}"
+            "known Badness 0.10.2 defect: {body:?}"
         );
         let twice =
             panache_body_with_preamble_and_width(&panache, None, OracleContext::Display, width)

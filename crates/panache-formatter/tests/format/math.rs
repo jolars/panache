@@ -96,6 +96,24 @@ fn assert_math_host_body(
 }
 
 #[test]
+fn multiline_environment_suffix_breaks_only_in_reflow_mode() {
+    let environment = "\\begin{matrix}\na&={b % inner\n+c}\\\\\nd&=e\n\\end{matrix}^T";
+    let expected = "  x\n  + \\begin{matrix}\n      a & = {b % inner\n             + c} \\\\\n      d & = e\n    \\end{matrix}^T";
+    for mode in [MathMode::Preserve, MathMode::SingleLine, MathMode::Reflow] {
+        for punctuation in [",", ";", ".", ",;"] {
+            let input = format!("x+{environment}{punctuation}y");
+            let separator = if mode == MathMode::Reflow { "\n  " } else { "" };
+            assert_math_host_body(
+                MathHost::DollarDisplay,
+                &input,
+                &format!("{expected}{punctuation}{separator}y"),
+                &math_mode_config(mode),
+            );
+        }
+    }
+}
+
+#[test]
 fn environment_leading_signs_preserve_authored_spacing() {
     for mode in [MathMode::Preserve, MathMode::SingleLine, MathMode::Reflow] {
         let config = math_mode_config(mode);

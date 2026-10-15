@@ -18,6 +18,22 @@ x+\begin{matrix}
 a&={b % inner
 +c}\\
 d&=e
+\end{matrix}^T,y
+$$
+
+$$
+x\gets\begin{matrix}
+a&={b % inner
++c}\\
+d&=e
+\end{matrix}^T\leq y
+$$
+
+$$
+x+\begin{matrix}
+a&={b % inner
++c}\\
+d&=e
 \end{matrix}+y
 $$
 
