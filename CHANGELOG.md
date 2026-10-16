@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.17.0](https://github.com/jolars/panache/compare/v3.16.0...v3.17.0) (2026-10-16)
 
 ### Highlights
 
@@ -25,6 +25,31 @@ r = "arity"
 [linters.arity]
 append-args = ["--ignore", "undefined-symbol"]
 ```
+
+### Features
+
+- **lint:** warn on unclosed HTML attributes ([`2aa27d9`](https://github.com/jolars/panache/commit/2aa27d969ff2d62081a2aa3174505284f17f3d4c)), closes [#464](https://github.com/jolars/panache/issues/464)
+- add Hugo flavor and syntax preservation (#570) ([`7247d79`](https://github.com/jolars/panache/commit/7247d79e8b78f74404fc1f258d89bcf5fe382f91)), closes [#558](https://github.com/jolars/panache/issues/558)
+
+### Bug Fixes
+
+- preserve definition bodies when formatting ([`4e95495`](https://github.com/jolars/panache/commit/4e95495554b9b832279b117562bbbdb9c9e2f463)), fixes [#576](https://github.com/jolars/panache/issues/576)
+- **parser:** preserve definition HTML indentation ([`12c77b0`](https://github.com/jolars/panache/commit/12c77b08298fca4e87647cf3f99e65eaad8144c7)), fixes [#577](https://github.com/jolars/panache/issues/577)
+- **formatter:** normalize unnumbered headings ([`4fe2f30`](https://github.com/jolars/panache/commit/4fe2f308b5e3d8a8c0e7571228ff1465172f748a)), closes [#463](https://github.com/jolars/panache/issues/463)
+- **linter:** reuse project tool configuration ([`8350961`](https://github.com/jolars/panache/commit/8350961e2f60f2b11c5fc8c7a1f15366d367d754)), fixes [#569](https://github.com/jolars/panache/issues/569)
+- **parser:** start HTML blocks after list markers ([`598fd82`](https://github.com/jolars/panache/commit/598fd82deaa627a1a9a76694a8900a2b2e0f736d)), fixes [#559](https://github.com/jolars/panache/issues/559)
+- **parser:** require paragraph context for lazy list lines ([`a39a6e7`](https://github.com/jolars/panache/commit/a39a6e7d10437c69421b67cd0e276ff52bf89afe)), fixes [#561](https://github.com/jolars/panache/issues/561)
+- **parser:** retain blocks after empty list markers ([`f6d117b`](https://github.com/jolars/panache/commit/f6d117becbf668b6ce4ee1f92643068d64300094)), fixes [#560](https://github.com/jolars/panache/issues/560)
+- **parser:** close lists after HTML blocks ([`fc6fb2b`](https://github.com/jolars/panache/commit/fc6fb2b12f1da83f0626b394afed0cf5bb97b412))
+- **parser:** detect HTML blocks at a nested list item's content column (#566) ([`d271057`](https://github.com/jolars/panache/commit/d27105781a8d103a2383ab5e09661435531cf0df))
+- **parser:** close lists before following blockquotes ([`0b852ef`](https://github.com/jolars/panache/commit/0b852ef7414dac94d50960d3e2c5886647518e16)), fixes [#562](https://github.com/jolars/panache/issues/562)
+- **parser:** require start 1 for interrupting sublists ([`2592b04`](https://github.com/jolars/panache/commit/2592b04f071c2fa29196977200d2544a34950a87)), fixes [#563](https://github.com/jolars/panache/issues/563)
+- **parser:** read a backslash before CRLF as a hard line break ([`d0e255d`](https://github.com/jolars/panache/commit/d0e255d63d2b24b226d2db5fc776289b6058e227))
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.28.0
+- updated crates/panache-parser to v0.34.0
 
 ## [3.16.0](https://github.com/jolars/panache/compare/v3.15.0...v3.16.0) (2026-10-12)
 

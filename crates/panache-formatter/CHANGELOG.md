@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.28.0](https://github.com/jolars/panache/compare/panache-formatter-v0.27.1...panache-formatter-v0.28.0) (2026-10-16)
+
+### Features
+
+- add Hugo flavor and syntax preservation (#570) ([`7247d79`](https://github.com/jolars/panache/commit/7247d79e8b78f74404fc1f258d89bcf5fe382f91)), closes [#558](https://github.com/jolars/panache/issues/558)
+
+### Bug Fixes
+
+- preserve definition bodies when formatting ([`4e95495`](https://github.com/jolars/panache/commit/4e95495554b9b832279b117562bbbdb9c9e2f463)), fixes [#576](https://github.com/jolars/panache/issues/576)
+- **formatter:** normalize unnumbered headings ([`4fe2f30`](https://github.com/jolars/panache/commit/4fe2f308b5e3d8a8c0e7571228ff1465172f748a)), closes [#463](https://github.com/jolars/panache/issues/463)
+- **parser:** start HTML blocks after list markers ([`598fd82`](https://github.com/jolars/panache/commit/598fd82deaa627a1a9a76694a8900a2b2e0f736d)), fixes [#559](https://github.com/jolars/panache/issues/559)
+- **parser:** require paragraph context for lazy list lines ([`a39a6e7`](https://github.com/jolars/panache/commit/a39a6e7d10437c69421b67cd0e276ff52bf89afe)), fixes [#561](https://github.com/jolars/panache/issues/561)
+- **parser:** retain blocks after empty list markers ([`f6d117b`](https://github.com/jolars/panache/commit/f6d117becbf668b6ce4ee1f92643068d64300094)), fixes [#560](https://github.com/jolars/panache/issues/560)
+- **parser:** detect HTML blocks at a nested list item's content column (#566) ([`d271057`](https://github.com/jolars/panache/commit/d27105781a8d103a2383ab5e09661435531cf0df))
+
+### Dependencies
+
+- updated crates/panache-parser to v0.34.0
+
 ## [0.27.1](https://github.com/jolars/panache/compare/panache-formatter-v0.27.0...panache-formatter-v0.27.1) (2026-10-12)
 
 ### Dependencies
