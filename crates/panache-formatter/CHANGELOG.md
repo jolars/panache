@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.28.1](https://github.com/jolars/panache/compare/panache-formatter-v0.28.0...panache-formatter-v0.28.1) (2026-10-23)
+
+### Bug Fixes
+
+- **parser:** expose IDs in raw CommonMark HTML ([`b076c95`](https://github.com/jolars/panache/commit/b076c955aa49d1a4ff9bb32cbc132e83d57b9a04))
+
+### Dependencies
+
+- updated crates/panache-parser to v0.34.1
+
 ## [0.28.0](https://github.com/jolars/panache/compare/panache-formatter-v0.27.1...panache-formatter-v0.28.0) (2026-10-16)
 
 ### Features
