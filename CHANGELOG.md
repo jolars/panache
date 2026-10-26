@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.17.1](https://github.com/jolars/panache/compare/v3.17.0...v3.17.1) (2026-10-26)
+
+### Bug Fixes
+
+- use backslash escaping in yaml oracle script ([`fb6a0eb`](https://github.com/jolars/panache/commit/fb6a0eb614db469e9e1a66d84a64e6dd67887f5c))
+- **parser:** reject trailing div attribute blocks ([`8f88555`](https://github.com/jolars/panache/commit/8f88555b61cc4edaaf2e2a8a74a6267953f47600)), refs [#584](https://github.com/jolars/panache/issues/584)
+- **linter:** preserve html context and raw labels ([`1655cf0`](https://github.com/jolars/panache/commit/1655cf067c19b7dd4f8e6f8dde080e3e03275a63))
+- **parser:** expose IDs in raw CommonMark HTML ([`b076c95`](https://github.com/jolars/panache/commit/b076c955aa49d1a4ff9bb32cbc132e83d57b9a04))
+- **linter:** accept knitr expr schema values (#581) ([`174e3ee`](https://github.com/jolars/panache/commit/174e3ee79b175d9fd447343df61dba45d989ebc3))
+- **linter:** support jarl json fix shapes (#582) ([`73692a2`](https://github.com/jolars/panache/commit/73692a2b00159fd683b89a86123380cb253180ba))
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.28.1
+- updated crates/panache-parser to v0.34.1
+
 ## [3.17.0](https://github.com/jolars/panache/compare/v3.16.0...v3.17.0) (2026-10-16)
 
 ### Highlights

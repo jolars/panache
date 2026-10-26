@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.1](https://github.com/jolars/panache/compare/panache-parser-v0.34.0...panache-parser-v0.34.1) (2026-10-26)
+
+### Bug Fixes
+
+- **parser:** reject trailing div attribute blocks ([`8f88555`](https://github.com/jolars/panache/commit/8f88555b61cc4edaaf2e2a8a74a6267953f47600)), refs [#584](https://github.com/jolars/panache/issues/584)
+- **linter:** preserve html context and raw labels ([`1655cf0`](https://github.com/jolars/panache/commit/1655cf067c19b7dd4f8e6f8dde080e3e03275a63))
+- **parser:** expose IDs in raw CommonMark HTML ([`b076c95`](https://github.com/jolars/panache/commit/b076c955aa49d1a4ff9bb32cbc132e83d57b9a04))
+
 ## [0.34.0](https://github.com/jolars/panache/compare/panache-parser-v0.33.0...panache-parser-v0.34.0) (2026-10-16)
 
 ### Features

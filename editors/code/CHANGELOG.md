@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.17.1](https://github.com/jolars/panache/compare/panache-code-v3.17.0...panache-code-v3.17.1) (2026-10-26)
+
+### Bug Fixes
+
+- **security:** bump msal ([`2fdcca9`](https://github.com/jolars/panache/commit/2fdcca9dcdf5b319c9a8b54d3b8ee631fae0fdf4))
+
+### Dependencies
+
+- updated panache to v3.17.1
+
 ## [3.17.0](https://github.com/jolars/panache/compare/panache-code-v3.16.0...panache-code-v3.17.0) (2026-10-16)
 
 ### Dependencies
