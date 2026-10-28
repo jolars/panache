@@ -121,9 +121,9 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "badness-formatter"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b174164ae9bb3abaa0115a64ecb11a54cdee5c93c9104c1cdf2c5da282039d76"
+checksum = "0165f729bcb3de3e5b19936829abb6e32204d5762ed93a2c131e65c3c9495810"
 dependencies = [
  "badness-parser",
  "rowan 0.17.0",
@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "badness-parser"
-version = "0.11.1"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32b45795e07c88249e867c1f2dd84ca0d5d78062753fb5fa75c8eb1ece8e202b"
+checksum = "75b997df78399ddfa09f747bbe52f8e1c8afc374e3fc95540cd312632b939744"
 dependencies = [
  "phf 0.14.0",
  "phf_codegen",
@@ -294,9 +294,9 @@ dependencies = [
 
 [[package]]
 name = "clapdown"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68bcefa13c36a119d957224c65214f792139033a34f8157297ac2a7fff5a343a"
+checksum = "d8f2a42d22b905f09c7e696e2f46a17e4aa956c8d8b8cd09806137fd99c8544c"
 dependencies = [
  "clap",
 ]
@@ -850,9 +850,9 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.59.0"
+version = "0.60.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b320ad34c177093d21622edc9215bb608294c2333ff296672c0c8265a5ee60c"
+checksum = "65de752665c4a06528af6759955eecf60ba73ae7442d35349963a09c8031cd71"
 dependencies = [
  "ahash",
  "bytecount",
@@ -878,23 +878,24 @@ dependencies = [
 
 [[package]]
 name = "jsonschema-regex"
-version = "0.59.0"
+version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1472f7be79026f79e01a9b172263311e829d7c210d57b39cb57037abc0ce0500"
+checksum = "107aeb6ff14b8deb5610096a8ce5c554ec89806b521147eaeb3cae05b07edb7a"
 dependencies = [
  "regex-syntax",
 ]
 
 [[package]]
 name = "jsonschema-value"
-version = "0.59.0"
+version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5a7550a7a84787e715ead0b47e01fa8c6bb7c3413630f91a8f2094c06c2078a"
+checksum = "e281d6b177bb4834f2ffd6f92aa0443cffe29c996b251c8d94eb6f456186feba"
 dependencies = [
  "ahash",
  "bytecount",
  "fraction",
  "getrandom 0.3.4",
+ "memchr",
  "num-cmp",
  "num-traits",
  "serde_json",
@@ -1461,9 +1462,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.59.0"
+version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "473f4dcca28ead7ee0f8e5b5d0bbae2549f4fc4c958fb20af328961b6c174be3"
+checksum = "f42818036d3b37cda6bd4c494543158a36e431cb717015ef7c93acc6ba214d3b"
 dependencies = [
  "ahash",
  "fluent-uri 0.4.1",
