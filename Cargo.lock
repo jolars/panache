@@ -1115,7 +1115,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "panache"
-version = "3.17.1"
+version = "3.17.2"
 dependencies = [
  "annotate-snippets",
  "assert_cmd",
@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "panache-formatter"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "badness-formatter",
  "insta",
@@ -1180,7 +1180,7 @@ dependencies = [
 
 [[package]]
 name = "panache-parser"
-version = "0.34.1"
+version = "0.34.2"
 dependencies = [
  "badness-parser",
  "entities",

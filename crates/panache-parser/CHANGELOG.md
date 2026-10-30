@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.2](https://github.com/jolars/panache/compare/panache-parser-v0.34.1...panache-parser-v0.34.2) (2026-10-30)
+
+### Bug Fixes
+
+- **lint:** validate custom cross-reference targets ([`f4f3a1d`](https://github.com/jolars/panache/commit/f4f3a1db60ec5ee2d537c72c60668426d696ecd9)), closes [#591](https://github.com/jolars/panache/issues/591)
+- **parser:** capture narrative citation suffixes ([`3b50e47`](https://github.com/jolars/panache/commit/3b50e47a2ccbae75974ab1926a24825b4c4f1c18)), fixes [#590](https://github.com/jolars/panache/issues/590)
+
 ## [0.34.1](https://github.com/jolars/panache/compare/panache-parser-v0.34.0...panache-parser-v0.34.1) (2026-10-26)
 
 ### Bug Fixes

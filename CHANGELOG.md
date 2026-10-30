@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.17.2](https://github.com/jolars/panache/compare/v3.17.1...v3.17.2) (2026-10-30)
+
+### Bug Fixes
+
+- **lint:** validate custom cross-reference targets ([`f4f3a1d`](https://github.com/jolars/panache/commit/f4f3a1db60ec5ee2d537c72c60668426d696ecd9)), closes [#591](https://github.com/jolars/panache/issues/591)
+- **parser:** capture narrative citation suffixes ([`3b50e47`](https://github.com/jolars/panache/commit/3b50e47a2ccbae75974ab1926a24825b4c4f1c18)), fixes [#590](https://github.com/jolars/panache/issues/590)
+- **lint:** avoid list warnings on wrapped prose numbers ([`ea2b67a`](https://github.com/jolars/panache/commit/ea2b67a1433866b2c0f67a7f38f948b55abac196))
+- **lint:** use Jarl byte ranges for diagnostic spans ([`7673719`](https://github.com/jolars/panache/commit/767371946653447aa970cdd94cebe32e7319a055))
+- **docs:** repair indexing signals and redirects ([`77928c7`](https://github.com/jolars/panache/commit/77928c744974848cffc5f685032622c6c99669c4))
+- **lint:** retain diagnostics spanning code chunks ([`10ec7c1`](https://github.com/jolars/panache/commit/10ec7c173ce450f76b115ceb327a02da05990c3e)), fixes [#586](https://github.com/jolars/panache/issues/586)
+- **lint:** respect R chunk error options ([`f8a557d`](https://github.com/jolars/panache/commit/f8a557d76dc92b92bc578301c3afcd11fc6c2389)), ref [#586](https://github.com/jolars/panache/issues/586)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.28.2
+- updated crates/panache-parser to v0.34.2
+
 ## [3.17.1](https://github.com/jolars/panache/compare/v3.17.0...v3.17.1) (2026-10-26)
 
 ### Bug Fixes

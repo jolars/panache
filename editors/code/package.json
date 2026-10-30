@@ -2,7 +2,7 @@
   "name": "panache",
   "displayName": "Panache",
   "description": "Language server for Quarto and other Markdown flavors",
-  "version": "3.17.1",
+  "version": "3.17.2",
   "publisher": "jolars",
   "license": "MIT",
   "icon": "icon.png",
