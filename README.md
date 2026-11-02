@@ -1,16 +1,13 @@
 # Panache <img src='https://raw.githubusercontent.com/jolars/panache/refs/heads/main/images/logo.png' align="right" width="139" />
 
-[![Build and
-Test](https://github.com/jolars/panache/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/jolars/panache/build-and-test.yml?branch=main&label=CI)](https://github.com/jolars/panache/actions/workflows/build-and-test.yml)
 [![Crates.io](https://img.shields.io/crates/v/panache.svg?logo=rust)](https://crates.io/crates/panache)
 [![Open
 VSX](https://img.shields.io/open-vsx/v/jolars/panache?logo=vsix)](https://open-vsx.org/extension/jolars/panache)
 [![VS
 Code](https://vsmarketplacebadges.dev/version-short/jolars.panache.svg?logo=vsix)](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
-[![PyPI
-version](https://badge.fury.io/py/panache-cli.svg?icon=si%3Apython)](https://badge.fury.io/py/panache-cli)
-[![npm
-version](https://badge.fury.io/js/@panache-cli%2Fpanache.svg?icon=si%3Anpm)](https://badge.fury.io/js/@panache-cli%2Fpanache)
+[![PyPi](https://img.shields.io/pypi/v/panache-cli?logo=python&label=PyPi)](https://badge.fury.io/py/panache-cli)
+[![npm](https://img.shields.io/npm/v/@panache-cli/panache?logo=npm&label=npm)](https://badge.fury.io/js/@panache-cli%2Fpanache)
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.18608442-blue)](https://doi.org/10.5281/zenodo.18608442)
 
 Panache is a language server, formatter, and linter for Quarto and other
