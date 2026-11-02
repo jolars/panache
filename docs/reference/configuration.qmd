@@ -632,10 +632,10 @@ single invocation, e.g. `panache format -o wrap=sentence`.
 ### Sentence-Wrapping Abbreviations {#no-break-abbreviations}
 
 In `sentence` and `semantic` modes, Panache must decide whether a trailing
-period ends a sentence or merely an abbreviation (`etc.`, `e.g.`). It picks a
-built-in abbreviation list from the document's language, read from the YAML
-`lang:` metadata (the same field Quarto and Pandoc use). Built-in profiles ship
-for English (`en`), Czech (`cs`), German (`de`), Spanish (`es`), and French
+period ends a sentence or merely an abbreviation (`etc.`, `e.g.`, `et al.`). It
+picks a built-in abbreviation list from the document's language, read from the
+YAML `lang:` metadata (the same field Quarto and Pandoc use). Built-in profiles
+ship for English (`en`), Czech (`cs`), German (`de`), Spanish (`es`), and French
 (`fr`); unknown languages fall back to English. Region subtags fold to their
 primary subtag, so `de-AT` uses the German profile.
 

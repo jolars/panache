@@ -698,6 +698,7 @@ golden_test_cases!(
     sentence_wrap_basic,
     issue_549_punctuation_spacing,
     sentence_wrap_abbreviations,
+    sentence_wrap_et_al,
     sentence_wrap_contextual_abbrev,
     sentence_wrap_lang_metadata,
     sentence_wrap_list_blockquote,

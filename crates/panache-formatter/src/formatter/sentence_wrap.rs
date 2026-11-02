@@ -50,7 +50,7 @@ struct LanguageProfile {
 const ENGLISH_PROFILE: LanguageProfile = LanguageProfile {
     no_break_abbreviations: &[
         "e.g.", "i.e.", "etc.", "mr.", "mrs.", "ms.", "dr.", "prof.", "vs.", "cf.", "fig.",
-        "figs.", "eq.", "dept.", "st.",
+        "figs.", "eq.", "dept.", "st.", "al.",
     ],
     contextual_abbreviations: &["co.", "inc.", "ltd.", "corp.", "u.s.", "u.k."],
     meridiem_abbreviations: &["a.m.", "p.m."],
