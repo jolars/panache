@@ -240,9 +240,9 @@
   },
   "devDependencies": {
     "@types/adm-zip": "^0.6.0",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/vscode": "1.91.0",
-    "@vscode/vsce": "^4.0.0",
+    "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
     "npm-run-all2": "^9.0.4",
     "typescript": "^7.0.2"
