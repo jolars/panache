@@ -204,17 +204,17 @@ use `flavor`, which defaults to `pandoc`.
 
 The plugin accepts these settings under `panache`:
 
-  | Key                  | Values                                                                    | Default     |
-  | -------------------- | ---------------------------------------------------------------------     | ----------- |
-  | `flavor`             | `pandoc`, `quarto`, `rmarkdown`, `gfm`, `commonmark`, `multimarkdown`     | `pandoc`    |
-  | `wrap`               | `reflow`, `preserve`, `sentence`, `semantic`                              | `reflow`    |
-  | `blankLines`         | `collapse`, `preserve`                                                    | `collapse`  |
-  | `mathIndent`         | Integer number of spaces                                                  | `2`         |
-  | `mathDelimiterStyle` | `preserve`, `dollars`, `backslash`                                        | `preserve`  |
-  | `tabStops`           | `normalize`, `preserve`                                                   | `normalize` |
-  | `lineEnding`         | `auto`, `lf`, `crlf`                                                      | `auto`      |
-  | `lineWidth`          | Integer; uses dprint's global `lineWidth` when set                        | `80`        |
-  | `tabWidth`           | Integer; uses dprint's global `indentWidth` when set                      | `4`         |
+  | Key                  | Values                                                                | Default     |
+  | -------------------- | --------------------------------------------------------------------- | ----------- |
+  | `flavor`             | `pandoc`, `quarto`, `rmarkdown`, `gfm`, `commonmark`, `multimarkdown` | `pandoc`    |
+  | `wrap`               | `reflow`, `preserve`, `sentence`, `semantic`                          | `reflow`    |
+  | `blankLines`         | `collapse`, `preserve`                                                | `collapse`  |
+  | `mathIndent`         | Integer number of spaces                                              | `2`         |
+  | `mathDelimiterStyle` | `preserve`, `dollars`, `backslash`                                    | `preserve`  |
+  | `tabStops`           | `normalize`, `preserve`                                               | `normalize` |
+  | `lineEnding`         | `auto`, `lf`, `crlf`                                                  | `auto`      |
+  | `lineWidth`          | Integer; uses dprint's global `lineWidth` when set                    | `80`        |
+  | `tabWidth`           | Integer; uses dprint's global `indentWidth` when set                  | `4`         |
 
 The plugin reads `dprint.json` and does not load `panache.toml`. Use dprint's
 top-level `includes` and `excludes` for file selection; Panache's TOML
