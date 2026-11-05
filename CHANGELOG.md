@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.17.3](https://github.com/jolars/panache/compare/v3.17.2...v3.17.3) (2026-11-05)
+
+### Bug Fixes
+
+- **cli:** reject unknown extension overrides ([`5ce0483`](https://github.com/jolars/panache/commit/5ce0483a6965c5e1f290f1de05bdf883c640a1fd)), fixes [#600](https://github.com/jolars/panache/issues/600)
+- **formatter:** preserve list block separators ([`fd9dbf4`](https://github.com/jolars/panache/commit/fd9dbf4c945296f4e38af94ae0e0d301d679092b)), fixes [#602](https://github.com/jolars/panache/issues/602)
+- **formatter:** trim excess pipe table padding ([`d77e076`](https://github.com/jolars/panache/commit/d77e076b58f5a90e574e82366ebede92b137e4f3)), fixes [#599](https://github.com/jolars/panache/issues/599)
+- **formatter:** keep `et al.` together ([`a5bb5e1`](https://github.com/jolars/panache/commit/a5bb5e11301bb373a2034f3ec3362dd258e50b42)), closes [#593](https://github.com/jolars/panache/issues/593)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.28.3
+
 ## [3.17.2](https://github.com/jolars/panache/compare/v3.17.1...v3.17.2) (2026-10-30)
 
 ### Bug Fixes
