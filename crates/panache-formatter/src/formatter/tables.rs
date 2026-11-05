@@ -838,26 +838,26 @@ fn pipe_table_layout(
         })
         .collect();
     let cols = marker_widths.len();
-    let source_rows: Vec<Vec<usize>> = table
-        .cell_rows()
-        .filter_map(TableRowNode::cast)
-        .map(|row| pipe_row_source_widths(&row, config))
-        .collect();
     let wide_source = std::iter::once(marker_widths.iter().sum::<usize>())
-        .chain(source_rows.iter().map(|row| row.iter().sum()))
+        .chain(
+            table
+                .cell_rows()
+                .filter_map(TableRowNode::cast)
+                .map(|row| pipe_row_source_widths(&row, config).iter().sum()),
+        )
         .any(|width| width + cols + 1 > PANDOC_READER_COLUMNS);
 
     if wide_source {
         // Padding may change, but the dash/colon counts encode the proportions.
-        // Retaining source field widths also keeps the table in wide mode.
         layout.separator_widths = marker_widths;
         for (width, marker_width) in layout.cell_widths.iter_mut().zip(&layout.separator_widths) {
             *width = (*width).max(*marker_width);
         }
-        for row in source_rows {
-            for (width, source_width) in layout.cell_widths.iter_mut().zip(row) {
-                *width = (*width).max(source_width.saturating_sub(2));
-            }
+        // Keep Pandoc's explicit-width interpretation without carrying over
+        // arbitrary source padding into every formatted row.
+        let formatted_width = layout.cell_widths.iter().sum::<usize>() + 3 * cols + 1;
+        if let Some(width) = layout.cell_widths.last_mut() {
+            *width += (PANDOC_READER_COLUMNS + 1).saturating_sub(formatted_width);
         }
     } else if layout.cell_widths.iter().sum::<usize>() + 3 * cols + 1 > PANDOC_READER_COLUMNS {
         // Aligning individually narrow rows can introduce explicit widths.

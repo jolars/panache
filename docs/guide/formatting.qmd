@@ -294,9 +294,11 @@ recognizes them as tables.
 
 #### Pipe Tables
 
-Panache pads cells to show each column's alignment in the source. In
-Pandoc-based flavors, Panache preserves separator widths when they control the
-rendered column proportions.
+Panache pads cells to show each column's alignment in the source and discards
+excess source padding. In Pandoc-based flavors, it preserves separator dash
+counts when they control the rendered column proportions. Pandoc uses these
+proportions only when a source row exceeds its reader width (72 columns by
+default), so Panache keeps enough padding to stay above that threshold.
 
 Input
 

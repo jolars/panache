@@ -380,6 +380,7 @@ golden_test_cases!(
     pipe_table_cell_whitespace_collapse,
     issue_538_nested_table_whitespace,
     table_whitespace_preserves_widths_538,
+    issue_599_pipe_table_excess_padding,
     caption_fence_continuation_before_table,
     table_caption_in_footnote_stops_at_note_marker,
     multiline_table_in_div_stops_at_closer,

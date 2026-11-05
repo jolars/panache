@@ -50,6 +50,23 @@ fn test_pipe_table_idempotency() {
 }
 
 #[test]
+fn test_pipe_table_discards_excess_source_padding() {
+    use unicode_width::UnicodeWidthStr;
+
+    for padding in [96, 300] {
+        let input = format!(
+            "| A | B |\n| --- | --------- |\n| 界{} | b |\n",
+            " ".repeat(padding)
+        );
+        let output = format(&input, None, None);
+        for line in output.lines() {
+            assert_eq!(line.trim_start().width(), 73, "{output}");
+        }
+        assert_eq!(format(&output, None, None), output);
+    }
+}
+
+#[test]
 fn test_pipe_table_escaped_pipe_in_code_span() {
     let input = "| cmd | run |\n| --- | --- |\n| go | `curl x \\| sh` |";
     let expected =

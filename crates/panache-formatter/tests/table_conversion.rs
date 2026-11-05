@@ -839,6 +839,29 @@ fn pandoc(text: &str) -> serde_json::Value {
 }
 
 #[test]
+fn pipe_formatting_discards_padding_without_changing_pandoc_widths() {
+    if std::process::Command::new("pandoc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("Skipping table width oracle: pandoc is unavailable");
+        return;
+    }
+    let fixture =
+        include_str!("../../../tests/fixtures/cases/issue_599_pipe_table_excess_padding/input.md");
+    let widths = include_str!(
+        "../../../tests/fixtures/cases/table_whitespace_preserves_widths_538/input.md"
+    );
+    for source in [fixture, widths] {
+        let output = format(source, None, None);
+        assert_eq!(pandoc_colspecs(&output), pandoc_colspecs(source));
+        assert_eq!(pandoc(&output), pandoc(source));
+        assert_eq!(format(&output, None, None), output);
+    }
+}
+
+#[test]
 fn multiline_formatting_preserves_column_widths() {
     if std::process::Command::new("pandoc")
         .arg("--version")
