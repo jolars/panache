@@ -269,7 +269,8 @@ inside the quote follow the chosen wrapping mode.
 
 Panache preserves the blank line between a list and a following block quote. To
 place a quote inside a list item, indent its `>` markers to align with the
-item's text.
+item's text. Inside a list item, Panache also preserves the blank line between a
+quote and a following paragraph so the paragraph stays outside the quote.
 
 Input
 

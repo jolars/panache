@@ -996,11 +996,18 @@ impl Formatter {
             }
 
             for child in node.children() {
-                if &child == leading_heading || child.kind() == SyntaxKind::BLANK_LINE {
+                if &child == leading_heading {
                     continue;
                 }
 
                 match child.kind() {
+                    SyntaxKind::BLANK_LINE => {
+                        // Without this separator, later paragraphs can become
+                        // lazy continuations of a preceding blockquote.
+                        if !self.output.ends_with("\n\n") {
+                            self.output.push('\n');
+                        }
+                    }
                     k if Self::is_item_content_block(k) => {
                         self.format_list_continuation_paragraph(&child, hanging);
                     }
