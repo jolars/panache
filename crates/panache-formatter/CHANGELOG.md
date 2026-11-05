@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.3](https://github.com/jolars/panache/compare/panache-formatter-v0.28.2...panache-formatter-v0.28.3) (2026-11-05)
+
+### Bug Fixes
+
+- **formatter:** preserve list block separators ([`fd9dbf4`](https://github.com/jolars/panache/commit/fd9dbf4c945296f4e38af94ae0e0d301d679092b)), fixes [#602](https://github.com/jolars/panache/issues/602)
+- **formatter:** trim excess pipe table padding ([`d77e076`](https://github.com/jolars/panache/commit/d77e076b58f5a90e574e82366ebede92b137e4f3)), fixes [#599](https://github.com/jolars/panache/issues/599)
+- **formatter:** keep `et al.` together ([`a5bb5e1`](https://github.com/jolars/panache/commit/a5bb5e11301bb373a2034f3ec3362dd258e50b42)), closes [#593](https://github.com/jolars/panache/issues/593)
+
 ## [0.28.2](https://github.com/jolars/panache/compare/panache-formatter-v0.28.1...panache-formatter-v0.28.2) (2026-10-30)
 
 ### Dependencies
