@@ -252,6 +252,8 @@ pub enum Commands {
             true/false/1/0/yes/no/on/off). \
             \n\nExample: `--option line-width=100 -o wrap=sentence \
             -o extensions.east-asian-line-breaks=true`. \
+            Extension names use hyphens (e.g. `east-asian-line-breaks`), whereas Pandoc \
+            uses underscores (`east_asian_line_breaks`). \
             \n\nNote: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so \
             that everyone formatting the repository gets the same result."
         )]
