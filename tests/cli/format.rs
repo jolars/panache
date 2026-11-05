@@ -895,6 +895,60 @@ fn test_format_option_rejects_unknown_key() {
 }
 
 #[test]
+fn test_format_option_rejects_unknown_extension_with_suggestion() {
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--isolated",
+            "--flavor",
+            "pandoc",
+            "-o",
+            "extensions.east-asian-line-breaks=true",
+            "-o",
+            "extensions.west-asian-line-breaks=true",
+            "-o",
+            "wrap=preserve",
+        ])
+        .write_stdin("# Heading\n")
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr(predicate::str::contains(
+            "unknown extension `west-asian-line-breaks` in --option",
+        ))
+        .stderr(predicate::str::contains(
+            "did you mean `east-asian-line-breaks`?",
+        ));
+}
+
+#[test]
+fn test_format_option_rejects_unknown_extension_without_changing_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.md");
+    let input = "#   Heading\n";
+    fs::write(&test_file, input).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--isolated",
+            "--no-cache",
+            "-o",
+            "extensions.not-a-real-extension=false",
+        ])
+        .arg(&test_file)
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr(predicate::str::contains(
+            "unknown extension `not-a-real-extension` in --option",
+        ))
+        .stderr(predicate::str::contains("did you mean").not());
+
+    assert_eq!(fs::read_to_string(&test_file).unwrap(), input);
+}
+
+#[test]
 fn test_format_option_rejects_missing_equals() {
     cargo_bin_cmd!("panache")
         .args(["format", "-o", "line-width"])
