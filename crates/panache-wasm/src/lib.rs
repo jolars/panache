@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 use panache_formatter::config::{
-    BlankLines, Flavor, HorizontalRuleStyle, LineEnding, MathDelimiterStyle, MathMode,
-    ParserExtensions, TabStopMode, WrapMode,
+    BlankLines, Flavor, FormatterExtensions, HorizontalRuleStyle, LineEnding, MathDelimiterStyle,
+    MathMode, ParserExtensions, TabStopMode, WrapMode,
 };
 
 fn parse_flavor(value: &str) -> Option<Flavor> {
@@ -64,6 +64,29 @@ mod hugo_tests {
         assert_eq!(overrides.get("strikeout"), Some(&false));
         assert_eq!(overrides.get("task-lists"), Some(&true));
         assert!(super::parse_extension_overrides("+nope").is_err());
+        // Formatter-only extensions are valid too.
+        assert!(super::parse_extension_overrides("-smart +smart-quotes").is_ok());
+    }
+
+    #[test]
+    fn extension_overrides_reach_formatter() {
+        let output = super::format_qmd_with_options(
+            "a  \nb\n",
+            None,
+            Some("pandoc".to_owned()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("-escaped-line-breaks".to_owned()),
+        )
+        .unwrap();
+        assert_eq!(output, "a  \nb\n");
     }
 
     #[test]
@@ -158,7 +181,7 @@ fn parse_extension_overrides(value: &str) -> Result<HashMap<String, bool>, Strin
                 Some(name) => (false, name),
                 None => (true, token.strip_prefix('+').unwrap_or(token)),
             };
-            if ParserExtensions::is_known_name(name) {
+            if ParserExtensions::is_known_name(name) || FormatterExtensions::is_known_name(name) {
                 Ok((name.to_owned(), enabled))
             } else {
                 Err(format!("Unknown extension: {name}"))
@@ -211,15 +234,15 @@ pub fn format_qmd_with_options(
             .ok_or_else(|| JsValue::from_str(&format!("Unsupported flavor: {flavor}")))?;
         cfg.flavor = parsed;
         cfg.parser_extensions = ParserExtensions::for_flavor(parsed);
-        cfg.formatter_extensions =
-            panache_formatter::config::FormatterExtensions::for_flavor(parsed);
+        cfg.formatter_extensions = FormatterExtensions::for_flavor(parsed);
     }
 
     // After the flavor block, so overrides apply on top of the flavor defaults.
     if let Some(extensions) = extensions {
         let overrides =
             parse_extension_overrides(&extensions).map_err(|e| JsValue::from_str(&e))?;
-        cfg.parser_extensions.apply_overrides(overrides);
+        cfg.parser_extensions.apply_overrides(overrides.clone());
+        cfg.formatter_extensions.apply_overrides(overrides);
     }
 
     if let Some(wrap) = wrap {
