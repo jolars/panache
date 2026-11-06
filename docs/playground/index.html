@@ -115,6 +115,7 @@
                                     <option value="gfm">GFM</option>
                                     <option value="hugo">Hugo</option>
                                     <option value="common-mark">CommonMark</option>
+                                    <option value="myst">MyST</option>
                                 </select>
                             </div>
                             <div class="col-12 col-sm-6 col-lg-2">
@@ -180,6 +181,22 @@
                             </div>
                         </div>
 
+                        <div class="row g-3 align-items-end mb-1">
+                            <div class="col-12">
+                                <label class="form-label fw-semibold mb-1" for="extensions">Extensions</label>
+                                <input id="extensions"
+                                       class="form-control font-monospace"
+                                       type="text"
+                                       spellcheck="false"
+                                       placeholder="+definition-lists -strikeout"
+                                       aria-describedby="extensions-help">
+                                <div id="extensions-help" class="form-text">
+                                    Override the flavor's default extensions: <code>+name</code> enables, <code>-name</code> disables.
+                                    Names match the <code>[extensions]</code> config keys.
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="row g-3 mt-1">
                             <div class="col-12 col-xl-6">
                                 <label class="pane-title" for="input">Input</label>
@@ -227,6 +244,7 @@
           mathIndent: readInt("math-indent", 2),
           tabStops: $("tab-stops").value,
           tabWidth: readInt("tab-width", 4),
+          extensions: $("extensions").value,
         };
       }
 
@@ -255,6 +273,9 @@
           tabStops: options.tabStops,
           tabWidth: String(options.tabWidth),
         });
+        if (options.extensions.trim()) {
+          params.set("extensions", options.extensions);
+        }
         history.replaceState(null, "", "?" + params.toString());
       }
 
@@ -270,6 +291,7 @@
           mathIndent: "math-indent",
           tabStops: "tab-stops",
           tabWidth: "tab-width",
+          extensions: "extensions",
         };
 
         for (const [key, id] of Object.entries(controls)) {
@@ -285,6 +307,7 @@
         const input = $("input").value;
         const options = currentOptions();
         const validationError = validateOptions(options);
+        updateQueryString(options);
 
         if (validationError) {
           $("output").value = "";
@@ -305,8 +328,9 @@
             options.tabStops,
             options.tabWidth,
             options.mathIndent,
+            undefined,
+            options.extensions,
           );
-          updateQueryString(options);
           setStatus("Formatted successfully.");
         } catch (error) {
           $("output").value = "";
@@ -335,6 +359,7 @@
           "math-indent",
           "tab-stops",
           "tab-width",
+          "extensions",
         ].forEach((id) => {
           $(id).addEventListener("input", applyFormat);
         });
