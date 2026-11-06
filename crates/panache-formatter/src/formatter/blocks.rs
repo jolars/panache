@@ -1,6 +1,6 @@
 use crate::config::WrapMode;
 use crate::formatter::preserve::{preserve_lines_normalized, preserve_lines_unprefixed_normalized};
-use crate::formatter::smart::normalize_smart_punctuation;
+use crate::formatter::smart::smart_node_text;
 use crate::formatter::utils::is_block_element;
 use crate::formatter::{Formatter, paragraphs};
 use crate::syntax::{SyntaxKind, SyntaxNode};
@@ -20,7 +20,7 @@ impl Formatter {
         }
 
         let para_start = self.output.len();
-        let text = node.text().to_string();
+        let text = smart_node_text(node, &self.config);
         log::trace!("Formatting paragraph, text length: {}", text.len());
         let paragraph_indent = " ".repeat(indent);
 
@@ -31,24 +31,10 @@ impl Formatter {
                         self.output.push('\n');
                     }
                     self.output.push_str(&paragraph_indent);
-                    self.output.push_str(
-                        normalize_smart_punctuation(
-                            line.trim_start(),
-                            self.config.formatter_extensions.smart,
-                            self.config.formatter_extensions.smart_quotes,
-                        )
-                        .as_ref(),
-                    );
+                    self.output.push_str(line.trim_start());
                 }
             } else {
-                self.output.push_str(
-                    normalize_smart_punctuation(
-                        &text,
-                        self.config.formatter_extensions.smart,
-                        self.config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
+                self.output.push_str(&text);
             }
             if !self.output.ends_with('\n') {
                 self.output.push('\n');
@@ -65,24 +51,10 @@ impl Formatter {
                         self.output.push('\n');
                     }
                     self.output.push_str(&paragraph_indent);
-                    self.output.push_str(
-                        normalize_smart_punctuation(
-                            line.trim_start(),
-                            self.config.formatter_extensions.smart,
-                            self.config.formatter_extensions.smart_quotes,
-                        )
-                        .as_ref(),
-                    );
+                    self.output.push_str(line.trim_start());
                 }
             } else {
-                self.output.push_str(
-                    normalize_smart_punctuation(
-                        &text,
-                        self.config.formatter_extensions.smart,
-                        self.config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
+                self.output.push_str(&text);
             }
             if !self.output.ends_with('\n') {
                 self.output.push('\n');
@@ -100,24 +72,10 @@ impl Formatter {
                         self.output.push('\n');
                     }
                     self.output.push_str(&paragraph_indent);
-                    self.output.push_str(
-                        normalize_smart_punctuation(
-                            line.trim_start(),
-                            self.config.formatter_extensions.smart,
-                            self.config.formatter_extensions.smart_quotes,
-                        )
-                        .as_ref(),
-                    );
+                    self.output.push_str(line.trim_start());
                 }
             } else {
-                self.output.push_str(
-                    normalize_smart_punctuation(
-                        &text,
-                        self.config.formatter_extensions.smart,
-                        self.config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
+                self.output.push_str(&text);
             }
             if !self.output.ends_with('\n') {
                 self.output.push('\n');

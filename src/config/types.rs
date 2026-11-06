@@ -3,7 +3,9 @@ use std::collections::{BTreeMap, HashMap};
 use schemars::{JsonSchema, Schema};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use panache_formatter::config::{FormatterExtensions, MathArgumentConfig, MathMode};
+use panache_formatter::config::{
+    FormatterExtensions, MathArgumentConfig, MathMode, SmartPunctuation,
+};
 use panache_parser::{Extensions, Flavor, PandocCompat, ParserOptions};
 
 use super::formatter_presets;
@@ -362,13 +364,20 @@ pub struct StyleConfig {
     pub tab_width: usize,
     /// Horizontal rule rendering: expanded to the line width or compact `---`
     pub horizontal_rule_style: HorizontalRuleStyle,
+    /// How to write punctuation that the `smart` extension makes equivalent:
+    /// `ascii` (`"`, `--`, `...`), `unicode` (`“”`, `–`, `…`), or `preserve`.
+    pub smart_punctuation: SmartPunctuation,
+    /// Quotes for `smart-punctuation = "unicode"` as `[open double, close
+    /// double, open single, close single]`. Defaults to the quotes of the
+    /// document language (`lang:` metadata or `lang`).
+    pub quotes: Option<[char; 4]>,
     /// Use panache-native greedy wrapping instead of textwrap.
     pub built_in_greedy_wrap: bool,
     /// Extra abbreviations whose trailing period must not end a sentence (used
     /// by `wrap = "sentence"`). Merged with the built-in per-language profile.
     pub no_break_abbreviations: Option<NoBreakAbbreviations>,
-    /// Fallback document language for sentence wrapping when the document has no
-    /// YAML `lang:`. A code such as `de` or `pt-BR`.
+    /// Fallback document language for sentence wrapping and localized quotes
+    /// when the document has no YAML `lang:`. A code such as `de` or `pt-BR`.
     pub lang: Option<String>,
 }
 
@@ -387,6 +396,8 @@ impl Default for StyleConfig {
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             horizontal_rule_style: HorizontalRuleStyle::LineWidth,
+            smart_punctuation: SmartPunctuation::default(),
+            quotes: None,
             built_in_greedy_wrap: true,
             no_break_abbreviations: None,
             lang: None,
@@ -947,6 +958,8 @@ impl RawConfig {
             wrap: style.wrap,
             blank_lines,
             horizontal_rule_style: style.horizontal_rule_style,
+            smart_punctuation: style.smart_punctuation,
+            quotes: style.quotes,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
             math,
@@ -1118,6 +1131,10 @@ pub struct Config {
     pub blank_lines: BlankLines,
     /// Horizontal rule rendering: expanded to the line width or compact `---`.
     pub horizontal_rule_style: HorizontalRuleStyle,
+    /// Spelling of `smart`-equivalent punctuation.
+    pub smart_punctuation: SmartPunctuation,
+    /// Explicit quotes for `smart-punctuation = "unicode"`.
+    pub quotes: Option<[char; 4]>,
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
@@ -1192,6 +1209,8 @@ impl Default for Config {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             horizontal_rule_style: HorizontalRuleStyle::LineWidth,
+            smart_punctuation: SmartPunctuation::default(),
+            quotes: None,
             formatters: HashMap::new(), // Opt-in: empty by default
             linter_definitions: HashMap::new(),
             linters: HashMap::new(), // Opt-in: empty by default

@@ -676,6 +676,66 @@ Text.[@citation]
 Next sentence.
 ```
 
+### Smart Punctuation {#smart-punctuation}
+
+With the [`smart`](#special-character-extensions) extension, Pandoc renders
+`"…"`, `'…'`, `--`, `---`, and `...` as curly quotes, en and em dashes, and an
+ellipsis, so both spellings produce the same output. `smart-punctuation` picks
+the spelling Panache writes:
+
+```toml
+[format]
+smart-punctuation = "unicode"
+```
+
+`ascii`
+:   Write `"`, `'`, `--`, `---`, and `...` (default).
+
+`unicode`
+:   Write curly quotes in the style of the document language, `’` for
+    apostrophes, and `–`, `—`, `…`.
+
+`preserve`
+:   Leave punctuation as written.
+
+The setting only applies where the `smart` extension is enabled. With only
+`smart-quotes` enabled, it applies to quotes and leaves dashes and ellipses as
+written. Code, math, URLs, attributes, link titles, raw HTML, and table cells
+are never changed.
+
+In `unicode` mode, Panache pairs quotes like Pandoc does: a quote opens after
+whitespace or punctuation and closes before it. A quote without a partner keeps
+its spelling, since Pandoc would render it literally. Existing curly quotes are
+paired the same way, so a document is re-localized when its language changes.
+
+The quote style comes from the document's YAML `lang:` metadata, falling back
+to `[format] lang` and then to English:
+
+| Language                       | Quotes              |
+|--------------------------------|---------------------|
+| English and others             | “double” ‘single’   |
+| `de`, `cs`, `sk`               | „double“ ‚single‘   |
+| `fr`                           | «double» «single»   |
+| `fr-CH`                        | «double» ‹single›   |
+| `it`, `pt-PT`                  | «double» “single”   |
+| `ru`, `uk`                     | «double» „single“   |
+| `pl`                           | „double” «single»   |
+| `sv`, `fi`                     | ”double” ’single’   |
+| `nb`, `nn`, `no`               | «double» ‘single’   |
+| `nl`                           | ‘double’ ‘single’   |
+| `ja`                           | 「double」『single』 |
+
+The styles follow the [Unicode CLDR](https://cldr.unicode.org/) locale data.
+
+French spacing inside guillemets is not added. To use other quotes, list them
+as opening double, closing double, opening single, and closing single quote:
+
+```toml
+[format]
+smart-punctuation = "unicode"
+quotes = ["»", "«", "›", "‹"]
+```
+
 ### Math Formatting
 
 Configure math content formatting, delimiters, and display indentation:
@@ -1342,17 +1402,19 @@ mark = false
     `east_asian_line_breaks` extension.
 
 `smart`
-:   Normalize smart/curly punctuation in formatter output (quotes/apostrophes
-    and en/em dashes, plus ellipsis) to Markdown forms (`'`, `"`, `--`, `---`,
-    `...`). Defaults: enabled for `pandoc`, `quarto`, `rmarkdown`; disabled for
-    `gfm`, `commonmark`, `multimarkdown`. A dash that would land alone on a line
-    (e.g. a paragraph that is just `---`) is left as the Unicode character
-    instead, since `---`/`--` there would re-parse as a thematic break or setext
-    underline.
+:   The renderer treats `"`, `'`, `--`, `---`, and `...` as curly quotes,
+    dashes, and ellipsis, so Panache may switch between those and the Unicode
+    characters. [`smart-punctuation`](#smart-punctuation) picks the direction;
+    by default Panache writes the Markdown forms. Defaults: enabled for
+    `pandoc`, `quarto`, `rmarkdown`; disabled for `gfm`, `commonmark`,
+    `multimarkdown`. When writing Markdown forms, a dash that would land alone
+    on a line (e.g. a paragraph that is just `—`) is left as the Unicode
+    character instead, since `---`/`--` there would re-parse as a thematic break
+    or setext underline.
 
 `smart-quotes`
-:   Normalize smart/curly quotes and apostrophes only (`'`, `"`). Unlike
-    `smart`, this does not normalize dashes or ellipsis. Default: disabled.
+:   Like `smart`, but for quotes and apostrophes only (`'`, `"`); dashes and
+    ellipses are left as written. Default: disabled.
 
 `emoji`
 :   Emoji syntax `:emoji:` (default: disabled, non-default extension)

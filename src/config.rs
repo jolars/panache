@@ -1952,6 +1952,34 @@ mod tests {
     }
 
     #[test]
+    fn smart_punctuation_and_quotes_parse_and_default() {
+        use panache_formatter::SmartPunctuation;
+        let cfg = parse_config_str(
+            "[format]\nsmart-punctuation = \"unicode\"\nquotes = [\"„\", \"“\", \"‚\", \"‘\"]\n",
+            Path::new("panache.toml"),
+        )
+        .expect("[format] smart-punctuation and quotes must parse");
+        assert_eq!(cfg.smart_punctuation, SmartPunctuation::Unicode);
+        assert_eq!(cfg.quotes, Some(['„', '“', '‚', '‘']));
+
+        let cfg = parse_config_str("[format]\n", Path::new("panache.toml"))
+            .expect("empty [format] section must parse");
+        assert_eq!(cfg.smart_punctuation, SmartPunctuation::Ascii);
+        assert_eq!(cfg.quotes, None);
+    }
+
+    #[test]
+    fn quotes_rejects_wrong_length_or_multi_char_entries() {
+        for value in ["[\"„\", \"“\"]", "[\"«\u{202F}\", \"»\", \"‹\", \"›\"]"] {
+            let toml = format!("[format]\nquotes = {value}\n");
+            assert!(
+                parse_config_str(&toml, Path::new("panache.toml")).is_err(),
+                "quotes = {value} must be rejected"
+            );
+        }
+    }
+
+    #[test]
     fn compat_quarto_resolves_into_lint_config() {
         let toml = "[compat]\nquarto = \"1.9\"\n[lint.rules]\nquarto-schema = false\n";
         let cfg = parse_config_str(toml, Path::new("panache.toml"))

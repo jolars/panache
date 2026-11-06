@@ -104,6 +104,10 @@ pub(crate) fn to_formatter_config(config: &Config) -> panache_formatter::Config 
         wrap,
         blank_lines,
         horizontal_rule_style,
+        smart_punctuation: config.smart_punctuation,
+        quotes: config.quotes,
+        // Derived per document in `Formatter::format`.
+        smart_text: Default::default(),
         lang: config.lang.clone(),
         no_break_abbreviations,
         formatters,

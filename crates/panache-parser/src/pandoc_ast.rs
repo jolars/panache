@@ -4409,9 +4409,7 @@ fn coalesce_inlines_inner(input: Vec<Inline>, trim_edges: bool) -> Vec<Inline> {
     }
     for inline in out.iter_mut() {
         if let Inline::Str(s) = inline {
-            let mut t = smart_intraword_apostrophe(s);
-            t = smart_dashes_and_ellipsis(&t);
-            *s = t;
+            *s = crate::smart::dashes_and_ellipsis(&crate::smart::intraword_apostrophe(s));
         }
     }
     let out = smart_quote_pairs(out);
@@ -4491,230 +4489,69 @@ fn apply_abbreviations(inlines: Vec<Inline>) -> Vec<Inline> {
 }
 
 fn smart_quote_pairs(inlines: Vec<Inline>) -> Vec<Inline> {
-    fn is_boundary(prev: Option<&Inline>) -> bool {
-        match prev {
-            None => true,
-            Some(Inline::Space | Inline::SoftBreak | Inline::LineBreak) => true,
-            Some(Inline::Str(s)) => s.chars().last().is_some_and(|c| !c.is_alphanumeric()),
-            _ => false,
-        }
-    }
+    use crate::smart::{QuoteAtom, QuoteKind, quote_pairs};
+    let atoms: Vec<QuoteAtom<'_>> = inlines
+        .iter()
+        .map(|inline| match inline {
+            Inline::Str(s) => QuoteAtom::Str(s),
+            Inline::Space | Inline::SoftBreak | Inline::LineBreak => QuoteAtom::Space,
+            Inline::Emph(_)
+            | Inline::Strong(_)
+            | Inline::Strikeout(_)
+            | Inline::Superscript(_)
+            | Inline::Subscript(_)
+            | Inline::Code(_, _) => QuoteAtom::Markup,
+            _ => QuoteAtom::Other,
+        })
+        .collect();
+    let mut pairs = quote_pairs(&atoms).into_iter().peekable();
     let mut out: Vec<Inline> = Vec::with_capacity(inlines.len());
-    let n = inlines.len();
-    let mut consumed = vec![false; n];
-    for i in 0..n {
-        if consumed[i] {
-            continue;
-        }
-        let Inline::Str(s) = &inlines[i] else {
-            out.push(inlines[i].clone());
-            consumed[i] = true;
+    let mut iter = inlines.into_iter().enumerate();
+    while let Some((i, inline)) = iter.next() {
+        let Some(pair) = pairs.next_if(|pair| pair.open == i) else {
+            out.push(inline);
             continue;
         };
-        let first = s.chars().next();
-        let quote = match first {
-            Some('"') => Some('"'),
-            Some('\'') => Some('\''),
-            _ => None,
+        let kind = match pair.kind {
+            QuoteKind::Double => "DoubleQuote",
+            QuoteKind::Single => "SingleQuote",
         };
-        let prev_is_boundary = is_boundary(out.last());
-        let str_has_more = s.chars().count() > 1;
-        let next_char_is_word = s.chars().nth(1).is_some_and(|c| !c.is_whitespace());
-        let next_is_markup_atom = matches!(
-            inlines.get(i + 1),
-            Some(
-                Inline::Emph(_)
-                    | Inline::Strong(_)
-                    | Inline::Strikeout(_)
-                    | Inline::Superscript(_)
-                    | Inline::Subscript(_)
-                    | Inline::Code(_, _)
-            )
-        );
-        let attaches =
-            (str_has_more && next_char_is_word) || (!str_has_more && next_is_markup_atom);
-        if let Some(q) = quote
-            && prev_is_boundary
-            && attaches
-        {
-            // Closing-quote matching is a separate pass over the inline stream.
-            if let Some(close_idx) = find_matching_close(&inlines, i, q, &consumed) {
-                let kind = if q == '"' {
-                    "DoubleQuote"
-                } else {
-                    "SingleQuote"
-                };
-                let mut content: Vec<Inline> = Vec::new();
-                for j in i..=close_idx {
-                    if consumed[j] {
-                        continue;
-                    }
-                    let inline = &inlines[j];
-                    if j == i && j == close_idx {
-                        if let Inline::Str(s) = inline {
-                            let mut chars: Vec<char> = s.chars().collect();
-                            if chars.len() >= 2 {
-                                chars.remove(0);
-                                chars.pop();
-                            }
-                            let stripped: String = chars.into_iter().collect();
-                            if !stripped.is_empty() {
-                                content.push(Inline::Str(stripped));
-                            }
-                        }
-                    } else if j == i {
-                        if let Inline::Str(s) = inline {
-                            let stripped: String = s.chars().skip(1).collect();
-                            if !stripped.is_empty() {
-                                content.push(Inline::Str(stripped));
-                            }
-                        }
-                    } else if j == close_idx {
-                        if let Inline::Str(s) = inline {
-                            let mut stripped: String = s.chars().collect();
-                            stripped.pop();
-                            if !stripped.is_empty() {
-                                content.push(Inline::Str(stripped));
-                            }
-                        }
-                    } else {
-                        content.push(inline.clone());
-                    }
-                    consumed[j] = true;
-                }
-                out.push(Inline::Quoted(kind, content));
-                continue;
+        let mut content: Vec<Inline> = Vec::new();
+        let mut push_str = |s: String| {
+            if !s.is_empty() {
+                content.push(Inline::Str(s));
             }
-        }
-        out.push(inlines[i].clone());
-        consumed[i] = true;
-    }
-    out
-}
-
-fn find_matching_close(
-    inlines: &[Inline],
-    open_idx: usize,
-    quote: char,
-    consumed: &[bool],
-) -> Option<usize> {
-    if let Inline::Str(s) = &inlines[open_idx]
-        && s.chars().count() >= 3
-        && s.ends_with(quote)
-    {
-        let next = inlines.get(open_idx + 1);
-        let after_is_boundary = match next {
-            None => true,
-            Some(Inline::Space | Inline::SoftBreak | Inline::LineBreak) => true,
-            Some(Inline::Str(s)) => s.chars().next().is_some_and(|c| !c.is_alphanumeric()),
-            _ => false,
         };
-        if after_is_boundary {
-            return Some(open_idx);
-        }
-    }
-    let n = inlines.len();
-    let mut j = open_idx + 1;
-    while j < n {
-        if consumed[j] {
-            return None;
-        }
-        match &inlines[j] {
-            Inline::Str(s) => {
-                if s.ends_with(quote) {
-                    let next = inlines.get(j + 1);
-                    let after_is_boundary = match next {
-                        None => true,
-                        Some(Inline::Space | Inline::SoftBreak | Inline::LineBreak) => true,
-                        Some(Inline::Str(s)) => {
-                            s.chars().next().is_some_and(|c| !c.is_alphanumeric())
-                        }
-                        _ => false,
-                    };
-                    if after_is_boundary {
-                        return Some(j);
+        if pair.close == i {
+            if let Inline::Str(s) = inline {
+                let mut chars: Vec<char> = s.chars().collect();
+                if chars.len() >= 2 {
+                    chars.remove(0);
+                    chars.pop();
+                }
+                push_str(chars.into_iter().collect());
+            }
+        } else {
+            if let Inline::Str(s) = inline {
+                push_str(s.chars().skip(1).collect());
+            }
+            for (j, inner) in iter.by_ref() {
+                if j < pair.close {
+                    content.push(inner);
+                    continue;
+                }
+                if let Inline::Str(mut s) = inner {
+                    s.pop();
+                    if !s.is_empty() {
+                        content.push(Inline::Str(s));
                     }
                 }
-            }
-            Inline::Space | Inline::SoftBreak | Inline::LineBreak => {}
-            _ => {}
-        }
-        j += 1;
-        if j - open_idx > 32 {
-            return None;
-        }
-    }
-    None
-}
-
-fn smart_dashes_and_ellipsis(s: &str) -> String {
-    if !s.contains(['-', '.']) {
-        return s.to_string();
-    }
-    let bytes = s.as_bytes();
-    let mut out = String::with_capacity(s.len());
-    let mut i = 0usize;
-    while i < bytes.len() {
-        if bytes[i] == b'-' {
-            if i + 2 < bytes.len() && bytes[i + 1] == b'-' && bytes[i + 2] == b'-' {
-                out.push('\u{2014}');
-                i += 3;
-                continue;
-            }
-            if i + 1 < bytes.len() && bytes[i + 1] == b'-' {
-                out.push('\u{2013}');
-                i += 2;
-                continue;
+                break;
             }
         }
-        if bytes[i] == b'.' && i + 2 < bytes.len() && bytes[i + 1] == b'.' && bytes[i + 2] == b'.' {
-            out.push('\u{2026}');
-            i += 3;
-            continue;
-        }
-        let len = utf8_char_len(bytes[i]);
-        out.push_str(&s[i..i + len]);
-        i += len;
+        out.push(Inline::Quoted(kind, content));
     }
     out
-}
-
-fn utf8_char_len(b: u8) -> usize {
-    if b < 0xc0 {
-        1
-    } else if b < 0xe0 {
-        2
-    } else if b < 0xf0 {
-        3
-    } else {
-        4
-    }
-}
-
-fn smart_intraword_apostrophe(s: &str) -> String {
-    if !s.contains('\'') {
-        return s.to_string();
-    }
-    let chars: Vec<char> = s.chars().collect();
-    let mut out = String::with_capacity(s.len());
-    for (i, &c) in chars.iter().enumerate() {
-        if c == '\'' {
-            let prev = i.checked_sub(1).map(|j| chars[j]);
-            let next = chars.get(i + 1).copied();
-            let prev_word = prev.is_some_and(is_word_char);
-            let next_word = next.is_some_and(is_word_char);
-            if prev_word && next_word {
-                out.push('\u{2019}');
-                continue;
-            }
-        }
-        out.push(c);
-    }
-    out
-}
-
-fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric()
 }
 
 fn inlines_to_plaintext(inlines: &[Inline]) -> String {

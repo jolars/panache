@@ -3,7 +3,7 @@ use rowan::NodeOrToken;
 
 use super::core::normalize_attribute_text;
 use super::inline::{collapse_spaces, format_inline_node_with_spacing};
-use super::smart::normalize_smart_punctuation;
+use super::smart::smart_token_text;
 use crate::config::{Config, Flavor};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
@@ -42,19 +42,13 @@ pub(super) fn format_heading(node: &SyntaxNode, config: &Config) -> String {
                                     content.push(' ');
                                 }
                             } else {
+                                let text = smart_token_text(&t, config);
                                 let text = if collapse_ws && t.kind() == SyntaxKind::TEXT {
-                                    std::borrow::Cow::Owned(collapse_spaces(t.text()))
+                                    std::borrow::Cow::Owned(collapse_spaces(&text))
                                 } else {
-                                    std::borrow::Cow::Borrowed(t.text())
+                                    text
                                 };
-                                content.push_str(
-                                    normalize_smart_punctuation(
-                                        &text,
-                                        config.formatter_extensions.smart,
-                                        config.formatter_extensions.smart_quotes,
-                                    )
-                                    .as_ref(),
-                                );
+                                content.push_str(&text);
                             }
                         }
                         NodeOrToken::Node(n) => {

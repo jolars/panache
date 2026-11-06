@@ -8,6 +8,7 @@ use panache_parser::parser::blocks::headings::try_parse_atx_heading;
 use panache_parser::parser::blocks::horizontal_rules::try_parse_horizontal_rule;
 use panache_parser::parser::utils::attributes::{AttrComponent, attribute_content_spans};
 use rowan::NodeOrToken;
+use std::sync::Arc;
 
 use super::code_blocks;
 use super::code_blocks::FormattedCodeMap;
@@ -64,6 +65,7 @@ impl Formatter {
         }
     }
     pub fn format(mut self, node: &SyntaxNode) -> String {
+        self.config.smart_text = Arc::new(super::smart::smart_text_map(node, &self.config));
         self.format_node_sync(node, 0);
         if node.kind() == SyntaxKind::DOCUMENT {
             // An unfinished opaque block owns the document's final whitespace.
@@ -656,7 +658,7 @@ impl Formatter {
         node: &SyntaxNode,
         indent: usize,
     ) {
-        if !self.config.formatter_extensions.smart
+        if self.config.smart_text.is_empty()
             || !Self::produces_dash_block_marker(&self.output[start..])
         {
             return;
@@ -665,11 +667,9 @@ impl Formatter {
         let original = self.output[start..].to_string();
         self.output.truncate(start);
 
-        let mut cfg = self.config.clone();
-        cfg.formatter_extensions.smart = false;
-        let saved = std::mem::replace(&mut self.config, cfg);
+        let saved = std::mem::take(&mut self.config.smart_text);
         self.format_node_sync(node, indent);
-        self.config = saved;
+        self.config.smart_text = saved;
 
         if Self::produces_dash_block_marker(&self.output[start..]) {
             self.output.truncate(start);
