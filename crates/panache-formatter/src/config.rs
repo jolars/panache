@@ -110,6 +110,20 @@ pub enum HorizontalRuleStyle {
     Compact,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum SmartPunctuation {
+    /// Write straight quotes, `--`, `---`, and `...`.
+    #[default]
+    Ascii,
+    /// Write curly quotes for the document language, en/em dashes, and `…`.
+    Unicode,
+    /// Leave punctuation as written.
+    Preserve,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
@@ -251,6 +265,15 @@ pub struct Config {
     /// How horizontal rules are rendered: expanded to the line width
     /// (default) or as a compact `---`.
     pub horizontal_rule_style: HorizontalRuleStyle,
+    /// Which spelling of `smart`-equivalent punctuation to write. Only takes
+    /// effect when the `smart` or `smart-quotes` extension is enabled.
+    pub smart_punctuation: SmartPunctuation,
+    /// Explicit `[open double, close double, open single, close single]`
+    /// quotes for `SmartPunctuation::Unicode`; `None` picks them by language.
+    pub quotes: Option<[char; 4]>,
+    /// Unicode punctuation per text-token start offset for this format run.
+    #[doc(hidden)]
+    pub smart_text: std::sync::Arc<HashMap<u32, String>>,
     /// Document-language fallback used by sentence wrapping when the document
     /// has no YAML `lang:`. Normalized lowercase code (e.g. `de`, `pt-br`).
     pub lang: Option<String>,
@@ -288,6 +311,9 @@ impl Default for Config {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             horizontal_rule_style: HorizontalRuleStyle::default(),
+            smart_punctuation: SmartPunctuation::default(),
+            quotes: None,
+            smart_text: Default::default(),
             lang: None,
             no_break_abbreviations: std::collections::BTreeMap::new(),
             formatters: HashMap::new(), // Opt-in: empty by default
@@ -368,6 +394,11 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn smart_punctuation(mut self, mode: SmartPunctuation) -> Self {
+        self.config.smart_punctuation = mode;
+        self
+    }
+
     pub fn build(self) -> Config {
         self.config
     }
@@ -417,6 +448,11 @@ mod schema_tests {
     #[test]
     fn blank_lines_values_are_lowercase() {
         assert_wire_values::<BlankLines>(&["preserve", "collapse"]);
+    }
+
+    #[test]
+    fn smart_punctuation_values_are_lowercase() {
+        assert_wire_values::<SmartPunctuation>(&["ascii", "unicode", "preserve"]);
     }
 
     #[test]

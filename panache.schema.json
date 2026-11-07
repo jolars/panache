@@ -404,6 +404,25 @@
       ],
       "type": "string"
     },
+    "SmartPunctuation": {
+      "oneOf": [
+        {
+          "const": "ascii",
+          "description": "Write straight quotes, `--`, `---`, and `...`.",
+          "type": "string"
+        },
+        {
+          "const": "unicode",
+          "description": "Write curly quotes for the document language, en/em dashes, and `…`.",
+          "type": "string"
+        },
+        {
+          "const": "preserve",
+          "description": "Leave punctuation as written.",
+          "type": "string"
+        }
+      ]
+    },
     "StyleConfig": {
       "additionalProperties": false,
       "description": "Formatting style configuration.\nGroups all style-related settings together.",
@@ -423,7 +442,7 @@
         },
         "lang": {
           "default": null,
-          "description": "Fallback document language for sentence wrapping when the document has no\nYAML `lang:`. A code such as `de` or `pt-BR`.",
+          "description": "Fallback document language for sentence wrapping and localized quotes\nwhen the document has no YAML `lang:`. A code such as `de` or `pt-BR`.",
           "type": [
             "string",
             "null"
@@ -487,6 +506,26 @@
             }
           ],
           "description": "Extra abbreviations whose trailing period must not end a sentence (used\nby `wrap = \"sentence\"`). Merged with the built-in per-language profile."
+        },
+        "quotes": {
+          "default": null,
+          "description": "Quotes for `smart-punctuation = \"unicode\"` as `[open double, close\ndouble, open single, close single]`. Defaults to the quotes of the\ndocument language (`lang:` metadata or `lang`).",
+          "items": {
+            "maxLength": 1,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "smart-punctuation": {
+          "$ref": "#/$defs/SmartPunctuation",
+          "default": "ascii",
+          "description": "How to write punctuation that the `smart` extension makes equivalent:\n`ascii` (`\"`, `--`, `...`), `unicode` (`“”`, `–`, `…`), or `preserve`."
         },
         "tab-stops": {
           "$ref": "#/$defs/TabStopMode",

@@ -1,8 +1,8 @@
 use wasm_bindgen::prelude::*;
 
 use panache_formatter::config::{
-    BlankLines, Flavor, HorizontalRuleStyle, LineEnding, MathDelimiterStyle, MathMode, TabStopMode,
-    WrapMode,
+    BlankLines, Flavor, HorizontalRuleStyle, LineEnding, MathDelimiterStyle, MathMode,
+    SmartPunctuation, TabStopMode, WrapMode,
 };
 
 fn parse_flavor(value: &str) -> Option<Flavor> {
@@ -33,6 +33,7 @@ mod hugo_tests {
             input,
             None,
             Some("hugo".to_owned()),
+            None,
             None,
             None,
             None,
@@ -102,6 +103,15 @@ fn parse_horizontal_rule_style(value: &str) -> Option<HorizontalRuleStyle> {
     }
 }
 
+fn parse_smart_punctuation(value: &str) -> Option<SmartPunctuation> {
+    match value.to_ascii_lowercase().as_str() {
+        "ascii" => Some(SmartPunctuation::Ascii),
+        "unicode" => Some(SmartPunctuation::Unicode),
+        "preserve" => Some(SmartPunctuation::Preserve),
+        _ => None,
+    }
+}
+
 fn parse_tab_stops(value: &str) -> Option<TabStopMode> {
     match value.to_ascii_lowercase().as_str() {
         "normalize" => Some(TabStopMode::Normalize),
@@ -133,6 +143,7 @@ pub fn format_qmd_with_options(
     tab_width: Option<usize>,
     math_indent: Option<usize>,
     horizontal_rule_style: Option<String>,
+    smart_punctuation: Option<String>,
 ) -> Result<String, JsValue> {
     let mut cfg = panache_formatter::Config::default();
 
@@ -205,6 +216,14 @@ pub fn format_qmd_with_options(
                     "Unsupported horizontal rule style: {horizontal_rule_style}"
                 ))
             })?;
+    }
+
+    if let Some(smart_punctuation) = smart_punctuation {
+        cfg.smart_punctuation = parse_smart_punctuation(&smart_punctuation).ok_or_else(|| {
+            JsValue::from_str(&format!(
+                "Unsupported smart punctuation mode: {smart_punctuation}"
+            ))
+        })?;
     }
 
     Ok(panache_formatter::format(input, Some(cfg), None))

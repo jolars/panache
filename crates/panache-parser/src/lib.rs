@@ -30,6 +30,7 @@ pub mod pandoc_ast;
 pub mod parser;
 pub mod range_utils;
 pub mod semantic;
+pub mod smart;
 pub mod syntax;
 
 /// Re-export of the [`entities`] crate (HTML5 named-entity table). Downstream

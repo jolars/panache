@@ -1,5 +1,23 @@
 use panache_formatter::config::{Flavor, WrapMode};
-use panache_formatter::{Config, format};
+use panache_formatter::{Config, SmartPunctuation, format};
+
+fn unicode_config() -> Config {
+    let mut cfg = Config::default();
+    cfg.formatter_extensions.smart = true;
+    cfg.smart_punctuation = SmartPunctuation::Unicode;
+    cfg
+}
+
+/// Format with `cfg`, asserting that formatting the result again is a no-op.
+fn format_idempotent(input: &str, cfg: &Config) -> String {
+    let out = format(input, Some(cfg.clone()), None);
+    assert_eq!(
+        format(&out, Some(cfg.clone()), None),
+        out,
+        "must be idempotent"
+    );
+    out
+}
 
 #[test]
 fn smart_enabled_normalizes_curly_quotes_and_dashes() {
@@ -193,4 +211,135 @@ fn smart_defaults_follow_flavor() {
         .formatter_extensions
         .smart
     );
+}
+
+#[test]
+fn unicode_writes_curly_quotes_dashes_and_ellipsis() {
+    let input = "He said \"hi\" -- it's 'fine'... --- ok\n";
+    let expected = "He said “hi” – it’s ‘fine’… — ok\n";
+    assert_eq!(format_idempotent(input, &unicode_config()), expected);
+}
+
+#[test]
+fn unicode_pairs_quotes_across_markup_lines_and_punctuation() {
+    let input = "A \"*b*\" and (\"c\"), \"d\nacross\".\n";
+    let expected = "A “*b*” and (“c”), “d across”.\n";
+    assert_eq!(format_idempotent(input, &unicode_config()), expected);
+}
+
+#[test]
+fn unicode_pairs_nested_quotes() {
+    let input = "\"She said 'no' to me\"\n";
+    assert_eq!(
+        format_idempotent(input, &unicode_config()),
+        "“She said ‘no’ to me”\n"
+    );
+}
+
+#[test]
+fn unicode_leaves_unpaired_quotes_as_written() {
+    let input = "a \" b and “ c\n";
+    assert_eq!(format_idempotent(input, &unicode_config()), input);
+}
+
+#[test]
+fn unicode_leaves_code_urls_and_link_titles_verbatim() {
+    let input = "[\"a\"](http://x--y.z \"t\") `\"b\" --` <http://u--v>\n";
+    let expected = "[“a”](http://x--y.z \"t\") `\"b\" --` <http://u--v>\n";
+    assert_eq!(format_idempotent(input, &unicode_config()), expected);
+}
+
+#[test]
+fn unicode_localizes_quotes_from_document_lang() {
+    let input = "---\nlang: de-DE\n---\n\nEr sagte \"hallo\" und 'tschüss'.\n";
+    let out = format_idempotent(input, &unicode_config());
+    assert!(out.ends_with("Er sagte „hallo“ und ‚tschüss‘.\n"), "{out}");
+}
+
+#[test]
+fn unicode_relocalizes_curly_quotes_from_config_lang() {
+    let mut cfg = unicode_config();
+    cfg.lang = Some("fr".to_string());
+    assert_eq!(
+        format_idempotent("Il dit “oui”.\n", &cfg),
+        "Il dit «oui».\n"
+    );
+}
+
+#[test]
+fn unicode_uses_explicit_quotes() {
+    let mut cfg = unicode_config();
+    cfg.quotes = Some(['»', '«', '›', '‹']);
+    assert_eq!(format_idempotent("\"a\" 'b'\n", &cfg), "»a« ›b‹\n");
+}
+
+#[test]
+fn unicode_with_smart_quotes_only_leaves_dashes() {
+    let mut cfg = unicode_config();
+    cfg.formatter_extensions.smart = false;
+    cfg.formatter_extensions.smart_quotes = true;
+    assert_eq!(format_idempotent("\"a\" -- b\n", &cfg), "“a” -- b\n");
+}
+
+#[test]
+fn unicode_without_smart_changes_nothing() {
+    let mut cfg = unicode_config();
+    cfg.formatter_extensions.smart = false;
+    let input = "\"a\" -- b “c” – d\n";
+    assert_eq!(format_idempotent(input, &cfg), input);
+}
+
+#[test]
+fn preserve_keeps_both_spellings() {
+    let mut cfg = unicode_config();
+    cfg.smart_punctuation = SmartPunctuation::Preserve;
+    let input = "\"a\" -- b “c” – d\n";
+    assert_eq!(format_idempotent(input, &cfg), input);
+}
+
+#[test]
+fn smart_keeps_verbatim_content_under_wrap_preserve() {
+    let mut cfg = Config::default();
+    cfg.formatter_extensions.smart = true;
+    cfg.wrap = Some(WrapMode::Preserve);
+    let input = "`a “b” –` $c – d$ <http://e—f> [g]{title=\"“h”\"} <span title=\"“i”\">j</span>\n";
+    let out = format(input, Some(cfg), None);
+    assert_eq!(out, input, "only prose may change");
+}
+
+#[test]
+fn smart_normalizes_strikeout_and_citation_affixes() {
+    let mut cfg = Config::default();
+    cfg.formatter_extensions.smart = true;
+    let input = "~~a “b”~~ [see “c” @key, p. 3–4]\n";
+    let expected = "~~a \"b\"~~ [see \"c\" @key, p. 3--4]\n";
+    assert_eq!(format_idempotent(input, &cfg), expected);
+}
+
+#[test]
+fn unicode_opens_quotes_before_any_inline() {
+    let input = "\"*a* b\" and \"[c](u) d\"\n";
+    let expected = "“*a* b” and “[c](u) d”\n";
+    assert_eq!(format_idempotent(input, &unicode_config()), expected);
+}
+
+#[test]
+fn unicode_writes_lone_single_quotes_as_apostrophes() {
+    let cfg = unicode_config();
+    assert_eq!(
+        format_idempotent("'tis the season's\n", &cfg),
+        "’tis the season’s\n"
+    );
+    assert_eq!(
+        format_idempotent("the dogs' bowls\n", &cfg),
+        "the dogs’ bowls\n"
+    );
+}
+
+#[test]
+fn unicode_nests_english_double_quotes_as_single_quotes() {
+    let mut cfg = unicode_config();
+    cfg.lang = Some("it".to_string());
+    let out = format_idempotent("\"a 'b' c\"\n", &cfg);
+    assert_eq!(out, "«a “b” c»\n");
 }
