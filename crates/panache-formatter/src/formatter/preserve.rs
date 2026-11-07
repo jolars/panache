@@ -117,14 +117,7 @@ fn collect(
                     append_verbatim_lines(&text, lines, current);
                     continue;
                 }
-                let smart = if matches!(
-                    child.kind(),
-                    SyntaxKind::INLINE_EXEC_SPAN | SyntaxKind::HUGO_SHORTCODE
-                ) {
-                    None
-                } else {
-                    smart
-                };
+                // `smart_text` only covers prose tokens, so code/raw/etc. pass through untouched.
                 collect(&child, escaped_line_breaks, prefix, smart, lines, current)
             }
             NodeOrToken::Token(token) => match token.kind() {

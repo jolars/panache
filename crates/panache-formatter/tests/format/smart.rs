@@ -75,6 +75,30 @@ fn smart_does_not_normalize_inline_code_span_content() {
 }
 
 #[test]
+fn smart_does_not_normalize_verbatim_inlines() {
+    let input = concat!(
+        "`<abbr title='it’s fine'>IIF</abbr>`{=html}\n",
+        "\n",
+        "`\\textit{“a”}`{=latex} `“a” – b` $“a”$ <i title=\"x’y\">z</i>\n",
+        "\n",
+        "[a]{title=\"x’y\"} <span title=\"x’y\">z</span>\n",
+    );
+    for wrap in [
+        WrapMode::Preserve,
+        WrapMode::Reflow,
+        WrapMode::Sentence,
+        WrapMode::Semantic,
+    ] {
+        let mut cfg = Config::default();
+        cfg.formatter_extensions.smart = true;
+        let cfg_wrap = format!("{wrap:?}");
+        cfg.wrap = Some(wrap);
+        let out = format(input, Some(cfg), None);
+        assert_eq!(out, input, "verbatim content changed with {cfg_wrap}");
+    }
+}
+
+#[test]
 fn smart_does_not_normalize_autolink_url() {
     let mut cfg = Config::default();
     cfg.formatter_extensions.smart = true;
