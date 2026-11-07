@@ -125,7 +125,14 @@ fn collect(
                 }
                 let smart = if matches!(
                     child.kind(),
-                    SyntaxKind::INLINE_EXEC_SPAN | SyntaxKind::HUGO_SHORTCODE
+                    SyntaxKind::INLINE_EXEC_SPAN
+                        | SyntaxKind::HUGO_SHORTCODE
+                        | SyntaxKind::INLINE_CODE
+                        | SyntaxKind::RAW_INLINE
+                        | SyntaxKind::INLINE_MATH
+                        | SyntaxKind::DISPLAY_MATH
+                        | SyntaxKind::INLINE_HTML
+                        | SyntaxKind::ATTR_KEY_VALUE
                 ) {
                     None
                 } else {

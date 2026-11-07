@@ -381,14 +381,7 @@ fn format_inline_node_with_options(
                         if t.kind() == SyntaxKind::RAW_INLINE_MARKER {
                             backtick_count = t.text().len();
                         } else if t.kind() == SyntaxKind::RAW_INLINE_CONTENT {
-                            content.push_str(
-                                normalize_smart_punctuation(
-                                    t.text(),
-                                    config.formatter_extensions.smart,
-                                    config.formatter_extensions.smart_quotes,
-                                )
-                                .as_ref(),
-                            );
+                            content.push_str(t.text());
                         }
                     }
                     _ => {}
