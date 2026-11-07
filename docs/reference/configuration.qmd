@@ -712,27 +712,27 @@ whitespace or punctuation and closes before it. A quote without a partner keeps
 its spelling, since Pandoc would render it literally. Existing curly quotes are
 paired the same way, so a document is re-localized when its language changes.
 
-The quote style comes from the document's YAML `lang:` metadata, falling back
-to `[format] lang` and then to English:
+The quote style comes from the document's YAML `lang:` metadata, falling back to
+`[format] lang` and then to English:
 
-| Language                       | Quotes              |
-|--------------------------------|---------------------|
-| English and others             | “double” ‘single’   |
-| `de`, `cs`, `sk`               | „double“ ‚single‘   |
-| `fr`                           | «double» «single»   |
-| `fr-CH`                        | «double» ‹single›   |
-| `it`, `pt-PT`                  | «double» “single”   |
-| `ru`, `uk`                     | «double» „single“   |
-| `pl`                           | „double” «single»   |
-| `sv`, `fi`                     | ”double” ’single’   |
-| `nb`, `nn`, `no`               | «double» ‘single’   |
-| `nl`                           | ‘double’ ‘single’   |
-| `ja`                           | 「double」『single』 |
+  | Language           | Quotes               |
+  | ------------------ | -------------------- |
+  | English and others | “double” ‘single’    |
+  | `de`, `cs`, `sk`   | „double“ ‚single‘    |
+  | `fr`               | «double» «single»    |
+  | `fr-CH`            | «double» ‹single›    |
+  | `it`, `pt-PT`      | «double» “single”    |
+  | `ru`, `uk`         | «double» „single“    |
+  | `pl`               | „double” «single»    |
+  | `sv`, `fi`         | ”double” ’single’    |
+  | `nb`, `nn`, `no`   | «double» ‘single’    |
+  | `nl`               | ‘double’ ‘single’    |
+  | `ja`               | 「double」『single』 |
 
 The styles follow the [Unicode CLDR](https://cldr.unicode.org/) locale data.
 
-French spacing inside guillemets is not added. To use other quotes, list them
-as opening double, closing double, opening single, and closing single quote:
+French spacing inside guillemets is not added. To use other quotes, list them as
+opening double, closing double, opening single, and closing single quote:
 
 ```toml
 [format]
