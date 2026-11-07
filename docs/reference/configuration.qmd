@@ -134,6 +134,10 @@ This is true regardless of how the config was found: a typo in a *discovered*
 `panache.toml` fails the run just like a broken `--config` path, rather than
 being silently ignored in favor of the user config or built-in defaults.
 
+The same validation applies to `panache format -o extensions.<name>=<bool>`.
+Unknown names fail the run with exit code 2 and suggest a close match when one
+exists.
+
 In the [language server](../guide/lsp.qmd) the same parse failure is surfaced
 rather than swallowed:
 
