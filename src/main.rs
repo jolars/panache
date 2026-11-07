@@ -96,6 +96,7 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
                         "invalid --option `{raw}`: missing extension name after `extensions.`"
                     ));
                 }
+                panache::config::validate_extension_name(name, "--option")?;
                 let bool_value = match value.to_ascii_lowercase().as_str() {
                     "true" | "1" | "yes" | "on" => true,
                     "false" | "0" | "no" | "off" => false,
@@ -3342,16 +3343,35 @@ mod tests {
         }
 
         #[test]
-        fn extensions_dot_key_ignores_snake_case_alias() {
-            // 3.0 dropped snake_case extension aliases; the snake_case spelling
-            // no longer matches a known extension, so it is not applied.
+        fn extensions_dot_key_rejects_snake_case_alias() {
             let mut c = cfg();
-            apply_format_overrides(
+            let err = apply_format_overrides(
                 &mut c,
                 &["extensions.east_asian_line_breaks=true".to_string()],
             )
-            .unwrap();
-            assert!(!c.extensions.east_asian_line_breaks);
+            .unwrap_err();
+            assert!(
+                err.contains("unknown extension `east_asian_line_breaks`"),
+                "{err}"
+            );
+            assert!(
+                err.contains("did you mean `east-asian-line-breaks`?"),
+                "{err}"
+            );
+        }
+
+        #[test]
+        fn extensions_dot_key_toggles_parser_only_extension() {
+            let mut c = cfg();
+            apply_format_overrides(&mut c, &["extensions.citations=false".to_string()]).unwrap();
+            assert!(!c.extensions.citations);
+        }
+
+        #[test]
+        fn extensions_dot_key_toggles_formatter_only_extension() {
+            let mut c = cfg();
+            apply_format_overrides(&mut c, &["extensions.smart-quotes=true".to_string()]).unwrap();
+            assert!(c.formatter_extensions.smart_quotes);
         }
 
         #[test]

@@ -399,23 +399,17 @@ fn validate_extension_names(s: &str) -> Result<(), String> {
         return Ok(());
     };
 
-    let known_exts = all_known_extension_names();
-
     for (key, val) in ext_table {
         match val {
             toml::Value::Boolean(_) => {
-                if !is_known_extension_name(key) {
-                    return Err(unknown_extension_error(key, &known_exts, None));
-                }
+                validate_extension_name(key, "[extensions]")?;
             }
             toml::Value::Table(flavor_table) => {
                 if parse_flavor_key(key).is_none() {
                     return Err(unknown_flavor_subtable_error(key));
                 }
                 for sub_key in flavor_table.keys() {
-                    if !is_known_extension_name(sub_key) {
-                        return Err(unknown_extension_error(sub_key, &known_exts, Some(key)));
-                    }
+                    validate_extension_name(sub_key, &format!("[extensions.{key}]"))?;
                 }
             }
             _ => {
@@ -428,15 +422,18 @@ fn validate_extension_names(s: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn unknown_extension_error(name: &str, known: &[&str], in_flavor: Option<&str>) -> String {
-    let mut msg = match in_flavor {
-        Some(f) => format!("unknown extension `{name}` in [extensions.{f}]"),
-        None => format!("unknown extension `{name}` in [extensions]"),
-    };
-    if let Some(suggestion) = closest_match(name, known) {
+/// Reject unknown parser or formatter extension names with a spelling suggestion.
+/// `context` identifies the config table or CLI option in the error message.
+pub fn validate_extension_name(name: &str, context: &str) -> Result<(), String> {
+    if is_known_extension_name(name) {
+        return Ok(());
+    }
+
+    let mut msg = format!("unknown extension `{name}` in {context}");
+    if let Some(suggestion) = closest_match(name, &all_known_extension_names()) {
         msg.push_str(&format!("; did you mean `{suggestion}`?"));
     }
-    msg
+    Err(msg)
 }
 
 fn unknown_flavor_subtable_error(name: &str) -> String {
