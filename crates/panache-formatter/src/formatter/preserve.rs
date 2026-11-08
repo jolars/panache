@@ -33,16 +33,13 @@ pub(super) fn preserve_lines(node: &SyntaxNode, escaped_line_breaks: bool) -> Ve
 /// Normalize prose punctuation while preserving executable source bytes.
 pub(super) fn preserve_lines_normalized(
     node: &SyntaxNode,
-    config: &crate::config::Config,
+    config: &super::FormatContext,
 ) -> Vec<String> {
     lines_with_prefix(
         node,
         config.formatter_extensions.escaped_line_breaks,
         LinePrefix::Keep,
-        Some((
-            config.formatter_extensions.smart,
-            config.formatter_extensions.smart_quotes,
-        )),
+        Some(config),
     )
 }
 
@@ -60,16 +57,13 @@ pub(super) fn preserve_lines_unprefixed(
 /// internal whitespace and prose receives the configured punctuation style.
 pub(super) fn preserve_lines_unprefixed_normalized(
     node: &SyntaxNode,
-    config: &crate::config::Config,
+    config: &super::FormatContext,
 ) -> Vec<String> {
     lines_with_prefix(
         node,
         config.formatter_extensions.escaped_line_breaks,
         LinePrefix::Drop,
-        Some((
-            config.formatter_extensions.smart,
-            config.formatter_extensions.smart_quotes,
-        )),
+        Some(config),
     )
 }
 
@@ -83,7 +77,7 @@ fn lines_with_prefix(
     node: &SyntaxNode,
     escaped_line_breaks: bool,
     prefix: LinePrefix,
-    smart: Option<(bool, bool)>,
+    smart: Option<&super::FormatContext>,
 ) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current = String::new();
@@ -106,7 +100,7 @@ fn collect(
     node: &SyntaxNode,
     escaped_line_breaks: bool,
     prefix: LinePrefix,
-    smart: Option<(bool, bool)>,
+    smart: Option<&super::FormatContext>,
     lines: &mut Vec<String>,
     current: &mut String,
 ) {
@@ -123,21 +117,7 @@ fn collect(
                     append_verbatim_lines(&text, lines, current);
                     continue;
                 }
-                let smart = if matches!(
-                    child.kind(),
-                    SyntaxKind::INLINE_EXEC_SPAN
-                        | SyntaxKind::HUGO_SHORTCODE
-                        | SyntaxKind::INLINE_CODE
-                        | SyntaxKind::RAW_INLINE
-                        | SyntaxKind::INLINE_MATH
-                        | SyntaxKind::DISPLAY_MATH
-                        | SyntaxKind::INLINE_HTML
-                        | SyntaxKind::ATTR_KEY_VALUE
-                ) {
-                    None
-                } else {
-                    smart
-                };
+                // `smart_token_text` only converts prose tokens, so code/raw/etc. pass through untouched.
                 collect(&child, escaped_line_breaks, prefix, smart, lines, current)
             }
             NodeOrToken::Token(token) => match token.kind() {
@@ -160,23 +140,22 @@ fn collect(
                     append_verbatim_lines(token.text(), lines, current);
                 }
                 _ => {
+                    let source = match smart {
+                        Some(config) => super::smart::smart_token_text(&token, config),
+                        None => std::borrow::Cow::Borrowed(token.text()),
+                    };
                     let text = if prefix == LinePrefix::Drop
                         && current.is_empty()
                         && matches!(token.kind(), SyntaxKind::TEXT | SyntaxKind::WHITESPACE)
                     {
-                        token.text().trim_start()
+                        source.trim_start()
                     } else {
-                        token.text()
-                    };
-                    let text = if let Some((enabled, quotes)) = smart {
-                        super::smart::normalize_smart_punctuation(text, enabled, quotes)
-                    } else {
-                        std::borrow::Cow::Borrowed(text)
+                        &source
                     };
                     if prefix == LinePrefix::Drop {
-                        append_verbatim_lines(&text, lines, current);
+                        append_verbatim_lines(text, lines, current);
                     } else {
-                        current.push_str(&text);
+                        current.push_str(text);
                     }
                 }
             },

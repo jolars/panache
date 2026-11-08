@@ -1,0 +1,11 @@
+Table: (\#tab:my--table) "Caption" --
+
+| A   | B   |
+| --- | --- |
+| 1   | 2   |
+
+See \@ref(tab:my--table).
+
+(ref:my--text) "Text" --
+
+Use (ref:my--text) --.

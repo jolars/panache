@@ -1,0 +1,8 @@
+flavor = "commonmark"
+
+[extensions]
+multiline-tables = true
+
+[format]
+smart-punctuation = "unicode"
+table-indent = 0

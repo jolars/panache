@@ -247,9 +247,10 @@ pub enum Commands {
             `line-width` (positive integer, measured in Unicode display columns, where \
             East Asian wide characters count as 2: `x宮` is 3 columns, not 2 characters \
             or 4 UTF-8 bytes); \
-            `wrap` (one of: reflow, sentence, semantic, preserve); and \
+            `wrap` (one of: reflow, sentence, semantic, preserve); \
+            `smart-punctuation` (one of: preserve, ascii, unicode); and \
             `extensions.<name>=<bool>` to toggle any extension (booleans accept \
-            true/false/1/0/yes/no/on/off). \
+            true/false/1/0/yes/no/on/off).\
             \n\nExample: `--option line-width=100 -o wrap=sentence \
             -o extensions.east-asian-line-breaks=true`. \
             Extension names use hyphens (e.g. `east-asian-line-breaks`), whereas Pandoc \

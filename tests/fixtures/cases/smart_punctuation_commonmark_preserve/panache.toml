@@ -1,0 +1,5 @@
+flavor = "commonmark"
+
+[format]
+smart-punctuation = "unicode"
+wrap = "preserve"

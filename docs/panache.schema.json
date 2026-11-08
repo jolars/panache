@@ -404,6 +404,26 @@
       ],
       "type": "string"
     },
+    "SmartPunctuation": {
+      "description": "Source spelling of punctuation in prose.",
+      "oneOf": [
+        {
+          "const": "preserve",
+          "description": "Leave punctuation as written.",
+          "type": "string"
+        },
+        {
+          "const": "ascii",
+          "description": "Write straight quotes with `smart` or `smart-quotes`, and `--`, `---`,\nand `...` with `smart`. Preserve punctuation otherwise.",
+          "type": "string"
+        },
+        {
+          "const": "unicode",
+          "description": "Write English curly quotes, en/em dashes, and `…`.",
+          "type": "string"
+        }
+      ]
+    },
     "StyleConfig": {
       "additionalProperties": false,
       "description": "Formatting style configuration.\nGroups all style-related settings together.",
@@ -487,6 +507,10 @@
             }
           ],
           "description": "Extra abbreviations whose trailing period must not end a sentence (used\nby `wrap = \"sentence\"`). Merged with the built-in per-language profile."
+        },
+        "smart-punctuation": {
+          "$ref": "#/$defs/SmartPunctuation",
+          "description": "Source spelling of punctuation. Defaults to ASCII for Pandoc, Quarto,\nand R Markdown, and preservation for other flavors."
         },
         "tab-stops": {
           "$ref": "#/$defs/TabStopMode",

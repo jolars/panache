@@ -1,12 +1,13 @@
-use crate::config::{Config, MathDelimiterStyle};
+use super::FormatContext;
+use crate::config::MathDelimiterStyle;
 use crate::formatter::Formatter;
 use crate::formatter::core::{normalize_attribute_text, normalize_span_attributes};
 use crate::formatter::math::{self, MathContext, MathFormatOptions};
 use crate::formatter::shortcodes::format_shortcode;
-use crate::formatter::smart::normalize_smart_punctuation;
+use crate::formatter::smart::smart_token_text;
 use crate::syntax::{
-    DisplayMath, ImageAlt, InlineMath, InlineNode, LinkText, SyntaxKind, SyntaxNode, SyntaxToken,
-    UnresolvedReference, code_span_payload, text_without_line_prefixes,
+    DisplayMath, Figure, ImageAlt, InlineMath, InlineNode, LinkText, SyntaxKind, SyntaxNode,
+    SyntaxToken, UnresolvedReference, code_span_payload, text_without_line_prefixes,
 };
 use rowan::NodeOrToken;
 use rowan::ast::AstNode;
@@ -25,7 +26,8 @@ impl Formatter {
             match child {
                 NodeOrToken::Node(child) => self.format_node_sync(&child, indent),
                 NodeOrToken::Token(token) if token.kind() != marker => {
-                    self.output.push_str(token.text());
+                    self.output
+                        .push_str(&smart_token_text(&token, &self.config));
                 }
                 NodeOrToken::Token(_) => {}
             }
@@ -42,26 +44,25 @@ impl Formatter {
 /// column 0 of the span's own content instead would rewrite the span to a
 /// different number of spaces, changing what the document means. The column
 /// bookkeeping (container prefixes, list gobble) lives in the parser crate so
-/// the pandoc-native projector and the formatter agree; only the line join is
-/// ours, since the reader turns each internal newline into a single space.
-fn expand_tabs_code_span(node: &SyntaxNode, tab_width: usize) -> String {
-    code_span_payload(node, tab_width).replace('\n', " ")
+/// the pandoc-native projector and the formatter agree. Reparsed table cells
+/// supply payloads expanded from their original columns instead. The formatter
+/// joins the lines, since the reader turns each internal newline into one space.
+fn expand_tabs_code_span(node: &SyntaxNode, config: &FormatContext) -> String {
+    config
+        .code_span_payloads
+        .get(&u32::from(node.text_range().start()))
+        .cloned()
+        .unwrap_or_else(|| code_span_payload(node, config.tab_width))
+        .replace('\n', " ")
 }
 
-fn format_citation_like(node: &SyntaxNode, config: &Config) -> String {
+fn format_citation_like(node: &SyntaxNode, config: &FormatContext) -> String {
     let mut result = String::new();
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::LINE_PREFIX => {}
             NodeOrToken::Token(tok) => {
-                result.push_str(
-                    normalize_smart_punctuation(
-                        tok.text(),
-                        config.formatter_extensions.smart,
-                        config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
+                result.push_str(&smart_token_text(&tok, config));
             }
             NodeOrToken::Node(n) => {
                 result.push_str(&n.text().to_string());
@@ -142,14 +143,19 @@ struct InlineSpacing {
     collapse_newlines: bool,
 }
 
-fn inline_token_text(token: &SyntaxToken, spacing: InlineSpacing) -> Cow<'_, str> {
+fn inline_token_text<'a>(
+    token: &'a SyntaxToken,
+    spacing: InlineSpacing,
+    config: &'a FormatContext,
+) -> Cow<'a, str> {
     let text = if spacing.collapse_newlines && token.kind() == SyntaxKind::NEWLINE {
         Cow::Borrowed(" ")
     } else if token.kind() == SyntaxKind::TEXT {
-        let text = if spacing.collapse_newlines && token.text().contains('\n') {
-            Cow::Owned(token.text().replace('\n', " "))
+        let text = smart_token_text(token, config);
+        let text = if spacing.collapse_newlines && text.contains('\n') {
+            Cow::Owned(text.replace('\n', " "))
         } else {
-            Cow::Borrowed(token.text())
+            text
         };
         if spacing.collapse_spaces {
             Cow::Owned(collapse_spaces(&text))
@@ -194,10 +200,11 @@ fn contains_inline_prose(node: &SyntaxNode) -> bool {
             | InlineNode::Subscript(_)
     ) || LinkText::can_cast(node.kind())
         || ImageAlt::can_cast(node.kind())
+        || Figure::can_cast(node.kind())
 }
 
 /// Format an inline node to normalized string (e.g., emphasis with asterisks).
-pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
+pub(super) fn format_inline_node(node: &SyntaxNode, config: &FormatContext) -> String {
     format_inline_node_with_spacing(node, config, false)
 }
 
@@ -205,7 +212,7 @@ pub(super) fn format_inline_node(node: &SyntaxNode, config: &Config) -> String {
 /// can contain identical-looking runs with different meanings.
 pub(super) fn format_inline_node_with_spacing(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     collapse_ws: bool,
 ) -> String {
     format_inline_node_with_options(
@@ -220,7 +227,7 @@ pub(super) fn format_inline_node_with_spacing(
 
 /// Normalize prose breaks before joining an atomic inline, so shortcode
 /// arguments never pass through a newline replacement on the complete string.
-pub(super) fn format_inline_node_for_sentence(node: &SyntaxNode, config: &Config) -> String {
+pub(super) fn format_inline_node_for_sentence(node: &SyntaxNode, config: &FormatContext) -> String {
     format_inline_node_with_options(
         node,
         config,
@@ -233,7 +240,7 @@ pub(super) fn format_inline_node_for_sentence(node: &SyntaxNode, config: &Config
 
 fn format_inline_node_with_options(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     spacing: InlineSpacing,
 ) -> String {
     let collapse_ws = spacing.collapse_spaces;
@@ -301,7 +308,7 @@ fn format_inline_node_with_options(
                 if matches!(config.tab_stops, crate::config::TabStopMode::Preserve) {
                     content.replace('\n', " ")
                 } else {
-                    expand_tabs_code_span(node, config.tab_width)
+                    expand_tabs_code_span(node, config)
                 };
             if collapse_block_chunk {
                 normalized_content = normalized_content.trim().to_string();
@@ -412,14 +419,7 @@ fn format_inline_node_with_options(
                             continue;
                         }
                         if t.kind() != SyntaxKind::EMPHASIS_MARKER {
-                            content.push_str(
-                                normalize_smart_punctuation(
-                                    inline_token_text(&t, spacing).as_ref(),
-                                    config.formatter_extensions.smart,
-                                    config.formatter_extensions.smart_quotes,
-                                )
-                                .as_ref(),
-                            );
+                            content.push_str(inline_token_text(&t, spacing, config).as_ref());
                         }
                     }
                 }
@@ -443,7 +443,7 @@ fn format_inline_node_with_options(
                             continue;
                         }
                         if t.kind() != SyntaxKind::STRONG_MARKER {
-                            content.push_str(&inline_token_text(&t, spacing));
+                            content.push_str(&inline_token_text(&t, spacing, config));
                         }
                     }
                 }
@@ -459,7 +459,7 @@ fn format_inline_node_with_options(
                         if t.kind() == SyntaxKind::LINE_PREFIX {
                             continue;
                         }
-                        result.push_str(&inline_token_text(&t, spacing));
+                        result.push_str(&inline_token_text(&t, spacing, config));
                     }
                     NodeOrToken::Node(n) => {
                         if n.kind() == SyntaxKind::SPAN_CONTENT {
@@ -469,7 +469,7 @@ fn format_inline_node_with_options(
                                         if t.kind() == SyntaxKind::LINE_PREFIX {
                                             continue;
                                         }
-                                        result.push_str(&inline_token_text(&t, spacing))
+                                        result.push_str(&inline_token_text(&t, spacing, config))
                                     }
                                     NodeOrToken::Node(nested) => {
                                         result.push_str(&format_inline_node_with_options(
@@ -495,14 +495,7 @@ fn format_inline_node_with_options(
                         if t.kind() == SyntaxKind::LINE_PREFIX {
                             continue;
                         }
-                        result.push_str(
-                            normalize_smart_punctuation(
-                                inline_token_text(&t, spacing).as_ref(),
-                                config.formatter_extensions.smart,
-                                config.formatter_extensions.smart_quotes,
-                            )
-                            .as_ref(),
-                        );
+                        result.push_str(inline_token_text(&t, spacing, config).as_ref());
                     }
                     NodeOrToken::Node(n) => {
                         if n.kind() == SyntaxKind::SPAN_CONTENT {
@@ -513,12 +506,7 @@ fn format_inline_node_with_options(
                                             continue;
                                         }
                                         result.push_str(
-                                            normalize_smart_punctuation(
-                                                inline_token_text(&t, spacing).as_ref(),
-                                                config.formatter_extensions.smart,
-                                                config.formatter_extensions.smart_quotes,
-                                            )
-                                            .as_ref(),
+                                            inline_token_text(&t, spacing, config).as_ref(),
                                         );
                                     }
                                     NodeOrToken::Node(nested) => {
@@ -745,14 +733,7 @@ fn format_inline_node_with_options(
                             t.kind(),
                             SyntaxKind::INLINE_FOOTNOTE_START | SyntaxKind::INLINE_FOOTNOTE_END
                         ) {
-                            content.push_str(
-                                normalize_smart_punctuation(
-                                    inline_token_text(&t, spacing).as_ref(),
-                                    config.formatter_extensions.smart,
-                                    config.formatter_extensions.smart_quotes,
-                                )
-                                .as_ref(),
-                            );
+                            content.push_str(inline_token_text(&t, spacing, config).as_ref());
                         }
                     }
                 }
@@ -780,7 +761,7 @@ fn format_inline_node_with_options(
                 match child {
                     NodeOrToken::Token(token) if token.kind() == SyntaxKind::LINE_PREFIX => {}
                     NodeOrToken::Token(token) => {
-                        result.push_str(&inline_token_text(&token, spacing));
+                        result.push_str(&inline_token_text(&token, spacing, config));
                     }
                     NodeOrToken::Node(child) => {
                         result.push_str(&format_inline_node_with_options(&child, config, spacing));

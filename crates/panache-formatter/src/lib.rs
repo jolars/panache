@@ -15,6 +15,7 @@ pub use config::MathArgumentConfig;
 pub use config::MathDelimiterStyle;
 pub use config::MathMode;
 pub use config::ParserOptions;
+pub use config::SmartPunctuation;
 pub use config::TabStopMode;
 pub use config::WrapMode;
 pub use formatter::ExternalCodeBlock;

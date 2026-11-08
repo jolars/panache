@@ -1,7 +1,9 @@
-use crate::config::{Config, Dialect, WrapMode};
+use super::FormatContext;
+use super::smart::smart_token_text;
+use crate::config::{Dialect, WrapMode};
 use crate::formatter::Formatter;
 use crate::formatter::inline::{collapse_spaces, format_inline_node_with_spacing};
-use crate::formatter::inline_layout::expand_tabs_from_column;
+use crate::formatter::inline_layout::{byte_index_at_column, expand_tabs_from_column};
 use crate::formatter::sentence_wrap::{ResolvedProfile, SentenceProfileCache, split_sentence_text};
 use crate::syntax::{
     AstNode, GridTable, PipeTable, SyntaxKind, SyntaxNode, SyntaxToken, TableAlignment, TableCell,
@@ -9,7 +11,9 @@ use crate::syntax::{
 };
 use panache_parser::analyze_grid;
 use panache_parser::grid_layout::{grid_char_width, grid_column_slice, grid_display_width};
-use rowan::NodeOrToken;
+use panache_parser::parser::inlines::core::parse_inline_text_recursive;
+use panache_parser::parser::inlines::sink::InlineSink;
+use rowan::{GreenNodeBuilder, NodeOrToken};
 use std::collections::BTreeSet;
 use unicode_width::UnicodeWidthStr;
 
@@ -172,8 +176,11 @@ fn wrap_words_with_widths(words: &[&str], first_width: usize, rest_width: usize)
     out
 }
 
-fn format_grid_cell_paragraph(text: &str, config: &Config) -> String {
+fn format_grid_cell_paragraph(text: &str, config: &FormatContext) -> String {
     let tree = crate::parser::parse(text, Some(config.parser_options()));
+    let mut context = config.clone();
+    context.punctuation = std::sync::Arc::new(super::smart::smart_text_map(&tree, config));
+    let config = &context;
     let mut blocks = tree.children();
     let Some(paragraph) = blocks.next() else {
         return text.to_string();
@@ -241,7 +248,7 @@ fn is_ordered_list_marker(token: &str) -> bool {
 /// when the content carries block structure -- keep it verbatim after dropping
 /// leading/trailing blank lines. Column widths are load-bearing, so `width` is
 /// the target for multiline prose; normalized single lines may widen later.
-fn reflow_or_trim_grid_cell(lines: &[String], width: usize, config: &Config) -> Vec<String> {
+fn reflow_or_trim_grid_cell(lines: &[String], width: usize, config: &FormatContext) -> Vec<String> {
     let first = lines.iter().position(|l| !l.trim().is_empty());
     let last = lines.iter().rposition(|l| !l.trim().is_empty());
     let original = match (first, last) {
@@ -328,7 +335,7 @@ fn reflow_or_trim_grid_cell(lines: &[String], width: usize, config: &Config) -> 
 /// Column widths never shrink (pandoc maps grid widths to relative output
 /// widths), but inline normalization may grow them. Cells with block content or
 /// hard line breaks stay verbatim.
-fn reflow_grid_table_cells(table_data: &mut GridTableData, config: &Config) {
+fn reflow_grid_table_cells(table_data: &mut GridTableData, config: &FormatContext) {
     let num_cols = table_data
         .column_widths
         .len()
@@ -398,7 +405,7 @@ fn split_sentences(text: &str, profile: ResolvedProfile<'_>) -> Vec<String> {
 
 fn format_table_caption_with_language(
     caption_text: &str,
-    config: &Config,
+    config: &FormatContext,
     profile: ResolvedProfile<'_>,
 ) -> String {
     const CAPTION_PREFIX: &str = ": ";
@@ -467,7 +474,7 @@ fn format_table_caption_with_language(
 
 fn format_table_caption(
     caption_text: &str,
-    config: &Config,
+    config: &FormatContext,
     node: &SyntaxNode,
     sentence_profile: &SentenceProfileCache,
 ) -> String {
@@ -475,24 +482,18 @@ fn format_table_caption(
     format_table_caption_with_language(caption_text, config, profile)
 }
 
-fn extract_table_caption_content(caption_node: &SyntaxNode) -> String {
-    let mut caption_body = String::new();
-    for caption_child in caption_node.children_with_tokens() {
-        match caption_child {
-            rowan::NodeOrToken::Token(token)
-                if matches!(
-                    token.kind(),
-                    SyntaxKind::LINE_PREFIX | SyntaxKind::TABLE_CAPTION_PREFIX
-                ) => {}
-            rowan::NodeOrToken::Token(token) => {
-                caption_body.push_str(token.text());
-            }
-            rowan::NodeOrToken::Node(node) => {
-                caption_body.push_str(&text_without_line_prefixes(&node));
-            }
-        }
-    }
-
+fn extract_table_caption_content(caption_node: &SyntaxNode, config: &FormatContext) -> String {
+    let caption_body: String = caption_node
+        .descendants_with_tokens()
+        .filter_map(NodeOrToken::into_token)
+        .filter(|token| {
+            !matches!(
+                token.kind(),
+                SyntaxKind::LINE_PREFIX | SyntaxKind::TABLE_CAPTION_PREFIX
+            )
+        })
+        .map(|token| smart_token_text(&token, config).into_owned())
+        .collect();
     normalize_table_caption(&caption_body)
 }
 
@@ -517,7 +518,7 @@ struct TableData {
 /// markup, collapse to a single space. Literal content keeps its spacing.
 /// Simple and pipe tables opt in; multiline tables must retain source offsets
 /// until their cells have been sliced, then reflow within the original widths.
-fn format_cell_content(node: &SyntaxNode, config: &Config, collapse_ws: bool) -> String {
+fn format_cell_content(node: &SyntaxNode, config: &FormatContext, collapse_ws: bool) -> String {
     let mut result = String::new();
 
     for child in node.children_with_tokens() {
@@ -525,13 +526,14 @@ fn format_cell_content(node: &SyntaxNode, config: &Config, collapse_ws: bool) ->
             NodeOrToken::Token(token) => {
                 if token.kind() == SyntaxKind::TEXT
                     || token.kind() == SyntaxKind::NEWLINE
+                    || token.kind() == SyntaxKind::HARD_LINE_BREAK
                     || token.kind() == SyntaxKind::ESCAPED_CHAR
                     || token.kind() == SyntaxKind::NONBREAKING_SPACE
                 {
                     if collapse_ws && token.kind() == SyntaxKind::TEXT {
-                        result.push_str(&collapse_spaces(token.text()));
+                        result.push_str(&collapse_spaces(&smart_token_text(&token, config)));
                     } else {
-                        result.push_str(token.text());
+                        result.push_str(&smart_token_text(&token, config));
                     }
                 }
             }
@@ -545,7 +547,11 @@ fn format_cell_content(node: &SyntaxNode, config: &Config, collapse_ws: bool) ->
 }
 
 /// Extract cell contents from TABLE_CELL nodes if present, otherwise fall back to text splitting
-fn extract_row_cells(row_node: &SyntaxNode, config: &Config, collapse_ws: bool) -> Vec<String> {
+fn extract_row_cells(
+    row_node: &SyntaxNode,
+    config: &FormatContext,
+    collapse_ws: bool,
+) -> Vec<String> {
     let mut cells = Vec::new();
 
     let has_table_cells = row_node
@@ -568,8 +574,8 @@ fn extract_row_cells(row_node: &SyntaxNode, config: &Config, collapse_ws: bool) 
 ///
 /// A table nested in a container carries its own prefix on every line it
 /// owns, but the *first* line's prefix belongs to the enclosing container
-/// and so sits outside the table node. Column geometry is byte offsets into
-/// these lines, so the header would otherwise be measured from a different
+/// and so sits outside the table node. Column geometry excludes these
+/// prefixes, so the header would otherwise be measured from a different
 /// origin than the separator and rows.
 fn container_prefix_len(node: &SyntaxNode) -> usize {
     node.children_with_tokens()
@@ -674,7 +680,7 @@ fn split_row(row_text: &str) -> Vec<String> {
         .collect()
 }
 
-fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
+fn extract_pipe_table_data(node: &SyntaxNode, config: &FormatContext) -> TableData {
     let mut rows = Vec::new();
     let mut alignments = Vec::new();
     let mut caption = None;
@@ -682,7 +688,7 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let caption_text = extract_table_caption_content(&child);
+                let caption_text = extract_table_caption_content(&child, config);
                 if caption.is_none() {
                     caption = Some(caption_text);
                 }
@@ -757,7 +763,7 @@ const PANDOC_READER_COLUMNS: usize = 72;
 
 /// Measure source fields before trimming cell padding. Pandoc uses their
 /// widths to decide whether the separator proportions control rendered widths.
-fn pipe_row_source_widths(row: &TableRowNode, config: &Config) -> Vec<usize> {
+fn pipe_row_source_widths(row: &TableRowNode, config: &FormatContext) -> Vec<usize> {
     let mut widths = Vec::new();
     let mut source_column = 0;
     let mut field_width = 0;
@@ -813,7 +819,7 @@ struct PipeTableLayout {
 
 fn pipe_table_layout(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     rows: &[Vec<String>],
 ) -> Option<PipeTableLayout> {
     let mut layout = PipeTableLayout {
@@ -876,7 +882,7 @@ fn pipe_table_layout(
 /// Format a pipe table with consistent alignment and padding
 pub(super) fn format_pipe_table(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     indent: usize,
 ) -> String {
@@ -1024,7 +1030,7 @@ pub(super) fn format_pipe_table(
 /// is read from the alignment-bearing separator's colons rather than guessed.
 fn format_unified_spanning_grid_table(
     raw_table: &str,
-    config: &Config,
+    config: &FormatContext,
     profile: ResolvedProfile<'_>,
     indent: usize,
 ) -> String {
@@ -1267,6 +1273,7 @@ struct GridTableData {
 fn extract_grid_table_data(
     node: &SyntaxNode,
     layout: &panache_parser::GridLayout,
+    config: &FormatContext,
 ) -> Option<GridTableData> {
     let grid = GridTable::cast(node.clone())?;
     let sections: Vec<_> = node
@@ -1317,7 +1324,7 @@ fn extract_grid_table_data(
             .collect(),
         caption: grid
             .caption()
-            .map(|caption| extract_table_caption_content(caption.syntax())),
+            .map(|caption| extract_table_caption_content(caption.syntax(), config)),
         column_widths: layout
             .cols_pos
             .windows(2)
@@ -1425,7 +1432,7 @@ fn colspan_separator_segments(separator: &str) -> Vec<Alignment> {
 /// Format a grid table with consistent alignment and padding
 pub(super) fn format_grid_table(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     indent: usize,
 ) -> String {
@@ -1443,7 +1450,7 @@ pub(super) fn format_grid_table(
         return format_unified_spanning_grid_table(&raw_table, config, profile, indent);
     }
 
-    let Some(mut table_data) = extract_grid_table_data(node, &layout) else {
+    let Some(mut table_data) = extract_grid_table_data(node, &layout, config) else {
         return indent_table_block(&raw_table, indent);
     };
     let mut output = String::new();
@@ -1665,7 +1672,7 @@ fn split_simple_table_row(row_text: &str, columns: &[SimpleColumn]) -> Vec<Strin
     cells
 }
 
-fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
+fn extract_simple_table_data(node: &SyntaxNode, config: &FormatContext) -> TableData {
     let mut rows = Vec::new();
     let mut columns: Vec<SimpleColumn> = Vec::new();
     let mut caption = None;
@@ -1677,7 +1684,7 @@ fn extract_simple_table_data(node: &SyntaxNode, config: &Config) -> TableData {
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let caption_text = extract_table_caption_content(&child);
+                let caption_text = extract_table_caption_content(&child, config);
                 if caption.is_none() {
                     caption = Some(caption_text);
                 }
@@ -1765,7 +1772,7 @@ pub(super) fn pad_simple_cell(cell: &str, width: usize, alignment: Alignment) ->
 /// parse to the same table format identically and the output is idempotent.
 fn format_simple_table(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     indent: usize,
 ) -> String {
@@ -1971,23 +1978,117 @@ fn extract_multiline_cells(text: &str, column_positions: &[(usize, usize)]) -> V
     cells
 }
 
-fn extract_cells_from_table_cell_nodes(
-    row: &SyntaxNode,
-    config: &Config,
-    column_positions: &[(usize, usize)],
-) -> Vec<Vec<String>> {
-    let formatted_text = text_without_prefixes(row, |node| {
-        if node.kind() == SyntaxKind::TABLE_CELL {
-            format_cell_content(node, config, false)
-        } else {
-            node.text().to_string()
-        }
-    });
-
-    extract_multiline_cells(&formatted_text, column_positions)
+struct MultilineCellSink<'a, 'b> {
+    builder: &'a mut GreenNodeBuilder<'static>,
+    prefixes: std::vec::IntoIter<&'b str>,
+    column: usize,
+    tab_width: usize,
+    offset: u32,
+    code_offset: u32,
+    payloads: std::collections::HashMap<u32, String>,
 }
 
-fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> MultilineTableData {
+impl InlineSink for MultilineCellSink<'_, '_> {
+    fn token(&mut self, kind: rowan::SyntaxKind, text: &str) {
+        for line in text.split_inclusive('\n') {
+            let expanded = expand_tabs_from_column(line, self.tab_width, self.column);
+            if kind == SyntaxKind::INLINE_CODE_CONTENT.into() {
+                self.payloads
+                    .entry(self.code_offset)
+                    .or_default()
+                    .push_str(&expanded);
+            }
+            self.column = if line.ends_with('\n') {
+                expand_tabs_from_column(self.prefixes.next().unwrap_or_default(), self.tab_width, 0)
+                    .chars()
+                    .count()
+            } else {
+                self.column + expanded.chars().count()
+            };
+        }
+        self.builder.token(kind, text);
+        self.offset += text.len() as u32;
+    }
+
+    fn start_node(&mut self, kind: rowan::SyntaxKind) {
+        if kind == SyntaxKind::INLINE_CODE.into() {
+            self.code_offset = self.offset;
+        }
+        self.builder.start_node(kind);
+    }
+
+    fn finish_node(&mut self) {
+        self.builder.finish_node();
+    }
+}
+
+fn extract_formatted_multiline_cells(
+    row: &SyntaxNode,
+    config: &FormatContext,
+    column_positions: &[(usize, usize)],
+) -> Vec<Vec<String>> {
+    // Separator columns describe tab-expanded source positions. Slice before
+    // inline normalization can move content across those boundaries.
+    let raw_text = raw_text_without_prefixes(row);
+    let source_text = row.text().to_string();
+    let options = config.parser_options();
+    let mut context = config.clone();
+    let tab_width = config.tab_width.max(1);
+    column_positions
+        .iter()
+        .map(|&(col_start, col_end)| {
+            let (cell, prefixes): (Vec<_>, Vec<_>) = raw_text
+                .lines()
+                .zip(source_text.lines())
+                .map(|(line, source)| {
+                    let prefix_len = source.len() - line.len();
+                    let source_column =
+                        expand_tabs_from_column(&source[..prefix_len], tab_width, 0)
+                            .chars()
+                            .count();
+                    let start = byte_index_at_column(line, col_start, tab_width, source_column);
+                    let end = byte_index_at_column(line, col_end, tab_width, source_column);
+                    let cell = &line[start..end];
+                    let leading = cell.len() - cell.trim_start().len();
+                    let prefix_len = prefix_len + start + leading;
+                    (cell.trim(), &source[..prefix_len])
+                })
+                .unzip();
+            // Continuations live outside TABLE_CELL in the source CST. Parse
+            // the full sliced cell so quote pairing and normalization see
+            // every line before reflow.
+            let mut builder = GreenNodeBuilder::new();
+            builder.start_node(SyntaxKind::TABLE_CELL.into());
+            // Expand code payloads while their source columns are still known.
+            // Keep that context outside the fragment so other literal content
+            // cannot accidentally emit excluded cells or container prefixes.
+            let mut prefixes = prefixes.into_iter();
+            let column = expand_tabs_from_column(prefixes.next().unwrap_or_default(), tab_width, 0)
+                .chars()
+                .count();
+            let mut sink = MultilineCellSink {
+                builder: &mut builder,
+                prefixes,
+                column,
+                tab_width,
+                offset: 0,
+                code_offset: 0,
+                payloads: Default::default(),
+            };
+            parse_inline_text_recursive(&mut sink, &cell.join("\n"), &options, false);
+            context.code_span_payloads = sink.payloads;
+            builder.finish_node();
+            let node = SyntaxNode::new_root(builder.finish());
+            context.punctuation = std::sync::Arc::new(super::smart::smart_text_map(&node, config));
+            format_cell_content(&node, &context, false)
+                .split('\n')
+                .map(|line| line.trim().to_string())
+                .collect()
+        })
+        .collect()
+}
+
+fn extract_multiline_table_data(node: &SyntaxNode, config: &FormatContext) -> MultilineTableData {
     let mut rows: Vec<Vec<Vec<String>>> = Vec::new();
     let mut raw_columns: Vec<(usize, usize)> = Vec::new();
     let mut alignments = Vec::new();
@@ -1999,7 +2100,7 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
     for child in node.children() {
         match child.kind() {
             SyntaxKind::TABLE_CAPTION => {
-                let caption_text = extract_table_caption_content(&child);
+                let caption_text = extract_table_caption_content(&child, config);
                 if caption.is_none() {
                     caption = Some(caption_text);
                 }
@@ -2017,14 +2118,7 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
             }
             SyntaxKind::TABLE_ROW => {
                 let slice = multiline_columns(&raw_columns).slice;
-                if child.children().any(|c| c.kind() == SyntaxKind::TABLE_CELL) {
-                    let cells = extract_cells_from_table_cell_nodes(&child, config, &slice);
-                    rows.push(cells);
-                } else {
-                    let row_content = format_cell_content(&child, config, false);
-                    let cells = extract_multiline_cells(&row_content, &slice);
-                    rows.push(cells);
-                }
+                rows.push(extract_formatted_multiline_cells(&child, config, &slice));
             }
             _ => {}
         }
@@ -2038,11 +2132,7 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
             .find(|c| c.kind() == SyntaxKind::TABLE_HEADER);
 
         let header_cells = if let Some(hdr) = header_node {
-            if hdr.children().any(|c| c.kind() == SyntaxKind::TABLE_CELL) {
-                extract_cells_from_table_cell_nodes(&hdr, config, &slice)
-            } else {
-                extract_multiline_cells(&header_text, &slice)
-            }
+            extract_formatted_multiline_cells(&hdr, config, &slice)
         } else {
             extract_multiline_cells(&header_text, &slice)
         };
@@ -2089,7 +2179,7 @@ fn extract_multiline_table_data(node: &SyntaxNode, config: &Config) -> Multiline
 /// Format a multiline table preserving column widths and structure
 fn format_multiline_table(
     node: &SyntaxNode,
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     indent: usize,
 ) -> String {
@@ -2177,6 +2267,12 @@ fn format_multiline_table(
         let max_lines = header_row.iter().map(|cell| cell.len()).max().unwrap_or(0);
 
         for line_idx in 0..max_lines {
+            if header_row
+                .iter()
+                .all(|cell| cell.get(line_idx).is_none_or(String::is_empty))
+            {
+                continue;
+            }
             let mut line_chars: Vec<char> = vec![' '; last_col_end];
 
             for (col_idx, cell_lines) in header_row.iter().enumerate() {
@@ -2226,6 +2322,13 @@ fn format_multiline_table(
         let max_lines = row.iter().map(|cell| cell.len()).max().unwrap_or(0);
 
         for line_idx in 0..max_lines {
+            // An inline can vacate a physical line without ending the logical row.
+            if row
+                .iter()
+                .all(|cell| cell.get(line_idx).is_none_or(String::is_empty))
+            {
+                continue;
+            }
             let mut line_chars: Vec<char> = vec![' '; last_col_end];
 
             for (col_idx, cell_lines) in row.iter().enumerate() {
@@ -2335,15 +2438,21 @@ mod grid_reflow_tests {
 
     #[test]
     fn reflow_packs_prose_and_drops_trailing_blank() {
-        let out =
-            reflow_or_trim_grid_cell(&lines("Lorem ipsum\ndolor sit\n"), 18, &Config::default());
+        let out = reflow_or_trim_grid_cell(
+            &lines("Lorem ipsum\ndolor sit\n"),
+            18,
+            &FormatContext::default(),
+        );
         assert_eq!(out, vec!["Lorem ipsum dolor", "sit"]);
     }
 
     #[test]
     fn trim_only_keeps_block_content_but_drops_blank_edges() {
-        let out =
-            reflow_or_trim_grid_cell(&lines("\n- item one\n- item two\n"), 18, &Config::default());
+        let out = reflow_or_trim_grid_cell(
+            &lines("\n- item one\n- item two\n"),
+            18,
+            &FormatContext::default(),
+        );
         assert_eq!(out, vec!["- item one", "- item two"]);
     }
 }

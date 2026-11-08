@@ -1,5 +1,5 @@
 use panache_formatter::config::WrapMode;
-use panache_formatter::{Config, ConfigBuilder, format};
+use panache_formatter::{Config, ConfigBuilder, SmartPunctuation, TabStopMode, format};
 
 #[test]
 fn test_basic_pipe_table() {
@@ -425,6 +425,168 @@ fn test_multiline_table_idempotency() {
         first_format, second_format,
         "Multiline table formatting must be idempotent"
     );
+}
+
+#[test]
+fn test_multiline_table_code_tabs_use_source_columns() {
+    let input = concat!(
+        "-------------------------------\n",
+        "h1         `h\ti`\n",
+        "---------- --------------------\n",
+        "a          `x\ty`\n",
+        "           *`u\tv`*\n",
+        "-------------------------------\n",
+    );
+    for prefix in ["", "> "] {
+        let input: String = input
+            .lines()
+            .map(|line| format!("{prefix}{line}\n"))
+            .collect();
+        for mode in [
+            SmartPunctuation::Preserve,
+            SmartPunctuation::Ascii,
+            SmartPunctuation::Unicode,
+        ] {
+            for wrap in [None, Some(WrapMode::Preserve), Some(WrapMode::Reflow)] {
+                for tab_width in [2, 4] {
+                    let config = Config {
+                        smart_punctuation: mode,
+                        wrap: wrap.clone(),
+                        tab_width,
+                        table_indent: 0,
+                        ..Config::default()
+                    };
+                    let output = format(&input, Some(config.clone()), None);
+                    let spaces = " ".repeat(tab_width - ((prefix.len() + 13) % tab_width));
+                    assert!(output.contains(&format!("`h{spaces}i`")), "{output:?}");
+                    assert!(output.contains(&format!("`x{spaces}y`")), "{output:?}");
+                    let spaces = " ".repeat(tab_width - ((prefix.len() + 14) % tab_width));
+                    assert!(output.contains(&format!("*`u{spaces}v`*")), "{output:?}");
+                    assert_eq!(format(&output, Some(config), None), output, "idempotency");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_multiline_table_slices_columns_after_tabs_in_earlier_cells() {
+    for prefix in ["", "> "] {
+        for tab_width in [2, 4] {
+            let left_spaces = " ".repeat(tab_width - ((prefix.len() + 2) % tab_width));
+            let left = format!("`a{left_spaces}b`c");
+            let gutter = " ".repeat(11 - left.len());
+            let right_spaces = " ".repeat(tab_width - ((prefix.len() + 13) % tab_width));
+            let input = format!(
+                "--------------------------\nh1         h2\n---------- ---------------\n`a\tb`c{gutter}`x\ty`\n--------------------------\n"
+            );
+            let expected = input
+                .replace("`a\tb`c", &left)
+                .replace("`x\ty`", &format!("`x{right_spaces}y`"));
+            let quoted = |text: &str| -> String {
+                text.lines()
+                    .map(|line| format!("{prefix}{line}\n"))
+                    .collect()
+            };
+            for wrap in [WrapMode::Preserve, WrapMode::Reflow] {
+                let config = Config {
+                    wrap: Some(wrap),
+                    tab_width,
+                    table_indent: 0,
+                    ..Config::default()
+                };
+                let output = format(&quoted(&input), Some(config.clone()), None);
+                assert_eq!(output, quoted(&expected));
+                assert_eq!(format(&output, Some(config), None), output, "idempotency");
+            }
+        }
+    }
+}
+
+#[test]
+fn test_multiline_table_preserve_removes_lines_vacated_by_code_spans() {
+    for (body, expected_body) in [
+        ("a          `x\n           y`\n", "a          `x y`\n"),
+        ("a          `x\nb          y`\n", "a          `x y`\nb\n"),
+        (
+            "a          `x\n           y\nb          z`\n",
+            "a          `x y z`\nb\n",
+        ),
+    ] {
+        let input = format!(
+            "--------------------------\nh1         h2\n---------- ---------------\n{body}--------------------------\n"
+        );
+        let expected = format!(
+            "--------------------------\nh1         h2\n---------- ---------------\n{expected_body}--------------------------\n"
+        );
+        let config = Config {
+            wrap: Some(WrapMode::Preserve),
+            table_indent: 0,
+            ..Config::default()
+        };
+        let output = format(&input, Some(config.clone()), None);
+        assert_eq!(output, expected);
+        assert_eq!(format(&output, Some(config), None), output, "idempotency");
+    }
+}
+
+#[test]
+fn test_multiline_table_preserves_literal_code_tabs() {
+    let input = "---------------------\nh1         h2\n---------- ----------\na          `x\ty`\n---------------------\n";
+    let config = Config {
+        tab_stops: TabStopMode::Preserve,
+        table_indent: 0,
+        ..Config::default()
+    };
+    let output = format(input, Some(config.clone()), None);
+    assert!(output.contains("`x\ty`"), "{output:?}");
+    assert_eq!(format(&output, Some(config), None), output);
+}
+
+#[test]
+fn test_multiline_table_continued_code_tabs_use_source_columns() {
+    let input = "-------------------------------\nh1         h2\n---------- --------------------\na          `x\n           y\tz`\n-------------------------------\n";
+    let config = Config {
+        table_indent: 0,
+        ..Config::default()
+    };
+    let output = format(input, Some(config.clone()), None);
+    assert!(output.contains("`x y    z`"), "{output:?}");
+    assert_eq!(format(&output, Some(config), None), output);
+}
+
+#[test]
+fn test_multiline_table_source_context_stays_outside_inline_content() {
+    for (first, second) in [("[x]{.foo", "key=v}"), ("\\foo{a", "b}"), ("^[one", "two]")] {
+        let input = format!(
+            "{border}\nh1         h2\n---------- {column}\nalpha      {first}\nbeta       {second}\n{border}\n",
+            border = "-".repeat(72),
+            column = "-".repeat(61),
+        );
+        let output = format(&input, None, None);
+        assert_eq!(output.matches("alpha").count(), 1, "{output:?}");
+        assert_eq!(output.matches("beta").count(), 1, "{output:?}");
+        assert_eq!(format(&output, None, None), output);
+    }
+}
+
+#[test]
+fn test_multiline_table_preserves_hard_breaks() {
+    for (first, second) in [("one\\", "two"), ("*one\\", "two*")] {
+        let input = format!(
+            "---------------------\nh1         h2\n---------- ----------\na          {first}\n           {second}\n---------------------\n"
+        );
+        for wrap in [None, Some(WrapMode::Preserve), Some(WrapMode::Reflow)] {
+            let config = Config {
+                wrap,
+                table_indent: 0,
+                ..Config::default()
+            };
+            let output = format(&input, Some(config.clone()), None);
+            assert_eq!(output, input, "{:?}", config.wrap);
+            assert_eq!(format(&output, Some(config), None), output, "idempotency");
+        }
+    }
 }
 
 #[test]

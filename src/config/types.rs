@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use schemars::{JsonSchema, Schema};
 use serde::{Deserialize, Deserializer, Serialize};
 
+pub use panache_formatter::SmartPunctuation;
 use panache_formatter::config::{FormatterExtensions, MathArgumentConfig, MathMode};
 use panache_parser::{Extensions, Flavor, PandocCompat, ParserOptions};
 
@@ -362,6 +363,10 @@ pub struct StyleConfig {
     pub tab_width: usize,
     /// Horizontal rule rendering: expanded to the line width or compact `---`
     pub horizontal_rule_style: HorizontalRuleStyle,
+    /// Source spelling of punctuation. Defaults to ASCII for Pandoc, Quarto,
+    /// and R Markdown, and preservation for other flavors.
+    #[schemars(with = "SmartPunctuation", transform = smart_punctuation_schema)]
+    pub smart_punctuation: Option<SmartPunctuation>,
     /// Use panache-native greedy wrapping instead of textwrap.
     pub built_in_greedy_wrap: bool,
     /// Extra abbreviations whose trailing period must not end a sentence (used
@@ -387,6 +392,7 @@ impl Default for StyleConfig {
             tab_stops: TabStopMode::Normalize,
             tab_width: 4,
             horizontal_rule_style: HorizontalRuleStyle::LineWidth,
+            smart_punctuation: None,
             built_in_greedy_wrap: true,
             no_break_abbreviations: None,
             lang: None,
@@ -403,6 +409,12 @@ fn stable_math_schema(schema: &mut Schema) {
         "default".to_string(),
         serde_json::Value::String("reflow".to_string()),
     );
+}
+
+fn smart_punctuation_schema(schema: &mut Schema) {
+    // The omitted value depends on the resolved flavor, so null is not a
+    // valid default for the enum exposed to configuration editors.
+    schema.remove("default");
 }
 
 fn deprecated_format_math_schema(schema: &mut Schema) {
@@ -947,6 +959,7 @@ impl RawConfig {
             wrap: style.wrap,
             blank_lines,
             horizontal_rule_style: style.horizontal_rule_style,
+            smart_punctuation: style.smart_punctuation,
             math_delimiter_style: style.math_delimiter_style,
             math_indent: style.math_indent,
             math,
@@ -1118,6 +1131,9 @@ pub struct Config {
     pub blank_lines: BlankLines,
     /// Horizontal rule rendering: expanded to the line width or compact `---`.
     pub horizontal_rule_style: HorizontalRuleStyle,
+    /// Source spelling of punctuation. Defaults to ASCII for Pandoc, Quarto,
+    /// and R Markdown, and preservation for other flavors.
+    pub smart_punctuation: Option<SmartPunctuation>,
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
     pub linters: HashMap<String, String>,
@@ -1192,6 +1208,7 @@ impl Default for Config {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             horizontal_rule_style: HorizontalRuleStyle::LineWidth,
+            smart_punctuation: None,
             formatters: HashMap::new(), // Opt-in: empty by default
             linter_definitions: HashMap::new(),
             linters: HashMap::new(), // Opt-in: empty by default
@@ -1265,6 +1282,11 @@ impl ConfigBuilder {
 
     pub fn horizontal_rule_style(mut self, style: HorizontalRuleStyle) -> Self {
         self.config.horizontal_rule_style = style;
+        self
+    }
+
+    pub fn smart_punctuation(mut self, mode: SmartPunctuation) -> Self {
+        self.config.smart_punctuation = Some(mode);
         self
     }
 

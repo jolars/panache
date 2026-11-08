@@ -1,0 +1,7 @@
+flavor = "pandoc"
+
+[extensions]
+auto-identifiers = false
+
+[format]
+smart-punctuation = "unicode"

@@ -1,4 +1,5 @@
-use crate::config::{Config, HorizontalRuleStyle, WrapMode};
+use super::FormatContext;
+use crate::config::{Config, HorizontalRuleStyle, SmartPunctuation, WrapMode};
 use crate::directives::DirectiveTracker;
 use crate::syntax::{
     AstNode, Definition, ExampleListMarker, ListItem, SyntaxKind, SyntaxNode, TomlMetadata,
@@ -6,6 +7,7 @@ use crate::syntax::{
 use panache_parser::parser::blocks::definition_lists::try_parse_definition_marker;
 use panache_parser::parser::blocks::headings::try_parse_atx_heading;
 use panache_parser::parser::blocks::horizontal_rules::try_parse_horizontal_rule;
+use panache_parser::parser::inlines::refdef_map::collect_refdef_labels_with_options;
 use panache_parser::parser::utils::attributes::{AttrComponent, attribute_content_spans};
 use rowan::NodeOrToken;
 
@@ -21,7 +23,7 @@ use super::utils::is_structural_block;
 
 pub struct Formatter {
     pub(super) output: String,
-    pub(super) config: Config,
+    pub(super) config: FormatContext,
     pub(super) sentence_profile: SentenceProfileCache,
     pub(super) consecutive_blank_lines: usize,
     pub(super) fenced_div_depth: usize,
@@ -51,7 +53,7 @@ impl Formatter {
     ) -> Self {
         Self {
             output: String::with_capacity(8192),
-            config,
+            config: config.into(),
             sentence_profile: SentenceProfileCache::default(),
             consecutive_blank_lines: 0,
             fenced_div_depth: 0,
@@ -64,6 +66,13 @@ impl Formatter {
         }
     }
     pub fn format(mut self, node: &SyntaxNode) -> String {
+        let root = node.ancestors().last().unwrap_or_else(|| node.clone());
+        self.config.refdef_labels = Some(collect_refdef_labels_with_options(
+            &root.text().to_string(),
+            &self.config.parser_options(),
+        ));
+        self.config.punctuation =
+            std::sync::Arc::new(super::smart::smart_text_map(node, &self.config));
         self.format_node_sync(node, 0);
         if node.kind() == SyntaxKind::DOCUMENT {
             // An unfinished opaque block owns the document's final whitespace.
@@ -642,11 +651,11 @@ impl Formatter {
         in_list_item_continuation
     }
 
-    /// Smart punctuation turns `—`→`---` and `–`→`--`. When a paragraph's
+    /// Smart punctuation turns `—`→`---` and `–`→`--`. When a prose block's
     /// whole content normalizes to dashes, the emitted line re-parses as a
     /// thematic break (or setext underline) — a semantic + idempotency break
-    /// (one pandoc itself shares). When that happens, re-emit the paragraph
-    /// with smart off so the lossless unicode dash is preserved. The smart-off
+    /// (one pandoc itself shares). When that happens, re-emit the block
+    /// in preserve mode so the original Unicode dash survives. That
     /// rendering is adopted only when it actually clears the marker, so a
     /// paragraph that genuinely contains a `***`/`___`/`- - -` line (not
     /// produced by smart) is left untouched.
@@ -656,7 +665,8 @@ impl Formatter {
         node: &SyntaxNode,
         indent: usize,
     ) {
-        if !self.config.formatter_extensions.smart
+        if self.config.smart_punctuation != SmartPunctuation::Ascii
+            || !self.config.formatter_extensions.smart
             || !Self::produces_dash_block_marker(&self.output[start..])
         {
             return;
@@ -665,11 +675,12 @@ impl Formatter {
         let original = self.output[start..].to_string();
         self.output.truncate(start);
 
-        let mut cfg = self.config.clone();
-        cfg.formatter_extensions.smart = false;
-        let saved = std::mem::replace(&mut self.config, cfg);
+        let saved = std::mem::replace(
+            &mut self.config.smart_punctuation,
+            SmartPunctuation::Preserve,
+        );
         self.format_node_sync(node, indent);
-        self.config = saved;
+        self.config.smart_punctuation = saved;
 
         if Self::produces_dash_block_marker(&self.output[start..]) {
             self.output.truncate(start);

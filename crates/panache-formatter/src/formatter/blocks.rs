@@ -1,10 +1,72 @@
-use crate::config::WrapMode;
+use crate::config::{SmartPunctuation, WrapMode};
 use crate::formatter::preserve::{preserve_lines_normalized, preserve_lines_unprefixed_normalized};
-use crate::formatter::smart::normalize_smart_punctuation;
+use crate::formatter::smart::{smart_node_text, smart_text_map};
 use crate::formatter::utils::is_block_element;
-use crate::formatter::{Formatter, paragraphs};
-use crate::syntax::{SyntaxKind, SyntaxNode};
-use rowan::NodeOrToken;
+use crate::formatter::{FormatContext, Formatter, paragraphs};
+use crate::syntax::{AstNode, LineBlock, LineBlockLine, SyntaxKind, SyntaxNode};
+use panache_parser::parser::blocks::tables::try_parse_pipe_separator;
+use panache_parser::parser::inlines::core::parse_inline_text_recursive;
+use rowan::{GreenNodeBuilder, NodeOrToken};
+
+pub(super) fn logical_line_block_lines(block: &LineBlock) -> Vec<Vec<LineBlockLine>> {
+    let mut lines: Vec<Vec<LineBlockLine>> = Vec::new();
+    for line in block.syntax().children().filter_map(LineBlockLine::cast) {
+        let has_marker = line
+            .syntax()
+            .children_with_tokens()
+            .any(|elem| elem.kind() == SyntaxKind::LINE_BLOCK_MARKER);
+        match lines.last_mut() {
+            Some(previous) if !has_marker => previous.push(line),
+            _ => lines.push(vec![line]),
+        }
+    }
+    lines
+}
+
+fn line_block_content(lines: &[LineBlockLine], config: &FormatContext) -> String {
+    let mut content = String::new();
+    for (i, line) in lines.iter().enumerate() {
+        let mut part = String::new();
+        let mut past_prefix = false;
+        for elem in line.syntax().children_with_tokens() {
+            let kind = elem.kind();
+            if !past_prefix && matches!(kind, SyntaxKind::WHITESPACE | SyntaxKind::LINE_PREFIX) {
+                continue;
+            }
+            past_prefix = true;
+            match kind {
+                SyntaxKind::LINE_BLOCK_MARKER => continue,
+                SyntaxKind::NEWLINE => break,
+                _ => match &elem {
+                    NodeOrToken::Token(t) => part.push_str(t.text()),
+                    NodeOrToken::Node(n) => part.push_str(&n.text().to_string()),
+                },
+            }
+        }
+        if i == 0 {
+            content.push_str(part.trim_end());
+        } else if !part.trim().is_empty() {
+            if !content.is_empty() {
+                content.push(' ');
+            }
+            content.push_str(part.trim());
+        }
+    }
+    if config.smart_punctuation == SmartPunctuation::Preserve {
+        return content;
+    }
+
+    // The source CST parses each physical line separately. Resolve inlines
+    // across the joined logical line so continued literals stay protected.
+    let mut builder = GreenNodeBuilder::new();
+    builder.start_node(SyntaxKind::PLAIN.into());
+    parse_inline_text_recursive(&mut builder, &content, &config.parser_options(), false);
+    builder.finish_node();
+    let node = SyntaxNode::new_root(builder.finish());
+    let mut context = config.clone();
+    context.punctuation = std::sync::Arc::new(smart_text_map(&node, config));
+    smart_node_text(&node, &context)
+}
 
 impl Formatter {
     pub(super) fn format_paragraph(&mut self, node: &SyntaxNode, indent: usize) {
@@ -20,110 +82,37 @@ impl Formatter {
         }
 
         let para_start = self.output.len();
-        let text = node.text().to_string();
-        log::trace!("Formatting paragraph, text length: {}", text.len());
+        log::trace!(
+            "Formatting paragraph, text length: {:?}",
+            node.text_range().len()
+        );
         let paragraph_indent = " ".repeat(indent);
 
-        if self.is_grid_table_continuation_paragraph(node) {
+        // Reflowing would break grid table continuations, bookdown text references,
+        // and LaTeX in fenced divs, so keep their source lines.
+        let keep_line_breaks = self.is_grid_table_continuation_paragraph(node)
+            || (self.config.formatter_extensions.bookdown_references
+                && paragraphs::is_bookdown_text_reference(node))
+            || (self.fenced_div_depth > 0 && self.contains_latex_command(node));
+        if keep_line_breaks {
+            let text = smart_node_text(node, &self.config);
             if indent > 0 {
                 for (i, line) in text.lines().enumerate() {
                     if i > 0 {
                         self.output.push('\n');
                     }
                     self.output.push_str(&paragraph_indent);
-                    self.output.push_str(
-                        normalize_smart_punctuation(
-                            line.trim_start(),
-                            self.config.formatter_extensions.smart,
-                            self.config.formatter_extensions.smart_quotes,
-                        )
-                        .as_ref(),
-                    );
+                    self.output.push_str(line.trim_start());
                 }
             } else {
-                self.output.push_str(
-                    normalize_smart_punctuation(
-                        &text,
-                        self.config.formatter_extensions.smart,
-                        self.config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
+                self.output.push_str(&text);
             }
             if !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
             return;
         }
-
-        if self.config.formatter_extensions.bookdown_references
-            && paragraphs::is_bookdown_text_reference(node)
-        {
-            if indent > 0 {
-                for (i, line) in text.lines().enumerate() {
-                    if i > 0 {
-                        self.output.push('\n');
-                    }
-                    self.output.push_str(&paragraph_indent);
-                    self.output.push_str(
-                        normalize_smart_punctuation(
-                            line.trim_start(),
-                            self.config.formatter_extensions.smart,
-                            self.config.formatter_extensions.smart_quotes,
-                        )
-                        .as_ref(),
-                    );
-                }
-            } else {
-                self.output.push_str(
-                    normalize_smart_punctuation(
-                        &text,
-                        self.config.formatter_extensions.smart,
-                        self.config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
-            }
-            if !self.output.ends_with('\n') {
-                self.output.push('\n');
-            }
-            return;
-        }
-
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
-        let preserve_newlines_for_latex =
-            self.fenced_div_depth > 0 && self.contains_latex_command(node);
-        if preserve_newlines_for_latex && self.fenced_div_depth > 0 {
-            if indent > 0 {
-                for (i, line) in text.lines().enumerate() {
-                    if i > 0 {
-                        self.output.push('\n');
-                    }
-                    self.output.push_str(&paragraph_indent);
-                    self.output.push_str(
-                        normalize_smart_punctuation(
-                            line.trim_start(),
-                            self.config.formatter_extensions.smart,
-                            self.config.formatter_extensions.smart_quotes,
-                        )
-                        .as_ref(),
-                    );
-                }
-            } else {
-                self.output.push_str(
-                    normalize_smart_punctuation(
-                        &text,
-                        self.config.formatter_extensions.smart,
-                        self.config.formatter_extensions.smart_quotes,
-                    )
-                    .as_ref(),
-                );
-            }
-            if !self.output.ends_with('\n') {
-                self.output.push('\n');
-            }
-            return;
-        }
         log::trace!(
             "Paragraph wrap mode: {:?}, line_width: {}",
             wrap_mode,
@@ -332,54 +321,26 @@ impl Formatter {
 
         let line_indent = " ".repeat(indent);
 
-        let mut rendered: Vec<String> = Vec::new();
-        for child in node.children() {
-            if child.kind() != SyntaxKind::LINE_BLOCK_LINE {
-                continue;
+        let block = LineBlock::cast(node.clone()).expect("line block");
+        for lines in logical_line_block_lines(&block) {
+            let mut line = line_block_content(&lines, &self.config);
+            if self.config.smart_punctuation == SmartPunctuation::Ascii
+                && self.config.formatter_extensions.smart
+                && self.config.parser_extensions.pipe_tables
+                && try_parse_pipe_separator(&format!("| {line}")).is_some()
+            {
+                // A dash-only logical line can become a table delimiter after
+                // continuations are joined, so keep its authored punctuation.
+                let mut preserve = self.config.clone();
+                preserve.smart_punctuation = SmartPunctuation::Preserve;
+                line = line_block_content(&lines, &preserve);
             }
-            let mut content = String::new();
-            let mut has_marker = false;
-            let mut past_prefix = false;
-            for elem in child.children_with_tokens() {
-                let kind = elem.kind();
-                if !past_prefix && matches!(kind, SyntaxKind::WHITESPACE | SyntaxKind::LINE_PREFIX)
-                {
-                    continue;
-                }
-                past_prefix = true;
-                match kind {
-                    SyntaxKind::LINE_BLOCK_MARKER => {
-                        has_marker = true;
-                        continue;
-                    }
-                    SyntaxKind::NEWLINE => break,
-                    _ => match &elem {
-                        NodeOrToken::Token(t) => content.push_str(t.text()),
-                        NodeOrToken::Node(n) => content.push_str(&n.text().to_string()),
-                    },
-                }
-            }
-            match rendered.last_mut() {
-                Some(previous) if !has_marker => {
-                    let continuation = content.trim();
-                    if !continuation.is_empty() {
-                        if !previous.is_empty() {
-                            previous.push(' ');
-                        }
-                        previous.push_str(continuation);
-                    }
-                }
-                _ => rendered.push(content.trim_end().to_string()),
-            }
-        }
-
-        for line in &rendered {
             self.output.push_str(&line_indent);
             if line.trim().is_empty() {
                 self.output.push('|');
             } else {
                 self.output.push_str("| ");
-                self.output.push_str(line);
+                self.output.push_str(&line);
             }
             self.output.push('\n');
         }

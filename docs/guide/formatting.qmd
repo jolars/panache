@@ -300,6 +300,10 @@ pipe, simple, and multiline tables by two spaces. Set
 them at the left margin. Grid tables stay at the left margin so Pandoc
 recognizes them as tables.
 
+Multiline tables use tab-expanded columns to locate cell boundaries. When an
+inline code span collapses onto one line, Panache removes any empty continuation
+lines it leaves in the row, including with `wrap = "preserve"`.
+
 #### Pipe Tables
 
 Panache pads cells to show each column's alignment in the source and discards
@@ -389,7 +393,8 @@ Output
 
 Panache wraps prose within the existing column widths and removes extra blank
 lines between rows. It keeps the widths because they affect the rendered layout.
-Code spans, links, and math stay intact when cells wrap.
+Code spans, links, and math stay intact when cells wrap. Panache reads cell text
+from the original column positions before normalizing punctuation or whitespace.
 
 Input
 

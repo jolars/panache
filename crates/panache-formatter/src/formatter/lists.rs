@@ -100,20 +100,23 @@ impl Formatter {
         if indent > 0 && (self.output.is_empty() || self.output.ends_with('\n')) {
             self.output.push_str(&" ".repeat(indent));
         }
+        let term_start = self.output.len();
         for child in node.children_with_tokens() {
             match child {
                 NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::TEXT => {
-                    self.output.push_str(tok.text());
+                    self.output
+                        .push_str(&super::smart::smart_token_text(&tok, &self.config));
                 }
                 NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::NEWLINE => {
                     self.output.push('\n');
                 }
                 NodeOrToken::Node(n) => {
-                    self.format_node_sync(&n, indent);
+                    self.output.push_str(&self.format_inline_node(&n));
                 }
                 _ => {}
             }
         }
+        self.guard_dash_block_marker(term_start, node, indent);
     }
 
     pub(super) fn format_definition(&mut self, node: &SyntaxNode, indent: usize) {

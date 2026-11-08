@@ -36,6 +36,7 @@ pub use types::LintConfig;
 pub use types::LinterDefinition;
 pub use types::MathDelimiterStyle;
 pub use types::NoBreakAbbreviations;
+pub use types::SmartPunctuation;
 pub use types::TabStopMode;
 pub use types::WrapMode;
 
@@ -1945,6 +1946,80 @@ mod tests {
         assert!(
             parse_config_str(toml, Path::new("panache.toml")).is_err(),
             "unknown horizontal-rule-style value must be rejected"
+        );
+    }
+
+    #[test]
+    fn smart_punctuation_modes_parse_with_smart_disabled() {
+        for mode in ["preserve", "ascii", "unicode"] {
+            let source = format!(
+                "flavor = \"commonmark\"\n[extensions]\nsmart = false\n[format]\nsmart-punctuation = \"{mode}\"\n"
+            );
+            let cfg = parse_config_str(&source, Path::new("panache.toml")).unwrap();
+            let expected = match mode {
+                "preserve" => SmartPunctuation::Preserve,
+                "ascii" => SmartPunctuation::Ascii,
+                _ => SmartPunctuation::Unicode,
+            };
+            assert_eq!(
+                crate::formatter::to_formatter_config(&cfg).smart_punctuation,
+                expected
+            );
+        }
+        assert!(
+            parse_config_str(
+                "[format]\nsmart-punctuation = \"auto\"\n",
+                Path::new("panache.toml")
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn ascii_punctuation_respects_smart_overrides_in_commonmark() {
+        let input = "“Hi” – it’s ‘fine’… — ok\n";
+        for (extensions, expected) in [
+            ("smart = false", input),
+            ("smart = true", "\"Hi\" -- it's 'fine'... --- ok\n"),
+            ("smart-quotes = true", "\"Hi\" – it's 'fine'… — ok\n"),
+        ] {
+            let source = format!(
+                "flavor = \"commonmark\"\n[extensions]\n{extensions}\n[format]\nsmart-punctuation = \"ascii\"\n"
+            );
+            let cfg = parse_config_str(&source, Path::new("panache.toml")).unwrap();
+            assert_eq!(
+                crate::format(input, Some(cfg), None),
+                expected,
+                "{extensions}"
+            );
+        }
+    }
+
+    #[test]
+    fn smart_punctuation_defaults_follow_the_resolved_flavor() {
+        let mut cfg = Config::default();
+        for flavor in [
+            Flavor::Pandoc,
+            Flavor::Quarto,
+            Flavor::RMarkdown,
+            Flavor::CommonMark,
+            Flavor::Gfm,
+            Flavor::MultiMarkdown,
+            Flavor::Hugo,
+            Flavor::Mdsvex,
+            Flavor::Myst,
+        ] {
+            apply_flavor(&mut cfg, flavor, None);
+            assert_eq!(
+                crate::formatter::to_formatter_config(&cfg).smart_punctuation,
+                SmartPunctuation::for_flavor(flavor)
+            );
+        }
+        cfg.smart_punctuation = Some(SmartPunctuation::Unicode);
+        apply_flavor(&mut cfg, Flavor::CommonMark, None);
+        assert_eq!(
+            crate::formatter::to_formatter_config(&cfg).smart_punctuation,
+            SmartPunctuation::Unicode
         );
     }
 

@@ -1,10 +1,11 @@
+use super::FormatContext;
 use panache_parser::parser::blocks::headings::content_reads_as_decoration;
 use rowan::NodeOrToken;
 
 use super::core::normalize_attribute_text;
 use super::inline::{collapse_spaces, format_inline_node_with_spacing};
-use super::smart::normalize_smart_punctuation;
-use crate::config::{Config, Flavor};
+use super::smart::smart_token_text;
+use crate::config::Flavor;
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 /// Render a single heading line (`### content {attrs}`), formatting inline
@@ -16,7 +17,7 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 /// inline content (code spans, links, emphasis) and attributes are reformatted
 /// identically regardless of where the heading appears. The `#` prefix means
 /// the rendered line can never collide with a thematic break.
-pub(super) fn format_heading(node: &SyntaxNode, config: &Config) -> String {
+pub(super) fn format_heading(node: &SyntaxNode, config: &FormatContext) -> String {
     // GitHub and Hugo derive anchors from each source space, so collapsing them can break links.
     let collapse_ws = !matches!(config.flavor, Flavor::Gfm | Flavor::Hugo);
     let mut level = 1;
@@ -42,19 +43,13 @@ pub(super) fn format_heading(node: &SyntaxNode, config: &Config) -> String {
                                     content.push(' ');
                                 }
                             } else {
+                                let text = smart_token_text(&t, config);
                                 let text = if collapse_ws && t.kind() == SyntaxKind::TEXT {
-                                    std::borrow::Cow::Owned(collapse_spaces(t.text()))
+                                    std::borrow::Cow::Owned(collapse_spaces(&text))
                                 } else {
-                                    std::borrow::Cow::Borrowed(t.text())
+                                    text
                                 };
-                                content.push_str(
-                                    normalize_smart_punctuation(
-                                        &text,
-                                        config.formatter_extensions.smart,
-                                        config.formatter_extensions.smart_quotes,
-                                    )
-                                    .as_ref(),
-                                );
+                                content.push_str(&text);
                             }
                         }
                         NodeOrToken::Node(n) => {

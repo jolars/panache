@@ -1,0 +1,4 @@
+flavor = "rmarkdown"
+
+[format]
+smart-punctuation = "unicode"

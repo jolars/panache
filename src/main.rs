@@ -76,6 +76,18 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
                 };
                 cfg.wrap = Some(mode);
             }
+            "smart-punctuation" => {
+                cfg.smart_punctuation = Some(match value {
+                    "preserve" => panache::config::SmartPunctuation::Preserve,
+                    "ascii" => panache::config::SmartPunctuation::Ascii,
+                    "unicode" => panache::config::SmartPunctuation::Unicode,
+                    other => {
+                        return Err(format!(
+                            "invalid value for `smart-punctuation`: `{other}` (expected one of: preserve, ascii, unicode)"
+                        ));
+                    }
+                });
+            }
             "table-indent" => {
                 let indent: usize = value.parse().map_err(|_| {
                     format!(
@@ -110,7 +122,7 @@ fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Re
             }
             other => {
                 return Err(format!(
-                    "unknown config key in --option: `{other}` (supported: line-width, wrap, table-indent, extensions.<name>)"
+                    "unknown config key in --option: `{other}` (supported: line-width, wrap, table-indent, smart-punctuation, extensions.<name>)"
                 ));
             }
         }
@@ -3326,6 +3338,20 @@ mod tests {
 
         fn cfg() -> panache::Config {
             panache::Config::default()
+        }
+
+        #[test]
+        fn smart_punctuation_overrides_the_configured_mode() {
+            let mut c = cfg();
+            c.smart_punctuation = Some(panache::config::SmartPunctuation::Preserve);
+            apply_format_overrides(&mut c, &["smart-punctuation=unicode".to_owned()]).unwrap();
+            assert_eq!(
+                c.smart_punctuation,
+                Some(panache::config::SmartPunctuation::Unicode)
+            );
+            assert!(
+                apply_format_overrides(&mut c, &["smart-punctuation=auto".to_owned()]).is_err()
+            );
         }
 
         #[test]

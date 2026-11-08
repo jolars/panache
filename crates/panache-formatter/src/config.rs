@@ -110,6 +110,31 @@ pub enum HorizontalRuleStyle {
     Compact,
 }
 
+/// Source spelling of punctuation in prose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum SmartPunctuation {
+    /// Leave punctuation as written.
+    Preserve,
+    /// Write straight quotes with `smart` or `smart-quotes`, and `--`, `---`,
+    /// and `...` with `smart`. Preserve punctuation otherwise.
+    #[default]
+    Ascii,
+    /// Write English curly quotes, en/em dashes, and `…`.
+    Unicode,
+}
+
+impl SmartPunctuation {
+    pub fn for_flavor(flavor: Flavor) -> Self {
+        match flavor {
+            Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown => Self::Ascii,
+            _ => Self::Preserve,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
@@ -251,6 +276,9 @@ pub struct Config {
     /// How horizontal rules are rendered: expanded to the line width
     /// (default) or as a compact `---`.
     pub horizontal_rule_style: HorizontalRuleStyle,
+    /// Source spelling of punctuation. ASCII normalization requires the
+    /// corresponding `smart` or `smart-quotes` renderer extension.
+    pub smart_punctuation: SmartPunctuation,
     /// Document-language fallback used by sentence wrapping when the document
     /// has no YAML `lang:`. Normalized lowercase code (e.g. `de`, `pt-br`).
     pub lang: Option<String>,
@@ -288,6 +316,7 @@ impl Default for Config {
             wrap: Some(WrapMode::Reflow),
             blank_lines: BlankLines::Collapse,
             horizontal_rule_style: HorizontalRuleStyle::default(),
+            smart_punctuation: SmartPunctuation::for_flavor(flavor),
             lang: None,
             no_break_abbreviations: std::collections::BTreeMap::new(),
             formatters: HashMap::new(), // Opt-in: empty by default
@@ -323,6 +352,11 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    pub fn smart_punctuation(mut self, mode: SmartPunctuation) -> Self {
+        self.config.smart_punctuation = mode;
+        self
+    }
+
     pub fn math(mut self, mode: MathMode) -> Self {
         self.config.math = mode;
         self
@@ -417,6 +451,11 @@ mod schema_tests {
     #[test]
     fn blank_lines_values_are_lowercase() {
         assert_wire_values::<BlankLines>(&["preserve", "collapse"]);
+    }
+
+    #[test]
+    fn smart_punctuation_values_are_lowercase() {
+        assert_wire_values::<SmartPunctuation>(&["preserve", "ascii", "unicode"]);
     }
 
     #[test]

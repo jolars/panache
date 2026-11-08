@@ -680,6 +680,49 @@ Text.[@citation]
 Next sentence.
 ```
 
+### Smart Punctuation {#smart-punctuation}
+
+Choose how Panache writes punctuation in prose:
+
+```toml
+[format]
+smart-punctuation = "unicode"
+```
+
+For a single invocation, use `panache format -o smart-punctuation=unicode`.
+
+`preserve`
+:   Leave ASCII and Unicode punctuation as written.
+
+`ascii`
+:   Convert English curly quotes and apostrophes to straight quotes, en and em
+    dashes to `--` and `---`, and ellipses to `...`. Quote conversion requires
+    `smart` or `smart-quotes`; dash and ellipsis conversion requires `smart`.
+    With both extensions disabled, punctuation stays as written.
+
+`unicode`
+:   Convert paired straight quotes to English curly quotes, apostrophes to `’`,
+    `--` to `–`, `---` to `—`, and `...` to `…`. Existing Unicode quotation
+    marks and unpaired straight double quotes keep their spelling.
+
+The default is `ascii` for Pandoc, Quarto, and R Markdown, and `preserve` for
+other flavors. The `preserve` and `unicode` modes work independently of the
+`smart` and `smart-quotes` extensions, including with CommonMark and GFM. An
+explicit `ascii` selection still requires the corresponding extension. Code,
+math, URLs, email addresses, attributes, link titles, escaped punctuation, and
+raw markup stay unchanged. Bare URL and email protection extends across inline
+markup in both conversion modes, even when `autolink-bare-uris` is disabled.
+Escaped punctuation still determines the direction of adjacent quotes. Panache
+resolves inline constructs across line-block continuations before normalizing
+prose. Multiline table cells normalize punctuation across continuation lines
+before reflow while preserving hard breaks and reference link labels. Unicode
+conversion preserves heading text when `auto-identifiers` or
+`implicit-header-references` is enabled so generated identifiers and implicit
+heading links keep working, including headings with explicit IDs when automatic
+identifiers are disabled. If Unicode conversion would turn literal bracketed
+text into a reference link, Panache escapes the literal opening brackets with
+character entities.
+
 ### Math Formatting
 
 Configure math content formatting, delimiters, and display indentation:
@@ -806,7 +849,9 @@ tab-width = 4
 ```
 
 `normalize`
-:   Convert tabs to spaces using `tab-width` (default 4).
+:   Convert tabs to spaces using `tab-width` (default 4). Code spans use each
+    tab's column in the source line, including container prefixes and table
+    columns, to preserve their literal content.
 
 `preserve`
 :   Preserve tabs in literal code spans and fenced/indented code blocks. Tabs in
@@ -1346,17 +1391,17 @@ mark = false
     `east_asian_line_breaks` extension.
 
 `smart`
-:   Normalize smart/curly punctuation in formatter output (quotes/apostrophes
-    and en/em dashes, plus ellipsis) to Markdown forms (`'`, `"`, `--`, `---`,
-    `...`). Defaults: enabled for `pandoc`, `quarto`, `rmarkdown`; disabled for
-    `gfm`, `commonmark`, `multimarkdown`. A dash that would land alone on a line
-    (e.g. a paragraph that is just `---`) is left as the Unicode character
-    instead, since `---`/`--` there would re-parse as a thematic break or setext
-    underline.
+:   Describes smart interpretation of ASCII punctuation by the target reader,
+    including quotes, dashes, and ellipses. Defaults: enabled for `pandoc`,
+    `quarto`, and `rmarkdown`; disabled for other flavors. Enables quote, dash,
+    and ellipsis normalization when [`smart-punctuation`](#smart-punctuation) is
+    `ascii`.
 
 `smart-quotes`
-:   Normalize smart/curly quotes and apostrophes only (`'`, `"`). Unlike
-    `smart`, this does not normalize dashes or ellipsis. Default: disabled.
+:   Describes smart interpretation of quotes and apostrophes only. Default:
+    disabled. Enables quote and apostrophe normalization when
+    [`smart-punctuation`](#smart-punctuation) is `ascii`, leaving dashes and
+    ellipses unchanged unless `smart` is also enabled.
 
 `emoji`
 :   Emoji syntax `:emoji:` (default: disabled, non-default extension)

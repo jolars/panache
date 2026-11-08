@@ -1249,7 +1249,7 @@ fn within_nonindent_spaces(line: &str) -> bool {
 
 /// Check if a line is a pipe table separator line.
 /// Returns the column alignments if it's a valid separator.
-pub(crate) fn try_parse_pipe_separator(line: &str) -> Option<Vec<Alignment>> {
+pub fn try_parse_pipe_separator(line: &str) -> Option<Vec<Alignment>> {
     let trimmed = line.trim();
 
     if !trimmed.contains('|') && !trimmed.contains('+') {

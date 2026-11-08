@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 
 use panache_formatter::config::{
     BlankLines, Flavor, FormatterExtensions, HorizontalRuleStyle, LineEnding, MathDelimiterStyle,
-    MathMode, ParserExtensions, TabStopMode, WrapMode,
+    MathMode, ParserExtensions, SmartPunctuation, TabStopMode, WrapMode,
 };
 
 fn parse_flavor(value: &str) -> Option<Flavor> {
@@ -25,6 +25,33 @@ fn parse_flavor(value: &str) -> Option<Flavor> {
 #[cfg(test)]
 mod hugo_tests {
     #[test]
+    fn punctuation_modes_override_the_flavor_default() {
+        let format = |mode: Option<&str>| {
+            super::format_qmd_with_options(
+                "\"hi\" -- “hi”\n",
+                None,
+                Some("commonmark".to_owned()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                mode.map(str::to_owned),
+            )
+            .unwrap()
+        };
+        assert_eq!(format(None), "\"hi\" -- “hi”\n");
+        assert_eq!(format(Some("preserve")), "\"hi\" -- “hi”\n");
+        assert_eq!(format(Some("ascii")), "\"hi\" -- “hi”\n");
+        assert_eq!(format(Some("unicode")), "“hi” – “hi”\n");
+    }
+
+    #[test]
     fn accepts_hugo_flavor() {
         assert_eq!(super::parse_flavor("hugo"), Some(super::Flavor::Hugo));
     }
@@ -41,6 +68,7 @@ mod hugo_tests {
             input,
             None,
             Some("hugo".to_owned()),
+            None,
             None,
             None,
             None,
@@ -84,6 +112,7 @@ mod hugo_tests {
             None,
             None,
             Some("-escaped-line-breaks".to_owned()),
+            None,
         )
         .unwrap();
         assert_eq!(output, "a  \nb\n");
@@ -106,6 +135,7 @@ mod hugo_tests {
                 None,
                 None,
                 extensions.map(str::to_owned),
+                None,
             )
             .unwrap()
         };
@@ -190,6 +220,15 @@ fn parse_extension_overrides(value: &str) -> Result<HashMap<String, bool>, Strin
         .collect()
 }
 
+fn parse_smart_punctuation(value: &str) -> Option<SmartPunctuation> {
+    match value {
+        "preserve" => Some(SmartPunctuation::Preserve),
+        "ascii" => Some(SmartPunctuation::Ascii),
+        "unicode" => Some(SmartPunctuation::Unicode),
+        _ => None,
+    }
+}
+
 fn parse_tab_stops(value: &str) -> Option<TabStopMode> {
     match value.to_ascii_lowercase().as_str() {
         "normalize" => Some(TabStopMode::Normalize),
@@ -222,6 +261,7 @@ pub fn format_qmd_with_options(
     math_indent: Option<usize>,
     horizontal_rule_style: Option<String>,
     extensions: Option<String>,
+    smart_punctuation: Option<String>,
 ) -> Result<String, JsValue> {
     let mut cfg = panache_formatter::Config::default();
 
@@ -233,6 +273,7 @@ pub fn format_qmd_with_options(
         let parsed = parse_flavor(&flavor)
             .ok_or_else(|| JsValue::from_str(&format!("Unsupported flavor: {flavor}")))?;
         cfg.flavor = parsed;
+        cfg.smart_punctuation = SmartPunctuation::for_flavor(parsed);
         cfg.parser_extensions = ParserExtensions::for_flavor(parsed);
         cfg.formatter_extensions = FormatterExtensions::for_flavor(parsed);
     }
@@ -301,6 +342,12 @@ pub fn format_qmd_with_options(
                     "Unsupported horizontal rule style: {horizontal_rule_style}"
                 ))
             })?;
+    }
+
+    if let Some(mode) = smart_punctuation {
+        cfg.smart_punctuation = parse_smart_punctuation(&mode).ok_or_else(|| {
+            JsValue::from_str(&format!("Unsupported smart punctuation mode: {mode}"))
+        })?;
     }
 
     Ok(panache_formatter::format(input, Some(cfg), None))

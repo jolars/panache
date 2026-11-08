@@ -1,6 +1,10 @@
 use crate::config::Config;
 use crate::syntax::{SyntaxNode, YamlFrontmatterRegion};
+use panache_parser::ParserOptions;
+use panache_parser::parser::inlines::refdef_map::RefdefMap;
 use panache_parser::semantic::math::{ArgSpec, CommandSignature, SignatureScope};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 mod blockquotes;
 mod blocks;
@@ -34,6 +38,51 @@ pub use code_blocks::FormattedCodeMap;
 pub use code_blocks::collect_code_blocks;
 pub use core::Formatter;
 pub use indent_utils::continuation_indent_at;
+
+/// Document-specific state shared by the block and inline emitters.
+#[derive(Clone, Default)]
+pub(super) struct FormatContext {
+    config: Config,
+    punctuation: Arc<std::collections::HashMap<u32, String>>,
+    // Detached fragments cannot recover code spans' original source columns.
+    code_span_payloads: std::collections::HashMap<u32, String>,
+    refdef_labels: Option<RefdefMap>,
+}
+
+impl From<Config> for FormatContext {
+    fn from(config: Config) -> Self {
+        Self {
+            config,
+            punctuation: Arc::default(),
+            code_span_payloads: Default::default(),
+            refdef_labels: None,
+        }
+    }
+}
+
+impl FormatContext {
+    fn parser_options(&self) -> ParserOptions {
+        let mut options = self.config.parser_options();
+        // Reparsed fragments must resolve references against the document,
+        // including definitions that appear after the fragment.
+        options.refdef_labels = self.refdef_labels.clone();
+        options
+    }
+}
+
+impl Deref for FormatContext {
+    type Target = Config;
+
+    fn deref(&self) -> &Config {
+        &self.config
+    }
+}
+
+impl DerefMut for FormatContext {
+    fn deref_mut(&mut self) -> &mut Config {
+        &mut self.config
+    }
+}
 
 /// Derive the effective math signature scope for `tree`: the configured
 /// `math-signatures` entries layered under the document's own `\newcommand`

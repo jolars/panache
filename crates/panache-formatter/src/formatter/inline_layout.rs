@@ -1,9 +1,10 @@
+use super::FormatContext;
 use crate::config::{Config, Dialect};
 use crate::formatter::sentence_wrap::{
     ResolvedProfile, SentenceBoundaryClass, SentenceLanguage, SentenceProfileCache,
     SentenceSegment, is_sentence_boundary_segment,
 };
-use crate::formatter::smart::normalize_smart_punctuation;
+use crate::formatter::smart::smart_token_text;
 use crate::syntax::{
     ExampleListMarker, ImageAlt, LatexCommand, LinkDest, LinkRef, LinkText, ListItem, SyntaxKind,
     SyntaxNode, UnresolvedReference, text_without_line_prefixes,
@@ -148,6 +149,27 @@ pub(super) fn expand_tabs_from_column(
         }
     }
     Cow::Owned(out)
+}
+
+/// Map tab-expanded character columns back to the source's UTF-8 boundaries.
+pub(super) fn byte_index_at_column(
+    text: &str,
+    target: usize,
+    tab_width: usize,
+    start_column: usize,
+) -> usize {
+    let mut column = 0;
+    for (offset, ch) in text.char_indices() {
+        if column >= target {
+            return offset;
+        }
+        column += if ch == '\t' {
+            tab_width - ((start_column + column) % tab_width)
+        } else {
+            1
+        };
+    }
+    text.len()
 }
 
 fn starts_with_ascii_whitespace(text: &str) -> bool {
@@ -708,7 +730,7 @@ fn node_starts_with_whitespace(node: &SyntaxNode) -> bool {
     false
 }
 
-fn append_link_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
+fn append_link_closing(node: &SyntaxNode, out: &mut String) {
     let mut past_link_text = false;
     for child in node.children_with_tokens() {
         match child {
@@ -731,14 +753,7 @@ fn append_link_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
                         SyntaxKind::LINK_TEXT_END
                         | SyntaxKind::LINK_DEST_START
                         | SyntaxKind::LINK_DEST_END
-                        | SyntaxKind::TEXT => out.push_str(
-                            normalize_smart_punctuation(
-                                t.text(),
-                                config.formatter_extensions.smart,
-                                config.formatter_extensions.smart_quotes,
-                            )
-                            .as_ref(),
-                        ),
+                        | SyntaxKind::TEXT => out.push_str(t.text()),
                         _ => {}
                     }
                 }
@@ -767,7 +782,7 @@ fn append_span_closing(node: &SyntaxNode, out: &mut String) {
     }
 }
 
-fn append_image_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
+fn append_image_closing(node: &SyntaxNode, out: &mut String) {
     let mut past_image_alt = false;
     for child in node.children_with_tokens() {
         match child {
@@ -790,14 +805,7 @@ fn append_image_closing(node: &SyntaxNode, out: &mut String, config: &Config) {
                         SyntaxKind::IMAGE_ALT_END
                         | SyntaxKind::IMAGE_DEST_START
                         | SyntaxKind::IMAGE_DEST_END
-                        | SyntaxKind::TEXT => out.push_str(
-                            normalize_smart_punctuation(
-                                t.text(),
-                                config.formatter_extensions.smart,
-                                config.formatter_extensions.smart_quotes,
-                            )
-                            .as_ref(),
-                        ),
+                        | SyntaxKind::TEXT => out.push_str(t.text()),
                         _ => {}
                     }
                 }
@@ -1037,7 +1045,7 @@ impl<'a> TraversalBuilder<'a> {
 }
 
 fn process_node_recursive(
-    config: &Config,
+    config: &FormatContext,
     node: &SyntaxNode,
     sink: &mut TraversalBuilder<'_>,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -1107,12 +1115,8 @@ fn process_node_recursive(
                 }
                 SyntaxKind::EMPHASIS_MARKER | SyntaxKind::STRONG_MARKER => {}
                 SyntaxKind::TEXT => {
-                    let raw = normalize_smart_punctuation(
-                        t.text(),
-                        config.formatter_extensions.smart,
-                        config.formatter_extensions.smart_quotes,
-                    );
-                    let text = expand_tabs_with_width(raw.as_ref(), config.tab_width);
+                    let smart_text = smart_token_text(&t, config);
+                    let text = expand_tabs_with_width(&smart_text, config.tab_width);
                     let mut text_to_process = text.as_ref();
                     if sink.skip_next_leading_whitespace() {
                         text_to_process =
@@ -1297,7 +1301,7 @@ fn process_node_recursive(
                             }
                         }
                         let mut closing = String::new();
-                        append_link_closing(&n, &mut closing, config);
+                        append_link_closing(&n, &mut closing);
                         sink.push_piece(&closing);
                     }
                 }
@@ -1323,7 +1327,7 @@ fn process_node_recursive(
                             }
                         }
                         let mut closing = String::new();
-                        append_image_closing(&n, &mut closing, config);
+                        append_image_closing(&n, &mut closing);
                         sink.push_piece(&closing);
                     }
                 }
@@ -1477,7 +1481,7 @@ fn process_node_recursive(
 }
 
 pub(super) fn wrapped_lines_for_paragraph(
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     width: usize,
@@ -1500,7 +1504,7 @@ pub(super) fn wrapped_lines_for_paragraph(
 }
 
 pub(super) fn wrapped_lines_for_paragraph_with_widths(
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     widths: &[usize],
@@ -1523,7 +1527,7 @@ pub(super) fn wrapped_lines_for_paragraph_with_widths(
 }
 
 pub(super) fn sentence_lines_for_paragraph(
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -1543,7 +1547,7 @@ pub(super) fn sentence_lines_for_paragraph(
 }
 
 pub(super) fn semantic_lines_for_paragraph(
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     format_inline_fn: &dyn Fn(&SyntaxNode) -> String,
@@ -1570,7 +1574,7 @@ fn preserved_paragraph_lines(node: &SyntaxNode) -> Vec<String> {
         .collect()
 }
 
-fn should_preserve_paragraph_layout(config: &Config, node: &SyntaxNode) -> bool {
+fn should_preserve_paragraph_layout(config: &FormatContext, node: &SyntaxNode) -> bool {
     is_fence_like_triplet_paragraph(node) || paragraph_has_swept_fence_shape(config, node)
 }
 
@@ -1579,7 +1583,7 @@ fn should_preserve_paragraph_layout(config: &Config, node: &SyntaxNode) -> bool 
 /// break between two wide characters. Detect when that removal would join a
 /// literal Pandoc subscript across the break so its `TEXT` tildes can remain
 /// escaped without penalizing unrelated literal tildes.
-fn east_asian_break_creates_subscript(config: &Config, node: &SyntaxNode) -> bool {
+fn east_asian_break_creates_subscript(config: &FormatContext, node: &SyntaxNode) -> bool {
     if !config.formatter_extensions.east_asian_line_breaks || !config.parser_extensions.subscript {
         return false;
     }
@@ -1624,7 +1628,7 @@ fn east_asian_break_creates_subscript(config: &Config, node: &SyntaxNode) -> boo
 }
 
 pub(super) fn wrapped_lines_for_node(
-    config: &Config,
+    config: &FormatContext,
     sentence_profile: &SentenceProfileCache,
     node: &SyntaxNode,
     widths: &[usize],
@@ -1710,7 +1714,7 @@ fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {
 /// destroys the visual signal of the missing blank line. Preserving source
 /// linebreaks keeps the user's intent legible. (The lint rule
 /// `stray-fenced-div-markers` flags the same shape diagnostically.)
-fn paragraph_has_swept_fence_shape(config: &Config, node: &SyntaxNode) -> bool {
+fn paragraph_has_swept_fence_shape(config: &FormatContext, node: &SyntaxNode) -> bool {
     if !config.parser_extensions.fenced_divs {
         return false;
     }
