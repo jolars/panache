@@ -4409,7 +4409,8 @@ fn coalesce_inlines_inner(input: Vec<Inline>, trim_edges: bool) -> Vec<Inline> {
     }
     for inline in out.iter_mut() {
         if let Inline::Str(s) = inline {
-            *s = crate::smart::dashes_and_ellipsis(&crate::smart::intraword_apostrophe(s));
+            *s = crate::smart::dashes_and_ellipsis(&crate::smart::intraword_apostrophe(s))
+                .into_owned();
         }
     }
     let out = smart_quote_pairs(out);

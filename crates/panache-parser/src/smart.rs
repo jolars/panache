@@ -126,9 +126,9 @@ fn find_matching_close(atoms: &[QuoteAtom<'_>], open: usize, quote: char) -> Opt
 
 /// Replace `---` with an em dash, `--` with an en dash, and `...` with an
 /// ellipsis.
-pub fn dashes_and_ellipsis(s: &str) -> String {
+pub fn dashes_and_ellipsis(s: &str) -> Cow<'_, str> {
     if !s.contains("--") && !s.contains("...") {
-        return s.to_string();
+        return Cow::Borrowed(s);
     }
     let mut out = String::with_capacity(s.len());
     let mut rest = s;
@@ -148,7 +148,7 @@ pub fn dashes_and_ellipsis(s: &str) -> String {
             rest = &rest[c.len_utf8()..];
         }
     }
-    out
+    Cow::Owned(out)
 }
 
 /// Inverse of the `smart` rules: write `‘’` as `'` and `“”` as `"`, and with
@@ -172,9 +172,9 @@ pub fn ascii_punctuation(s: &str, dashes: bool) -> Cow<'_, str> {
 }
 
 /// Replace a `'` between two alphanumeric characters with an apostrophe.
-pub fn intraword_apostrophe(s: &str) -> String {
+pub fn intraword_apostrophe(s: &str) -> Cow<'_, str> {
     if !s.contains('\'') {
-        return s.to_string();
+        return Cow::Borrowed(s);
     }
     let chars: Vec<char> = s.chars().collect();
     chars
@@ -186,7 +186,8 @@ pub fn intraword_apostrophe(s: &str) -> String {
                 && chars.get(i + 1).is_some_and(|n| n.is_alphanumeric());
             if c == '\'' && between_words { '’' } else { c }
         })
-        .collect()
+        .collect::<String>()
+        .into()
 }
 
 #[cfg(test)]

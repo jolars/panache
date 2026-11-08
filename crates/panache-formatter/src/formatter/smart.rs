@@ -183,11 +183,21 @@ struct Piece {
     view: String,
 }
 
-/// One element of a container's inline run: a byte range of a piece's view,
-/// or a non-text atom.
+/// One element of a container's inline run: text read from a piece's view or
+/// straight from the source, or a non-text atom.
 #[derive(Clone)]
 enum Atom {
-    Text { piece: usize, range: Range<usize> },
+    /// A byte range of a [`Piece`]'s view, for words with quotes.
+    View {
+        piece: usize,
+        range: Range<usize>,
+    },
+    /// A byte range of a token's source, for words without quotes: pairing
+    /// reads them, but nothing in them converts.
+    Source {
+        token: usize,
+        range: Range<usize>,
+    },
     Other(QuoteAtom<'static>),
 }
 
@@ -283,7 +293,21 @@ impl Converter {
                     continue;
                 }
                 if let Some(s) = word_start.take() {
-                    let mapped: String = text[s..i]
+                    let word = &text[s..i];
+                    if !word
+                        .chars()
+                        .any(|c| c == '"' || c == '\'' || self.ascii_quote(c).is_some())
+                    {
+                        atoms.push(Atom::Source {
+                            token: tokens.len(),
+                            range: s..i,
+                        });
+                        if i < text.len() {
+                            push_space(&mut atoms);
+                        }
+                        continue;
+                    }
+                    let mapped: String = word
                         .chars()
                         .map(|c| self.ascii_quote(c).unwrap_or(c))
                         .collect();
@@ -300,7 +324,7 @@ impl Converter {
                         .chain([view_chars.len()])
                     {
                         let view: String = view_chars[from..to].iter().collect();
-                        atoms.push(Atom::Text {
+                        atoms.push(Atom::View {
                             piece: pieces.len(),
                             range: 0..view.len(),
                         });
@@ -318,39 +342,48 @@ impl Converter {
             }
             tokens.push(token);
         }
-        if pieces.is_empty() {
-            return;
-        }
-
         let mut marks: HashMap<(usize, usize), char> = HashMap::new();
-        self.pair(&atoms, &pieces, &mut marks);
-
-        let mut new_texts: Vec<String> = tokens.iter().map(|t| t.text().to_string()).collect();
-        // Back to front, so earlier byte ranges in a token stay valid.
-        for (p, piece) in pieces.iter().enumerate().rev() {
-            let source = &tokens[piece.token].text()[piece.range.clone()];
-            let converted: String = source
-                .chars()
-                .zip(piece.view.chars())
-                .enumerate()
-                .map(|(i, (src, view))| match marks.get(&(p, i)) {
-                    Some(&quote) => quote,
-                    // Pandoc renders a lone `'` as an apostrophe.
-                    None if src == '\'' => '’',
-                    // Other unpaired quotes keep their source spelling.
-                    None if self.ascii_quote(src).is_some() && view != '’' => src,
-                    None => view,
-                })
-                .collect();
-            let converted = if self.dashes {
-                dashes_and_ellipsis(&converted)
-            } else {
-                converted
-            };
-            new_texts[piece.token].replace_range(piece.range.clone(), &converted);
+        if !pieces.is_empty() {
+            self.pair(&atoms, &tokens, &pieces, &mut marks);
         }
-        for (token, text) in tokens.iter().zip(new_texts) {
-            if text != token.text() {
+
+        // Pieces are in token order; `next` walks them alongside the tokens.
+        let mut next = 0;
+        for (t, token) in tokens.iter().enumerate() {
+            let first = next;
+            while next < pieces.len() && pieces[next].token == t {
+                next += 1;
+            }
+            let mut text = Cow::Borrowed(token.text());
+            // Back to front, so earlier byte ranges in the token stay valid.
+            for (p, piece) in pieces.iter().enumerate().take(next).skip(first).rev() {
+                let source = &token.text()[piece.range.clone()];
+                let converted: String = source
+                    .chars()
+                    .zip(piece.view.chars())
+                    .enumerate()
+                    .map(|(i, (src, view))| match marks.get(&(p, i)) {
+                        Some(&quote) => quote,
+                        // Pandoc renders a lone `'` as an apostrophe.
+                        None if src == '\'' => '’',
+                        // Other unpaired quotes keep their source spelling.
+                        None if self.ascii_quote(src).is_some() && view != '’' => src,
+                        None => view,
+                    })
+                    .collect();
+                if converted != source {
+                    text.to_mut().replace_range(piece.range.clone(), &converted);
+                }
+            }
+            // Pieces only split next to quotes, never inside `--` or `...`.
+            if self.dashes
+                && let Cow::Owned(dashed) = dashes_and_ellipsis(&text)
+            {
+                text = Cow::Owned(dashed);
+            }
+            if let Cow::Owned(text) = text
+                && text != token.text()
+            {
                 map.insert(u32::from(token.text_range().start()), text);
             }
         }
@@ -359,11 +392,20 @@ impl Converter {
     /// Pair quotes among `atoms`, recording the quote char for each paired
     /// position as `(piece, char index)`, then recurse into each pair's
     /// content so nested quotes pair too.
-    fn pair(&self, atoms: &[Atom], pieces: &[Piece], marks: &mut HashMap<(usize, usize), char>) {
+    fn pair(
+        &self,
+        atoms: &[Atom],
+        tokens: &[SyntaxToken],
+        pieces: &[Piece],
+        marks: &mut HashMap<(usize, usize), char>,
+    ) {
         let quote_atoms: Vec<QuoteAtom<'_>> = atoms
             .iter()
             .map(|atom| match atom {
-                Atom::Text { piece, range } => QuoteAtom::Str(&pieces[*piece].view[range.clone()]),
+                Atom::View { piece, range } => QuoteAtom::Str(&pieces[*piece].view[range.clone()]),
+                Atom::Source { token, range } => {
+                    QuoteAtom::Str(&tokens[*token].text()[range.clone()])
+                }
                 Atom::Other(atom) => *atom,
             })
             .collect();
@@ -374,11 +416,11 @@ impl Converter {
                 QuoteKind::Single => (os, cs),
             };
             let (
-                Atom::Text {
+                Atom::View {
                     piece: op,
                     range: or,
                 },
-                Atom::Text {
+                Atom::View {
                     piece: cp,
                     range: cr,
                 },
@@ -392,17 +434,17 @@ impl Converter {
 
             // The quotes are ASCII in the view, so +-1 stays on char boundaries.
             let inner: Vec<Atom> = if pair.open == pair.close {
-                vec![Atom::Text {
+                vec![Atom::View {
                     piece: *op,
                     range: or.start + 1..or.end - 1,
                 }]
             } else {
-                std::iter::once(Atom::Text {
+                std::iter::once(Atom::View {
                     piece: *op,
                     range: or.start + 1..or.end,
                 })
                 .chain(atoms[pair.open + 1..pair.close].iter().cloned())
-                .chain([Atom::Text {
+                .chain([Atom::View {
                     piece: *cp,
                     range: cr.start..cr.end - 1,
                 }])
@@ -411,9 +453,9 @@ impl Converter {
             // Pandoc drops a quote's emptied first/last `Str`.
             let inner: Vec<Atom> = inner
                 .into_iter()
-                .filter(|atom| !matches!(atom, Atom::Text { range, .. } if range.is_empty()))
+                .filter(|atom| !matches!(atom, Atom::View { range, .. } if range.is_empty()))
                 .collect();
-            self.pair(&inner, pieces, marks);
+            self.pair(&inner, tokens, pieces, marks);
         }
     }
 }
