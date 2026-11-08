@@ -1,4 +1,4 @@
-use crate::config::{Config, HorizontalRuleStyle, WrapMode};
+use crate::config::{Config, HorizontalRuleStyle, SmartPunctuation, WrapMode};
 use crate::directives::DirectiveTracker;
 use crate::syntax::{
     AstNode, Definition, ExampleListMarker, ListItem, SyntaxKind, SyntaxNode, TomlMetadata,
@@ -658,7 +658,7 @@ impl Formatter {
         node: &SyntaxNode,
         indent: usize,
     ) {
-        if self.config.smart_text.is_empty()
+        if !super::smart::smart_active(&self.config)
             || !Self::produces_dash_block_marker(&self.output[start..])
         {
             return;
@@ -667,9 +667,12 @@ impl Formatter {
         let original = self.output[start..].to_string();
         self.output.truncate(start);
 
-        let saved = std::mem::take(&mut self.config.smart_text);
+        let saved = std::mem::replace(
+            &mut self.config.smart_punctuation,
+            SmartPunctuation::Preserve,
+        );
         self.format_node_sync(node, indent);
-        self.config.smart_text = saved;
+        self.config.smart_punctuation = saved;
 
         if Self::produces_dash_block_marker(&self.output[start..]) {
             self.output.truncate(start);

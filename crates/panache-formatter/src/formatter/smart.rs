@@ -13,21 +13,48 @@ use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 use super::sentence_wrap::resolve_lang_string;
 
-/// Text of `token` with smart punctuation applied, when the current format
-/// run computed any for it (see [`smart_text_map`]).
+/// Whether [`smart_token_text`] can change any token in this format run.
+pub(super) fn smart_active(config: &Config) -> bool {
+    let ext = &config.formatter_extensions;
+    (ext.smart || ext.smart_quotes)
+        && match config.smart_punctuation {
+            SmartPunctuation::Ascii => true,
+            SmartPunctuation::Unicode => !config.smart_text.is_empty(),
+            SmartPunctuation::Preserve => false,
+        }
+}
+
+/// Text of `token` with smart punctuation applied. `ascii` converts each prose
+/// token on its own; `unicode` reads what [`smart_text_map`] computed.
 pub(super) fn smart_token_text<'a>(token: &'a SyntaxToken, config: &Config) -> Cow<'a, str> {
-    match config
-        .smart_text
-        .get(&u32::from(token.text_range().start()))
-    {
-        Some(text) => Cow::Owned(text.clone()),
-        None => Cow::Borrowed(token.text()),
+    let ext = &config.formatter_extensions;
+    match config.smart_punctuation {
+        SmartPunctuation::Ascii
+            if (ext.smart || ext.smart_quotes) && is_prose_text(token.kind()) =>
+        {
+            let text = ascii_punctuation(token.text(), ext.smart);
+            // Only prose containers' own tokens, so code/raw/etc. stay verbatim.
+            match text {
+                Cow::Owned(_) if token.parent().is_some_and(|p| is_prose_container(p.kind())) => {
+                    text
+                }
+                _ => Cow::Borrowed(token.text()),
+            }
+        }
+        SmartPunctuation::Unicode => match config
+            .smart_text
+            .get(&u32::from(token.text_range().start()))
+        {
+            Some(text) => Cow::Owned(text.clone()),
+            None => Cow::Borrowed(token.text()),
+        },
+        _ => Cow::Borrowed(token.text()),
     }
 }
 
 /// Source text of `node` with [`smart_token_text`] applied to each token.
 pub(super) fn smart_node_text(node: &SyntaxNode, config: &Config) -> String {
-    if config.smart_text.is_empty() {
+    if !smart_active(config) {
         return node.text().to_string();
     }
     node.descendants_with_tokens()
@@ -164,9 +191,10 @@ enum Atom {
     Other(QuoteAtom<'static>),
 }
 
-/// Compute the smart-punctuation text of every prose token in `tree` that
-/// changes under `smart-punctuation`, keyed by token start offset. Empty unless
-/// `smart` or `smart-quotes` is enabled.
+/// Compute the `unicode` smart-punctuation text of every prose token in `tree`
+/// that changes, keyed by token start offset. Quote pairing needs lookahead,
+/// so it can't happen per token like `ascii` (see [`smart_token_text`]).
+/// Empty unless `smart` or `smart-quotes` is enabled.
 pub(super) fn smart_text_map(tree: &SyntaxNode, config: &Config) -> HashMap<u32, String> {
     let ext = &config.formatter_extensions;
     let mut map = HashMap::new();
@@ -175,20 +203,7 @@ pub(super) fn smart_text_map(tree: &SyntaxNode, config: &Config) -> HashMap<u32,
     }
     let containers = tree.descendants().filter(|n| is_prose_container(n.kind()));
     match config.smart_punctuation {
-        SmartPunctuation::Preserve => {}
-        SmartPunctuation::Ascii => {
-            let tokens = containers.flat_map(|node| {
-                node.children_with_tokens()
-                    .filter_map(NodeOrToken::into_token)
-                    .filter(|token| is_prose_text(token.kind()))
-            });
-            for token in tokens {
-                let text = ascii_punctuation(token.text(), ext.smart);
-                if text != token.text() {
-                    map.insert(u32::from(token.text_range().start()), text.into_owned());
-                }
-            }
-        }
+        SmartPunctuation::Preserve | SmartPunctuation::Ascii => {}
         SmartPunctuation::Unicode => {
             let quotes = config.quotes.unwrap_or_else(|| {
                 quotes_for_lang(resolve_lang_string(tree, config.lang.as_deref()).as_deref())

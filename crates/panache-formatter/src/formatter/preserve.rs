@@ -117,7 +117,7 @@ fn collect(
                     append_verbatim_lines(&text, lines, current);
                     continue;
                 }
-                // `smart_text` only covers prose tokens, so code/raw/etc. pass through untouched.
+                // `smart_token_text` only converts prose tokens, so code/raw/etc. pass through untouched.
                 collect(&child, escaped_line_breaks, prefix, smart, lines, current)
             }
             NodeOrToken::Token(token) => match token.kind() {

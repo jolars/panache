@@ -20,11 +20,20 @@ impl Formatter {
         }
 
         let para_start = self.output.len();
-        let text = smart_node_text(node, &self.config);
-        log::trace!("Formatting paragraph, text length: {}", text.len());
+        log::trace!(
+            "Formatting paragraph, text length: {:?}",
+            node.text_range().len()
+        );
         let paragraph_indent = " ".repeat(indent);
 
-        if self.is_grid_table_continuation_paragraph(node) {
+        // Reflowing would break grid table continuations, bookdown text references,
+        // and LaTeX in fenced divs, so keep their source lines.
+        let keep_line_breaks = self.is_grid_table_continuation_paragraph(node)
+            || (self.config.formatter_extensions.bookdown_references
+                && paragraphs::is_bookdown_text_reference(node))
+            || (self.fenced_div_depth > 0 && self.contains_latex_command(node));
+        if keep_line_breaks {
+            let text = smart_node_text(node, &self.config);
             if indent > 0 {
                 for (i, line) in text.lines().enumerate() {
                     if i > 0 {
@@ -41,47 +50,7 @@ impl Formatter {
             }
             return;
         }
-
-        if self.config.formatter_extensions.bookdown_references
-            && paragraphs::is_bookdown_text_reference(node)
-        {
-            if indent > 0 {
-                for (i, line) in text.lines().enumerate() {
-                    if i > 0 {
-                        self.output.push('\n');
-                    }
-                    self.output.push_str(&paragraph_indent);
-                    self.output.push_str(line.trim_start());
-                }
-            } else {
-                self.output.push_str(&text);
-            }
-            if !self.output.ends_with('\n') {
-                self.output.push('\n');
-            }
-            return;
-        }
-
         let wrap_mode = self.config.wrap.clone().unwrap_or(WrapMode::Reflow);
-        let preserve_newlines_for_latex =
-            self.fenced_div_depth > 0 && self.contains_latex_command(node);
-        if preserve_newlines_for_latex && self.fenced_div_depth > 0 {
-            if indent > 0 {
-                for (i, line) in text.lines().enumerate() {
-                    if i > 0 {
-                        self.output.push('\n');
-                    }
-                    self.output.push_str(&paragraph_indent);
-                    self.output.push_str(line.trim_start());
-                }
-            } else {
-                self.output.push_str(&text);
-            }
-            if !self.output.ends_with('\n') {
-                self.output.push('\n');
-            }
-            return;
-        }
         log::trace!(
             "Paragraph wrap mode: {:?}, line_width: {}",
             wrap_mode,
