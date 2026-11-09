@@ -53,6 +53,15 @@ impl LazyInterrupts {
 }
 
 impl<'a> Parser<'a> {
+    pub(super) fn close_lists_before_blockquote(&mut self, line: &str, current_bq_depth: usize) {
+        // A new blockquote cannot lazily continue an under-indented
+        // CommonMark list item, even when there is no preceding blank line.
+        if self.config.dialect == crate::options::Dialect::CommonMark {
+            let content = strip_n_blockquote_markers(line, current_bq_depth);
+            self.close_lists_above_indent(leading_indent(content).0);
+        }
+    }
+
     /// Close blockquotes down to a target depth.
     ///
     /// Must use `Parser::close_containers_to` (not `ContainerStack::close_to`) so list/paragraph

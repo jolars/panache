@@ -406,6 +406,7 @@ golden_test_cases!(
     list_gobble_chain_lazy_continuation,
     list_interrupts_paragraph_commonmark,
     blockquote_after_list_commonmark,
+    blockquote_after_list_item_commonmark,
     list_item_ordered_paragraph_continuation_commonmark,
     list_item_lazy_checkbox_paragraph_gfm,
     list_item_lazy_unicode_whitespace_commonmark,

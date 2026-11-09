@@ -873,6 +873,7 @@ impl<'a> Parser<'a> {
                 // The marker line's buffered newline precedes the empty
                 // quote, just as it precedes a quote with text content.
                 self.emit_list_item_buffer_if_needed();
+                self.close_lists_before_blockquote(line, current_bq_depth);
                 for _ in current_bq_depth..bq_depth {
                     self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
                     self.containers.push(Container::BlockQuote {});
@@ -1096,6 +1097,8 @@ impl<'a> Parser<'a> {
             if matches!(self.containers.last(), Some(Container::Paragraph { .. })) {
                 self.close_containers_to(self.containers.depth() - 1);
             }
+
+            self.close_lists_before_blockquote(line, current_bq_depth);
 
             let marker_info = self.marker_info_for_line(
                 blockquote_payload.as_ref(),

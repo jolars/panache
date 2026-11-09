@@ -547,6 +547,7 @@ golden_test_cases!(
     gfm_bare_uri_trailing_delimiters,
     blankline_concatenation,
     blockquote_after_list_commonmark,
+    blockquote_after_list_item_commonmark,
     blockquote_definition_later_line_html_div_pandoc,
     blockquote_depth_change,
     blockquote_no_interrupt_def_plain_continuation_pandoc,

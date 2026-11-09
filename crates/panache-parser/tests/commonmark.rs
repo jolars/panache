@@ -104,6 +104,64 @@ fn commonmark_blockquote_after_list() {
 }
 
 #[test]
+fn commonmark_blockquote_interrupts_list_item() {
+    let expected =
+        "<ul>\n<li>x</li>\n</ul>\n<blockquote>\n<ul>\n<li>q</li>\n</ul>\n</blockquote>\n";
+    for input in [
+        include_str!("fixtures/cases/blockquote_after_list_item_commonmark/input.md"),
+        "- x\n > - q\n",
+        "- x\r\n> - q\r\n",
+        "- x\n> - q",
+    ] {
+        let tree = parse(input, Some(commonmark_options()));
+        assert_eq!(tree.text().to_string(), input);
+        assert_eq!(
+            normalize_html(&html_renderer::render(&tree)),
+            normalize_html(expected),
+            "{input:?}"
+        );
+    }
+}
+
+#[test]
+fn commonmark_blockquote_list_item_indentation() {
+    for (input, expected) in [
+        (
+            "- x\n  > q\n",
+            "<ul>\n<li>x\n<blockquote>\n<p>q</p>\n</blockquote>\n</li>\n</ul>\n",
+        ),
+        (
+            "1. x\n  > q\n",
+            "<ol>\n<li>x</li>\n</ol>\n<blockquote>\n<p>q</p>\n</blockquote>\n",
+        ),
+        (
+            "1. x\n   > q\n",
+            "<ol>\n<li>x\n<blockquote>\n<p>q</p>\n</blockquote>\n</li>\n</ol>\n",
+        ),
+        (
+            "- x\n  - y\n  > q\n",
+            "<ul>\n<li>x\n<ul>\n<li>y</li>\n</ul>\n<blockquote>\n<p>q</p>\n</blockquote>\n</li>\n</ul>\n",
+        ),
+        (
+            "> - x\n> > q\n",
+            "<blockquote>\n<ul>\n<li>x</li>\n</ul>\n<blockquote>\n<p>q</p>\n</blockquote>\n</blockquote>\n",
+        ),
+        (
+            "- x\n>\n",
+            "<ul>\n<li>x</li>\n</ul>\n<blockquote>\n</blockquote>\n",
+        ),
+    ] {
+        let tree = parse(input, Some(commonmark_options()));
+        assert_eq!(tree.text().to_string(), input);
+        assert_eq!(
+            normalize_html(&html_renderer::render(&tree)),
+            normalize_html(expected),
+            "{input:?}"
+        );
+    }
+}
+
+#[test]
 fn commonmark_empty_list_marker_block_then_indented_code() {
     let input = include_str!(
         "fixtures/cases/empty_list_marker_block_then_indented_code_commonmark/input.md"
