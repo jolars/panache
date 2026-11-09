@@ -1097,6 +1097,8 @@ fn commonmark_non_one_ordered_sublist_does_not_interrupt_paragraph() {
         ("1. a\n   1. inner\n      9. b\n", 2, "inner"),
         ("> 1. a\n>    9. b\n", 1, "a"),
         ("1. a\n       9. b\n", 1, "a"),
+        ("- # h\n  paragraph\n  9. b\n", 1, "paragraph"),
+        ("> - # h\n>   paragraph\n>   9. b\n", 1, ">   paragraph"),
     ] {
         let tree = parse_blocks_with_config(input, &config);
         assert_eq!(
@@ -1119,6 +1121,38 @@ fn commonmark_non_one_ordered_sublist_does_not_interrupt_paragraph() {
             "{input:?}"
         );
         assert_eq!(tree.text().to_string(), input, "parse must stay lossless");
+    }
+}
+
+#[test]
+fn commonmark_non_one_ordered_sublist_can_follow_non_paragraph_blocks() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm] {
+        let config = ParserOptions {
+            flavor,
+            dialect: Dialect::for_flavor(flavor),
+            extensions: Extensions::for_flavor(flavor),
+            ..Default::default()
+        };
+        for (input, first_block) in [
+            ("- # h\n  9. b\n", SyntaxKind::HEADING),
+            ("- # h\n  9) b\n", SyntaxKind::HEADING),
+            ("- # h\n  0. b\n", SyntaxKind::HEADING),
+            ("1. ## h\n   9. b\n", SyntaxKind::HEADING),
+            ("> - # h\n>   9. b\n", SyntaxKind::HEADING),
+            ("- # h\r\n  9. b\r\n", SyntaxKind::HEADING),
+            ("- # h\n  9. b", SyntaxKind::HEADING),
+            ("- ***\n  9. b\n", SyntaxKind::HORIZONTAL_RULE),
+        ] {
+            let tree = parse_blocks_with_config(input, &config);
+            let item = find_first(&tree, SyntaxKind::LIST_ITEM).unwrap();
+            let blocks: Vec<_> = item.children().map(|node| node.kind()).collect();
+            assert_eq!(
+                blocks,
+                [first_block, SyntaxKind::LIST],
+                "{flavor:?}: {input:?}"
+            );
+            assert_eq!(tree.text().to_string(), input, "parse must stay lossless");
+        }
     }
 }
 

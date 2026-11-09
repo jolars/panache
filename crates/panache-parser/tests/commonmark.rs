@@ -66,6 +66,19 @@ fn commonmark_ordered_sublist_paragraph_continuation() {
 }
 
 #[test]
+fn commonmark_ordered_sublist_after_heading() {
+    let input =
+        include_str!("fixtures/cases/list_item_ordered_list_after_heading_commonmark/input.md");
+    let tree = parse(input, Some(commonmark_options()));
+    assert_eq!(
+        normalize_html(&html_renderer::render(&tree)),
+        normalize_html(
+            "<ul>\n<li>\n<h1>h</h1>\n<ol start=\"9\">\n<li>b</li>\n</ol>\n</li>\n</ul>\n"
+        )
+    );
+}
+
+#[test]
 fn commonmark_html_block_on_list_marker_line() {
     for (input, html) in [
         (

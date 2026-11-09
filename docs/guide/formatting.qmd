@@ -212,6 +212,10 @@ Under CommonMark, a list item can start with its marker on a line of its own.
 Once the item contains a block, later blocks stay inside it when they meet its
 required indentation, including after a blank line.
 
+In CommonMark and GFM, a nested ordered list can start at any number immediately
+after a heading or thematic break. After paragraph text, it must start at `1` or
+be separated by a blank line.
+
 In CommonMark and GFM, an HTML block can start immediately after the list
 marker. Panache preserves its raw content and relative indentation when it
 adjusts the list indentation.

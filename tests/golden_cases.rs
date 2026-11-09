@@ -154,6 +154,16 @@ fn html_block_dedented_paragraph_preserves_commonmark_html() {
 }
 
 #[test]
+fn ordered_sublist_after_heading_preserves_commonmark_html() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm] {
+        assert_commonmark_html_preserved(
+            include_str!("fixtures/cases/list_item_ordered_list_after_heading_commonmark/input.md"),
+            flavor,
+        );
+    }
+}
+
+#[test]
 fn html_block_on_list_marker_line_preserves_commonmark_html() {
     for flavor in [Flavor::CommonMark, Flavor::Gfm] {
         assert_commonmark_html_preserved(
@@ -408,6 +418,7 @@ golden_test_cases!(
     blockquote_after_list_commonmark,
     blockquote_after_list_item_commonmark,
     list_item_ordered_paragraph_continuation_commonmark,
+    list_item_ordered_list_after_heading_commonmark,
     list_item_lazy_checkbox_paragraph_gfm,
     list_item_lazy_unicode_whitespace_commonmark,
     list_item_blockquote_inner_list_siblings,

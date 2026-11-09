@@ -680,6 +680,16 @@ impl<'a> Parser<'a> {
         )
     }
 
+    /// Buffered headings and thematic breaks leave no paragraph for a
+    /// nested list to interrupt.
+    pub(super) fn is_list_item_paragraph_open(&self) -> bool {
+        matches!(
+            self.containers.last(),
+            Some(Container::ListItem { buffer, content_col, .. })
+                if buffer.has_open_paragraph(*content_col)
+        )
+    }
+
     /// Whether `content`'s ordered list marker is one pandoc 3.10 refuses to
     /// read as a sublist: a start number other than 1 on a list that would be
     /// newly opened inside an enclosing list item or definition body.
