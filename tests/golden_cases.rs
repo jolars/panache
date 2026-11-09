@@ -283,6 +283,8 @@ golden_test_cases!(
     bookdown_math_labels_host,
     gfm_bare_uri_trailing_delimiters,
     chunk_options_complex,
+    issue_609_chunk_option_expressions_rmarkdown,
+    issue_609_chunk_option_expressions_quarto,
     code_blocks_executable,
     code_blocks_raw,
     code_spans,

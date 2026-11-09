@@ -1,0 +1,43 @@
+```{r, eval=x == "a"}
+#| label: example
+
+1 + 1
+```
+
+```{r, eval=n > 1}
+#| label: example2
+
+1 + 1
+```
+
+```{r, eval=n + 1 > 2}
+#| label: arithmetic
+#| echo: false
+
+1 + 1
+```
+
+```{r, eval=n > 1}
+#| label: spaced
+#| warning: false
+
+1 + 1
+```
+
+```{r, eval=x == "a, } ( b" && y != 'c, ]'}
+#| label: strings
+#| echo: true
+
+1 + 1
+```
+
+```{r, eval=grepl(")", x) && n > 1}
+#| label: nested
+#| warning: false
+
+1 + 1
+```
+
+```{r, eval=n > 1}
+1 + 1
+```

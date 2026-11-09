@@ -403,14 +403,17 @@ impl InfoString {
                             continue;
                         }
 
-                        if depth == 0 && (ch == ' ' || ch == '\t' || ch == ',') {
+                        if depth == 0
+                            && (ch == ','
+                                || (matches!(ch, ' ' | '\t') && starts_chunk_option(chars.clone())))
+                        {
                             break;
                         }
 
                         val.push(ch);
                         chars.next();
                     }
-                    val
+                    val.trim_end().to_string()
                 };
 
                 attrs.push((key, Some(value)));
@@ -769,6 +772,30 @@ impl ContainerExitScan {
     }
 }
 
+/// Whitespace separates options only when another assignment or fence attribute follows.
+/// In particular, comparison operators belong to the current expression.
+fn starts_chunk_option(chars: impl Iterator<Item = char>) -> bool {
+    let mut chars = chars.skip_while(|ch| matches!(ch, ' ' | '\t')).peekable();
+    if matches!(chars.peek(), None | Some(',' | '}' | '#')) {
+        return true;
+    }
+
+    let is_class = chars.peek() == Some(&'.');
+    let mut has_key = false;
+    while matches!(chars.peek(), Some(ch) if ch.is_alphanumeric() || matches!(ch, '_' | '.' | '-'))
+    {
+        has_key = true;
+        chars.next();
+    }
+    if is_class && matches!(chars.peek(), None | Some(' ' | '\t' | ',' | '}')) {
+        return true;
+    }
+    while matches!(chars.peek(), Some(' ' | '\t')) {
+        chars.next();
+    }
+    has_key && chars.next() == Some('=') && chars.peek() != Some(&'=')
+}
+
 fn emit_chunk_options(builder: &mut GreenNodeBuilder<'static>, content: &str) {
     if content.trim().is_empty() {
         builder.token(SyntaxKind::TEXT.into(), content);
@@ -885,32 +912,48 @@ fn emit_chunk_options(builder: &mut GreenNodeBuilder<'static>, content: &str) {
                 } else {
                     let val_start = pos;
                     let mut depth = 0;
+                    let mut in_quote = None;
+                    let mut escaped = false;
 
                     while pos < bytes.len() {
                         let ch = bytes[pos] as char;
-                        match ch {
-                            '(' | '[' | '{' => depth += 1,
-                            ')' | ']' => {
-                                if depth > 0 {
-                                    depth -= 1;
-                                } else {
+                        if escaped {
+                            escaped = false;
+                        } else if ch == '\\' {
+                            escaped = true;
+                        } else if let Some(quote) = in_quote {
+                            if ch == quote {
+                                in_quote = None;
+                            }
+                        } else {
+                            match ch {
+                                '"' | '\'' | '`' => in_quote = Some(ch),
+                                '(' | '[' | '{' => depth += 1,
+                                ')' | ']' => {
+                                    if depth > 0 {
+                                        depth -= 1;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                                '}' => {
+                                    if depth > 0 {
+                                        depth -= 1;
+                                    } else {
+                                        break; // End of chunk options
+                                    }
+                                }
+                                ',' if depth == 0 => {
+                                    break; // Next option
+                                }
+                                ' ' | '\t'
+                                    if depth == 0
+                                        && starts_chunk_option(content[pos..].chars()) =>
+                                {
                                     break;
                                 }
+                                _ => {}
                             }
-                            '}' => {
-                                if depth > 0 {
-                                    depth -= 1;
-                                } else {
-                                    break; // End of chunk options
-                                }
-                            }
-                            ',' if depth == 0 => {
-                                break; // Next option
-                            }
-                            ' ' | '\t' if depth == 0 => {
-                                break; // Space separator
-                            }
-                            _ => {}
                         }
                         pos += 1;
                     }
@@ -1715,6 +1758,32 @@ mod tests {
         assert_eq!(attrs[0], ("python".to_string(), None));
         assert_eq!(attrs[1], ("echo".to_string(), Some("False".to_string())));
         assert_eq!(attrs[2], ("warning".to_string(), Some("True".to_string())));
+    }
+
+    #[test]
+    fn test_parse_chunk_options_spaced_expressions() {
+        for expression in [
+            r#"x == "a""#,
+            "n > 1",
+            "n + 1 > 2",
+            r#"x == "a, } ( b" && y != 'c, ]'"#,
+            r#"grepl(")", x) && n > 1"#,
+        ] {
+            for separator in [", ", " ", "\t"] {
+                let info = InfoString::parse(&format!(
+                    "{{r example, eval = {expression}{separator}echo=FALSE}}"
+                ));
+                assert_eq!(
+                    info.attributes,
+                    vec![
+                        ("label".to_string(), Some("example".to_string())),
+                        ("eval".to_string(), Some(expression.to_string())),
+                        ("echo".to_string(), Some("FALSE".to_string())),
+                    ],
+                    "{expression:?}, {separator:?}"
+                );
+            }
+        }
     }
 
     #[test]

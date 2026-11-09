@@ -667,7 +667,7 @@ Output
 
 For Quarto and R Markdown code chunks, Panache converts simple header options to
 `#|` comments and formats them as YAML. Options containing R expressions stay in
-the header.
+the header, including expressions with spaces such as `eval = n > 1`.
 
 Input
 

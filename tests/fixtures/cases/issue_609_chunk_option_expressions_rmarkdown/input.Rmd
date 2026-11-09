@@ -1,0 +1,27 @@
+```{r example, eval = x == "a"}
+1 + 1
+```
+
+```{r example2, eval = n > 1}
+1 + 1
+```
+
+```{r arithmetic, eval = n + 1 > 2, echo=FALSE}
+1 + 1
+```
+
+```{r spaced, eval = n > 1 warning=FALSE}
+1 + 1
+```
+
+```{r strings, eval = x == "a, } ( b" && y != 'c, ]', echo=TRUE}
+1 + 1
+```
+
+```{r nested, eval = grepl(")", x) && n > 1, warning=FALSE}
+1 + 1
+```
+
+```{r, eval = n > 1   }
+1 + 1
+```

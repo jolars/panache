@@ -585,6 +585,7 @@ golden_test_cases!(
     bookdown_math_labels_host,
     bookdown_math_labels_nested,
     chunk_options_complex,
+    issue_609_chunk_option_expressions,
     code_blocks_executable,
     code_blocks_executable_with_classes,
     code_blocks_explicit_structured,

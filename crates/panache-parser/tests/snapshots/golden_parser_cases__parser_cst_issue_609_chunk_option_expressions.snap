@@ -1,0 +1,210 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..377
+  CODE_BLOCK@0..42
+    CODE_FENCE_OPEN@0..32
+      CODE_FENCE_MARKER@0..3 "```"
+      CODE_INFO@3..31
+        TEXT@3..4 "{"
+        CODE_LANGUAGE@4..5 "r"
+        CHUNK_OPTIONS@5..31
+          TEXT@5..6 " "
+          CHUNK_LABEL@6..13
+            TEXT@6..13 "example"
+          TEXT@13..15 ", "
+          CHUNK_OPTION@15..30
+            CHUNK_OPTION_KEY@15..19 "eval"
+            TEXT@19..20 " "
+            TEXT@20..21 "="
+            TEXT@21..22 " "
+            CHUNK_OPTION_VALUE@22..30 "x == \"a\""
+          TEXT@30..31 "}"
+      NEWLINE@31..32 "\n"
+    CODE_CONTENT@32..38
+      TEXT@32..37 "1 + 1"
+      NEWLINE@37..38 "\n"
+    CODE_FENCE_CLOSE@38..42
+      CODE_FENCE_MARKER@38..41 "```"
+      NEWLINE@41..42 "\n"
+  BLANK_LINE@42..43
+    BLANK_LINE@42..43 "\n"
+  CODE_BLOCK@43..83
+    CODE_FENCE_OPEN@43..73
+      CODE_FENCE_MARKER@43..46 "```"
+      CODE_INFO@46..72
+        TEXT@46..47 "{"
+        CODE_LANGUAGE@47..48 "r"
+        CHUNK_OPTIONS@48..72
+          TEXT@48..49 " "
+          CHUNK_LABEL@49..57
+            TEXT@49..57 "example2"
+          TEXT@57..59 ", "
+          CHUNK_OPTION@59..71
+            CHUNK_OPTION_KEY@59..63 "eval"
+            TEXT@63..64 " "
+            TEXT@64..65 "="
+            TEXT@65..66 " "
+            CHUNK_OPTION_VALUE@66..71 "n > 1"
+          TEXT@71..72 "}"
+      NEWLINE@72..73 "\n"
+    CODE_CONTENT@73..79
+      TEXT@73..78 "1 + 1"
+      NEWLINE@78..79 "\n"
+    CODE_FENCE_CLOSE@79..83
+      CODE_FENCE_MARKER@79..82 "```"
+      NEWLINE@82..83 "\n"
+  BLANK_LINE@83..84
+    BLANK_LINE@83..84 "\n"
+  CODE_BLOCK@84..142
+    CODE_FENCE_OPEN@84..132
+      CODE_FENCE_MARKER@84..87 "```"
+      CODE_INFO@87..131
+        TEXT@87..88 "{"
+        CODE_LANGUAGE@88..89 "r"
+        CHUNK_OPTIONS@89..131
+          TEXT@89..90 " "
+          CHUNK_LABEL@90..100
+            TEXT@90..100 "arithmetic"
+          TEXT@100..102 ", "
+          CHUNK_OPTION@102..118
+            CHUNK_OPTION_KEY@102..106 "eval"
+            TEXT@106..107 " "
+            TEXT@107..108 "="
+            TEXT@108..109 " "
+            CHUNK_OPTION_VALUE@109..118 "n + 1 > 2"
+          TEXT@118..120 ", "
+          CHUNK_OPTION@120..130
+            CHUNK_OPTION_KEY@120..124 "echo"
+            TEXT@124..125 "="
+            CHUNK_OPTION_VALUE@125..130 "FALSE"
+          TEXT@130..131 "}"
+      NEWLINE@131..132 "\n"
+    CODE_CONTENT@132..138
+      TEXT@132..137 "1 + 1"
+      NEWLINE@137..138 "\n"
+    CODE_FENCE_CLOSE@138..142
+      CODE_FENCE_MARKER@138..141 "```"
+      NEWLINE@141..142 "\n"
+  BLANK_LINE@142..143
+    BLANK_LINE@142..143 "\n"
+  CODE_BLOCK@143..195
+    CODE_FENCE_OPEN@143..185
+      CODE_FENCE_MARKER@143..146 "```"
+      CODE_INFO@146..184
+        TEXT@146..147 "{"
+        CODE_LANGUAGE@147..148 "r"
+        CHUNK_OPTIONS@148..184
+          TEXT@148..149 " "
+          CHUNK_LABEL@149..155
+            TEXT@149..155 "spaced"
+          TEXT@155..157 ", "
+          CHUNK_OPTION@157..169
+            CHUNK_OPTION_KEY@157..161 "eval"
+            TEXT@161..162 " "
+            TEXT@162..163 "="
+            TEXT@163..164 " "
+            CHUNK_OPTION_VALUE@164..169 "n > 1"
+          TEXT@169..170 " "
+          CHUNK_OPTION@170..183
+            CHUNK_OPTION_KEY@170..177 "warning"
+            TEXT@177..178 "="
+            CHUNK_OPTION_VALUE@178..183 "FALSE"
+          TEXT@183..184 "}"
+      NEWLINE@184..185 "\n"
+    CODE_CONTENT@185..191
+      TEXT@185..190 "1 + 1"
+      NEWLINE@190..191 "\n"
+    CODE_FENCE_CLOSE@191..195
+      CODE_FENCE_MARKER@191..194 "```"
+      NEWLINE@194..195 "\n"
+  BLANK_LINE@195..196
+    BLANK_LINE@195..196 "\n"
+  CODE_BLOCK@196..271
+    CODE_FENCE_OPEN@196..261
+      CODE_FENCE_MARKER@196..199 "```"
+      CODE_INFO@199..260
+        TEXT@199..200 "{"
+        CODE_LANGUAGE@200..201 "r"
+        CHUNK_OPTIONS@201..260
+          TEXT@201..202 " "
+          CHUNK_LABEL@202..209
+            TEXT@202..209 "strings"
+          TEXT@209..211 ", "
+          CHUNK_OPTION@211..248
+            CHUNK_OPTION_KEY@211..215 "eval"
+            TEXT@215..216 " "
+            TEXT@216..217 "="
+            TEXT@217..218 " "
+            CHUNK_OPTION_VALUE@218..248 "x == \"a, } ( b\" && y  ..."
+          TEXT@248..250 ", "
+          CHUNK_OPTION@250..259
+            CHUNK_OPTION_KEY@250..254 "echo"
+            TEXT@254..255 "="
+            CHUNK_OPTION_VALUE@255..259 "TRUE"
+          TEXT@259..260 "}"
+      NEWLINE@260..261 "\n"
+    CODE_CONTENT@261..267
+      TEXT@261..266 "1 + 1"
+      NEWLINE@266..267 "\n"
+    CODE_FENCE_CLOSE@267..271
+      CODE_FENCE_MARKER@267..270 "```"
+      NEWLINE@270..271 "\n"
+  BLANK_LINE@271..272
+    BLANK_LINE@271..272 "\n"
+  CODE_BLOCK@272..342
+    CODE_FENCE_OPEN@272..332
+      CODE_FENCE_MARKER@272..275 "```"
+      CODE_INFO@275..331
+        TEXT@275..276 "{"
+        CODE_LANGUAGE@276..277 "r"
+        CHUNK_OPTIONS@277..331
+          TEXT@277..278 " "
+          CHUNK_LABEL@278..284
+            TEXT@278..284 "nested"
+          TEXT@284..286 ", "
+          CHUNK_OPTION@286..315
+            CHUNK_OPTION_KEY@286..290 "eval"
+            TEXT@290..291 " "
+            TEXT@291..292 "="
+            TEXT@292..293 " "
+            CHUNK_OPTION_VALUE@293..315 "grepl(\")\", x) && n > 1"
+          TEXT@315..317 ", "
+          CHUNK_OPTION@317..330
+            CHUNK_OPTION_KEY@317..324 "warning"
+            TEXT@324..325 "="
+            CHUNK_OPTION_VALUE@325..330 "FALSE"
+          TEXT@330..331 "}"
+      NEWLINE@331..332 "\n"
+    CODE_CONTENT@332..338
+      TEXT@332..337 "1 + 1"
+      NEWLINE@337..338 "\n"
+    CODE_FENCE_CLOSE@338..342
+      CODE_FENCE_MARKER@338..341 "```"
+      NEWLINE@341..342 "\n"
+  BLANK_LINE@342..343
+    BLANK_LINE@342..343 "\n"
+  CODE_BLOCK@343..377
+    CODE_FENCE_OPEN@343..367
+      CODE_FENCE_MARKER@343..346 "```"
+      CODE_INFO@346..366
+        TEXT@346..347 "{"
+        CODE_LANGUAGE@347..348 "r"
+        CHUNK_OPTIONS@348..366
+          TEXT@348..350 ", "
+          CHUNK_OPTION@350..362
+            CHUNK_OPTION_KEY@350..354 "eval"
+            TEXT@354..355 " "
+            TEXT@355..356 "="
+            TEXT@356..357 " "
+            CHUNK_OPTION_VALUE@357..362 "n > 1"
+          TEXT@362..365 "   "
+          TEXT@365..366 "}"
+      NEWLINE@366..367 "\n"
+    CODE_CONTENT@367..373
+      TEXT@367..372 "1 + 1"
+      NEWLINE@372..373 "\n"
+    CODE_FENCE_CLOSE@373..377
+      CODE_FENCE_MARKER@373..376 "```"
+      NEWLINE@376..377 "\n"
