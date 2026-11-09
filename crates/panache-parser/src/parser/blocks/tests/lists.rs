@@ -1081,6 +1081,73 @@ fn ordered_marker_at_content_column_opens_nested_list_under_pandoc_3_9() {
 }
 
 #[test]
+fn commonmark_empty_sublist_does_not_interrupt_paragraph() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm] {
+        let config = ParserOptions {
+            flavor,
+            dialect: Dialect::for_flavor(flavor),
+            extensions: Extensions::for_flavor(flavor),
+            ..Default::default()
+        };
+        for input in [
+            "- a\n  *\n",
+            "- a\n  +\n",
+            "- a\n  1.\n",
+            "- a\n  1)\n",
+            "- a\n  * \t\n",
+            "- a\n  1. \t\n",
+            "1. a\n   *\n",
+            "- a\n  *",
+            "- a\r\n  *\r\n",
+            "> - a\n>   *\n",
+            "- a\n\n  paragraph\n  *\n",
+            "- # h\n  paragraph\n  *\n",
+        ] {
+            let tree = parse_blocks_with_config(input, &config);
+            assert_eq!(tree.text().to_string(), input);
+            assert_eq!(
+                find_all(&tree, SyntaxKind::LIST).len(),
+                1,
+                "an empty child list must stay paragraph text: {flavor:?}: {input:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn commonmark_empty_list_interruption_rule_preserves_valid_lists() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm] {
+        let config = ParserOptions {
+            flavor,
+            dialect: Dialect::for_flavor(flavor),
+            extensions: Extensions::for_flavor(flavor),
+            ..Default::default()
+        };
+        for (input, expected_lists) in [
+            ("- a\n\n  *\n", 2),
+            ("- a\n\n  1.\n", 2),
+            ("- # h\n  *\n", 2),
+            ("- # h\n  1.\n", 2),
+            ("- ***\n  *\n", 2),
+            ("-\n  *\n", 2),
+            ("- *\n", 2),
+            ("- a\n  * \u{a0}\n", 2),
+            ("- a\n-\n", 1),
+            ("1. a\n2.\n", 1),
+        ] {
+            let tree = parse_blocks_with_config(input, &config);
+            assert_eq!(tree.text().to_string(), input);
+            assert_eq!(
+                find_all(&tree, SyntaxKind::LIST).len(),
+                expected_lists,
+                "{flavor:?}: {input:?}"
+            );
+            assert_eq!(find_all(&tree, SyntaxKind::LIST_ITEM).len(), 2);
+        }
+    }
+}
+
+#[test]
 fn commonmark_non_one_ordered_sublist_does_not_interrupt_paragraph() {
     let config = ParserOptions {
         flavor: Flavor::CommonMark,

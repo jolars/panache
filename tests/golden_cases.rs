@@ -417,6 +417,7 @@ golden_test_cases!(
     list_interrupts_paragraph_commonmark,
     blockquote_after_list_commonmark,
     blockquote_after_list_item_commonmark,
+    list_item_empty_marker_paragraph_commonmark,
     list_item_ordered_paragraph_continuation_commonmark,
     list_item_ordered_list_after_heading_commonmark,
     list_item_lazy_checkbox_paragraph_gfm,

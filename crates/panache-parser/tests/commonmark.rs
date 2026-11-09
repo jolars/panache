@@ -55,6 +55,16 @@ fn matches_expected(example: &SpecExample, rendered: &str) -> bool {
 }
 
 #[test]
+fn commonmark_empty_sublist_paragraph_continuation() {
+    let input = include_str!("fixtures/cases/list_item_empty_marker_paragraph_commonmark/input.md");
+    let tree = parse(input, Some(commonmark_options()));
+    assert_eq!(
+        normalize_html(&html_renderer::render(&tree)),
+        normalize_html("<ul>\n<li>a\n*</li>\n<li>b\n1.</li>\n</ul>\n")
+    );
+}
+
+#[test]
 fn commonmark_ordered_sublist_paragraph_continuation() {
     let input =
         include_str!("fixtures/cases/list_item_ordered_paragraph_continuation_commonmark/input.md");

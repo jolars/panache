@@ -214,7 +214,8 @@ required indentation, including after a blank line.
 
 In CommonMark and GFM, a nested ordered list can start at any number immediately
 after a heading or thematic break. After paragraph text, it must start at `1` or
-be separated by a blank line.
+be separated by a blank line. An empty nested list marker stays part of an open
+paragraph.
 
 In CommonMark and GFM, an HTML block can start immediately after the list
 marker. Panache preserves its raw content and relative indentation when it
