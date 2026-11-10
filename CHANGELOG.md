@@ -4,11 +4,11 @@
 
 ### Highlights
 
-As of this release, Panache now longer converts unicode "smart" punctuation to ASCII punctuation by default. There is now a new configuration option:
+As of this release, Panache no longer converts unicode "smart" punctuation to ASCII punctuation by default. There is now a new configuration option:
 
 ```toml
 [format]
-smart-punctuation = "preserve" # or "ascii" or "preserve"
+smart-punctuation = "preserve" # or "ascii" or "unicode"
 ```
 
 This now defaults to "preserve", to avoid breaking some valid types of quotes and dashes. It also makes Panache behave more consistently across Pandoc and CommonMark-based flavors. Pick `"ascii"` if you want to retain the old behavior.
