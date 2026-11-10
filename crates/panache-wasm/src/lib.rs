@@ -25,30 +25,53 @@ fn parse_flavor(value: &str) -> Option<Flavor> {
 #[cfg(test)]
 mod hugo_tests {
     #[test]
+    fn default_preserves_authored_punctuation() {
+        let input = "„Hallo“ ”Hej” “hello” ‘hi’ it's it’s -- --- ... – — …\n";
+        assert_eq!(super::format_qmd(input, None), input);
+    }
+
+    #[test]
     fn punctuation_modes_override_the_flavor_default() {
-        let format = |mode: Option<&str>| {
-            super::format_qmd_with_options(
-                "\"hi\" -- “hi”\n",
-                None,
-                Some("commonmark".to_owned()),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                mode.map(str::to_owned),
-            )
-            .unwrap()
-        };
-        assert_eq!(format(None), "\"hi\" -- “hi”\n");
-        assert_eq!(format(Some("preserve")), "\"hi\" -- “hi”\n");
-        assert_eq!(format(Some("ascii")), "\"hi\" -- “hi”\n");
-        assert_eq!(format(Some("unicode")), "“hi” – “hi”\n");
+        for flavor in [
+            None,
+            Some("pandoc"),
+            Some("quarto"),
+            Some("rmarkdown"),
+            Some("commonmark"),
+            Some("gfm"),
+            Some("multimarkdown"),
+            Some("hugo"),
+            Some("mdsvex"),
+            Some("myst"),
+        ] {
+            let format = |mode: Option<&str>| {
+                super::format_qmd_with_options(
+                    "\"hi\" -- “hi”\n",
+                    None,
+                    flavor.map(str::to_owned),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    mode.map(str::to_owned),
+                )
+                .unwrap()
+            };
+            assert_eq!(format(None), "\"hi\" -- “hi”\n", "{flavor:?}");
+            assert_eq!(format(Some("preserve")), "\"hi\" -- “hi”\n", "{flavor:?}");
+            let ascii = match flavor {
+                None | Some("pandoc" | "quarto" | "rmarkdown") => "\"hi\" -- \"hi\"\n",
+                _ => "\"hi\" -- “hi”\n",
+            };
+            assert_eq!(format(Some("ascii")), ascii, "{flavor:?}");
+            assert_eq!(format(Some("unicode")), "“hi” – “hi”\n", "{flavor:?}");
+        }
     }
 
     #[test]

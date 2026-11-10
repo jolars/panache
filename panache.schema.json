@@ -510,7 +510,8 @@
         },
         "smart-punctuation": {
           "$ref": "#/$defs/SmartPunctuation",
-          "description": "Source spelling of punctuation. Defaults to ASCII for Pandoc, Quarto,\nand R Markdown, and preservation for other flavors."
+          "default": "preserve",
+          "description": "Source spelling of punctuation. Defaults to preservation for all flavors."
         },
         "tab-stops": {
           "$ref": "#/$defs/TabStopMode",

@@ -1,8 +1,8 @@
 # Indented code in list items
 
 An indented code block inside a list item is converted to a fence whose content
-keeps its true logical indentation --- the list's content indent is stripped,
-not doubled.
+keeps its true logical indentation — the list's content indent is stripped, not
+doubled.
 
 - item
 

@@ -1996,9 +1996,9 @@ mod tests {
     }
 
     #[test]
-    fn smart_punctuation_defaults_follow_the_resolved_flavor() {
+    fn smart_punctuation_defaults_to_preserve_in_every_flavor() {
         let mut cfg = Config::default();
-        for flavor in [
+        let flavors = [
             Flavor::Pandoc,
             Flavor::Quarto,
             Flavor::RMarkdown,
@@ -2008,19 +2008,30 @@ mod tests {
             Flavor::Hugo,
             Flavor::Mdsvex,
             Flavor::Myst,
-        ] {
+        ];
+        for flavor in flavors {
             apply_flavor(&mut cfg, flavor, None);
             assert_eq!(
                 crate::formatter::to_formatter_config(&cfg).smart_punctuation,
-                SmartPunctuation::for_flavor(flavor)
+                SmartPunctuation::Preserve,
+                "{flavor:?}"
             );
         }
-        cfg.smart_punctuation = Some(SmartPunctuation::Unicode);
-        apply_flavor(&mut cfg, Flavor::CommonMark, None);
-        assert_eq!(
-            crate::formatter::to_formatter_config(&cfg).smart_punctuation,
-            SmartPunctuation::Unicode
-        );
+        for mode in [
+            SmartPunctuation::Preserve,
+            SmartPunctuation::Ascii,
+            SmartPunctuation::Unicode,
+        ] {
+            cfg.smart_punctuation = Some(mode);
+            for flavor in flavors {
+                apply_flavor(&mut cfg, flavor, None);
+                assert_eq!(
+                    crate::formatter::to_formatter_config(&cfg).smart_punctuation,
+                    mode,
+                    "{flavor:?} with {mode:?}"
+                );
+            }
+        }
     }
 
     #[test]

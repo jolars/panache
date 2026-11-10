@@ -21,6 +21,55 @@ fn test_format_stdin_to_stdout() {
 }
 
 #[test]
+fn test_format_stdin_preserves_punctuation_by_default() {
+    let input = "„Hallo“ ”Hej” “hello” ‘hi’ it's it’s -- --- ... – — …\n";
+    for flavor in [
+        "pandoc",
+        "quarto",
+        "rmarkdown",
+        "commonmark",
+        "gfm",
+        "multimarkdown",
+        "hugo",
+        "mdsvex",
+        "myst",
+    ] {
+        cargo_bin_cmd!("panache")
+            .args(["format", "--isolated", "--no-cache", "--flavor", flavor])
+            .write_stdin(input)
+            .assert()
+            .success()
+            .stdout(input);
+    }
+}
+
+#[test]
+fn test_format_punctuation_options_override_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("panache.toml");
+    fs::write(&config_path, "[format]\nsmart-punctuation = \"ascii\"\n").unwrap();
+    let input = "He said \"hi\" -- it’s fine…\n";
+    for (mode, expected) in [
+        (None, "He said \"hi\" -- it's fine...\n"),
+        (Some("preserve"), input),
+        (Some("unicode"), "He said “hi” – it’s fine…\n"),
+    ] {
+        let mut command = cargo_bin_cmd!("panache");
+        command
+            .args(["format", "--no-cache", "--flavor", "pandoc", "--config"])
+            .arg(&config_path);
+        if let Some(mode) = mode {
+            command.args(["-o", &format!("smart-punctuation={mode}")]);
+        }
+        command
+            .write_stdin(input)
+            .assert()
+            .success()
+            .stdout(expected);
+    }
+}
+
+#[test]
 fn test_format_simple_file() {
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test.qmd");

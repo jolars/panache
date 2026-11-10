@@ -117,21 +117,18 @@ pub enum HorizontalRuleStyle {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SmartPunctuation {
     /// Leave punctuation as written.
+    #[default]
     Preserve,
     /// Write straight quotes with `smart` or `smart-quotes`, and `--`, `---`,
     /// and `...` with `smart`. Preserve punctuation otherwise.
-    #[default]
     Ascii,
     /// Write English curly quotes, en/em dashes, and `…`.
     Unicode,
 }
 
 impl SmartPunctuation {
-    pub fn for_flavor(flavor: Flavor) -> Self {
-        match flavor {
-            Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown => Self::Ascii,
-            _ => Self::Preserve,
-        }
+    pub fn for_flavor(_flavor: Flavor) -> Self {
+        Self::default()
     }
 }
 
@@ -276,8 +273,9 @@ pub struct Config {
     /// How horizontal rules are rendered: expanded to the line width
     /// (default) or as a compact `---`.
     pub horizontal_rule_style: HorizontalRuleStyle,
-    /// Source spelling of punctuation. ASCII normalization requires the
-    /// corresponding `smart` or `smart-quotes` renderer extension.
+    /// Source spelling of punctuation. Defaults to preservation. ASCII
+    /// normalization requires the corresponding `smart` or `smart-quotes`
+    /// renderer extension.
     pub smart_punctuation: SmartPunctuation,
     /// Document-language fallback used by sentence wrapping when the document
     /// has no YAML `lang:`. Normalized lowercase code (e.g. `de`, `pt-br`).

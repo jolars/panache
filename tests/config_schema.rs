@@ -98,6 +98,15 @@ fn build_validator() -> Validator {
 }
 
 #[test]
+fn schema_smart_punctuation_defaults_to_preserve() {
+    let schema = generate_schema_json();
+    assert_eq!(
+        schema.pointer("/$defs/StyleConfig/properties/smart-punctuation/default"),
+        Some(&Value::String("preserve".to_string()))
+    );
+}
+
+#[test]
 fn schema_accepts_every_fixture_panache_toml() {
     let validator = build_validator();
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))

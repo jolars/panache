@@ -705,17 +705,20 @@ For a single invocation, use `panache format -o smart-punctuation=unicode`.
     `--` to `–`, `---` to `—`, and `...` to `…`. Existing Unicode quotation
     marks and unpaired straight double quotes keep their spelling.
 
-The default is `ascii` for Pandoc, Quarto, and R Markdown, and `preserve` for
-other flavors. The `preserve` and `unicode` modes work independently of the
-`smart` and `smart-quotes` extensions, including with CommonMark and GFM. An
-explicit `ascii` selection still requires the corresponding extension. Code,
-math, URLs, email addresses, attributes, link titles, escaped punctuation, and
-raw markup stay unchanged. Bare URL and email protection extends across inline
-markup in both conversion modes, even when `autolink-bare-uris` is disabled.
-Escaped punctuation still determines the direction of adjacent quotes. Panache
-resolves inline constructs across line-block continuations before normalizing
-prose. Multiline table cells normalize punctuation across continuation lines
-before reflow while preserving hard breaks and reference link labels. Unicode
+The default is `preserve` for every flavor. To retain the ASCII normalization
+used by earlier releases for Pandoc, Quarto, and R Markdown, set
+`smart-punctuation = "ascii"` in `[format]`.
+
+The `preserve` and `unicode` modes work independently of the `smart` and
+`smart-quotes` extensions, including with CommonMark and GFM. An explicit
+`ascii` selection still requires the corresponding extension. Code, math, URLs,
+email addresses, attributes, link titles, escaped punctuation, and raw markup
+stay unchanged. Bare URL and email protection extends across inline markup in
+both conversion modes, even when `autolink-bare-uris` is disabled. Escaped
+punctuation still determines the direction of adjacent quotes. Panache resolves
+inline constructs across line-block continuations before normalizing prose.
+Multiline table cells normalize punctuation across continuation lines before
+reflow while preserving hard breaks and reference link labels. Unicode
 conversion preserves heading text when `auto-identifiers` or
 `implicit-header-references` is enabled so generated identifiers and implicit
 heading links keep working, including headings with explicit IDs when automatic

@@ -33,6 +33,46 @@ fn assert_config(input: &str, expected: &str, config: Config) {
 }
 
 #[test]
+fn default_preserves_punctuation_in_every_flavor() {
+    let input = "„Hallo“ ”Hej” “hello” ‘hi’ it's it’s -- --- ... – — …\n";
+    assert_eq!(format(input, None, None), input);
+    for flavor in [
+        Flavor::Pandoc,
+        Flavor::Quarto,
+        Flavor::RMarkdown,
+        Flavor::CommonMark,
+        Flavor::Gfm,
+        Flavor::MultiMarkdown,
+        Flavor::Hugo,
+        Flavor::Mdsvex,
+        Flavor::Myst,
+    ] {
+        assert_config(
+            input,
+            input,
+            Config {
+                flavor,
+                parser_extensions: Extensions::for_flavor(flavor),
+                formatter_extensions: FormatterExtensions::for_flavor(flavor),
+                ..Config::default()
+            },
+        );
+    }
+    assert_eq!(SmartPunctuation::default(), SmartPunctuation::Preserve);
+}
+
+#[test]
+fn default_preserves_punctuation_in_headings_references_and_literals() {
+    let input = concat!(
+        "# “hello” — world\n\n",
+        "[“hello” — world] and [‘label’][].\n\n",
+        "[‘label’]: /url\n\n",
+        "`“code” —` and `\\textit{“a”}`{=latex} and $“math”$.\n",
+    );
+    assert_config(input, input, Config::default());
+}
+
+#[test]
 fn unicode_converts_ascii_punctuation() {
     assert_mode(
         "He said \"hi\" -- it's 'fine'... --- ok\n",
@@ -535,6 +575,7 @@ fn ascii_preserves_bare_addresses_across_inline_nodes() {
                     &format!("{prefix}See {address} --- 'prose'\n"),
                     Config {
                         parser_extensions: extensions.clone(),
+                        smart_punctuation: SmartPunctuation::Ascii,
                         ..Config::default()
                     },
                 );
@@ -869,7 +910,10 @@ fn unicode_applies_to_terms_line_blocks_and_table_cells() {
 
 #[test]
 fn smart_enabled_normalizes_curly_quotes_and_dashes() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     cfg.wrap = Some(WrapMode::Preserve);
     let input = "Curly: ‘single’ “double” – en — em\n";
@@ -934,7 +978,10 @@ fn ascii_with_smart_normalizes_quotes_dashes_and_ellipsis() {
 
 #[test]
 fn smart_normalizes_unicode_ellipsis() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     cfg.formatter_extensions.smart_quotes = false;
     cfg.wrap = Some(WrapMode::Preserve);
@@ -946,7 +993,10 @@ fn smart_normalizes_unicode_ellipsis() {
 
 #[test]
 fn smart_does_not_normalize_inline_code_span_content() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     let input = "`a — b … “q” –`\n";
     let out = format(input, Some(cfg.clone()), None);
@@ -969,7 +1019,10 @@ fn smart_does_not_normalize_verbatim_inlines() {
         WrapMode::Sentence,
         WrapMode::Semantic,
     ] {
-        let mut cfg = Config::default();
+        let mut cfg = Config {
+            smart_punctuation: SmartPunctuation::Ascii,
+            ..Config::default()
+        };
         cfg.formatter_extensions.smart = true;
         let cfg_wrap = format!("{wrap:?}");
         cfg.wrap = Some(wrap);
@@ -980,7 +1033,10 @@ fn smart_does_not_normalize_verbatim_inlines() {
 
 #[test]
 fn smart_does_not_normalize_autolink_url() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     let input = "<https://example.com/a—b>\n";
     let out = format(input, Some(cfg.clone()), None);
@@ -990,7 +1046,10 @@ fn smart_does_not_normalize_autolink_url() {
 
 #[test]
 fn smart_normalizes_dashes_in_atx_heading() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     let input = "# em — dash and en – dash\n";
     let expected = "# em --- dash and en -- dash\n";
@@ -999,7 +1058,10 @@ fn smart_normalizes_dashes_in_atx_heading() {
 
 #[test]
 fn smart_dash_only_paragraph_does_not_become_thematic_break() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     let out = format("—\n", Some(cfg.clone()), None);
     assert_eq!(out, "—\n");
@@ -1032,7 +1094,10 @@ fn ascii_preserves_dash_terms_in_containers() {
 
 #[test]
 fn smart_multi_dash_paragraph_does_not_become_thematic_break() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     let out = format("– –\n", Some(cfg.clone()), None);
     assert!(
@@ -1047,7 +1112,10 @@ fn smart_multi_dash_paragraph_does_not_become_thematic_break() {
 
 #[test]
 fn smart_single_en_dash_paragraph_normalizes_safely() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     let out = format("–\n", Some(cfg.clone()), None);
     assert_eq!(out, "--\n");
@@ -1056,7 +1124,10 @@ fn smart_single_en_dash_paragraph_normalizes_safely() {
 
 #[test]
 fn smart_dash_within_text_still_normalizes() {
-    let mut cfg = Config::default();
+    let mut cfg = Config {
+        smart_punctuation: SmartPunctuation::Ascii,
+        ..Config::default()
+    };
     cfg.formatter_extensions.smart = true;
     assert_eq!(format("a — b\n", Some(cfg), None), "a --- b\n");
 }

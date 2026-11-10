@@ -363,8 +363,7 @@ pub struct StyleConfig {
     pub tab_width: usize,
     /// Horizontal rule rendering: expanded to the line width or compact `---`
     pub horizontal_rule_style: HorizontalRuleStyle,
-    /// Source spelling of punctuation. Defaults to ASCII for Pandoc, Quarto,
-    /// and R Markdown, and preservation for other flavors.
+    /// Source spelling of punctuation. Defaults to preservation for all flavors.
     #[schemars(with = "SmartPunctuation", transform = smart_punctuation_schema)]
     pub smart_punctuation: Option<SmartPunctuation>,
     /// Use panache-native greedy wrapping instead of textwrap.
@@ -412,9 +411,10 @@ fn stable_math_schema(schema: &mut Schema) {
 }
 
 fn smart_punctuation_schema(schema: &mut Schema) {
-    // The omitted value depends on the resolved flavor, so null is not a
-    // valid default for the enum exposed to configuration editors.
-    schema.remove("default");
+    schema.insert(
+        "default".to_string(),
+        serde_json::Value::String("preserve".to_string()),
+    );
 }
 
 fn deprecated_format_math_schema(schema: &mut Schema) {
@@ -1131,8 +1131,7 @@ pub struct Config {
     pub blank_lines: BlankLines,
     /// Horizontal rule rendering: expanded to the line width or compact `---`.
     pub horizontal_rule_style: HorizontalRuleStyle,
-    /// Source spelling of punctuation. Defaults to ASCII for Pandoc, Quarto,
-    /// and R Markdown, and preservation for other flavors.
+    /// Source spelling of punctuation. Defaults to preservation for all flavors.
     pub smart_punctuation: Option<SmartPunctuation>,
     /// Language → Formatter(s) mapping (supports multiple formatters per language)
     pub formatters: HashMap<String, Vec<FormatterConfig>>,
