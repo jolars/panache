@@ -2,46 +2,6 @@
 
 This document tracks implementation status for Panache's features.
 
-## Architecture and refactoring
-
-- [x] Split `crates/panache-formatter/src/formatter/core.rs`'s
-  `Formatter::format_node_sync` dispatch into cohesive formatter modules
-  (document/blocks, containers, lists, tables, math, and raw content). Keep
-  shared `Formatter` state in the core module and preserve idempotency
-  golden coverage throughout.
-
-- [x] Split `crates/panache-parser/src/parser/core.rs` at its line-framing and
-  inner-content orchestration boundary. Extract cohesive list-item,
-  blockquote, definition-list, and HTML-interruption protocols, but retain
-  the parser's single-pass block-then-inline architecture in the
-  orchestrator.
-
-- [ ] Split `crates/panache-parser/src/parser/block_dispatcher.rs` by parser
-  family: metadata/headings, references/lists, tables, code/TeX, HTML, and
-  fenced containers. Keep `BlockParser`, its shared context types, and the
-  registry's ordering in one authoritative place.
-
-- [ ] Split `src/salsa.rs` by query domain: parsing, YAML, symbols, definitions,
-  project graph, and database runtime. Re-export the present public API so
-  callers do not need a broad migration.
-
-- [ ] Split `src/main.rs`'s `run` match into command handlers for parse, format,
-  lint, debug, clean, and LSP. Keep process startup, configuration loading
-  helpers, and final top-level dispatch in `main.rs`.
-
-- [ ] Split `crates/panache-parser/src/parser/blocks/html_blocks.rs` into HTML
-  classification, Pandoc lifting, and CST emission. Treat Pandoc-native and
-  CommonMark conformance as required regression gates because this code owns
-  subtle parser structure.
-
-- [ ] Split `crates/panache-parser/src/parser/yaml/validator.rs` by independent
-  validation-rule family while retaining its single diagnostic-selection
-  contract and YAML corpus coverage.
-
-- [ ] Consider splitting `crates/panache-parser/src/parser/inlines/inline_ir.rs`
-  into scanning, emphasis planning, bracket planning, and scratch allocation
-  after higher-churn parser and formatter refactors land.
-
 ## Language Server
 
 ### Issues
