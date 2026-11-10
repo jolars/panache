@@ -145,6 +145,12 @@ impl Rule for UndefinedReferencesRule {
                 continue;
             }
 
+            // A bare `- [x]` item is a checked task item in the wild (pandoc
+            // renders it as a checkbox), not a reference to a missing label.
+            if is_bare_task_checkbox(&unresolved) {
+                continue;
+            }
+
             let Some((label_text, location_node)) = extract_unresolved_label_and_node(&unresolved)
             else {
                 continue;
@@ -236,6 +242,23 @@ fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)>
         .map(|text| (text.raw_label(), link.syntax().clone()))
 }
 
+/// Whether the unresolved reference is the sole content of a list item and
+/// reads as a task checkbox (`- [x]` / `- [X]`).
+fn is_bare_task_checkbox(unresolved: &UnresolvedReference) -> bool {
+    let text = unresolved.syntax().text().to_string();
+    if unresolved.is_image() || !matches!(text.as_str(), "[x]" | "[X]") {
+        return false;
+    }
+    let Some(block) = unresolved.syntax().parent() else {
+        return false;
+    };
+    matches!(block.kind(), SyntaxKind::PLAIN | SyntaxKind::PARAGRAPH)
+        && block.text().to_string().trim() == text
+        && block
+            .parent()
+            .is_some_and(|p| p.kind() == SyntaxKind::LIST_ITEM)
+}
+
 /// Mirror of [`extract_reference_label_and_node`] for the
 /// `UnresolvedReference` wrapper. Full / collapsed forms expose the
 /// label via `LinkRef`; shortcut form has no `LinkRef` and uses the
@@ -273,6 +296,19 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
         rule.check_tree(&tree, input, &config, None)
+    }
+
+    #[test]
+    fn bare_task_checkbox_is_not_an_undefined_reference() {
+        for input in ["- [x]\n", "- [X]\n", "- [x]", "1. [x]\n"] {
+            assert!(parse_and_lint(input).is_empty(), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn bracket_x_outside_a_bare_list_item_is_still_reported() {
+        assert_eq!(parse_and_lint("[x]\n").len(), 1);
+        assert_eq!(parse_and_lint("- see [x]\n").len(), 1);
     }
 
     #[test]
