@@ -194,6 +194,9 @@ Show the resolved Markdown flavor, configuration files, and extension states for
 
 ### Options
 
+`--json`
+:   Emit JSON output for machine-readable inspection
+
 `-o`, `--option <KEY=VALUE>`
 :   Apply the same KEY=VALUE overrides as `panache format -o`. May be repeated. For example: -o extensions.east-asian-line-breaks=false.
 

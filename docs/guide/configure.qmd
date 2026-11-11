@@ -84,6 +84,13 @@ stdin, so the file does not need to exist. With no file, it uses the current
 directory's configuration; `--stdin-filename` supplies a document path when
 needed.
 
+For scripts, use `panache inspect document.qmd --json`. The JSON object contains
+`flavor`, `configuration`, and `extensions`. Each extension has Boolean
+`effective` and `default` values. The configuration records its `source`
+(`explicit`, `discovered`, `env`, `global`, or `none`), `path`, and `chain` of
+canonical paths, starting with the selected config and followed by its inherited
+files. With no config file, `path` is `null`, and `chain` is empty.
+
 ## Share Settings Between Projects
 
 Discovery selects a single config. Use `extend` to inherit another file:

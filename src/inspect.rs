@@ -1,15 +1,37 @@
 use std::collections::BTreeMap;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use panache::Config;
 use panache::config::{ConfigSource, Extensions, Flavor, FormatterExtensions};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct Report<'a> {
+    flavor: &'static str,
+    configuration: Configuration<'a>,
+    extensions: BTreeMap<&'static str, ExtensionState>,
+}
+
+#[derive(Serialize)]
+struct Configuration<'a> {
+    source: &'static str,
+    path: Option<&'a Path>,
+    chain: &'a [PathBuf],
+}
+
+#[derive(Serialize)]
+struct ExtensionState {
+    effective: bool,
+    default: bool,
+}
 
 pub fn write_report(
     mut out: impl Write,
     cfg: &Config,
     source: &ConfigSource,
     chain: &[PathBuf],
+    json: bool,
 ) -> io::Result<()> {
     let flavor = match cfg.flavor {
         Flavor::Pandoc => "pandoc",
@@ -22,41 +44,73 @@ pub fn write_report(
         Flavor::Myst => "myst",
         Flavor::Hugo => "hugo",
     };
-    writeln!(out, "Flavor: {flavor}")?;
-
-    let origin = match source {
-        ConfigSource::Explicit(_) => "--config",
-        ConfigSource::Discovered(_) => "discovered",
-        ConfigSource::Env(_) => "PANACHE_CONFIG",
-        ConfigSource::Global(_) => "user config",
-        ConfigSource::None => "built-in defaults",
+    let (source_name, origin) = match source {
+        ConfigSource::Explicit(_) => ("explicit", "--config"),
+        ConfigSource::Discovered(_) => ("discovered", "discovered"),
+        ConfigSource::Env(_) => ("env", "PANACHE_CONFIG"),
+        ConfigSource::Global(_) => ("global", "user config"),
+        ConfigSource::None => ("none", "built-in defaults"),
     };
-    if let Some(path) = source.path() {
+
+    let parser_defaults = Extensions::for_flavor(cfg.flavor);
+    let formatter_defaults = FormatterExtensions::for_flavor(cfg.flavor);
+    let defaults: BTreeMap<_, _> = parser_defaults
+        .states()
+        .chain(formatter_defaults.states())
+        .collect();
+    let extensions = cfg
+        .extensions
+        .states()
+        .chain(cfg.formatter_extensions.states())
+        .map(|(name, effective)| {
+            (
+                name,
+                ExtensionState {
+                    effective,
+                    default: defaults[name],
+                },
+            )
+        })
+        .collect();
+    let report = Report {
+        flavor,
+        configuration: Configuration {
+            source: source_name,
+            path: source.path(),
+            chain,
+        },
+        extensions,
+    };
+
+    if json {
+        serde_json::to_writer_pretty(&mut out, &report).map_err(io::Error::other)?;
+        return writeln!(out);
+    }
+
+    writeln!(out, "Flavor: {}", report.flavor)?;
+    if let Some(path) = report.configuration.path {
         writeln!(out, "Configuration: {} ({origin})", path.display())?;
-        for path in chain.iter().skip(1) {
+        for path in report.configuration.chain.iter().skip(1) {
             writeln!(out, "  extends {}", path.display())?;
         }
     } else {
         writeln!(out, "Configuration: {origin}")?;
     }
-
-    let parser_defaults = Extensions::for_flavor(cfg.flavor);
-    let formatter_defaults = FormatterExtensions::for_flavor(cfg.flavor);
-    let effective: BTreeMap<_, _> = cfg
+    let width = report
         .extensions
-        .states()
-        .chain(cfg.formatter_extensions.states())
-        .collect();
-    let defaults: BTreeMap<_, _> = parser_defaults
-        .states()
-        .chain(formatter_defaults.states())
-        .collect();
-    let width = effective.keys().map(|name| name.len()).max().unwrap_or(9);
+        .keys()
+        .map(|name| name.len())
+        .max()
+        .unwrap_or(9);
 
     writeln!(out)?;
     writeln!(out, "{:<width$}  {:<9}  Default", "Extension", "Effective")?;
-    for (name, enabled) in effective {
-        writeln!(out, "{name:<width$}  {enabled:<9}  {}", defaults[name])?;
+    for (name, state) in report.extensions {
+        writeln!(
+            out,
+            "{name:<width$}  {:<9}  {}",
+            state.effective, state.default
+        )?;
     }
     Ok(())
 }

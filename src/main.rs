@@ -983,7 +983,7 @@ fn run() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
-        Commands::Inspect { file, option } => {
+        Commands::Inspect { file, json, option } => {
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
             let start_dir = start_dir_for(input_path)?;
             let (mut cfg, source, chain) = load_config_for_cli_with_chain(
@@ -995,7 +995,7 @@ fn run() -> io::Result<()> {
                 cli.flavor.map(Flavor::from),
             )?;
             apply_cli_overrides(&mut cfg, &option).map_err(io::Error::other)?;
-            inspect::write_report(io::stdout().lock(), &cfg, &source, &chain)
+            inspect::write_report(io::stdout().lock(), &cfg, &source, &chain, json)
         }
         Commands::Parse { file, to, json } => {
             let file = normalize_parse_path_or_exit(file);

@@ -883,7 +883,8 @@ Run `panache inspect document.qmd` to list every extension's effective state
 alongside its default for the resolved flavor. Use
 `panache inspect --isolated --flavor pandoc` to list only built-in defaults, or
 pass `-o extensions.<name>=<bool>` to inspect a one-off override. See
-[inspecting settings](../guide/configure.qmd#inspect-settings) for details.
+[inspecting settings](../guide/configure.qmd#inspect-settings) for details. Add
+`--json` for machine-readable output.
 
 Panache supports most of the Pandoc extensions. Defaults vary by flavor, but you
 can override any extension:

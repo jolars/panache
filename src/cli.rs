@@ -425,6 +425,10 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         )]
         file: Option<PathBuf>,
 
+        /// Emit JSON output for machine-readable inspection
+        #[arg(long)]
+        json: bool,
+
         /// Override individual config options, as with `panache format -o`
         #[arg(short = 'o', long = "option", value_name = "KEY=VALUE")]
         #[arg(
