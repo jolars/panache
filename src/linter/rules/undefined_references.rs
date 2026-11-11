@@ -2,7 +2,8 @@ use crate::linter::diagnostics::{Diagnostic, Location};
 use crate::linter::project_index::{DefinitionLabels, extend_labels_from_tree};
 use crate::linter::rules::{DiagnosticCode, LintContext, Requirement, Rule, RuleMeta};
 use crate::syntax::{
-    AstNode, Crossref, FootnoteReference, Link, SyntaxKind, SyntaxNode, UnresolvedReference,
+    AstNode, BlockNode, Crossref, FootnoteReference, Link, ListItem, SyntaxKind, SyntaxNode,
+    UnresolvedReference,
 };
 use crate::utils::{crossref_resolution_labels, normalize_anchor_label, normalize_label};
 
@@ -145,6 +146,12 @@ impl Rule for UndefinedReferencesRule {
                 continue;
             }
 
+            // Pandoc treats a bare `- [x]` at the start of an item as a task
+            // checkbox when task lists are enabled.
+            if config.extensions.task_lists && is_bare_task_checkbox(&unresolved) {
+                continue;
+            }
+
             let Some((label_text, location_node)) = extract_unresolved_label_and_node(&unresolved)
             else {
                 continue;
@@ -236,6 +243,28 @@ fn extract_reference_label_and_node(link: &Link) -> Option<(String, SyntaxNode)>
         .map(|text| (text.raw_label(), link.syntax().clone()))
 }
 
+/// Whether the unresolved reference fills a list item's first paragraph and
+/// reads as a task checkbox (`- [x]` or `- [X]`).
+fn is_bare_task_checkbox(unresolved: &UnresolvedReference) -> bool {
+    let text = unresolved.syntax().text().to_string();
+    if unresolved.is_image() || !matches!(text.as_str(), "[x]" | "[X]") {
+        return false;
+    }
+    let Some(block) = unresolved.syntax().parent() else {
+        return false;
+    };
+    let Some(item) = block.parent().and_then(ListItem::cast) else {
+        return false;
+    };
+    item.block_nodes()
+        .find(|child| !matches!(child, BlockNode::Trivia(_)))
+        .is_some_and(|first_block| {
+            matches!(first_block, BlockNode::Plain(_) | BlockNode::Paragraph(_))
+                && first_block.text_range() == block.text_range()
+                && block.text().to_string().trim() == text
+        })
+}
+
 /// Mirror of [`extract_reference_label_and_node`] for the
 /// `UnresolvedReference` wrapper. Full / collapsed forms expose the
 /// label via `LinkRef`; shortcut form has no `LinkRef` and uses the
@@ -273,6 +302,53 @@ mod tests {
         let tree = crate::parser::parse(input, Some(config.clone()));
         let rule = UndefinedReferencesRule;
         rule.check_tree(&tree, input, &config, None)
+    }
+
+    #[test]
+    fn bare_task_checkbox_is_not_an_undefined_reference() {
+        for input in [
+            "- [x]\n",
+            "- [X]\n",
+            "- [x]",
+            "1. [x]\n",
+            "- [x]\n\n    Intro\n",
+            "- [X]\n\n- [x]\n",
+        ] {
+            assert!(parse_and_lint(input).is_empty(), "{input:?}");
+        }
+    }
+
+    #[test]
+    fn bare_task_checkbox_with_task_lists_disabled_is_reported() {
+        let mut config = Config::default();
+        config.extensions.task_lists = false;
+
+        for input in ["- [x]\n", "- [X]\n", "1. [x]\n"] {
+            let tree = crate::parser::parse(input, Some(config.clone()));
+            let diagnostics = UndefinedReferencesRule.check_tree(&tree, input, &config, None);
+            assert_eq!(diagnostics.len(), 1, "{input:?}");
+            assert_eq!(diagnostics[0].code, "undefined-reference-label");
+        }
+    }
+
+    #[test]
+    fn bracket_x_in_later_list_paragraph_is_reported() {
+        for input in [
+            "- Intro\n\n    [x]\n",
+            "- Intro\n\n    [X]\n",
+            "1. Intro\n\n    [x]\n",
+        ] {
+            let diagnostics = parse_and_lint(input);
+            assert_eq!(diagnostics.len(), 1, "{input:?}");
+            assert_eq!(diagnostics[0].code, "undefined-reference-label");
+            assert_eq!(diagnostics[0].location.line, 3);
+        }
+    }
+
+    #[test]
+    fn bracket_x_outside_a_bare_list_item_is_still_reported() {
+        assert_eq!(parse_and_lint("[x]\n").len(), 1);
+        assert_eq!(parse_and_lint("- see [x]\n").len(), 1);
     }
 
     #[test]
