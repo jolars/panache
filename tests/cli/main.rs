@@ -12,6 +12,7 @@ mod common;
 mod config;
 mod debug;
 mod format;
+mod inspect;
 mod lint;
 mod parse;
 

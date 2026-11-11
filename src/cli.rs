@@ -407,6 +407,32 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         )]
         check: bool,
     },
+    /// Show how Panache would configure a document
+    #[command(
+        long_about = "Show the resolved Markdown flavor, configuration files, and extension states \
+        for a document. Each extension is listed alongside its built-in default for the resolved \
+        flavor. Uses the same configuration discovery and flavor detection as formatting. \
+        Omit FILE to inspect settings for the current directory, or use --isolated --flavor FLAVOR \
+        to list a flavor's built-in defaults. Does not read document contents or stdin."
+    )]
+    Inspect {
+        /// Document path used for configuration discovery and flavor detection
+        #[arg(value_name = "FILE")]
+        #[arg(
+            long_help = "Document path used for configuration discovery and flavor detection. \
+            The file does not need to exist. If omitted, uses --stdin-filename when supplied, \
+            otherwise the current directory's configuration."
+        )]
+        file: Option<PathBuf>,
+
+        /// Override individual config options, as with `panache format -o`
+        #[arg(short = 'o', long = "option", value_name = "KEY=VALUE")]
+        #[arg(
+            long_help = "Apply the same KEY=VALUE overrides as `panache format -o`. May be repeated. \
+            For example: -o extensions.east-asian-line-breaks=false."
+        )]
+        option: Vec<String>,
+    },
     /// Delete cache data
     #[command(long_about = "Delete Panache's on-disk cache data.")]
     Clean {

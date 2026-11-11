@@ -58,6 +58,32 @@ project config. The [configuration reference](../reference/configuration.qmd)
 describes precedence, global config locations, and how the language server
 reloads them.
 
+## Inspect a Document's Settings {#inspect-settings}
+
+Use `panache inspect` to see the resolved flavor, configuration file and any
+inherited files, and all extension states for a document:
+
+```sh
+panache inspect document.qmd
+```
+
+The `Effective` column includes configuration overrides; `Default` shows the
+built-in value for the resolved flavor. This makes it easy to see whether an
+extension override changes a default. Names use the same kebab-case spelling as
+`[extensions]` in `panache.toml`.
+
+To list a flavor's built-in defaults or inspect a one-off extension override:
+
+```sh
+panache inspect --isolated --flavor pandoc
+panache inspect document.qmd -o extensions.east-asian-line-breaks=false
+```
+
+The command resolves settings from the path without reading the document or
+stdin, so the file does not need to exist. With no file, it uses the current
+directory's configuration; `--stdin-filename` supplies a document path when
+needed.
+
 ## Share Settings Between Projects
 
 Discovery selects a single config. Use `extend` to inherit another file:

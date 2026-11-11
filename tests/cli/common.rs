@@ -18,7 +18,8 @@ fn test_help() {
         .stdout(predicate::str::contains("--color <WHEN>"))
         .stdout(predicate::str::contains("--no-color"))
         .stdout(predicate::str::contains("--isolated"))
-        .stdout(predicate::str::contains("clean"));
+        .stdout(predicate::str::contains("clean"))
+        .stdout(predicate::str::contains("inspect"));
 }
 
 #[test]

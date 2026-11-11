@@ -14,6 +14,7 @@ use serde_json::json;
 mod cache;
 mod cli;
 mod diagnostic_renderer;
+mod inspect;
 mod io_context;
 use cache::{
     CachedLintDocument, CliCache, FormatCacheMode, FormatStoreArgs, global_cache_base_dir,
@@ -40,8 +41,8 @@ impl From<CliFlavor> for Flavor {
     }
 }
 
-/// Apply `panache format -o key=value` overrides on top of a loaded config.
-fn apply_format_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Result<(), String> {
+/// Apply CLI `-o key=value` overrides on top of a loaded config.
+fn apply_cli_overrides(cfg: &mut panache::Config, overrides: &[String]) -> Result<(), String> {
     let mut extension_overrides: std::collections::HashMap<String, bool> =
         std::collections::HashMap::new();
     for raw in overrides {
@@ -639,8 +640,27 @@ fn load_config_for_cli(
     input_path: Option<&Path>,
     flavor_override: Option<Flavor>,
 ) -> io::Result<(panache::Config, panache::config::ConfigSource)> {
+    let (cfg, source, _) = load_config_for_cli_with_chain(
+        config_path,
+        isolated,
+        cli_cache_dir,
+        start_dir,
+        input_path,
+        flavor_override,
+    )?;
+    Ok((cfg, source))
+}
+
+fn load_config_for_cli_with_chain(
+    config_path: Option<&Path>,
+    isolated: bool,
+    cli_cache_dir: Option<&Path>,
+    start_dir: &Path,
+    input_path: Option<&Path>,
+    flavor_override: Option<Flavor>,
+) -> io::Result<(panache::Config, panache::config::ConfigSource, Vec<PathBuf>)> {
     let mut loaded = if !isolated {
-        panache::config::load(config_path, start_dir, input_path, flavor_override)?
+        panache::config::load_with_chain(config_path, start_dir, input_path, flavor_override)?
     } else {
         let mut cfg = panache::Config::default();
         // Delegate to the canonical flavor defaults so `--isolated` stays in
@@ -654,7 +674,7 @@ fn load_config_for_cli(
             cfg.extensions = panache::config::Extensions::for_flavor(flavor);
             cfg.formatter_extensions = panache::config::FormatterExtensions::for_flavor(flavor);
         }
-        (cfg, panache::config::ConfigSource::None)
+        (cfg, panache::config::ConfigSource::None, Vec::new())
     };
 
     if let Some(cache_dir) = cli_cache_dir {
@@ -963,6 +983,20 @@ fn run() -> io::Result<()> {
     init_logger(debug_log.as_deref());
 
     match cli.command {
+        Commands::Inspect { file, option } => {
+            let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
+            let start_dir = start_dir_for(input_path)?;
+            let (mut cfg, source, chain) = load_config_for_cli_with_chain(
+                cli.config.as_deref(),
+                cli.isolated,
+                cli.cache_dir.as_deref(),
+                &start_dir,
+                input_path,
+                cli.flavor.map(Flavor::from),
+            )?;
+            apply_cli_overrides(&mut cfg, &option).map_err(io::Error::other)?;
+            inspect::write_report(io::stdout().lock(), &cfg, &source, &chain)
+        }
         Commands::Parse { file, to, json } => {
             let file = normalize_parse_path_or_exit(file);
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
@@ -1046,7 +1080,7 @@ fn run() -> io::Result<()> {
                     cli.stdin_filename.as_deref(),
                     cli.flavor.map(Flavor::from),
                 )?;
-                if let Err(err) = apply_format_overrides(&mut cfg, &option) {
+                if let Err(err) = apply_cli_overrides(&mut cfg, &option) {
                     eprintln!("Error: {err}");
                     std::process::exit(2);
                 }
@@ -1150,7 +1184,7 @@ fn run() -> io::Result<()> {
                     Some(file_path),
                     cli.flavor.map(Flavor::from),
                 )?;
-                if let Err(err) = apply_format_overrides(&mut cfg, &option) {
+                if let Err(err) = apply_cli_overrides(&mut cfg, &option) {
                     eprintln!("Error: {err}");
                     std::process::exit(2);
                 }
@@ -3334,7 +3368,7 @@ mod tests {
     }
 
     mod format_overrides {
-        use crate::apply_format_overrides;
+        use crate::apply_cli_overrides;
 
         fn cfg() -> panache::Config {
             panache::Config::default()
@@ -3344,14 +3378,12 @@ mod tests {
         fn smart_punctuation_overrides_the_configured_mode() {
             let mut c = cfg();
             c.smart_punctuation = Some(panache::config::SmartPunctuation::Preserve);
-            apply_format_overrides(&mut c, &["smart-punctuation=unicode".to_owned()]).unwrap();
+            apply_cli_overrides(&mut c, &["smart-punctuation=unicode".to_owned()]).unwrap();
             assert_eq!(
                 c.smart_punctuation,
                 Some(panache::config::SmartPunctuation::Unicode)
             );
-            assert!(
-                apply_format_overrides(&mut c, &["smart-punctuation=auto".to_owned()]).is_err()
-            );
+            assert!(apply_cli_overrides(&mut c, &["smart-punctuation=auto".to_owned()]).is_err());
         }
 
         #[test]
@@ -3359,7 +3391,7 @@ mod tests {
             let mut c = cfg();
             assert!(!c.extensions.east_asian_line_breaks);
             assert!(!c.formatter_extensions.east_asian_line_breaks);
-            apply_format_overrides(
+            apply_cli_overrides(
                 &mut c,
                 &["extensions.east-asian-line-breaks=true".to_string()],
             )
@@ -3371,7 +3403,7 @@ mod tests {
         #[test]
         fn extensions_dot_key_rejects_snake_case_alias() {
             let mut c = cfg();
-            let err = apply_format_overrides(
+            let err = apply_cli_overrides(
                 &mut c,
                 &["extensions.east_asian_line_breaks=true".to_string()],
             )
@@ -3389,21 +3421,21 @@ mod tests {
         #[test]
         fn extensions_dot_key_toggles_parser_only_extension() {
             let mut c = cfg();
-            apply_format_overrides(&mut c, &["extensions.citations=false".to_string()]).unwrap();
+            apply_cli_overrides(&mut c, &["extensions.citations=false".to_string()]).unwrap();
             assert!(!c.extensions.citations);
         }
 
         #[test]
         fn extensions_dot_key_toggles_formatter_only_extension() {
             let mut c = cfg();
-            apply_format_overrides(&mut c, &["extensions.smart-quotes=true".to_string()]).unwrap();
+            apply_cli_overrides(&mut c, &["extensions.smart-quotes=true".to_string()]).unwrap();
             assert!(c.formatter_extensions.smart_quotes);
         }
 
         #[test]
         fn extensions_dot_key_rejects_non_boolean_value() {
             let mut c = cfg();
-            let err = apply_format_overrides(
+            let err = apply_cli_overrides(
                 &mut c,
                 &["extensions.east-asian-line-breaks=maybe".to_string()],
             )
@@ -3414,15 +3446,14 @@ mod tests {
         #[test]
         fn extensions_dot_key_requires_name() {
             let mut c = cfg();
-            let err =
-                apply_format_overrides(&mut c, &["extensions.=true".to_string()]).unwrap_err();
+            let err = apply_cli_overrides(&mut c, &["extensions.=true".to_string()]).unwrap_err();
             assert!(err.contains("missing extension name"), "{err}");
         }
 
         #[test]
         fn unknown_top_level_key_still_errors() {
             let mut c = cfg();
-            let err = apply_format_overrides(&mut c, &["nope=1".to_string()]).unwrap_err();
+            let err = apply_cli_overrides(&mut c, &["nope=1".to_string()]).unwrap_err();
             assert!(err.contains("unknown config key"), "{err}");
         }
 
@@ -3430,22 +3461,21 @@ mod tests {
         fn table_indent_override_sets_value() {
             let mut c = cfg();
             assert_eq!(c.table_indent, 2);
-            apply_format_overrides(&mut c, &["table-indent=0".to_string()]).unwrap();
+            apply_cli_overrides(&mut c, &["table-indent=0".to_string()]).unwrap();
             assert_eq!(c.table_indent, 0);
         }
 
         #[test]
         fn table_indent_override_rejects_out_of_range_value() {
             let mut c = cfg();
-            let err = apply_format_overrides(&mut c, &["table-indent=4".to_string()]).unwrap_err();
+            let err = apply_cli_overrides(&mut c, &["table-indent=4".to_string()]).unwrap_err();
             assert!(err.contains("invalid value for `table-indent`"), "{err}");
         }
 
         #[test]
         fn table_indent_override_rejects_non_integer_value() {
             let mut c = cfg();
-            let err =
-                apply_format_overrides(&mut c, &["table-indent=flush".to_string()]).unwrap_err();
+            let err = apply_cli_overrides(&mut c, &["table-indent=flush".to_string()]).unwrap_err();
             assert!(err.contains("invalid value for `table-indent`"), "{err}");
         }
     }

@@ -181,6 +181,22 @@ Lint a document to check for correctness issues and best practice violations. Un
 `--check`
 :   Deprecated and now a no-op. `panache lint` exits with code 1 whenever any violations are found, so this flag is no longer needed. It is still accepted for backward compatibility but will be removed in a future release. Use `--fix` to apply auto-fixes instead of reporting.
 
+## `panache inspect`
+
+Show the resolved Markdown flavor, configuration files, and extension states for a document. Each extension is listed alongside its built-in default for the resolved flavor. Uses the same configuration discovery and flavor detection as formatting. Omit FILE to inspect settings for the current directory, or use --isolated --flavor FLAVOR to list a flavor's built-in defaults. Does not read document contents or stdin.
+
+**Usage:** `panache inspect [OPTIONS] [FILE]`
+
+### Arguments
+
+`<FILE>`
+:   Document path used for configuration discovery and flavor detection. The file does not need to exist. If omitted, uses --stdin-filename when supplied, otherwise the current directory's configuration.
+
+### Options
+
+`-o`, `--option <KEY=VALUE>`
+:   Apply the same KEY=VALUE overrides as `panache format -o`. May be repeated. For example: -o extensions.east-asian-line-breaks=false.
+
 ## `panache clean`
 
 Delete Panache's on-disk cache data.

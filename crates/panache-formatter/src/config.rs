@@ -209,14 +209,19 @@ impl FormatterExtensions {
 
 /// See [`known_extensions!`](panache_parser::Extensions) for the parser-side
 /// twin. The formatter extension surface is a small subset; the macro keeps
-/// the runtime setter, the public name list, and the JSON Schema generator in
-/// lockstep.
+/// the runtime setter, public name list, state iterator, and JSON Schema
+/// generator in lockstep.
 macro_rules! known_formatter_extensions {
     ( $( $kebab:literal => $field:ident ),* $(,)? ) => {
         impl FormatterExtensions {
             /// Canonical kebab-case names accepted in `[extensions]` that
             /// affect formatter behavior (a subset of the parser names).
             pub const KNOWN_NAMES: &'static [&'static str] = &[ $($kebab),* ];
+
+            /// Canonical names and current states of all formatter extensions.
+            pub fn states(&self) -> impl Iterator<Item = (&'static str, bool)> {
+                [$(($kebab, self.$field)),*].into_iter()
+            }
 
             /// True if `name` matches a known formatter extension. Only
             /// kebab-case is accepted; snake_case aliases were removed in 3.0.

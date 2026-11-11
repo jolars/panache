@@ -652,7 +652,7 @@ impl Extensions {
 
 /// Define the canonical mapping between kebab-case extension names (as users
 /// write them in `[extensions]`) and the corresponding `Extensions` fields.
-/// Drives both the runtime setter and the public name list, so adding an
+/// Drives the runtime setter, public name list, and state iterator, so adding an
 /// extension means editing exactly one table.
 macro_rules! known_extensions {
     ( $( $kebab:literal => $field:ident ),* $(,)? ) => {
@@ -662,6 +662,11 @@ macro_rules! known_extensions {
             /// generator. Only kebab-case is accepted; the snake_case aliases
             /// were removed in 3.0.
             pub const KNOWN_NAMES: &'static [&'static str] = &[ $($kebab),* ];
+
+            /// Canonical names and current states of all parser extensions.
+            pub fn states(&self) -> impl Iterator<Item = (&'static str, bool)> {
+                [$(($kebab, self.$field)),*].into_iter()
+            }
 
             /// True if `name` is a known (kebab-case) extension key.
             pub fn is_known_name(name: &str) -> bool {
