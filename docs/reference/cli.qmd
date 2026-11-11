@@ -60,6 +60,12 @@ Panache is a language server, formatter, and linter for Quarto and other Markdow
 
     Default value: `0`
 
+For help with a specific command, see: `panache help <command>`.
+
+To preserve formatting or suppress lint diagnostics for a region, see the ignore directives in `panache format --help` and `panache lint --help`.
+
+Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>
+
 ## `panache format`
 
 Format a Quarto or other Markdown document according to Panache's formatting rules. By default, formats files in place. Use --check to verify formatting without making changes. Stdin input always outputs to stdout.
@@ -97,6 +103,23 @@ Format a Quarto or other Markdown document according to Panache's formatting rul
 
     Note: this is an escape hatch for ad-hoc invocations. Prefer panache.toml so that everyone formatting the repository gets the same result.
 
+Ignore directives:
+
+Place HTML comments around a region to preserve its formatting:
+
+    <!-- panache-ignore-format-start -->
+    Keep    this    spacing.
+    <!-- panache-ignore-format-end -->
+
+To disable both formatting and linting, use:
+
+    <!-- panache-ignore-start -->
+    Custom    formatting    without    lint    diagnostics.
+    <!-- panache-ignore-end -->
+
+Use matching start and end comments. Directives also work inside lists and
+blockquotes.
+
 ## `panache parse`
 
 Parse a document and display its Concrete Syntax Tree (CST) for debugging and understanding how Panache interprets the document structure. The CST shows all block and inline elements detected by the parser.
@@ -133,6 +156,10 @@ Start the Panache language server protocol (LSP) server for editor integration. 
 
 `--debug`
 :   Enable verbose LSP debug logging to ~/.local/state/panache/lsp-debug.log (or $XDG_STATE_HOME/panache/lsp-debug.log when XDG_STATE_HOME is set). Logs are written to file to avoid interfering with the LSP protocol over stdout.
+
+The LSP server communicates via stdin/stdout and is typically launched automatically by your editor's LSP client. You generally don't need to run this command manually.
+
+For editor configuration examples, see: https://github.com/jolars/panache#editor-integration
 
 ## `panache lint`
 
@@ -180,6 +207,26 @@ Lint a document to check for correctness issues and best practice violations. Un
 
 `--check`
 :   Deprecated and now a no-op. `panache lint` exits with code 1 whenever any violations are found, so this flag is no longer needed. It is still accepted for backward compatibility but will be removed in a future release. Use `--fix` to apply auto-fixes instead of reporting.
+
+Ignore directives:
+
+Place HTML comments around a region to suppress its lint diagnostics:
+
+    <!-- panache-ignore-lint-start -->
+    #### This heading skip is intentional.
+    <!-- panache-ignore-lint-end -->
+
+To disable both linting and formatting, use:
+
+    <!-- panache-ignore-start -->
+    Custom    formatting    without    lint    diagnostics.
+    <!-- panache-ignore-end -->
+
+Use matching start and end comments. Ignored regions still contribute to
+document context, such as heading hierarchy. Only their diagnostics are suppressed.
+
+To disable rules for the whole project, configure the [lint] section in
+panache.toml.
 
 ## `panache inspect`
 

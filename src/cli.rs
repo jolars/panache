@@ -25,6 +25,8 @@ const STYLES: Styles = Styles::styled()
 #[command(after_help = "For help with a specific command, see: `panache help <command>`.")]
 #[command(
     after_long_help = "For help with a specific command, see: `panache help <command>`.\n\n\
+    To preserve formatting or suppress lint diagnostics for a region, see the ignore \
+    directives in `panache format --help` and `panache lint --help`.\n\n\
     Homepage and downloads (including .deb and .rpm packages): <https://panache.bz>"
 )]
 #[command(arg_required_else_help = true)]
@@ -182,6 +184,23 @@ pub enum Commands {
         formatting rules. By default, formats files in place. Use --check to verify formatting \
         without making changes. Stdin input always outputs to stdout."
     )]
+    #[command(after_long_help = "\
+Ignore directives:
+
+Place HTML comments around a region to preserve its formatting:
+
+    <!-- panache-ignore-format-start -->
+    Keep    this    spacing.
+    <!-- panache-ignore-format-end -->
+
+To disable both formatting and linting, use:
+
+    <!-- panache-ignore-start -->
+    Custom    formatting    without    lint    diagnostics.
+    <!-- panache-ignore-end -->
+
+Use matching start and end comments. Directives also work inside lists and
+blockquotes.")]
     Format {
         /// Input file(s) (stdin if not provided, or pass `-`)
         #[arg(help = "Input file path(s) or directories (use `-` for stdin)")]
@@ -331,6 +350,26 @@ For editor configuration examples, see: https://github.com/jolars/panache#editor
         problems like syntax errors, heading hierarchy issues, and broken references."
     )]
     #[command(after_help = "Configure rules in panache.toml with [lint] section.")]
+    #[command(after_long_help = "\
+Ignore directives:
+
+Place HTML comments around a region to suppress its lint diagnostics:
+
+    <!-- panache-ignore-lint-start -->
+    #### This heading skip is intentional.
+    <!-- panache-ignore-lint-end -->
+
+To disable both linting and formatting, use:
+
+    <!-- panache-ignore-start -->
+    Custom    formatting    without    lint    diagnostics.
+    <!-- panache-ignore-end -->
+
+Use matching start and end comments. Ignored regions still contribute to
+document context, such as heading hierarchy. Only their diagnostics are suppressed.
+
+To disable rules for the whole project, configure the [lint] section in
+panache.toml.")]
     Lint {
         /// Input file(s) or directories (stdin if not provided, or pass `-`)
         #[arg(help = "Input file path(s) or directories (use `-` for stdin)")]

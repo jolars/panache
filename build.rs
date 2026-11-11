@@ -1,6 +1,7 @@
 use clap::CommandFactory;
 use clap_complete::{Shell, generate_to};
 use clap_mangen::Man;
+use clap_mangen::roff::{Roff, roman};
 use std::env;
 use std::fs;
 use std::io::Result;
@@ -352,6 +353,38 @@ fn format_see_also(refs: &[String]) -> String {
     format!(".SH \"SEE ALSO\"\n{}\n", formatted.join(", "))
 }
 
+fn render_man_directives(help: &str) -> Result<String> {
+    let (title, body) = help.split_once("\n\n").unwrap_or((help, ""));
+    let mut roff = Roff::default();
+    let title = title.trim_end_matches(':').to_ascii_uppercase();
+    roff.control("SH", [title.as_str()]);
+
+    // The shared help uses indented Markdown examples, which need no-fill mode
+    // in man pages to preserve the spacing the directives are meant to protect.
+    for paragraph in body.split("\n\n") {
+        roff.control("PP", []);
+        let is_example = paragraph.lines().all(|line| line.starts_with("    "));
+        if is_example {
+            roff.control("RS", ["4"]);
+            roff.control("nf", []);
+        }
+        for line in paragraph.lines() {
+            let line = if is_example { &line[4..] } else { line };
+            roff.text([roman(line)]);
+        }
+        if is_example {
+            roff.control("fi", []);
+            roff.control("RE", []);
+        }
+    }
+
+    let mut buffer = Vec::new();
+    roff.to_writer(&mut buffer)?;
+    Ok(String::from_utf8_lossy(&buffer)
+        .trim_start_matches(Roff::default().render().as_str())
+        .to_owned())
+}
+
 fn generate_man_pages() -> Result<()> {
     // Create man directory if it doesn't exist
     let out_dir = PathBuf::from("target/man");
@@ -387,8 +420,22 @@ fn generate_man_pages() -> Result<()> {
         let mut buffer = Vec::new();
         man.render(&mut buffer)?;
 
+        let mut content = String::from_utf8_lossy(&buffer).into_owned();
+        if matches!(subcommand_name, "format" | "lint")
+            && let Some(help) = subcommand.get_after_long_help()
+        {
+            let mut extra = Vec::new();
+            man.render_extra_section(&mut extra)?;
+            // Standalone section renders include the preamble from the full page.
+            content = content.replacen(
+                String::from_utf8_lossy(&extra)
+                    .trim_start_matches(Roff::default().render().as_str()),
+                &render_man_directives(&help.to_string())?,
+                1,
+            );
+        }
+
         // Post-process: fix NAME, SYNOPSIS, and nested subcommand references
-        let content = String::from_utf8_lossy(&buffer);
         let fixed_content = content
             .replace(
                 &format!("{} \\-", subcommand_name),
@@ -399,8 +446,8 @@ fn generate_man_pages() -> Result<()> {
                 &format!("\\fBpanache {}\\fR", subcommand_name),
             )
             .replace(
-                &format!("{}\\-", subcommand_name),
-                &format!("panache\\-{}\\-", subcommand_name),
+                &format!("\n{}\\-", subcommand_name),
+                &format!("\npanache\\-{}\\-", subcommand_name),
             );
 
         // SEE ALSO: panache(1) plus sibling subcommand pages

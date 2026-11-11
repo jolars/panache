@@ -294,9 +294,9 @@ dependencies = [
 
 [[package]]
 name = "clapdown"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8f2a42d22b905f09c7e696e2f46a17e4aa956c8d8b8cd09806137fd99c8544c"
+checksum = "b247c825c52bf1a125ed92810ee82340e304938d4162683c4c4af2fe5e205748"
 dependencies = [
  "clap",
 ]
