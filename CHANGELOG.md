@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [3.18.0](https://github.com/jolars/panache/compare/v3.17.2...v3.18.0) (2026-11-11)
 
 ### Highlights
 
@@ -12,6 +12,30 @@ smart-punctuation = "preserve" # or "ascii" or "unicode"
 ```
 
 This now defaults to "preserve", to avoid breaking some valid types of quotes and dashes. It also makes Panache behave more consistently across Pandoc and CommonMark-based flavors. Pick `"ascii"` if you want to retain the old behavior.
+
+### Features
+
+- **cli:** add JSON output to inspect ([`bc048b2`](https://github.com/jolars/panache/commit/bc048b22fc37e17c10ad56911d8f1eee2e986294)), ref [#601](https://github.com/jolars/panache/issues/601)
+- **cli:** add inspect command ([`1545ef4`](https://github.com/jolars/panache/commit/1545ef4f77e299104c504434170a3fa556579e4d)), closes [#601](https://github.com/jolars/panache/issues/601)
+- **formatter:** preserve punctuation by default ([`ca09ecc`](https://github.com/jolars/panache/commit/ca09ecc46f86a56554d345b3abe3a61b75fe28dd)), ref [#605](https://github.com/jolars/panache/issues/605) and [#607](https://github.com/jolars/panache/issues/607)
+- **formatter:** add smart punctuation modes ([`38c161e`](https://github.com/jolars/panache/commit/38c161ee428a27813bfcd7bc7c8530f49c3540df)), closes [#605](https://github.com/jolars/panache/issues/605), ref [#607](https://github.com/jolars/panache/issues/607)
+
+### Bug Fixes
+
+- **linter:** don't flag bare task checkbox as undefined reference (#615) ([`a749c97`](https://github.com/jolars/panache/commit/a749c976102cd65c510b3f745287465a17bbee1c)), closes [#614](https://github.com/jolars/panache/issues/614), fixes [#614](https://github.com/jolars/panache/issues/614)
+- **parser:** keep empty markers in paragraphs ([`4ee1d82`](https://github.com/jolars/panache/commit/4ee1d82939cef263f0b5b34f6114d6f3dd186e75)), fixes [#612](https://github.com/jolars/panache/issues/612)
+- **parser:** allow ordered lists after headings ([`d0ab49e`](https://github.com/jolars/panache/commit/d0ab49ece3bfd345637d386fc71d8b927cc54ea6)), fixes [#613](https://github.com/jolars/panache/issues/613)
+- **parser:** end list items before blockquotes ([`6764249`](https://github.com/jolars/panache/commit/6764249d50ece93361547b9716a9ec8c988679d7)), fixes [#611](https://github.com/jolars/panache/issues/611)
+- **parser:** preserve spaces in chunk option expressions ([`297968b`](https://github.com/jolars/panache/commit/297968b6f540da7adaa9c6ef1cf8c21b601238cc)), fixes [#609](https://github.com/jolars/panache/issues/609)
+- **cli:** reject unknown extension overrides ([`5ce0483`](https://github.com/jolars/panache/commit/5ce0483a6965c5e1f290f1de05bdf883c640a1fd)), fixes [#600](https://github.com/jolars/panache/issues/600)
+- **formatter:** preserve list block separators ([`fd9dbf4`](https://github.com/jolars/panache/commit/fd9dbf4c945296f4e38af94ae0e0d301d679092b)), fixes [#602](https://github.com/jolars/panache/issues/602)
+- **formatter:** trim excess pipe table padding ([`d77e076`](https://github.com/jolars/panache/commit/d77e076b58f5a90e574e82366ebede92b137e4f3)), fixes [#599](https://github.com/jolars/panache/issues/599)
+- **formatter:** keep `et al.` together ([`a5bb5e1`](https://github.com/jolars/panache/commit/a5bb5e11301bb373a2034f3ec3362dd258e50b42)), closes [#593](https://github.com/jolars/panache/issues/593)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.29.0
+- updated crates/panache-parser to v0.35.0
 
 ## [3.17.2](https://github.com/jolars/panache/compare/v3.17.1...v3.17.2) (2026-10-30)
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.29.0](https://github.com/jolars/panache/compare/panache-formatter-v0.28.2...panache-formatter-v0.29.0) (2026-11-11)
+
+### Features
+
+- **cli:** add inspect command ([`1545ef4`](https://github.com/jolars/panache/commit/1545ef4f77e299104c504434170a3fa556579e4d)), closes [#601](https://github.com/jolars/panache/issues/601)
+- **formatter:** preserve punctuation by default ([`ca09ecc`](https://github.com/jolars/panache/commit/ca09ecc46f86a56554d345b3abe3a61b75fe28dd)), ref [#605](https://github.com/jolars/panache/issues/605) and [#607](https://github.com/jolars/panache/issues/607)
+- **formatter:** add smart punctuation modes ([`38c161e`](https://github.com/jolars/panache/commit/38c161ee428a27813bfcd7bc7c8530f49c3540df)), closes [#605](https://github.com/jolars/panache/issues/605), ref [#607](https://github.com/jolars/panache/issues/607)
+
+### Bug Fixes
+
+- don’t apply `smart` transform to raw/code inline (#610) ([`15502cc`](https://github.com/jolars/panache/commit/15502ccd2f3339c7de218de8875016d2fd75429a))
+- **formatter:** preserve list block separators ([`fd9dbf4`](https://github.com/jolars/panache/commit/fd9dbf4c945296f4e38af94ae0e0d301d679092b)), fixes [#602](https://github.com/jolars/panache/issues/602)
+- **formatter:** trim excess pipe table padding ([`d77e076`](https://github.com/jolars/panache/commit/d77e076b58f5a90e574e82366ebede92b137e4f3)), fixes [#599](https://github.com/jolars/panache/issues/599)
+- **formatter:** keep `et al.` together ([`a5bb5e1`](https://github.com/jolars/panache/commit/a5bb5e11301bb373a2034f3ec3362dd258e50b42)), closes [#593](https://github.com/jolars/panache/issues/593)
+
+### Dependencies
+
+- updated crates/panache-parser to v0.35.0
+
 ## [0.28.2](https://github.com/jolars/panache/compare/panache-formatter-v0.28.1...panache-formatter-v0.28.2) (2026-10-30)
 
 ### Dependencies

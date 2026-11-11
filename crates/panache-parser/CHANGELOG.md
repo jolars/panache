@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.35.0](https://github.com/jolars/panache/compare/panache-parser-v0.34.2...panache-parser-v0.35.0) (2026-11-11)
+
+### Features
+
+- **cli:** add inspect command ([`1545ef4`](https://github.com/jolars/panache/commit/1545ef4f77e299104c504434170a3fa556579e4d)), closes [#601](https://github.com/jolars/panache/issues/601)
+- **formatter:** add smart punctuation modes ([`38c161e`](https://github.com/jolars/panache/commit/38c161ee428a27813bfcd7bc7c8530f49c3540df)), closes [#605](https://github.com/jolars/panache/issues/605), ref [#607](https://github.com/jolars/panache/issues/607)
+
+### Bug Fixes
+
+- **parser:** keep empty markers in paragraphs ([`4ee1d82`](https://github.com/jolars/panache/commit/4ee1d82939cef263f0b5b34f6114d6f3dd186e75)), fixes [#612](https://github.com/jolars/panache/issues/612)
+- **parser:** allow ordered lists after headings ([`d0ab49e`](https://github.com/jolars/panache/commit/d0ab49ece3bfd345637d386fc71d8b927cc54ea6)), fixes [#613](https://github.com/jolars/panache/issues/613)
+- **parser:** end list items before blockquotes ([`6764249`](https://github.com/jolars/panache/commit/6764249d50ece93361547b9716a9ec8c988679d7)), fixes [#611](https://github.com/jolars/panache/issues/611)
+- **parser:** preserve spaces in chunk option expressions ([`297968b`](https://github.com/jolars/panache/commit/297968b6f540da7adaa9c6ef1cf8c21b601238cc)), fixes [#609](https://github.com/jolars/panache/issues/609)
+
 ## [0.34.2](https://github.com/jolars/panache/compare/panache-parser-v0.34.1...panache-parser-v0.34.2) (2026-10-30)
 
 ### Bug Fixes
