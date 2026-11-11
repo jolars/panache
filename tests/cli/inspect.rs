@@ -4,6 +4,7 @@ use predicates::prelude::*;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::Path;
 use tempfile::TempDir;
 
 fn project() -> TempDir {
@@ -90,10 +91,13 @@ fn inspect_discovers_config_from_document_and_shows_inheritance() {
 
     let output = output(command(&dir).arg("docs/document.qmd"));
     assert!(output.contains("Flavor: quarto\n"));
-    assert!(output.contains("docs/panache.toml (discovered)"));
+    assert!(output.contains(&format!(
+        "{} (discovered)",
+        Path::new("docs").join("panache.toml").display()
+    )));
     assert!(output.contains(&format!(
         "  extends {}",
-        dir.path().join("base.toml").display()
+        dir.path().join("base.toml").canonicalize().unwrap().display()
     )));
     let states = states(&output);
     assert_eq!(states["citations"], (true, true));
@@ -270,13 +274,16 @@ fn inspect_json_reports_discovered_config_chain_and_scoped_overrides() {
     let output = output(command(&dir).args(["document.qmd", "--json"]));
     let report: Value = serde_json::from_str(&output).unwrap();
     assert_eq!(report["flavor"], "quarto");
+    assert_eq!(report["configuration"]["source"], "discovered");
     assert_eq!(
-        report["configuration"],
-        json!({
-            "source": "discovered",
-            "path": config,
-            "chain": [config.canonicalize().unwrap(), base.canonicalize().unwrap()],
-        })
+        Path::new(report["configuration"]["path"].as_str().unwrap())
+            .canonicalize()
+            .unwrap(),
+        config.canonicalize().unwrap()
+    );
+    assert_eq!(
+        report["configuration"]["chain"],
+        json!([config.canonicalize().unwrap(), base.canonicalize().unwrap()])
     );
     assert_eq!(
         report["extensions"]["citations"],
