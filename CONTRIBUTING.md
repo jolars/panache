@@ -304,7 +304,7 @@ RUST_LOG=info ./target/release/panache lsp
 - Verify `panache` is available in your shell `PATH` as seen by Neovim.
 
 Full editor setup instructions for these, plus Helix, Emacs, Sublime Text, and
-Kate, are in the [LSP guide](https://panache.bz/guide/lsp.html).
+Kate, are in [Editor Setup](https://panache.bz/guide/lsp.html).
 
 ## Commits and Releases
 

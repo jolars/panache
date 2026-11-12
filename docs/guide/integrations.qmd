@@ -7,7 +7,7 @@ description: >
 
 Use Panache in CI, Git hooks, and other formatting tools. For editor setup,
 including RStudio, Mason, and Conform, see [Editor
-Configuration](lsp.qmd#editor-configuration).
+Setup](lsp.qmd#editor-configuration).
 
 ## GitHub Actions
 

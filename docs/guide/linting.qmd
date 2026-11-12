@@ -448,7 +448,9 @@ editor as you type:
 - Hover tooltips showing diagnostic messages
 - Code actions for auto-fixes (e.g., fix heading hierarchy)
 
-See the [LSP documentation](lsp.qmd) for editor configuration details.
+See [Editor Setup](lsp.qmd) to connect your editor and [Language
+Server](language-server.qmd#live-diagnostics) for diagnostic behavior and [code
+actions](language-server.qmd#code-actions).
 
 ## Examples
 

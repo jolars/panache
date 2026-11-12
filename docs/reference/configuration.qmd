@@ -138,8 +138,8 @@ The same validation applies to `panache format -o extensions.<name>=<bool>`.
 Unknown names fail the run with exit code 2 and suggest a close match when one
 exists.
 
-In the [language server](../guide/lsp.qmd) the same parse failure is surfaced
-rather than swallowed:
+In the [language server](../guide/language-server.qmd) the same parse failure is
+surfaced rather than swallowed:
 
 - a diagnostic is published on the offending `panache.toml`, anchored at the bad
   key (so it shows even when the config file isn't open), and

@@ -154,8 +154,8 @@ panache --version
 
 ## Editor Setup
 
-You will get the most out of Panache by integrating its language server into
-your editor. This gets you access to
+You will get the most out of Panache by integrating its [language
+server](guide/language-server.qmd) into your editor. This gets you access to
 
 - formatting on save,
 - real-time linting feedback,
@@ -186,8 +186,8 @@ the server in your `init.lua`:
 vim.lsp.enable("panache")
 ```
 
-See [Editor Configuration](guide/lsp.qmd#editor-configuration) for the complete
-Neovim setup, Conform, Emacs, Helix, Zed, and other LSP clients.
+See [Editor Setup](guide/lsp.qmd#editor-configuration) for the complete Neovim
+setup, Conform, Emacs, Helix, Zed, and other LSP clients.
 
 ### RStudio
 

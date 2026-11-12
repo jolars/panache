@@ -154,9 +154,10 @@ r = "jarl" # R linter with JSON output
 ### Language Server
 
 Panache implements the language server protocol (LSP) to provide editor features
-like formatting, diagnostics, code actions, and more. See [the language server
-documentation](https://panache.bz/guide/lsp) for guides on how to connect
-Panache to your editor and configure LSP features.
+like formatting, diagnostics, code actions, and more. See [Language
+Server](https://panache.bz/guide/language-server.html) for feature details and
+[Editor Setup](https://panache.bz/guide/lsp.html) to connect Panache to your
+editor.
 
 The list of LSP features supported by Panache includes, among others:
 

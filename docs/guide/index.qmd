@@ -16,8 +16,10 @@ rules, and external-tool presets.
   findings.
 - [Configuration](configure.qmd): share project settings and choose external
   formatters and linters for code blocks.
-- [Editor Setup](lsp.qmd): connect an editor and use formatting, diagnostics,
-  navigation, and code actions.
+- [Editor Setup](lsp.qmd): connect your editor, configure formatting on save,
+  and customize semantic highlighting.
+- [Language Server](language-server.qmd): use formatting, diagnostics,
+  navigation, completion, and code actions while editing.
 - [Integrations](integrations.qmd): run Panache through GitHub Actions,
   pre-commit, and dprint.
 - [Performance](performance.qmd): compare measured formatting and linting speed

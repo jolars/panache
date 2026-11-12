@@ -97,6 +97,8 @@ website:
               text: Configuration
             - href: guide/lsp.qmd
               text: Editor Setup
+            - href: guide/language-server.qmd
+              text: Language Server
             - href: guide/integrations.qmd
               text: Integrations
             - href: guide/performance.qmd
