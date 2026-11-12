@@ -1,11 +1,40 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "panache-markdown-negotiation",
   "main": "./markdown-negotiation.mjs",
   "compatibility_date": "2026-10-05",
+  "workers_dev": false,
+  "preview_urls": false,
   "routes": [
-    {
-      "pattern": "panache.bz/*",
-      "zone_name": "panache.bz"
-    }
-  ]
+    { "pattern": "panache.bz", "custom_domain": true },
+    { "pattern": "www.panache.bz", "custom_domain": true },
+  ],
+  "assets": {
+    "directory": "../docs/_site",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/",
+      "/*.html",
+      "/guide",
+      "/guide/*",
+      "/reference",
+      "/reference/*",
+      "/development",
+      "/development/*",
+      "/getting-started",
+      "/changelog",
+      "/playground",
+      "/playground/",
+      "/user-guide",
+      "/user-guide/*",
+      "!/*.llms.md",
+      "!/*.json",
+    ],
+  },
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 },
+  },
 }

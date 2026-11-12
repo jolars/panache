@@ -1,0 +1,15 @@
+{
+  "name": "panache-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:check": "wrangler deploy --dry-run",
+    "test": "node --test markdown-negotiation.test.mjs",
+    "test:site": "node --test site.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.156.0"
+  }
+}

@@ -7,8 +7,8 @@ on:
       - "v*"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: documentation-production
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,38 +18,26 @@ permissions:
 
 jobs:
   docs:
-    name: Build Documentation
+    name: Deploy Documentation
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
 
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: production
+      url: https://panache.bz
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Test Markdown negotiation Worker
-        run: node --test workers/markdown-negotiation.test.mjs
-
       - name: Build documentation
         uses: ./.github/actions/build-docs
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: docs/_site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+      - name: Deploy to Cloudflare Workers
+        working-directory: workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy
 
       - name: Submit sitemap to IndexNow
         uses: bojieyang/indexnow-action@v3

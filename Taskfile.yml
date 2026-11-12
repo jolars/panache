@@ -54,6 +54,31 @@ tasks:
     cmds:
       - cd docs && quarto preview --no-browser
 
+  docs:build:
+    desc: Build documentation and public downloads for Cloudflare Workers
+    cmds:
+      - bash scripts/build-docs.sh
+
+  docs:worker:
+    desc: Preview the built documentation through Cloudflare Workers
+    dir: workers
+    cmds:
+      - npm run dev
+
+  docs:check:
+    desc: Test the built website and validate its Workers deployment
+    dir: workers
+    cmds:
+      - npm test
+      - npm run deploy:check
+      - npm run test:site
+
+  docs:deploy:
+    desc: Deploy the built documentation to Cloudflare Workers
+    dir: workers
+    cmds:
+      - npm run deploy
+
   docs:rules:
     desc: Regenerate the lint rule reference from descriptions and executable examples
     cmds:

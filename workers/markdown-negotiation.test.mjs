@@ -1,7 +1,47 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { handleRequest } from "./markdown-negotiation.mjs";
+import worker, { handleRequest } from "./markdown-negotiation.mjs";
+
+test("serves the site through the static assets binding", async () => {
+  const requests = [];
+  const response = await worker.fetch(
+    new Request("https://panache.bz/getting-started.html"),
+    { ASSETS: { fetch: assets(requests) } },
+  );
+  assert.deepEqual(requests, ["/getting-started.html"]);
+  assert.equal(await response.text(), "<h1>Page</h1>");
+});
+
+test("serves directory pages from their index assets", async () => {
+  for (const path of [
+    "/",
+    "/guide/",
+    "/reference/",
+    "/development/",
+    "/playground/",
+  ]) {
+    const requests = [];
+    const response = await handleRequest(
+      new Request(`https://panache.bz${path}`),
+      assets(requests),
+    );
+    assert.deepEqual(requests, [`${path}index.html`]);
+    assert.equal(response.status, 200);
+  }
+});
+
+test("redirects www page URLs to the production hostname", async () => {
+  const response = await handleRequest(
+    new Request("https://www.panache.bz/guide/lsp.html?editor=nvim"),
+    () => assert.fail("A redirect must not fetch an asset."),
+  );
+  assert.equal(response.status, 301);
+  assert.equal(
+    response.headers.get("Location"),
+    "https://panache.bz/guide/lsp.html?editor=nvim",
+  );
+});
 
 test("redirects legacy documentation and directory aliases", async () => {
   for (const [path, target] of [
@@ -16,6 +56,9 @@ test("redirects legacy documentation and directory aliases", async () => {
     ["/user-guide/lsp.html", "/guide/lsp.html"],
     ["/user-guide/formatting", "/guide/formatting.html"],
     ["/user-guide/formatting.html", "/guide/formatting.html"],
+    ["/guide", "/guide/"],
+    ["/reference", "/reference/"],
+    ["/development", "/development/"],
     ["/guide/configuration", "/reference/configuration.html"],
     ["/guide/configuration.html", "/reference/configuration.html"],
     ["/index.html", "/"],
@@ -27,7 +70,7 @@ test("redirects legacy documentation and directory aliases", async () => {
   ]) {
     const response = await handleRequest(
       new Request(`https://panache.bz${path}`),
-      () => assert.fail("A redirect must not fetch the origin."),
+      () => assert.fail("A redirect must not fetch an asset."),
     );
     assert.equal(response.status, 301, path);
     assert.equal(
@@ -41,11 +84,14 @@ test("redirects legacy documentation and directory aliases", async () => {
 test("redirects preserve query strings and run before Markdown negotiation", async () => {
   for (const method of ["GET", "HEAD"]) {
     const response = await handleRequest(
-      new Request("http://panache.bz/playground/index.html?flavor=quarto&lw=88", {
-        method,
-        headers: { Accept: "text/markdown" },
-      }),
-      () => assert.fail("A redirect must not fetch the origin."),
+      new Request(
+        "http://panache.bz/playground/index.html?flavor=quarto&lw=88",
+        {
+          method,
+          headers: { Accept: "text/markdown" },
+        },
+      ),
+      () => assert.fail("A redirect must not fetch an asset."),
     );
     assert.equal(response.status, 301);
     assert.equal(
@@ -55,7 +101,7 @@ test("redirects preserve query strings and run before Markdown negotiation", asy
   }
 });
 
-test("unknown legacy pages and non-read requests reach the origin", async () => {
+test("unknown legacy pages and non-read requests reach the assets binding", async () => {
   for (const [path, method] of [
     ["/user-guide/missing.html", "GET"],
     ["/missing/index.html", "GET"],
@@ -74,7 +120,7 @@ test("unknown legacy pages and non-read requests reach the origin", async () => 
   }
 });
 
-function origin(requests, markdownStatus = 200) {
+function assets(requests, markdownStatus = 200) {
   return async (request) => {
     requests.push(new URL(request.url).pathname);
     if (request.url.endsWith(".llms.md")) {
@@ -90,7 +136,7 @@ test("serves HTML by default", async () => {
   const requests = [];
   const response = await handleRequest(
     new Request("https://panache.bz/guide/formatting.html"),
-    origin(requests),
+    assets(requests),
   );
   assert.deepEqual(requests, ["/guide/formatting.html"]);
   assert.equal(response.headers.get("Content-Type"), "text/html");
@@ -103,10 +149,13 @@ test("serves generated Markdown at the original page URL", async () => {
     new Request("https://panache.bz/guide/formatting.html", {
       headers: { Accept: "text/markdown" },
     }),
-    origin(requests),
+    assets(requests),
   );
   assert.deepEqual(requests, ["/guide/formatting.llms.md"]);
-  assert.equal(response.headers.get("Content-Type"), "text/markdown; charset=utf-8");
+  assert.equal(
+    response.headers.get("Content-Type"),
+    "text/markdown; charset=utf-8",
+  );
   assert.equal(response.headers.get("Vary"), "Accept");
   assert.equal(await response.text(), "# Page\n");
 });
@@ -121,7 +170,7 @@ test("maps the homepage and directory URLs to index Markdown", async () => {
       new Request(`https://panache.bz${page}`, {
         headers: { Accept: "text/markdown" },
       }),
-      origin(requests),
+      assets(requests),
     );
     assert.deepEqual(requests, [markdown]);
   }
@@ -133,7 +182,7 @@ test("falls back to the original page when Markdown is unavailable", async () =>
     new Request("https://panache.bz/guide/missing.html", {
       headers: { Accept: "text/markdown" },
     }),
-    origin(requests, 404),
+    assets(requests, 404),
   );
   assert.deepEqual(requests, ["/guide/missing.llms.md", "/guide/missing.html"]);
   assert.equal(response.headers.get("Content-Type"), "text/html");
@@ -150,8 +199,10 @@ test("ignores rejected Markdown and non-page requests", async () => {
     const requests = [];
     await handleRequest(
       new Request(`https://panache.bz${path}`, { headers: { Accept: accept } }),
-      origin(requests),
+      assets(requests),
     );
-    assert.deepEqual(requests, [path]);
+    assert.deepEqual(requests, [
+      path.endsWith("/") ? `${path}index.html` : path,
+    ]);
   }
 });

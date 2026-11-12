@@ -19,14 +19,6 @@ runs:
     - name: Install wasm-pack
       uses: taiki-e/install-action@wasm-pack
 
-    - name: Build playground WASM bundle
-      shell: bash
-      run: |
-        wasm-pack build crates/panache-wasm --target web
-        rm -rf docs/playground/pkg
-        cp -r crates/panache-wasm/pkg docs/playground/
-        rm -f docs/playground/pkg/.gitignore
-
     - uses: r-lib/actions/setup-r@v2
       with:
         use-public-rspm: true
@@ -43,22 +35,32 @@ runs:
     - name: Restore timestamps
       uses: chetan/git-restore-mtime-action@v2
 
-    - name: Render Quarto Project
-      uses: quarto-dev/quarto-actions/render@v2
+    - name: Build documentation and public downloads
+      shell: bash
+      run: bash scripts/build-docs.sh
+
+    - uses: actions/setup-node@v7
       with:
-        path: docs
+        node-version: 24
+        cache: npm
+        cache-dependency-path: workers/package-lock.json
 
-    - name: Prepare installers
+    - name: Install website deployment tools
       shell: bash
-      run: |
-        install -m 0644 scripts/panache-installer.sh docs/_site/install
-        install -m 0644 scripts/panache-installer.ps1 docs/_site/install.ps1
-        cmp scripts/panache-installer.sh docs/_site/install
-        cmp scripts/panache-installer.ps1 docs/_site/install.ps1
-        sh -n docs/_site/install
+      working-directory: workers
+      run: npm ci
 
-    - name: Publish funding manifest
+    - name: Test website request handling
       shell: bash
-      run: |
-        install -m 0644 funding.json docs/_site/funding.json
-        cmp funding.json docs/_site/funding.json
+      working-directory: workers
+      run: npm test
+
+    - name: Validate Workers deployment
+      shell: bash
+      working-directory: workers
+      run: npm run deploy:check
+
+    - name: Test built website through Workers
+      shell: bash
+      working-directory: workers
+      run: npm run test:site

@@ -43,3 +43,11 @@ updates:
       npm:
         patterns:
           - "*"
+  - package-ecosystem: "npm"
+    directory: "/workers"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm:
+        patterns:
+          - "*"

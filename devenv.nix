@@ -1,5 +1,7 @@
 {
   pkgs,
+  lib,
+  config,
   ...
 }:
 
@@ -72,8 +74,22 @@ in
     })
   ];
 
-  # Yamark 0.3.0 does not expose a version command.
-  env.PANACHE_BENCH_YAMARK_VERSION = yamark.version;
+  env = {
+    # Yamark 0.3.0 does not expose a version command.
+    PANACHE_BENCH_YAMARK_VERSION = yamark.version;
+  }
+  // lib.optionalAttrs pkgs.stdenv.isLinux {
+    # Run npm's pinned runtime through Nix's loader without patching generated binaries.
+    MINIFLARE_WORKERD_PATH = toString (
+      pkgs.writeShellScript "panache-workerd" ''
+        exec ${pkgs.stdenv.cc.bintools.dynamicLinker} \
+          --library-path ${pkgs.glibc}/lib \
+          ${config.devenv.root}/workers/node_modules/@cloudflare/workerd-linux-${
+            if pkgs.stdenv.hostPlatform.isAarch64 then "arm64" else "64"
+          }/bin/workerd "$@"
+      ''
+    );
+  };
 
   languages = {
     rust = {

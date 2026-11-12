@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: 📖 Documentation
-    url: https://jolars.github.io/panache
+    url: https://panache.bz
     about: Read the panache documentation
   - name: 💬 Discussions
     url: https://github.com/jolars/panache/discussions
