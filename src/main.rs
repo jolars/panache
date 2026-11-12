@@ -32,6 +32,7 @@ impl From<CliFlavor> for Flavor {
             CliFlavor::Quarto => Flavor::Quarto,
             CliFlavor::RMarkdown => Flavor::RMarkdown,
             CliFlavor::Gfm => Flavor::Gfm,
+            CliFlavor::Jupyter => Flavor::Jupyter,
             CliFlavor::CommonMark => Flavor::CommonMark,
             CliFlavor::MultiMarkdown => Flavor::MultiMarkdown,
             CliFlavor::Mdsvex => Flavor::Mdsvex,
@@ -152,6 +153,26 @@ const SUPPORTED_EXTENSIONS: &[&str] = &[
     "svx",
 ];
 
+fn format_input(
+    input: &str,
+    cfg: &panache::Config,
+    range: Option<(usize, usize)>,
+    path: Option<&Path>,
+) -> io::Result<String> {
+    if path.is_some_and(panache::notebook::is_notebook_path) {
+        if range.is_some() {
+            return Err(io::Error::other(
+                "--range is not supported for notebooks; format a cell in your editor",
+            ));
+        }
+        panache::format_notebook(input, cfg).map_err(|e| {
+            io::Error::other(format!("{}: {e}", path.expect("notebook path").display()))
+        })
+    } else {
+        Ok(format(input, Some(cfg.clone()), range))
+    }
+}
+
 fn init_logger(debug_log: Option<&Path>) {
     let Some(path) = debug_log else {
         env_logger::Builder::from_default_env().init();
@@ -237,12 +258,17 @@ fn expand_paths(
     anchor: &Path,
     force_exclude: bool,
     accept_any_extension: bool,
+    notebooks: bool,
 ) -> io::Result<Vec<PathBuf>> {
     use ignore::WalkBuilder;
 
     let mut files = Vec::new();
     // One matcher set; paths are matched config-dir-relative (the unified rule).
-    let filters = build_path_filters(cfg)?;
+    let mut discovery_cfg = cfg.clone();
+    if notebooks && discovery_cfg.include.is_none() {
+        discovery_cfg.extend_include.push("**/*.ipynb".into());
+    }
+    let filters = build_path_filters(&discovery_cfg)?;
 
     for path in paths {
         if path.is_file() {
@@ -253,7 +279,13 @@ fn expand_paths(
             if force_exclude && filters.exclude.is_match(&rel) {
                 continue;
             }
-            if accept_any_extension {
+            if panache::notebook::is_notebook_path(path) {
+                if notebooks {
+                    files.push(path.clone());
+                } else {
+                    return Err(io::Error::other("notebooks support formatting only"));
+                }
+            } else if accept_any_extension {
                 files.push(path.clone());
             } else if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if SUPPORTED_EXTENSIONS.contains(&ext) {
@@ -291,6 +323,9 @@ fn expand_paths(
                     continue;
                 }
                 if !filters.include.is_match(&rel) {
+                    continue;
+                }
+                if !notebooks && panache::notebook::is_notebook_path(entry_path) {
                     continue;
                 }
                 if entry_path.is_file() {
@@ -985,6 +1020,9 @@ fn run() -> io::Result<()> {
     match cli.command {
         Commands::Inspect { file, json, option } => {
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
+            if input_path.is_some_and(panache::notebook::is_notebook_path) {
+                return Err(io::Error::other("notebooks support formatting only"));
+            }
             let start_dir = start_dir_for(input_path)?;
             let (mut cfg, source, chain) = load_config_for_cli_with_chain(
                 cli.config.as_deref(),
@@ -1000,6 +1038,9 @@ fn run() -> io::Result<()> {
         Commands::Parse { file, to, json } => {
             let file = normalize_parse_path_or_exit(file);
             let input_path = file.as_deref().or(cli.stdin_filename.as_deref());
+            if input_path.is_some_and(panache::notebook::is_notebook_path) {
+                return Err(io::Error::other("notebooks support formatting only"));
+            }
             let start_dir = start_dir_for(input_path)?;
             let (cfg, cfg_source) = load_config_for_cli(
                 cli.config.as_deref(),
@@ -1092,7 +1133,8 @@ fn run() -> io::Result<()> {
                 }
 
                 let input = read_all(None)?;
-                let output = format(&input, Some(cfg), parsed_range);
+                let output =
+                    format_input(&input, &cfg, parsed_range, cli.stdin_filename.as_deref())?;
 
                 if check {
                     if input != output {
@@ -1133,6 +1175,7 @@ fn run() -> io::Result<()> {
                 &anchor,
                 force_exclude,
                 cli.flavor.is_some(),
+                true,
             )?;
             let mut cache = if cli.no_cache || !traversal_cfg.cache {
                 None
@@ -1235,7 +1278,7 @@ fn run() -> io::Result<()> {
                         if let Some(cached) = cached {
                             cached
                         } else {
-                            let output = format(&input, Some(cfg.clone()), parsed_range);
+                            let output = format_input(&input, &cfg, parsed_range, Some(file_path))?;
                             let mut guard = cache_handle.lock().unwrap();
                             if guard.supports_format_mode(&cfg, mode) {
                                 let unchanged = input == output;
@@ -1254,10 +1297,10 @@ fn run() -> io::Result<()> {
                             output
                         }
                     } else {
-                        format(&input, Some(cfg.clone()), parsed_range)
+                        format_input(&input, &cfg, parsed_range, Some(file_path))?
                     }
                 } else {
-                    format(&input, Some(cfg.clone()), parsed_range)
+                    format_input(&input, &cfg, parsed_range, Some(file_path))?
                 };
 
                 Ok(FormatOutcome {
@@ -1489,6 +1532,13 @@ fn run() -> io::Result<()> {
                 dump_passes,
                 force_exclude,
             } => {
+                if cli
+                    .stdin_filename
+                    .as_deref()
+                    .is_some_and(panache::notebook::is_notebook_path)
+                {
+                    return Err(io::Error::other("notebooks support formatting only"));
+                }
                 if json && report {
                     eprintln!("Error: --json and --report cannot be used together");
                     std::process::exit(1);
@@ -1533,6 +1583,7 @@ fn run() -> io::Result<()> {
                         &anchor,
                         force_exclude,
                         cli.flavor.is_some(),
+                        false,
                     )?
                 };
 
@@ -1697,6 +1748,13 @@ fn run() -> io::Result<()> {
             message_format,
             force_exclude,
         } => {
+            if cli
+                .stdin_filename
+                .as_deref()
+                .is_some_and(panache::notebook::is_notebook_path)
+            {
+                return Err(io::Error::other("notebooks support formatting only"));
+            }
             let load_lint_config = |start_dir: &Path, input_path: Option<&Path>| {
                 let (mut cfg, source) = load_config_for_cli(
                     cli.config.as_deref(),
@@ -1876,6 +1934,7 @@ fn run() -> io::Result<()> {
                 &anchor,
                 force_exclude,
                 cli.flavor.is_some(),
+                false,
             )?;
             let mut cache = if cli.no_cache || !traversal_cfg.cache {
                 None

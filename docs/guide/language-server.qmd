@@ -600,3 +600,13 @@ marked *out of scope*.
   | `workspace/willCreateFiles`, `willDeleteFiles`                                                                              | ⛔     | Intentionally omitted: no scaffolding/auto-deletion          |
   | `willSave`, `willSaveWaitUntil`                                                                                             | ❌     | Format-on-save runs client-side instead                      |
   | Call/type hierarchy, `implementation`, `typeDefinition`, `declaration`, `inlineValue`, `moniker`, document color, code lens | ⛔     | Out of scope for prose                                       |
+
+## Jupyter Notebook Formatting
+
+The server supports LSP 3.17 notebook synchronization for `jupyter-notebook`
+notebooks with Markdown markup cells. Document and range formatting operate on
+individual cell text, with cell-relative UTF-16 positions. Configuration and
+exclusions resolve from the parent notebook. Cells keep independent in-memory
+identities; notebook JSON is not parsed as Markdown. Notebook diagnostics and
+lint fixes are not provided. Notebook text changes still schedule diagnostics
+for other open documents after the debounce window.

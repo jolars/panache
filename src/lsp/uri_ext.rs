@@ -27,11 +27,10 @@ const ASCII_SET: AsciiSet = percent_encoding::NON_ALPHANUMERIC
 
 /// Extension methods that fill the file-path gap left by `fluent_uri`.
 pub trait UriExt {
-    /// Assuming the URI is in the `file` scheme, decode its path into an
+    /// For a URI in the `file` scheme, decode its path into an
     /// absolute [`Path`].
     ///
-    /// **Note:** this does not check the scheme; callers are responsible for
-    /// only invoking it on `file:` URIs. Returns `None` for an empty path.
+    /// Returns `None` for non-file URIs or an empty path.
     fn to_file_path(&self) -> Option<Cow<'_, Path>>;
 
     /// Build a `file:` [`Uri`] from a filesystem path.
@@ -43,6 +42,9 @@ pub trait UriExt {
 
 impl UriExt for Uri {
     fn to_file_path(&self) -> Option<Cow<'_, Path>> {
+        if self.scheme()?.as_str() != "file" {
+            return None;
+        }
         // `self` derefs to `fluent_uri::Uri<String>`.
         let path_str = self.path().as_estr().decode().into_string_lossy();
         if path_str.is_empty() {
@@ -195,6 +197,17 @@ mod tests {
         if let Ok(uri) = uri {
             // An http authority-only URI has an empty path → None.
             let _ = uri.to_file_path();
+        }
+    }
+    #[test]
+    fn virtual_documents_are_not_files() {
+        for value in [
+            "untitled:Untitled-1",
+            "vscode-notebook-cell:///tmp/book.ipynb#cell",
+            "https://example.com/doc.md",
+        ] {
+            let uri: Uri = value.parse().unwrap();
+            assert!(uri.to_file_path().is_none());
         }
     }
 }

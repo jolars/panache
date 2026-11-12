@@ -176,7 +176,8 @@ fn frontmatter_consumers(flavor: Flavor) -> ConsumerSet {
         Flavor::Pandoc => ConsumerSet::of(YamlConsumer::Libyaml),
         Flavor::Quarto => ConsumerSet::of(YamlConsumer::Libyaml).with(YamlConsumer::Jsyaml),
         Flavor::RMarkdown => ConsumerSet::of(YamlConsumer::Libyaml).with(YamlConsumer::RYaml),
-        Flavor::Gfm
+        Flavor::Jupyter
+        | Flavor::Gfm
         | Flavor::CommonMark
         | Flavor::MultiMarkdown
         | Flavor::Mdsvex
@@ -190,6 +191,7 @@ fn hashpipe_consumers(flavor: Flavor) -> ConsumerSet {
         Flavor::Quarto => ConsumerSet::of(YamlConsumer::Jsyaml),
         Flavor::RMarkdown => ConsumerSet::of(YamlConsumer::RYaml),
         Flavor::Pandoc
+        | Flavor::Jupyter
         | Flavor::Gfm
         | Flavor::CommonMark
         | Flavor::MultiMarkdown

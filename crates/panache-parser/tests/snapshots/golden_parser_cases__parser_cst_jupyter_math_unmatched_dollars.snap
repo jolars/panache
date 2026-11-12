@@ -1,0 +1,97 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..90
+  PARAGRAPH@0..9
+    TEXT@0..4 "$$a "
+    EMPHASIS@4..7
+      EMPHASIS_MARKER@4..5 "*"
+      TEXT@5..6 "b"
+      EMPHASIS_MARKER@6..7 "*"
+    TEXT@7..8 "$"
+    NEWLINE@8..9 "\n"
+  BLANK_LINE@9..10
+    BLANK_LINE@9..10 "\n"
+  PARAGRAPH@10..21
+    TEXT@10..14 "$$a "
+    STRONG@14..19
+      STRONG_MARKER@14..16 "**"
+      TEXT@16..17 "b"
+      STRONG_MARKER@17..19 "**"
+    TEXT@19..20 "$"
+    NEWLINE@20..21 "\n"
+  BLANK_LINE@21..22
+    BLANK_LINE@21..22 "\n"
+  PARAGRAPH@22..36
+    TEXT@22..26 "$$a "
+    LINK@26..34
+      LINK_START@26..27
+        LINK_START@26..27 "["
+      LINK_TEXT@27..28
+        TEXT@27..28 "b"
+      LINK_TEXT_END@28..29 "]"
+      LINK_DEST_START@29..30 "("
+      LINK_DEST@30..33
+        LINK_DEST_URL@30..33
+          TEXT@30..33 "url"
+      LINK_DEST_END@33..34 ")"
+    TEXT@34..35 "$"
+    NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..48
+    TEXT@37..41 "$$a "
+    EMPHASIS@41..46
+      EMPHASIS_MARKER@41..42 "*"
+      TEXT@42..43 "b"
+      NEWLINE@43..44 "\n"
+      TEXT@44..45 "c"
+      EMPHASIS_MARKER@45..46 "*"
+    TEXT@46..47 "$"
+    NEWLINE@47..48 "\n"
+  BLANK_LINE@48..49
+    BLANK_LINE@48..49 "\n"
+  PIPE_TABLE@49..90
+    TABLE_HEADER@49..59
+      TEXT@49..50 "|"
+      WHITESPACE@50..51 " "
+      TABLE_CELL@51..52
+        TEXT@51..52 "A"
+      WHITESPACE@52..53 " "
+      TEXT@53..54 "|"
+      WHITESPACE@54..55 " "
+      TABLE_CELL@55..56
+        TEXT@55..56 "B"
+      WHITESPACE@56..57 " "
+      TEXT@57..58 "|"
+      NEWLINE@58..59 "\n"
+    TABLE_SEPARATOR@59..73
+      TABLE_SEP_DELIM@59..60 "|"
+      TABLE_SEP_WHITESPACE@60..61 " "
+      TABLE_SEP_DASHES@61..64 "---"
+      TABLE_SEP_WHITESPACE@64..65 " "
+      TABLE_SEP_DELIM@65..66 "|"
+      TABLE_SEP_WHITESPACE@66..67 " "
+      TABLE_SEP_DASHES@67..70 "---"
+      TABLE_SEP_WHITESPACE@70..71 " "
+      TABLE_SEP_DELIM@71..72 "|"
+      NEWLINE@72..73 "\n"
+    TABLE_ROW@73..90
+      TEXT@73..74 "|"
+      WHITESPACE@74..75 " "
+      TABLE_CELL@75..83
+        TEXT@75..79 "$$a "
+        EMPHASIS@79..82
+          EMPHASIS_MARKER@79..80 "*"
+          TEXT@80..81 "b"
+          EMPHASIS_MARKER@81..82 "*"
+        TEXT@82..83 "$"
+      WHITESPACE@83..84 " "
+      TEXT@84..85 "|"
+      WHITESPACE@85..86 " "
+      TABLE_CELL@86..87
+        TEXT@86..87 "z"
+      WHITESPACE@87..88 " "
+      TEXT@88..89 "|"
+      NEWLINE@89..90 "\n"

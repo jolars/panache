@@ -20,6 +20,7 @@ mod handlers;
 mod helpers;
 pub(crate) mod line_index;
 mod navigation;
+mod notebooks;
 mod symbols;
 mod task_pool;
 #[doc(hidden)]
@@ -35,6 +36,10 @@ pub use uri_ext::UriExt;
 /// State for a single document in the LSP.
 #[derive(Clone)]
 pub struct DocumentState {
+    /// Parent notebook; cell text has no backing filesystem path.
+    pub notebook_uri: Option<lsp_types::Uri>,
+    /// Kind supplied by notebook synchronization.
+    pub notebook_cell_kind: Option<lsp_types::NotebookCellKind>,
     /// Stable VFS identity for this document. The backing path (if any) is
     /// derived on demand via [`crate::salsa::Db::path_of_id`] rather than
     /// duplicated here.

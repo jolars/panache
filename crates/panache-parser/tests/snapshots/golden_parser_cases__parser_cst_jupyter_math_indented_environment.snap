@@ -1,0 +1,50 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..105
+  PARAGRAPH@0..35
+    LATEX_COMMAND@0..34
+      TEXT@0..34 "\\begin{align}\nx &= y\n ..."
+    NEWLINE@34..35 "\n"
+  BLANK_LINE@35..36
+    BLANK_LINE@35..36 "\n"
+  PIPE_TABLE@36..105
+    TABLE_HEADER@36..46
+      TEXT@36..37 "|"
+      WHITESPACE@37..38 " "
+      TABLE_CELL@38..39
+        TEXT@38..39 "A"
+      WHITESPACE@39..40 " "
+      TEXT@40..41 "|"
+      WHITESPACE@41..42 " "
+      TABLE_CELL@42..43
+        TEXT@42..43 "B"
+      WHITESPACE@43..44 " "
+      TEXT@44..45 "|"
+      NEWLINE@45..46 "\n"
+    TABLE_SEPARATOR@46..60
+      TABLE_SEP_DELIM@46..47 "|"
+      TABLE_SEP_WHITESPACE@47..48 " "
+      TABLE_SEP_DASHES@48..51 "---"
+      TABLE_SEP_WHITESPACE@51..52 " "
+      TABLE_SEP_DELIM@52..53 "|"
+      TABLE_SEP_WHITESPACE@53..54 " "
+      TABLE_SEP_DASHES@54..57 "---"
+      TABLE_SEP_WHITESPACE@57..58 " "
+      TABLE_SEP_DELIM@58..59 "|"
+      NEWLINE@59..60 "\n"
+    TABLE_ROW@60..105
+      TEXT@60..61 "|"
+      WHITESPACE@61..62 " "
+      TABLE_CELL@62..98
+        LATEX_COMMAND@62..98
+          TEXT@62..98 "\\begin{align}\n  x &=  ..."
+      WHITESPACE@98..99 " "
+      TEXT@99..100 "|"
+      WHITESPACE@100..101 " "
+      TABLE_CELL@101..102
+        TEXT@101..102 "z"
+      WHITESPACE@102..103 " "
+      TEXT@103..104 "|"
+      NEWLINE@104..105 "\n"

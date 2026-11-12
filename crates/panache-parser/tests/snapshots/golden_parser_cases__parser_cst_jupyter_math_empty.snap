@@ -1,0 +1,96 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..89
+  PARAGRAPH@0..12
+    INLINE_MATH@0..3
+      INLINE_MATH_MARKER@0..1 "$"
+      MATH_CONTENT@1..2
+        MATH_WORD@1..2 "x"
+      INLINE_MATH_MARKER@2..3 "$"
+    TEXT@3..4 " "
+    INLINE_MATH@4..7
+      INLINE_MATH_MARKER@4..5 "$"
+      MATH_CONTENT@5..6
+        MATH_SPACE@5..6 " "
+      INLINE_MATH_MARKER@6..7 "$"
+    TEXT@7..8 " "
+    INLINE_MATH@8..11
+      INLINE_MATH_MARKER@8..9 "$"
+      MATH_CONTENT@9..10
+        MATH_WORD@9..10 "y"
+      INLINE_MATH_MARKER@10..11 "$"
+    NEWLINE@11..12 "\n"
+  BLANK_LINE@12..13
+    BLANK_LINE@12..13 "\n"
+  PARAGRAPH@13..19
+    INLINE_MATH@13..18
+      INLINE_MATH_MARKER@13..14 "$"
+      MATH_CONTENT@14..17
+        MATH_SPACE@14..17 "   "
+      INLINE_MATH_MARKER@17..18 "$"
+    NEWLINE@18..19 "\n"
+  BLANK_LINE@19..20
+    BLANK_LINE@19..20 "\n"
+  PARAGRAPH@20..28
+    INLINE_MATH@20..27
+      INLINE_MATH_MARKER@20..23 "\\\\("
+      MATH_CONTENT@23..24
+        MATH_SPACE@23..24 " "
+      INLINE_MATH_MARKER@24..27 "\\\\)"
+    NEWLINE@27..28 "\n"
+  BLANK_LINE@28..29
+    BLANK_LINE@28..29 "\n"
+  PARAGRAPH@29..36
+    INLINE_MATH@29..35
+      INLINE_MATH_MARKER@29..32 "\\\\("
+      MATH_CONTENT@32..32
+      INLINE_MATH_MARKER@32..35 "\\\\)"
+    NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..43
+    DISPLAY_MATH@37..42
+      DISPLAY_MATH_MARKER@37..39 "$$"
+      MATH_CONTENT@39..40
+        MATH_SPACE@39..40 " "
+      DISPLAY_MATH_MARKER@40..42 "$$"
+    NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  PARAGRAPH@44..50
+    DISPLAY_MATH@44..49
+      DISPLAY_MATH_MARKER@44..46 "$$"
+      MATH_CONTENT@46..47
+        MATH_NEWLINE@46..47 "\n"
+      DISPLAY_MATH_MARKER@47..49 "$$"
+    NEWLINE@49..50 "\n"
+  BLANK_LINE@50..51
+    BLANK_LINE@50..51 "\n"
+  PARAGRAPH@51..59
+    DISPLAY_MATH@51..58
+      DISPLAY_MATH_MARKER@51..54 "\\\\["
+      MATH_CONTENT@54..55
+        MATH_SPACE@54..55 " "
+      DISPLAY_MATH_MARKER@55..58 "\\\\]"
+    NEWLINE@58..59 "\n"
+  BLANK_LINE@59..60
+    BLANK_LINE@59..60 "\n"
+  PARAGRAPH@60..67
+    DISPLAY_MATH@60..66
+      DISPLAY_MATH_MARKER@60..63 "\\\\["
+      MATH_CONTENT@63..63
+      DISPLAY_MATH_MARKER@63..66 "\\\\]"
+    NEWLINE@66..67 "\n"
+  BLANK_LINE@67..68
+    BLANK_LINE@67..68 "\n"
+  PARAGRAPH@68..89
+    TEXT@68..74 "Empty "
+    DISPLAY_MATH@74..79
+      DISPLAY_MATH_MARKER@74..76 "$$"
+      MATH_CONTENT@76..77
+        MATH_SPACE@76..77 " "
+      DISPLAY_MATH_MARKER@77..79 "$$"
+    TEXT@79..88 " display."
+    NEWLINE@88..89 "\n"

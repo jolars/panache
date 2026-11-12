@@ -118,6 +118,7 @@ fn known_flavor_keys_json() -> Vec<serde_json::Value> {
         "rmarkdown",
         "r-markdown",
         "gfm",
+        "jupyter",
         "commonmark",
         "common-mark",
         "multimarkdown",

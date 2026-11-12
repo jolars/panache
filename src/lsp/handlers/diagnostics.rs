@@ -33,6 +33,12 @@ pub(crate) type Publish = (Uri, Option<i32>, Vec<Diagnostic>);
 /// Exclusions apply to the URI receiving a diagnostic, including diagnostics
 /// attributed to it by another open document's project graph.
 pub(crate) fn is_diagnostic_excluded(snap: &StateSnapshot, uri: &Uri) -> bool {
+    if snap
+        .document_state(uri)
+        .is_some_and(|s| s.notebook_uri.is_some())
+    {
+        return true;
+    }
     let (config, source) =
         crate::lsp::config::load_config_with_source(&snap.workspace_folders, Some(uri));
     let workspace_root = snap.workspace_root_for(uri);
@@ -261,6 +267,12 @@ pub(crate) fn compute_publishes_with_execution(
         Arc<crate::linter::execution_context::ExecutionResults>,
     >,
 ) -> Vec<Publish> {
+    if snap
+        .document_state(uri)
+        .is_some_and(|s| s.notebook_uri.is_some())
+    {
+        return Vec::new();
+    }
     log::debug!(
         "compute_publishes uri={} run_external={}",
         uri.as_str(),

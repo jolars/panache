@@ -266,6 +266,10 @@ The available flavors are:
 `gfm`
 :   GitHub-Flavored Markdown
 
+`jupyter`
+:   JupyterLab Markdown (GFM with Jupyter math), auto-detected for `.ipynb`
+    files.
+
 `hugo`
 :   [Hugo](https://gohugo.io)-flavored Markdown, using the CommonMark dialect
     with Goldmark's default tables, strikethrough, task lists, bare autolinks,
@@ -2044,3 +2048,29 @@ emoji = false
 r = "air"
 python = "ruff"
 ```
+
+## Jupyter Markdown
+
+The `jupyter` flavor is selected automatically for `.ipynb` files. It uses the
+CommonMark dialect with GFM tables, task lists, strikethrough, HTML, and Jupyter
+math. YAML metadata, GitHub alerts, emoji aliases, footnotes, and
+GitHub-specific math delimiters are disabled by default.
+
+`tex-math-jupyter` enables JupyterLab's math boundaries: dollar-delimited math,
+escaped bracket delimiters, and bare TeX environments. Unlike Pandoc's dollar
+rules, whitespace and adjacent digits do not prevent recognition. Inline math
+can span a single line break. Markdown source uses doubled backslashes for
+bracket delimiters, such as `\\(x\\)` and `\\[x\\]`. The formatter preserves
+these delimiters by default. Explicit backslash normalization also emits the
+doubled form. Override extensions under `[extensions.jupyter]`.
+
+Dollar normalization adds a space between adjacent inline math spans to keep
+their delimiters separate. Standalone Markdown linting with `--flavor jupyter`
+includes math syntax and inline math line-break diagnostics.
+
+Math is resolved before table rows and heading underlines, so multiline math
+stays within its cell or heading. Unmatched delimiters leave ordinary Markdown
+active. Empty math remains valid when whitespace or delimiters are normalized.
+
+Notebook formatting discovers `.ipynb` files by default; notebook linting is not
+supported. Existing `include`, `exclude`, and `--force-exclude` settings apply.

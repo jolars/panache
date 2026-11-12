@@ -355,6 +355,7 @@ pub(crate) struct AtxHeadingParser;
 struct AtxHeadingPrepared {
     level: usize,
     shortcode: Option<super::blocks::hugo::PreparedShortcode>,
+    math: Option<(super::utils::text_buffer::ParagraphBuffer, usize)>,
 }
 
 impl BlockParser for AtxHeadingParser {
@@ -373,6 +374,11 @@ impl BlockParser for AtxHeadingParser {
         } else {
             None
         };
+        let math = if ctx.config.extensions.tex_math_jupyter {
+            super::blocks::headings::prepare_jupyter_heading(lines)
+        } else {
+            None
+        };
         let detection = if ctx.config.extensions.blank_before_header {
             BlockDetectionResult::Yes
         } else {
@@ -380,7 +386,11 @@ impl BlockParser for AtxHeadingParser {
         };
         Some((
             detection,
-            Some(Box::new(AtxHeadingPrepared { level, shortcode })),
+            Some(Box::new(AtxHeadingPrepared {
+                level,
+                shortcode,
+                math,
+            })),
         ))
     }
 
@@ -400,6 +410,10 @@ impl BlockParser for AtxHeadingParser {
             return shortcode.line_count;
         }
         emit_content_indent(builder, ctx);
+        if let Some((math, count)) = &prepared.math {
+            math.emit_atx_heading(builder, prepared.level, ctx.config);
+            return *count;
+        }
         emit_atx_heading(builder, content, prepared.level, ctx.config);
         1
     }
@@ -1278,13 +1292,12 @@ fn resolve_table_pos(
 fn try_parse_kind(
     ctx: &BlockContext,
     kind: TableKind,
-    raw: &[&str],
+    lines: &StrippedLines<'_, '_>,
     pos: usize,
     dispatch: usize,
-    prefix: &ContainerPrefix,
     builder: &mut GreenNodeBuilder<'static>,
 ) -> Option<usize> {
-    let window = StrippedLines::with_dispatch(raw, pos, dispatch, prefix);
+    let window = lines.with_positions(pos, dispatch);
     match kind {
         TableKind::Grid if ctx.config.extensions.grid_tables => {
             try_parse_grid_table(&window, builder, ctx.config)
@@ -1308,10 +1321,9 @@ fn try_parse_kind(
 /// pick the position-ordering policy.
 fn first_kind_at(
     ctx: &BlockContext,
-    raw: &[&str],
+    lines: &StrippedLines<'_, '_>,
     pos: usize,
     dispatch: usize,
-    prefix: &ContainerPrefix,
     builder: &mut GreenNodeBuilder<'static>,
 ) -> Option<(TableKind, usize)> {
     for kind in [
@@ -1320,7 +1332,7 @@ fn first_kind_at(
         TableKind::Pipe,
         TableKind::Simple,
     ] {
-        if let Some(consumed) = try_parse_kind(ctx, kind, raw, pos, dispatch, prefix, builder) {
+        if let Some(consumed) = try_parse_kind(ctx, kind, lines, pos, dispatch, builder) {
             return Some((kind, consumed));
         }
     }
@@ -1330,17 +1342,16 @@ fn first_kind_at(
 fn emit_table_kind(
     ctx: &BlockContext,
     kind: TableKind,
-    raw: &[&str],
+    lines: &StrippedLines<'_, '_>,
     line_pos: usize,
     table_pos: usize,
-    prefix: &ContainerPrefix,
     builder: &mut GreenNodeBuilder<'static>,
 ) -> Option<usize> {
-    if let Some(n) = try_parse_kind(ctx, kind, raw, line_pos, line_pos, prefix, builder) {
+    if let Some(n) = try_parse_kind(ctx, kind, lines, line_pos, line_pos, builder) {
         return Some(n);
     }
     if table_pos != line_pos
-        && let Some(n) = try_parse_kind(ctx, kind, raw, table_pos, line_pos, prefix, builder)
+        && let Some(n) = try_parse_kind(ctx, kind, lines, table_pos, line_pos, builder)
     {
         return Some(n);
     }
@@ -1359,7 +1370,6 @@ impl BlockParser for TableParser {
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         let line_pos = lines.pos();
         let prefix = lines.prefix();
-        let lines = lines.raw();
         if !ctx.has_blank_before && !ctx.at_document_start {
             return None;
         }
@@ -1378,17 +1388,16 @@ impl BlockParser for TableParser {
             BlockDetectionResult::YesCanInterrupt
         };
 
-        let table_pos = resolve_table_pos(ctx, lines, line_pos, prefix);
+        let table_pos = resolve_table_pos(ctx, lines.raw(), line_pos, prefix);
 
         let mut probe = GreenNodeBuilder::new();
-        let (kind, probe_consumed) =
-            first_kind_at(ctx, lines, table_pos, line_pos, prefix, &mut probe)?;
+        let (kind, probe_consumed) = first_kind_at(ctx, lines, table_pos, line_pos, &mut probe)?;
 
         let (green, consumed) = if table_pos == line_pos {
             (probe.finish(), probe_consumed)
         } else {
             let mut b = GreenNodeBuilder::new();
-            let consumed = emit_table_kind(ctx, kind, lines, line_pos, table_pos, prefix, &mut b)?;
+            let consumed = emit_table_kind(ctx, kind, lines, line_pos, table_pos, &mut b)?;
             (b.finish(), consumed)
         };
 
@@ -1409,14 +1418,13 @@ impl BlockParser for TableParser {
 
         let line_pos = lines.pos();
         let prefix = lines.prefix();
-        let lines = lines.raw();
-        let table_pos = resolve_table_pos(ctx, lines, line_pos, prefix);
+        let table_pos = resolve_table_pos(ctx, lines.raw(), line_pos, prefix);
 
-        if let Some((_, n)) = first_kind_at(ctx, lines, line_pos, line_pos, prefix, builder) {
+        if let Some((_, n)) = first_kind_at(ctx, lines, line_pos, line_pos, builder) {
             return n;
         }
         if table_pos != line_pos
-            && let Some((_, n)) = first_kind_at(ctx, lines, table_pos, line_pos, prefix, builder)
+            && let Some((_, n)) = first_kind_at(ctx, lines, table_pos, line_pos, builder)
         {
             return n;
         }
@@ -3163,6 +3171,19 @@ impl BlockParser for SetextHeadingParser {
                 Some(&b'=') | Some(&b'-') => {}
                 _ => return None,
             }
+        }
+
+        // Jupyter resolves math before Markdown lookahead. The underline
+        // belongs to the span when its actual closer occurs in this paragraph.
+        if ctx.config.extensions.tex_math_jupyter
+            && (content.contains('$') || content.contains('\\'))
+            && super::blocks::paragraphs::jupyter_math_closing_line(
+                content,
+                (1..stripped.remaining()).map(|i| stripped.get(i)),
+            )
+            .is_some()
+        {
+            return None;
         }
 
         let lines = [content, next_line];

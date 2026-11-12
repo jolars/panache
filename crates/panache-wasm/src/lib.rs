@@ -13,6 +13,7 @@ fn parse_flavor(value: &str) -> Option<Flavor> {
         "quarto" => Some(Flavor::Quarto),
         "rmarkdown" | "r-markdown" => Some(Flavor::RMarkdown),
         "gfm" => Some(Flavor::Gfm),
+        "jupyter" => Some(Flavor::Jupyter),
         "commonmark" | "common-mark" => Some(Flavor::CommonMark),
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
         "mdsvex" => Some(Flavor::Mdsvex),

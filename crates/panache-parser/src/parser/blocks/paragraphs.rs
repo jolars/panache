@@ -6,9 +6,10 @@
 use crate::options::ParserOptions;
 use rowan::GreenNodeBuilder;
 
+use crate::parser::blocks::container_prefix::{ContainerPrefix, StripOp};
 use crate::parser::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use crate::parser::utils::container_stack::{Container, ContainerStack, OpenDisplayMath};
-use crate::parser::utils::helpers::trim_end_newlines;
+use crate::parser::utils::helpers::{is_blank_line, trim_end_newlines};
 use crate::parser::utils::text_buffer::ParagraphBuffer;
 
 fn dollar_run(trimmed: &str) -> Option<(usize, &str)> {
@@ -19,8 +20,8 @@ fn dollar_run(trimmed: &str) -> Option<(usize, &str)> {
     Some((run_len, &trimmed[run_len..]))
 }
 
-/// Scan a paragraph line for pandoc bracket display-math delimiters and return
-/// the open state after the line.
+/// Scan a paragraph line for bracket math delimiters and return the open state
+/// after the line.
 ///
 /// Mirrors the inline parsers (`try_parse_single_backslash_display_math` /
 /// `try_parse_double_backslash_display_math`): delimiters may share a line
@@ -68,17 +69,18 @@ fn scan_bracket_delimiters(
                     i += 1;
                 }
             }
-            Some(OpenDisplayMath::Dollars(_)) => return state,
+            Some(OpenDisplayMath::Dollars(_) | OpenDisplayMath::Jupyter) => return state,
         }
     }
     state
 }
 
-/// Track multi-line display-math regions (`$$ ... $$`, `\[ ... \]`,
-/// `\\[ ... \\]`) across buffered paragraph lines.
+/// Track multi-line math regions (`$$ ... $$`, `\[ ... \]`, `\\[ ... \\]`)
+/// across buffered lines, or note a possible Jupyter math opener.
 ///
 /// While a region of one delimiter kind is open, delimiters of the other
 /// kinds are content and are ignored; only the matching closer changes state.
+/// Jupyter instead verifies pending candidates through its inline matcher.
 ///
 /// Shared with `ListItemBuffer`, which tracks the same regions across
 /// buffered list-item lines.
@@ -87,6 +89,17 @@ pub(in crate::parser) fn update_display_math_state(
     open_display_math: &mut Option<OpenDisplayMath>,
     config: &ParserOptions,
 ) {
+    if config.extensions.tex_math_jupyter {
+        if line_no_newline.trim().is_empty() {
+            *open_display_math = None;
+        } else if crate::parser::inlines::math::pending_jupyter_math(line_no_newline) {
+            // Do not approximate Jupyter's brace depth, code spans, or bare
+            // environments here. The continuation hook uses the same matcher
+            // as inline emission before holding any following line.
+            *open_display_math = Some(OpenDisplayMath::Jupyter);
+        }
+        return;
+    }
     match *open_display_math {
         Some(OpenDisplayMath::Dollars(open_len)) => {
             let trimmed = line_no_newline.trim();
@@ -101,7 +114,7 @@ pub(in crate::parser) fn update_display_math_state(
                 }
             }
         }
-        Some(OpenDisplayMath::SingleBrackets) | Some(OpenDisplayMath::DoubleBrackets) => {
+        Some(OpenDisplayMath::SingleBrackets | OpenDisplayMath::DoubleBrackets) => {
             *open_display_math =
                 scan_bracket_delimiters(line_no_newline, *open_display_math, config);
         }
@@ -115,7 +128,105 @@ pub(in crate::parser) fn update_display_math_state(
                 *open_display_math = scan_bracket_delimiters(line_no_newline, None, config);
             }
         }
+        Some(OpenDisplayMath::Jupyter) => unreachable!("Jupyter state requires its extension"),
     }
+}
+
+/// A paragraph's stripped lookahead, scanned monotonically across math spans.
+/// The owning buffer drops this cache when it is cleared or split, so another
+/// paragraph cannot inherit its inline context.
+#[derive(Debug, Clone)]
+pub(crate) struct JupyterMathLookahead {
+    text: String,
+    first_line: usize,
+    offsets: Vec<usize>,
+    cursor: usize,
+    ops: Vec<StripOp>,
+    lazy_blockquote_gobble: bool,
+}
+
+impl JupyterMathLookahead {
+    pub(crate) fn new<'a>(
+        mut text: String,
+        first_line: usize,
+        prefix: &ContainerPrefix,
+        following: impl Iterator<Item = &'a str>,
+    ) -> Self {
+        let mut offsets = vec![text.len()];
+        for line in following
+            .map(|line| prefix.strip(line))
+            .take_while(|line| !is_blank_line(line))
+        {
+            text.push_str(line);
+            offsets.push(text.len());
+        }
+        Self {
+            text,
+            first_line,
+            offsets,
+            cursor: 0,
+            ops: prefix.ops().to_vec(),
+            lazy_blockquote_gobble: prefix.lazy_blockquote_gobble,
+        }
+    }
+
+    pub(crate) fn contains(&self, line: usize, prefix: &ContainerPrefix) -> bool {
+        line >= self.first_line
+            && line - self.first_line < self.offsets.len()
+            && self.ops == prefix.ops()
+            && self.lazy_blockquote_gobble == prefix.lazy_blockquote_gobble
+    }
+
+    /// Find math crossing the start of `line`, retaining the verified cursor
+    /// so neither earlier spans nor the accumulated buffer need to be rescanned.
+    pub(crate) fn closing_line(&mut self, line: usize) -> Option<usize> {
+        let boundary = *self.offsets.get(line.checked_sub(self.first_line)?)?;
+        while self.cursor < boundary {
+            let rest = &self.text[self.cursor..];
+            if matches!(rest.as_bytes()[0], b'$' | b'\\')
+                && let Some((len, ..)) = crate::parser::inlines::math::jupyter_math(rest)
+            {
+                self.cursor += len;
+                if self.cursor > boundary {
+                    return Some(
+                        self.first_line + self.offsets.partition_point(|&at| at < self.cursor) - 1,
+                    );
+                }
+                continue;
+            }
+            if rest.starts_with("$$") {
+                self.cursor += 2;
+                continue;
+            }
+            if rest.starts_with('`')
+                && let Some((len, ..)) =
+                    crate::parser::inlines::code_spans::try_parse_code_span(rest)
+            {
+                self.cursor += len;
+                continue;
+            }
+            self.cursor += if let Some(after_escape) = rest.strip_prefix('\\') {
+                1 + after_escape.chars().next().map_or(0, char::len_utf8)
+            } else {
+                rest.chars().next().expect("character boundary").len_utf8()
+            };
+        }
+        None
+    }
+}
+
+/// Find the closing line of matched Jupyter math crossing the end of `buffered`.
+pub(in crate::parser) fn jupyter_math_closing_line<'a>(
+    buffered: &str,
+    following: impl Iterator<Item = &'a str>,
+) -> Option<usize> {
+    JupyterMathLookahead::new(
+        buffered.to_owned(),
+        0,
+        &ContainerPrefix::default(),
+        following,
+    )
+    .closing_line(0)
 }
 
 fn extract_end_environment_name(line: &str) -> Option<&str> {
@@ -199,7 +310,8 @@ pub(in crate::parser) fn append_paragraph_line_gobbling(
 
         let line_no_newline = trim_end_newlines(line);
         update_display_math_state(line_no_newline, open_display_math, config);
-        if let Some(env_name) = extract_environment_name(line_no_newline)
+        if !config.extensions.tex_math_jupyter
+            && let Some(env_name) = extract_environment_name(line_no_newline)
             && is_inline_math_environment(env_name)
         {
             open_inline_math_envs.push(env_name.to_string());

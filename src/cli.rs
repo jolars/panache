@@ -208,7 +208,7 @@ blockquotes.")]
             long_help = "Path(s) to the input file(s) or directories to format. If not provided, or if \
             the single argument `-` is given, reads from stdin (with no arguments at an \
         interactive terminal this is a usage error instead, since there is nothing to read). \
-            Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. When file paths are \
+            Supports .qmd, .md, .Rmd/.Rmarkdown, .ipynb Markdown cells, and other Markdown-based formats. When file paths are \
             provided, the files are formatted in place by default. Stdin input always outputs \
             to stdout. Supports glob patterns (e.g., *.md) and directories (e.g., . or docs/). \
             Directories are traversed recursively, respecting .gitignore files. \
@@ -377,7 +377,7 @@ panache.toml.")]
             long_help = "Path(s) to the input file(s) or directories to check. If not provided, or if \
             the single argument `-` is given, reads from stdin (with no arguments at an \
         interactive terminal this is a usage error instead, since there is nothing to read). \
-            Supports .qmd, .md, .Rmd/.Rmarkdown, and other Markdown-based formats. Supports glob patterns \
+            Supports .qmd, .md, .Rmd/.Rmarkdown, .ipynb Markdown cells, and other Markdown-based formats. Supports glob patterns \
             (e.g., *.md) and directories (e.g., . or docs/). Directories are traversed recursively, \
             respecting .gitignore files. `-` cannot be combined with other paths."
         )]
@@ -591,6 +591,8 @@ pub enum CliFlavor {
     RMarkdown,
     /// GitHub Flavored Markdown
     Gfm,
+    /// Jupyter notebook Markdown
+    Jupyter,
     /// CommonMark (the strict, standardized base dialect)
     #[value(name = "commonmark")]
     CommonMark,

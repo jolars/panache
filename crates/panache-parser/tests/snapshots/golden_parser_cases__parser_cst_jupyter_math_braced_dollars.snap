@@ -1,0 +1,85 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..76
+  PARAGRAPH@0..22
+    INLINE_MATH@0..21
+      INLINE_MATH_MARKER@0..1 "$"
+      MATH_CONTENT@1..20
+        MATH_WORD@1..2 "x"
+        MATH_SPACE@2..3 " "
+        MATH_WORD@3..4 "+"
+        MATH_SPACE@4..5 " "
+        MATH_COMMAND@5..9
+          MATH_CONTROL_WORD@5..9 "\\def"
+        MATH_COMMAND@9..16
+          MATH_CONTROL_WORD@9..13 "\\foo"
+          MATH_GROUP@13..16
+            MATH_GROUP_OPEN@13..14 "{"
+            MATH_WORD@14..15 "$"
+            MATH_GROUP_CLOSE@15..16 "}"
+        MATH_NEWLINE@16..17 "\n"
+        MATH_WORD@17..18 "+"
+        MATH_SPACE@18..19 " "
+        MATH_WORD@19..20 "y"
+      INLINE_MATH_MARKER@20..21 "$"
+    NEWLINE@21..22 "\n"
+  BLANK_LINE@22..23
+    BLANK_LINE@22..23 "\n"
+  LIST@23..49
+    LIST_ITEM@23..49
+      LIST_MARKER@23..24 "-"
+      WHITESPACE@24..25 " "
+      PLAIN@25..49
+        INLINE_MATH@25..48
+          INLINE_MATH_MARKER@25..26 "$"
+          MATH_CONTENT@26..47
+            MATH_WORD@26..27 "x"
+            MATH_SPACE@27..28 " "
+            MATH_WORD@28..29 "+"
+            MATH_SPACE@29..30 " "
+            MATH_COMMAND@30..34
+              MATH_CONTROL_WORD@30..34 "\\def"
+            MATH_COMMAND@34..41
+              MATH_CONTROL_WORD@34..38 "\\foo"
+              MATH_GROUP@38..41
+                MATH_GROUP_OPEN@38..39 "{"
+                MATH_WORD@39..40 "$"
+                MATH_GROUP_CLOSE@40..41 "}"
+            MATH_NEWLINE@41..42 "\n"
+            LINE_PREFIX@42..44 "  "
+            MATH_WORD@44..45 "+"
+            MATH_SPACE@45..46 " "
+            MATH_WORD@46..47 "y"
+          INLINE_MATH_MARKER@47..48 "$"
+        NEWLINE@48..49 "\n"
+  BLANK_LINE@49..50
+    BLANK_LINE@49..50 "\n"
+  BLOCK_QUOTE@50..76
+    BLOCK_QUOTE_MARKER@50..51 ">"
+    WHITESPACE@51..52 " "
+    PARAGRAPH@52..76
+      INLINE_MATH@52..75
+        INLINE_MATH_MARKER@52..53 "$"
+        MATH_CONTENT@53..74
+          MATH_WORD@53..54 "x"
+          MATH_SPACE@54..55 " "
+          MATH_WORD@55..56 "+"
+          MATH_SPACE@56..57 " "
+          MATH_COMMAND@57..61
+            MATH_CONTROL_WORD@57..61 "\\def"
+          MATH_COMMAND@61..68
+            MATH_CONTROL_WORD@61..65 "\\foo"
+            MATH_GROUP@65..68
+              MATH_GROUP_OPEN@65..66 "{"
+              MATH_WORD@66..67 "$"
+              MATH_GROUP_CLOSE@67..68 "}"
+          MATH_NEWLINE@68..69 "\n"
+          LINE_PREFIX@69..70 ">"
+          LINE_PREFIX@70..71 " "
+          MATH_WORD@71..72 "+"
+          MATH_SPACE@72..73 " "
+          MATH_WORD@73..74 "y"
+        INLINE_MATH_MARKER@74..75 "$"
+      NEWLINE@75..76 "\n"

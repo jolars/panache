@@ -20,6 +20,20 @@ typed raw environment as a math-formatting host in every non-`verbatim` mode.
 The same environment-body rules therefore apply both to standalone environments
 and to TeX environments nested inside `$$...$$` or `\[...\]`.
 
+Single-line table cells preserve bare TeX environments on their authored line.
+Environment formatting must not introduce line breaks that split a table row.
+Jupyter math may span physical table lines. Those continuations exclude table
+and container prefixes from the math body. Column widths use physical line
+widths, and table delimiters align after the final math line. Table padding
+stays outside the math delimiters.
+
+Empty Jupyter inline math with dollar delimiters retains one space between the
+markers. Empty display math uses consecutive delimiter lines without an
+intervening blank line.
+
+Dollar delimiter normalization separates adjacent Jupyter inline math spans with
+a space so their markers cannot merge into a `$$` run.
+
 The formatter **re-parses the clean content string** (delimiters excluded) into
 a `MATH_CONTENT` CST and re-emits it. Re-parsing the already-prefix-stripped
 string (from `math_content_text`) avoids the host container-prefix problem that

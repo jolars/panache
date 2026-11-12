@@ -10,6 +10,28 @@ use std::time::Duration;
 use tempfile::TempDir;
 
 #[test]
+fn jupyter_markdown_lint_runs_shared_math_rules() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("math.md"), "$x^{a$\n\n$x\\\\y$\n").unwrap();
+    cargo_bin_cmd!("panache")
+        .current_dir(dir.path())
+        .args([
+            "--isolated",
+            "lint",
+            "--no-cache",
+            "--flavor",
+            "jupyter",
+            "math.md",
+        ])
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("math-unclosed-group"))
+        .stdout(predicate::str::contains("math.md:1:"))
+        .stdout(predicate::str::contains("inline-math-line-break"))
+        .stdout(predicate::str::contains("math.md:3:"));
+}
+
+#[test]
 fn quarto_displayed_includes_keep_source_diagnostics_and_fixes() {
     if which::which("arity").is_err() {
         return;

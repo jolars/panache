@@ -94,7 +94,8 @@ thread_local! {
 fn smart_for_flavor(flavor: crate::Flavor) -> bool {
     match flavor {
         crate::Flavor::Pandoc | crate::Flavor::Quarto | crate::Flavor::RMarkdown => true,
-        crate::Flavor::Gfm
+        crate::Flavor::Jupyter
+        | crate::Flavor::Gfm
         | crate::Flavor::CommonMark
         | crate::Flavor::MultiMarkdown
         | crate::Flavor::Mdsvex

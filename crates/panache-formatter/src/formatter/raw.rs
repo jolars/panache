@@ -1,6 +1,6 @@
 use crate::directives::extract_directive_from_node;
 use crate::formatter::Formatter;
-use crate::syntax::{AstNode, SyntaxKind, SyntaxNode, TomlMetadata};
+use crate::syntax::{AstNode, SyntaxKind, SyntaxNode, TomlMetadata, text_without_line_prefixes};
 use rowan::NodeOrToken;
 
 use super::math;
@@ -84,7 +84,7 @@ impl Formatter {
 
     pub(super) fn format_latex_command(&mut self, node: &SyntaxNode) {
         let formatted = math::format_latex_math_environment(node, &self.config)
-            .unwrap_or_else(|| node.text().to_string());
+            .unwrap_or_else(|| text_without_line_prefixes(node));
         self.output.push_str(&formatted);
     }
 

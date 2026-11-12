@@ -1,0 +1,126 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..203
+  HORIZONTAL_RULE@0..4
+    HORIZONTAL_RULE@0..3 "---"
+    NEWLINE@3..4 "\n"
+  HEADING@4..30
+    HEADING_CONTENT@4..25
+      TEXT@4..25 "title: ordinary prose"
+    NEWLINE@25..26 "\n"
+    SETEXT_HEADING_UNDERLINE@26..29
+      SETEXT_HEADING_UNDERLINE@26..29 "---"
+    NEWLINE@29..30 "\n"
+  BLANK_LINE@30..31
+    BLANK_LINE@30..31 "\n"
+  HEADING@31..43
+    ATX_HEADING_MARKER@31..32
+      ATX_HEADING_MARKER@31..32 "#"
+    WHITESPACE@32..35 "   "
+    HEADING_CONTENT@35..42
+      TEXT@35..42 "Heading"
+    NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  PARAGRAPH@44..73
+    IMAGE_LINK@44..72
+      IMAGE_LINK_START@44..46
+        IMAGE_LINK_START@44..46 "!["
+      IMAGE_ALT@46..50
+        TEXT@46..50 "plot"
+      IMAGE_ALT_END@50..51 "]"
+      IMAGE_DEST_START@51..52 "("
+      LINK_DEST@52..71
+        LINK_DEST_URL@52..71
+          TEXT@52..71 "attachment:plot.png"
+      IMAGE_DEST_END@71..72 ")"
+    NEWLINE@72..73 "\n"
+  BLANK_LINE@73..74
+    BLANK_LINE@73..74 "\n"
+  PARAGRAPH@74..98
+    INLINE_MATH@74..83
+      INLINE_MATH_MARKER@74..75 "$"
+      MATH_CONTENT@75..82
+        MATH_SPACE@75..76 " "
+        MATH_WORD@76..77 "a"
+        MATH_SPACE@77..78 " "
+        MATH_WORD@78..79 "*"
+        MATH_SPACE@79..80 " "
+        MATH_WORD@80..81 "b"
+        MATH_SPACE@81..82 " "
+      INLINE_MATH_MARKER@82..83 "$"
+    TEXT@83..89 "2 and "
+    INLINE_MATH@89..96
+      INLINE_MATH_MARKER@89..90 "$"
+      MATH_CONTENT@90..95
+        MATH_WORD@90..91 "x"
+        MATH_NEWLINE@91..92 "\n"
+        MATH_WORD@92..93 "+"
+        MATH_SPACE@93..94 " "
+        MATH_WORD@94..95 "y"
+      INLINE_MATH_MARKER@95..96 "$"
+    TEXT@96..97 "."
+    NEWLINE@97..98 "\n"
+  BLANK_LINE@98..99
+    BLANK_LINE@98..99 "\n"
+  LIST@99..126
+    LIST_ITEM@99..126
+      LIST_MARKER@99..100 "-"
+      WHITESPACE@100..101 " "
+      PLAIN@101..126
+        TEXT@101..108 "Inline "
+        INLINE_MATH@108..119
+          INLINE_MATH_MARKER@108..111 "\\\\("
+          MATH_CONTENT@111..116
+            MATH_WORD@111..112 "x"
+            MATH_SPACE@112..113 " "
+            MATH_WORD@113..114 "*"
+            MATH_SPACE@114..115 " "
+            MATH_WORD@115..116 "y"
+          INLINE_MATH_MARKER@116..119 "\\\\)"
+        TEXT@119..125 " here."
+        NEWLINE@125..126 "\n"
+  BLANK_LINE@126..127
+    BLANK_LINE@126..127 "\n"
+  BLOCK_QUOTE@127..145
+    BLOCK_QUOTE_MARKER@127..128 ">"
+    WHITESPACE@128..129 " "
+    PARAGRAPH@129..145
+      DISPLAY_MATH@129..144
+        DISPLAY_MATH_MARKER@129..131 "$$"
+        MATH_CONTENT@131..140
+          MATH_NEWLINE@131..132 "\n"
+          LINE_PREFIX@132..133 ">"
+          LINE_PREFIX@133..134 " "
+          MATH_WORD@134..135 "x"
+          MATH_SPACE@135..136 " "
+          MATH_WORD@136..137 "+"
+          MATH_SPACE@137..138 " "
+          MATH_WORD@138..139 "y"
+          MATH_NEWLINE@139..140 "\n"
+        LINE_PREFIX@140..141 ">"
+        LINE_PREFIX@141..142 " "
+        DISPLAY_MATH_MARKER@142..144 "$$"
+      NEWLINE@144..145 "\n"
+  BLANK_LINE@145..146
+    BLANK_LINE@145..146 "\n"
+  PARAGRAPH@146..179
+    LATEX_COMMAND@146..178
+      TEXT@146..178 "\\begin{align}\nx &= y\n ..."
+    NEWLINE@178..179 "\n"
+  BLANK_LINE@179..180
+    BLANK_LINE@179..180 "\n"
+  CODE_BLOCK@180..203
+    CODE_FENCE_OPEN@180..188
+      CODE_FENCE_MARKER@180..183 "```"
+      CODE_INFO@183..187
+        CODE_LANGUAGE@183..187 "math"
+      NEWLINE@187..188 "\n"
+    CODE_CONTENT@188..199
+      TEXT@188..198 "keep  this"
+      NEWLINE@198..199 "\n"
+    CODE_FENCE_CLOSE@199..203
+      CODE_FENCE_MARKER@199..202 "```"
+      NEWLINE@202..203 "\n"

@@ -280,7 +280,7 @@ pub(crate) fn structural_byte_mask_without_uri_schemes(config: &ParserOptions) -
         }
     }
 
-    if exts.tex_math_dollars || exts.tex_math_gfm {
+    if exts.tex_math_dollars || exts.tex_math_gfm || exts.tex_math_jupyter {
         mask[b'$' as usize] = true;
     }
 
@@ -428,6 +428,30 @@ fn parse_inline_range_impl(
         }
         if stop_at_bracket && bytes[pos] == b']' && bracket_depth == 0 {
             break;
+        }
+        if config.extensions.tex_math_jupyter
+            && matches!(text.as_bytes()[pos], b'$' | b'\\')
+            && let Some((len, content, open, close)) = super::math::jupyter_math(&text[pos..end])
+        {
+            if pos > text_start {
+                builder.token(SyntaxKind::TEXT.into(), &text[text_start..pos]);
+            }
+            super::math::emit_jupyter_math(
+                builder,
+                &text[pos..end],
+                len,
+                content,
+                open,
+                close,
+                math_opts(config),
+            );
+            pos += len;
+            text_start = pos;
+            continue;
+        }
+        if config.extensions.tex_math_jupyter && text[pos..end].starts_with("$$") {
+            pos += 2;
+            continue;
         }
         if let Some(dispo) = construct_plan.lookup(pos) {
             match *dispo {

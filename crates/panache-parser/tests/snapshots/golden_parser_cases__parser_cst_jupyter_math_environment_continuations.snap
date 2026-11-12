@@ -1,0 +1,69 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..197
+  PARAGRAPH@0..40
+    TEXT@0..5 "Here "
+    LATEX_COMMAND@5..39
+      TEXT@5..39 "\\begin{align}\n+ x &=  ..."
+    NEWLINE@39..40 "\n"
+  BLANK_LINE@40..41
+    BLANK_LINE@40..41 "\n"
+  LIST@41..87
+    LIST_ITEM@41..87
+      LIST_MARKER@41..42 "-"
+      WHITESPACE@42..43 " "
+      PLAIN@43..87
+        TEXT@43..48 "Here "
+        LATEX_COMMAND@48..86
+          TEXT@48..62 "\\begin{align}\n"
+          LINE_PREFIX@62..64 "  "
+          TEXT@64..73 "+ x &= y\n"
+          LINE_PREFIX@73..75 "  "
+          TEXT@75..86 "\\end{align}"
+        NEWLINE@86..87 "\n"
+  BLANK_LINE@87..88
+    BLANK_LINE@87..88 "\n"
+  BLOCK_QUOTE@88..142
+    BLOCK_QUOTE_MARKER@88..89 ">"
+    WHITESPACE@89..90 " "
+    LIST@90..142
+      LIST_ITEM@90..142
+        LIST_MARKER@90..91 "-"
+        WHITESPACE@91..92 " "
+        PLAIN@92..142
+          TEXT@92..97 "Here "
+          LATEX_COMMAND@97..141
+            TEXT@97..112 "\\begin{align*}\n"
+            LINE_PREFIX@112..113 ">"
+            LINE_PREFIX@113..114 " "
+            LINE_PREFIX@114..116 "  "
+            TEXT@116..125 "+ x &= y\n"
+            LINE_PREFIX@125..126 ">"
+            LINE_PREFIX@126..127 " "
+            LINE_PREFIX@127..129 "  "
+            TEXT@129..141 "\\end{align*}"
+          NEWLINE@141..142 "\n"
+  BLANK_LINE@142..143
+    BLANK_LINE@142..143 "\n"
+  LIST@143..197
+    LIST_ITEM@143..197
+      LIST_MARKER@143..144 "-"
+      WHITESPACE@144..145 " "
+      BLOCK_QUOTE@145..197
+        BLOCK_QUOTE_MARKER@145..146 ">"
+        WHITESPACE@146..147 " "
+        PARAGRAPH@147..197
+          TEXT@147..152 "Here "
+          LATEX_COMMAND@152..196
+            TEXT@152..167 "\\begin{custom}\n"
+            LINE_PREFIX@167..169 "  "
+            LINE_PREFIX@169..170 ">"
+            LINE_PREFIX@170..171 " "
+            TEXT@171..180 "+ x &= y\n"
+            LINE_PREFIX@180..182 "  "
+            LINE_PREFIX@182..183 ">"
+            LINE_PREFIX@183..184 " "
+            TEXT@184..196 "\\end{custom}"
+          NEWLINE@196..197 "\n"

@@ -8,6 +8,8 @@
 
 use super::inline_emission;
 use crate::options::ParserOptions;
+use crate::parser::blocks::container_prefix::{ContainerPrefix, ContainerPrefixLine};
+use crate::parser::blocks::paragraphs::JupyterMathLookahead;
 use crate::parser::inlines::code_spans::pending_code_span_openers;
 use crate::parser::inlines::sink::{InjectedMarker, MarkerInjectingSink};
 use rowan::GreenNodeBuilder;
@@ -49,6 +51,7 @@ impl ParagraphSegment {
 pub(crate) struct ParagraphBuffer {
     /// Interleaved segments of text and markers
     segments: Vec<ParagraphSegment>,
+    jupyter_math_lookahead: Option<Box<JupyterMathLookahead>>,
 }
 
 impl ParagraphBuffer {
@@ -56,6 +59,7 @@ impl ParagraphBuffer {
     pub(crate) fn new() -> Self {
         Self {
             segments: Vec::new(),
+            jupyter_math_lookahead: None,
         }
     }
 
@@ -108,6 +112,27 @@ impl ParagraphBuffer {
         result
     }
 
+    pub(crate) fn jupyter_math_closing_line(
+        &mut self,
+        line: usize,
+        prefix: &ContainerPrefix,
+        following: &[&str],
+    ) -> Option<usize> {
+        if self
+            .jupyter_math_lookahead
+            .as_ref()
+            .is_none_or(|lookahead| !lookahead.contains(line, prefix))
+        {
+            self.jupyter_math_lookahead = Some(Box::new(JupyterMathLookahead::new(
+                self.get_text_for_parsing(),
+                line,
+                prefix,
+                following.iter().copied(),
+            )));
+        }
+        self.jupyter_math_lookahead.as_mut()?.closing_line(line)
+    }
+
     /// Backtick runs in the buffered text that are still waiting for a closer.
     ///
     /// See [`pending_code_span_openers`]; measured on the inline-parser view,
@@ -146,6 +171,31 @@ impl ParagraphBuffer {
         result
     }
 
+    /// Per-line prefixes for the existing list-item block lift. Opaque inline
+    /// holds keep these bytes out of text just like ordinary container strips.
+    pub(crate) fn container_prefix_lines(&self) -> Vec<ContainerPrefixLine> {
+        let mut lines = vec![ContainerPrefixLine::default()];
+        for segment in &self.segments {
+            match segment {
+                ParagraphSegment::Text(text) => lines.extend(
+                    text.bytes()
+                        .filter(|&byte| byte == b'\n')
+                        .map(|_| ContainerPrefixLine::default()),
+                ),
+                ParagraphSegment::Indent(indent) => lines.last_mut().unwrap().push_indent(indent),
+                ParagraphSegment::BlockquoteMarker {
+                    leading_spaces,
+                    has_trailing_space,
+                } => lines.last_mut().unwrap().push_bq(&format!(
+                    "{}>{}",
+                    " ".repeat(*leading_spaces),
+                    if *has_trailing_space { " " } else { "" },
+                )),
+            }
+        }
+        lines
+    }
+
     /// Split off everything from `raw_offset` (a byte offset into
     /// [`Self::raw_text`]) onward, leaving `self` untouched.
     ///
@@ -179,6 +229,7 @@ impl ParagraphBuffer {
             .map_or(0, |i| i + 1);
         ParagraphBuffer {
             segments: self.segments.split_off(start),
+            jupyter_math_lookahead: None,
         }
     }
 
@@ -243,14 +294,27 @@ impl ParagraphBuffer {
         }
     }
 
-    /// Buffered container content must hold a heading's shortcode arguments
-    /// together, just as ordinary block dispatch does.
-    pub(crate) fn try_emit_hugo_heading(
+    pub(crate) fn emit_atx_heading(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        level: usize,
+        config: &ParserOptions,
+    ) {
+        let text = self.get_text_for_parsing();
+        let markers = self.get_marker_positions();
+        let mut sink = MarkerInjectingSink::new(builder, &markers);
+        crate::parser::blocks::headings::emit_atx_heading(&mut sink, &text, level, config);
+        sink.finish();
+    }
+
+    /// Buffered container content must hold a heading's opaque multiline
+    /// constructs together, just as ordinary block dispatch does.
+    pub(crate) fn try_emit_multiline_heading(
         &self,
         builder: &mut GreenNodeBuilder<'static>,
         config: &ParserOptions,
     ) -> Option<ParagraphBuffer> {
-        if !config.extensions.hugo_shortcodes {
+        if !config.extensions.hugo_shortcodes && !config.extensions.tex_math_jupyter {
             return None;
         }
         let text = self.get_text_for_parsing();
@@ -260,12 +324,24 @@ impl ParagraphBuffer {
         let prefix = crate::parser::blocks::container_prefix::ContainerPrefix::default();
         let lines =
             crate::parser::blocks::container_prefix::StrippedLines::new(&raw_lines, 0, &prefix);
-        let prepared = crate::parser::blocks::hugo::prepare(&lines, true, None)?;
-        let cutoff = prepared.text.len();
+        let cutoff = if config.extensions.hugo_shortcodes
+            && let Some(prepared) = crate::parser::blocks::hugo::prepare(&lines, true, None)
+        {
+            prepared.text.len()
+        } else if config.extensions.tex_math_jupyter {
+            crate::parser::inlines::math::jupyter_logical_line_len(&text)?
+        } else {
+            return None;
+        };
         let mut markers = self.get_marker_positions();
         markers.retain(|(offset, _)| *offset < cutoff);
         let mut sink = MarkerInjectingSink::new(builder, &markers);
-        crate::parser::blocks::headings::emit_atx_heading(&mut sink, &prepared.text, level, config);
+        crate::parser::blocks::headings::emit_atx_heading(
+            &mut sink,
+            &text[..cutoff],
+            level,
+            config,
+        );
         sink.finish();
 
         let mut raw_end = 0;
@@ -318,6 +394,7 @@ impl ParagraphBuffer {
     /// Clear the buffer for reuse.
     pub(crate) fn clear(&mut self) {
         self.segments.clear();
+        self.jupyter_math_lookahead = None;
     }
 }
 

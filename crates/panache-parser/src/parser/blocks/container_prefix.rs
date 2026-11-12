@@ -1221,6 +1221,7 @@ pub(crate) fn strip_content_indent(line: &str, content_indent: usize) -> (&str, 
 /// Raw access via [`Self::raw`] / [`Self::raw_at`] is preserved for
 /// helpers that need byte positions inside the original source (table
 /// scans, indent-rule probes, byte-level lookahead).
+#[derive(Clone, Copy)]
 pub(crate) struct StrippedLines<'a, 'p> {
     raw: &'a [&'a str],
     base: usize,
@@ -1232,6 +1233,7 @@ pub(crate) struct StrippedLines<'a, 'p> {
     dispatch: usize,
     prefix: &'p ContainerPrefix,
     hugo_lookahead: Option<&'p std::cell::RefCell<super::hugo::LookaheadCache>>,
+    jupyter_lookahead: Option<&'p std::cell::RefCell<super::jupyter::LookaheadCache>>,
 }
 
 #[allow(dead_code)]
@@ -1243,6 +1245,7 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             dispatch: base,
             prefix,
             hugo_lookahead: None,
+            jupyter_lookahead: None,
         }
     }
 
@@ -1261,12 +1264,48 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             dispatch,
             prefix,
             hugo_lookahead: None,
+            jupyter_lookahead: None,
         }
     }
 
     /// Number of lines available from `base` onward (line 0 plus lookahead).
     pub fn remaining(&self) -> usize {
         self.raw.len().saturating_sub(self.base)
+    }
+
+    /// Rebase a scan while preserving its container and shared lookahead.
+    pub(crate) fn with_positions(&self, base: usize, dispatch: usize) -> Self {
+        Self {
+            base,
+            dispatch,
+            ..*self
+        }
+    }
+
+    pub(crate) fn with_jupyter_lookahead(
+        mut self,
+        cache: &'p std::cell::RefCell<super::jupyter::LookaheadCache>,
+    ) -> Self {
+        self.jupyter_lookahead = Some(cache);
+        self
+    }
+
+    pub(crate) fn jupyter_lookahead(
+        &self,
+        start: usize,
+        first: &str,
+        unicode_blank: bool,
+    ) -> std::sync::Arc<super::jupyter::Lookahead> {
+        if let Some(cache) = self.jupyter_lookahead {
+            cache.borrow_mut().get(self, start, first, unicode_blank)
+        } else {
+            std::sync::Arc::new(super::jupyter::Lookahead::new(
+                self,
+                start,
+                first,
+                unicode_blank,
+            ))
+        }
     }
 
     pub(crate) fn with_hugo_lookahead(
@@ -1791,6 +1830,26 @@ impl ContainerPrefixLine {
         line
     }
 
+    /// Prefix token text in emission order: indents stay together, while
+    /// blockquote runs split into individual characters.
+    pub(crate) fn token_texts(&self) -> impl Iterator<Item = &str> {
+        self.pieces.iter().flat_map(|(kind, bytes)| {
+            let mut tail = bytes.as_str();
+            std::iter::from_fn(move || {
+                if tail.is_empty() {
+                    return None;
+                }
+                let len = match kind {
+                    PrefixPieceKind::Indent => tail.len(),
+                    PrefixPieceKind::BqRun => tail.chars().next()?.len_utf8(),
+                };
+                let (token, rest) = tail.split_at(len);
+                tail = rest;
+                Some(token)
+            })
+        })
+    }
+
     /// Test-only view of the ordered pieces.
     #[cfg(test)]
     pub(crate) fn pieces(&self) -> &[(PrefixPieceKind, String)] {
@@ -1811,18 +1870,8 @@ pub(crate) fn emit_container_prefix_tokens(
     builder: &mut GreenNodeBuilder<'static>,
     line: &ContainerPrefixLine,
 ) {
-    for (kind, bytes) in &line.pieces {
-        match kind {
-            PrefixPieceKind::Indent => {
-                builder.token(SyntaxKind::LINE_PREFIX.into(), bytes);
-            }
-            PrefixPieceKind::BqRun => {
-                for ch in bytes.chars() {
-                    let mut buf = [0u8; 4];
-                    builder.token(SyntaxKind::LINE_PREFIX.into(), ch.encode_utf8(&mut buf));
-                }
-            }
-        }
+    for text in line.token_texts() {
+        builder.token(SyntaxKind::LINE_PREFIX.into(), text);
     }
 }
 
@@ -1840,16 +1889,20 @@ pub(crate) fn emit_grafted_token(
     prefix: &mut Option<ContainerPrefixState>,
 ) {
     if let Some(state) = prefix.as_mut() {
-        if state.at_line_start {
-            if let Some(line_prefix) = state.prefixes.get(state.line_idx) {
-                emit_container_prefix_tokens(builder, line_prefix);
+        // Math uses MATH_NEWLINE, and opaque inline tokens can contain more
+        // than one physical line. Restore prefixes by source line boundaries.
+        for line in text.split_inclusive('\n') {
+            if state.at_line_start {
+                if let Some(line_prefix) = state.prefixes.get(state.line_idx) {
+                    emit_container_prefix_tokens(builder, line_prefix);
+                }
+                state.at_line_start = false;
             }
-            state.at_line_start = false;
-        }
-        builder.token(kind.into(), text);
-        if kind == SyntaxKind::NEWLINE || kind == SyntaxKind::BLANK_LINE {
-            state.line_idx += 1;
-            state.at_line_start = true;
+            builder.token(kind.into(), line);
+            if line.ends_with('\n') {
+                state.line_idx += 1;
+                state.at_line_start = true;
+            }
         }
     } else {
         builder.token(kind.into(), text);

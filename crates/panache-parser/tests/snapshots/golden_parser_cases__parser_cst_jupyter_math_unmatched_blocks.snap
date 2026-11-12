@@ -1,0 +1,69 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..101
+  PARAGRAPH@0..8
+    TEXT@0..7 "cost $5"
+    NEWLINE@7..8 "\n"
+  LIST@8..16
+    LIST_ITEM@8..16
+      LIST_MARKER@8..10 "1."
+      WHITESPACE@10..11 " "
+      PLAIN@11..16
+        TEXT@11..15 "item"
+        NEWLINE@15..16 "\n"
+  BLANK_LINE@16..17
+    BLANK_LINE@16..17 "\n"
+  PARAGRAPH@17..25
+    TEXT@17..24 "cost $5"
+    NEWLINE@24..25 "\n"
+  HTML_BLOCK@25..43
+    HTML_BLOCK_TAG@25..31
+      TEXT@25..30 "<div>"
+      NEWLINE@30..31 "\n"
+    HTML_BLOCK_CONTENT@31..43
+      TEXT@31..35 "text"
+      NEWLINE@35..36 "\n"
+      TEXT@36..42 "</div>"
+      NEWLINE@42..43 "\n"
+  BLANK_LINE@43..44
+    BLANK_LINE@43..44 "\n"
+  PARAGRAPH@44..53
+    TEXT@44..52 "cost $$5"
+    NEWLINE@52..53 "\n"
+  HEADING@53..63
+    ATX_HEADING_MARKER@53..54
+      ATX_HEADING_MARKER@53..54 "#"
+    WHITESPACE@54..55 " "
+    HEADING_CONTENT@55..62
+      TEXT@55..62 "Heading"
+    NEWLINE@62..63 "\n"
+  BLANK_LINE@63..64
+    BLANK_LINE@63..64 "\n"
+  PARAGRAPH@64..69
+    ESCAPED_CHAR@64..66 "\\\\"
+    TEXT@66..68 "(x"
+    NEWLINE@68..69 "\n"
+  LIST@69..77
+    LIST_ITEM@69..77
+      LIST_MARKER@69..71 "1."
+      WHITESPACE@71..72 " "
+      PLAIN@72..77
+        TEXT@72..76 "item"
+        NEWLINE@76..77 "\n"
+  BLANK_LINE@77..78
+    BLANK_LINE@77..78 "\n"
+  PARAGRAPH@78..83
+    ESCAPED_CHAR@78..80 "\\\\"
+    TEXT@80..82 "[x"
+    NEWLINE@82..83 "\n"
+  HTML_BLOCK@83..101
+    HTML_BLOCK_TAG@83..89
+      TEXT@83..88 "<div>"
+      NEWLINE@88..89 "\n"
+    HTML_BLOCK_CONTENT@89..101
+      TEXT@89..93 "text"
+      NEWLINE@93..94 "\n"
+      TEXT@94..100 "</div>"
+      NEWLINE@100..101 "\n"

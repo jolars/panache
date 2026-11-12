@@ -3,11 +3,12 @@ use super::text_buffer::ParagraphBuffer;
 use crate::parser::blocks::lists::ListMarker;
 use rowan::Checkpoint;
 
-/// Which multi-line display-math delimiter is currently open in a paragraph.
+/// Multiline math tracking state for a buffered paragraph or list item.
 ///
 /// One field (rather than parallel per-delimiter flags) so that delimiters of
 /// one kind occurring inside an open region of another kind cannot latch a
 /// second "open" state: while a region is open, only its own closer matters.
+/// Jupyter holds only a candidate flag until the inline matcher verifies it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OpenDisplayMath {
     /// `$$`-delimited; holds the opening run length (a closer needs
@@ -17,6 +18,9 @@ pub(crate) enum OpenDisplayMath {
     SingleBrackets,
     /// `\\[ ... \\]` (extension `tex_math_double_backslash`).
     DoubleBrackets,
+    /// A possible Jupyter opener, resolved by the verified inline matcher
+    /// before a continuation can bypass Markdown block detection.
+    Jupyter,
 }
 
 /// An open container on the parse stack.

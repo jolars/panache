@@ -1,0 +1,92 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..94
+  PARAGRAPH@0..63
+    INLINE_MATH@0..6
+      INLINE_MATH_MARKER@0..1 "$"
+      MATH_CONTENT@1..5
+        MATH_WORD@1..2 "x"
+        MATH_NEWLINE@2..3 "\n"
+        MATH_WORD@3..5 "+y"
+      INLINE_MATH_MARKER@5..6 "$"
+    NEWLINE@6..7 "\n"
+    INLINE_MATH@7..13
+      INLINE_MATH_MARKER@7..8 "$"
+      MATH_CONTENT@8..12
+        MATH_WORD@8..9 "z"
+        MATH_NEWLINE@9..10 "\n"
+        MATH_WORD@10..12 "#w"
+      INLINE_MATH_MARKER@12..13 "$"
+    NEWLINE@13..14 "\n"
+    INLINE_MATH@14..20
+      INLINE_MATH_MARKER@14..15 "$"
+      MATH_CONTENT@15..19
+        MATH_WORD@15..16 "a"
+        MATH_NEWLINE@16..17 "\n"
+        MATH_WORD@17..19 "+b"
+      INLINE_MATH_MARKER@19..20 "$"
+    TEXT@20..25 " and "
+    INLINE_MATH@25..33
+      INLINE_MATH_MARKER@25..26 "$"
+      MATH_CONTENT@26..32
+        MATH_WORD@26..27 "c"
+        MATH_NEWLINE@27..28 "\n"
+        MATH_WORD@28..30 "1."
+        MATH_SPACE@30..31 " "
+        MATH_WORD@31..32 "d"
+      INLINE_MATH_MARKER@32..33 "$"
+    NEWLINE@33..34 "\n"
+    INLINE_CODE@34..54
+      INLINE_CODE_MARKER@34..35 "`"
+      INLINE_CODE_CONTENT@35..53 "$literal\nnot math$"
+      INLINE_CODE_MARKER@53..54 "`"
+    NEWLINE@54..55 "\n"
+    INLINE_MATH@55..62
+      INLINE_MATH_MARKER@55..56 "$"
+      MATH_CONTENT@56..61
+        MATH_WORD@56..57 "e"
+        MATH_NEWLINE@57..58 "\n"
+        MATH_WORD@58..59 ">"
+        MATH_SPACE@59..60 " "
+        MATH_WORD@60..61 "f"
+      INLINE_MATH_MARKER@61..62 "$"
+    NEWLINE@62..63 "\n"
+  BLANK_LINE@63..64
+    BLANK_LINE@63..64 "\n"
+  LIST@64..86
+    LIST_ITEM@64..86
+      LIST_MARKER@64..65 "-"
+      WHITESPACE@65..66 " "
+      PLAIN@66..86
+        INLINE_MATH@66..74
+          INLINE_MATH_MARKER@66..67 "$"
+          MATH_CONTENT@67..73
+            MATH_WORD@67..68 "g"
+            MATH_NEWLINE@68..69 "\n"
+            LINE_PREFIX@69..71 "  "
+            MATH_WORD@71..73 "+h"
+          INLINE_MATH_MARKER@73..74 "$"
+        NEWLINE@74..75 "\n"
+        LINE_PREFIX@75..77 "  "
+        INLINE_MATH@77..85
+          INLINE_MATH_MARKER@77..78 "$"
+          MATH_CONTENT@78..84
+            MATH_WORD@78..79 "i"
+            MATH_NEWLINE@79..80 "\n"
+            LINE_PREFIX@80..82 "  "
+            MATH_WORD@82..84 "#j"
+          INLINE_MATH_MARKER@84..85 "$"
+        NEWLINE@85..86 "\n"
+  BLANK_LINE@86..87
+    BLANK_LINE@86..87 "\n"
+  PARAGRAPH@87..94
+    INLINE_MATH@87..93
+      INLINE_MATH_MARKER@87..88 "$"
+      MATH_CONTENT@88..92
+        MATH_WORD@88..89 "k"
+        MATH_NEWLINE@89..90 "\n"
+        MATH_WORD@90..92 "+l"
+      INLINE_MATH_MARKER@92..93 "$"
+    NEWLINE@93..94 "\n"

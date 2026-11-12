@@ -186,3 +186,14 @@ prefers the binary that shipped inside the VSIX. If no bundled binary is
 available, or `panache.version` / `panache.releaseTag` is set explicitly, it
 downloads from GitHub releases configured by `panache.githubRepo` (default
 `jolars/panache`).
+
+### Jupyter notebooks
+
+Panache formats Markdown markup cells in Jupyter notebooks through standard LSP
+notebook synchronization. Select Panache as the Markdown formatter, then use
+**Format Cell** or **Format Notebook**. To format on save, enable VS Code's
+`notebook.formatOnSave` setting. Panache does not enable it automatically.
+
+Each cell uses configuration discovered from its parent notebook's directory.
+Untitled notebooks use workspace settings. Python and other executable cells
+remain handled by their existing formatters. Notebook linting is not supported.

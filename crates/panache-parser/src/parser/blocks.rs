@@ -26,6 +26,7 @@ pub mod html_blocks;
 pub(crate) mod hugo;
 #[path = "blocks/indented_code.rs"]
 pub mod indented_code;
+pub(crate) mod jupyter;
 #[path = "blocks/line_blocks.rs"]
 pub mod line_blocks;
 #[path = "blocks/lists.rs"]

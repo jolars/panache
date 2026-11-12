@@ -17,6 +17,8 @@ pub enum Flavor {
     RMarkdown,
     /// GitHub Flavored Markdown
     Gfm,
+    /// Jupyter notebook Markdown (GFM with Jupyter math).
+    Jupyter,
     /// CommonMark
     #[cfg_attr(feature = "serde", serde(alias = "commonmark"))]
     CommonMark,
@@ -134,6 +136,8 @@ pub struct Extensions {
     pub tex_math_dollars: bool,
     /// [NON-DEFAULT] GFM math: inline $`...`$ and fenced ``` math blocks
     pub tex_math_gfm: bool,
+    /// JupyterLab math boundaries, including bare environments.
+    pub tex_math_jupyter: bool,
     /// [NON-DEFAULT] Single backslash math \(...\) and \[...\] (RMarkdown default)
     pub tex_math_single_backslash: bool,
     /// [NON-DEFAULT] Double backslash math \\(...\\) and \\[...\\]
@@ -329,6 +333,7 @@ impl Extensions {
             tex_math_dollars: false,
             tex_math_double_backslash: false,
             tex_math_gfm: false,
+            tex_math_jupyter: false,
             tex_math_single_backslash: false,
             wikilinks_title_after_pipe: false,
             wikilinks_title_before_pipe: false,
@@ -346,6 +351,7 @@ impl Extensions {
             Flavor::Quarto => Self::quarto_defaults(),
             Flavor::RMarkdown => Self::rmarkdown_defaults(),
             Flavor::Gfm => Self::gfm_defaults(),
+            Flavor::Jupyter => Self::jupyter_defaults(),
             Flavor::CommonMark => Self::commonmark_defaults(),
             Flavor::MultiMarkdown => Self::multimarkdown_defaults(),
             Flavor::Mdsvex => Self::mdsvex_defaults(),
@@ -406,6 +412,7 @@ impl Extensions {
             tex_math_dollars: true,
             tex_math_double_backslash: false,
             tex_math_gfm: false,
+            tex_math_jupyter: false,
             tex_math_single_backslash: false,
 
             footnotes: true,
@@ -517,6 +524,18 @@ impl Extensions {
         ext.tex_math_gfm = true;
         ext.yaml_metadata_block = true;
 
+        ext
+    }
+
+    fn jupyter_defaults() -> Self {
+        let mut ext = Self::gfm_defaults();
+        ext.yaml_metadata_block = false;
+        ext.alerts = false;
+        ext.emoji = false;
+        ext.footnotes = false;
+        ext.tex_math_dollars = false;
+        ext.tex_math_gfm = false;
+        ext.tex_math_jupyter = true;
         ext
     }
 
@@ -725,6 +744,7 @@ known_extensions! {
     "implicit-figures" => implicit_figures,
     "tex-math-dollars" => tex_math_dollars,
     "tex-math-gfm" => tex_math_gfm,
+    "tex-math-jupyter" => tex_math_jupyter,
     "tex-math-single-backslash" => tex_math_single_backslash,
     "tex-math-double-backslash" => tex_math_double_backslash,
     "inline-footnotes" => inline_footnotes,
@@ -1069,9 +1089,12 @@ impl Dialect {
     /// Default dialect for a given user-facing flavor.
     pub fn for_flavor(flavor: Flavor) -> Self {
         match flavor {
-            Flavor::CommonMark | Flavor::Gfm | Flavor::Mdsvex | Flavor::Myst | Flavor::Hugo => {
-                Dialect::CommonMark
-            }
+            Flavor::CommonMark
+            | Flavor::Jupyter
+            | Flavor::Gfm
+            | Flavor::Mdsvex
+            | Flavor::Myst
+            | Flavor::Hugo => Dialect::CommonMark,
             Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown | Flavor::MultiMarkdown => {
                 Dialect::Pandoc
             }
@@ -1164,6 +1187,7 @@ impl schemars::JsonSchema for Flavor {
                 "quarto",
                 "rmarkdown",
                 "gfm",
+                "jupyter",
                 "common-mark",
                 "commonmark",
                 "multimarkdown",

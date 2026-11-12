@@ -171,7 +171,7 @@ impl<'a> Parser<'a> {
             }
         }
         let underline =
-            !standalone && self.try_fold_held_shortcode_into_setext(&prefix, prepared.line_count);
+            !standalone && self.try_fold_held_inline_into_setext(&prefix, prepared.line_count);
         Some(prepared.line_count + usize::from(underline) - 1)
     }
 
@@ -918,9 +918,9 @@ impl<'a> Parser<'a> {
         Some(LineDispatch::consumed(1))
     }
 
-    /// A held shortcode can span the text line that ordinary Setext lookahead
+    /// A held inline can span the text line that ordinary Setext lookahead
     /// would inspect. Fold the buffered logical line before consuming it.
-    pub(super) fn try_fold_held_shortcode_into_setext(
+    pub(super) fn try_fold_held_inline_into_setext(
         &mut self,
         prefix: &ContainerPrefix,
         line_count: usize,
@@ -937,33 +937,38 @@ impl<'a> Parser<'a> {
         }
         let lines = StrippedLines::new(&self.lines, self.pos, prefix);
         let underline = lines.peek_prefix_at(underline_pos);
-        if try_parse_setext_heading(&[lines.first_unconditional(), underline], 0).is_none() {
+        // Most held math spans are followed by prose or another formula.
+        // Reject those before cloning the accumulated buffer and lookahead.
+        if !matches!(underline.trim_start().as_bytes().first(), Some(b'=' | b'-')) {
             return false;
         }
-
-        match self.containers.last() {
+        let (buffer, checkpoint) = match self.containers.last() {
             Some(Container::Paragraph {
                 buffer,
                 start_checkpoint,
                 ..
-            }) => {
-                let buffer = buffer.clone();
-                let checkpoint = *start_checkpoint;
-                self.containers.stack.pop();
-                self.builder
-                    .start_node_at(checkpoint, SyntaxKind::HEADING.into());
-                buffer.emit_setext_heading_text(&mut self.builder, self.config);
-            }
-            Some(Container::ListItem { buffer, .. }) => {
-                let buffer = buffer.to_paragraph_buffer(&self.containers.gobble_chain());
-                if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
-                    buffer.clear();
-                }
-                self.builder.start_node(SyntaxKind::HEADING.into());
-                buffer.emit_setext_heading_text(&mut self.builder, self.config);
-            }
+            }) => (buffer.clone(), Some(*start_checkpoint)),
+            Some(Container::ListItem { buffer, .. }) => (
+                buffer.to_paragraph_buffer(&self.containers.gobble_chain()),
+                None,
+            ),
             _ => return false,
+        };
+        if try_parse_setext_heading(&[&buffer.get_text_for_parsing(), underline], 0).is_none() {
+            return false;
         }
+
+        if let Some(checkpoint) = checkpoint {
+            self.containers.stack.pop();
+            self.builder
+                .start_node_at(checkpoint, SyntaxKind::HEADING.into());
+        } else {
+            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                buffer.clear();
+            }
+            self.builder.start_node(SyntaxKind::HEADING.into());
+        }
+        buffer.emit_setext_heading_text(&mut self.builder, self.config);
         let underline = lines.emit_prefix_at(&mut self.builder, underline_pos);
         emit_setext_underline(&mut self.builder, underline);
         self.builder.finish_node();

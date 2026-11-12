@@ -267,6 +267,7 @@ async function startClient(
 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
+      { notebook: "jupyter-notebook", language: "markdown" },
       { scheme: "file", language: "markdown" },
       { scheme: "untitled", language: "markdown" },
       { scheme: "file", language: "quarto" },

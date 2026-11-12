@@ -1,0 +1,4 @@
+flavor = "jupyter"
+
+[format]
+line-width = 40

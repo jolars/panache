@@ -170,8 +170,17 @@ pub(crate) fn reload_execution_contexts(gs: &mut GlobalState) {
 /// Every path that can change a document's resolved config goes through here:
 /// resolution reads the document's *path* and the config files above it, never
 /// its text, so nothing a text edit does can invalidate it.
-fn refresh_document_config(gs: &mut GlobalState, uri_str: &str, uri: &lsp_types::Uri) -> bool {
-    let new_config = gs.load_config_notifying(uri);
+pub(crate) fn refresh_document_config(
+    gs: &mut GlobalState,
+    uri_str: &str,
+    uri: &lsp_types::Uri,
+) -> bool {
+    let config_uri = gs
+        .document_map
+        .get(uri_str)
+        .and_then(|s| s.notebook_uri.as_ref())
+        .map(|u| super::notebooks::config_uri(&gs.workspace_folders, u));
+    let new_config = gs.load_config_notifying(config_uri.as_ref().unwrap_or(uri));
     // Re-point at the shared handle for the reloaded value: a no-op when the
     // config is unchanged, and a switch to the value's shared handle when it
     // changed (rather than mutating a handle other documents may share).
@@ -222,14 +231,34 @@ pub(crate) fn reload_open_documents_config(gs: &mut GlobalState) {
 
 /// Handle `textDocument/didOpen`.
 pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) {
+    open_document(gs, params, None);
+}
+
+pub(crate) fn open_document(
+    gs: &mut GlobalState,
+    params: DidOpenTextDocumentParams,
+    notebook_uri: Option<lsp_types::Uri>,
+) {
     let uri = params.text_document.uri.clone();
     let uri_string = uri.to_string();
     let text = params.text_document.text.clone();
     log::debug!("did_open uri={uri_string}, bytes={}", text.len());
     let start = Instant::now();
 
-    let config = gs.load_config_notifying(&uri);
-    let doc_path = uri.to_file_path().map(|p| p.into_owned());
+    let config_uri = notebook_uri
+        .as_ref()
+        .map(|u| super::notebooks::config_uri(&gs.workspace_folders, u));
+    let config = gs.load_config_notifying(config_uri.as_ref().unwrap_or(&uri));
+    let notebook_cell_kind = notebook_uri
+        .as_ref()
+        .and_then(|p| gs.notebooks.get(p))
+        .and_then(|n| n.cells.iter().find(|c| c.document == uri))
+        .map(|c| c.kind.clone());
+    let doc_path = if notebook_uri.is_some() {
+        None
+    } else {
+        uri.to_file_path().map(|p| p.into_owned())
+    };
     // On-disk documents register under their path; an in-memory buffer gets a
     // distinct `FileId` with no backing path, avoiding collisions between
     // untitled buffers.
@@ -265,6 +294,8 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     gs.document_map_mut().insert(
         uri_string.clone(),
         DocumentState {
+            notebook_uri,
+            notebook_cell_kind,
             file_id,
             salsa_file,
             salsa_config,
@@ -286,7 +317,15 @@ pub(crate) fn did_open(gs: &mut GlobalState, params: DidOpenTextDocumentParams) 
     // would be cancelled by the next open's write. Open runs external linters
     // (like save) so their diagnostics surface without waiting for the first
     // manual save.
-    gs.arm_settle_external(uri);
+    if gs
+        .document_map
+        .get(uri.as_str())
+        .is_none_or(|s| s.notebook_uri.is_none())
+    {
+        gs.arm_settle_external(uri);
+    } else {
+        gs.arm_settle();
+    }
     log::debug!("did_open complete in {:?}", start.elapsed());
 }
 
@@ -388,6 +427,8 @@ pub(crate) fn did_change(gs: &mut GlobalState, params: DidChangeTextDocumentPara
     // No parse here at all. The settle demands it within the debounce window,
     // on a pool thread, and salsa's per-key claim dedupes concurrent demands --
     // so the main loop stops paying parse time per keystroke.
+    // Notebook edits also cancel reads of this shared database. The read pass
+    // excludes notebook cells, but must retry diagnostics for other documents.
     gs.arm_settle();
 
     log::debug!(
@@ -430,7 +471,15 @@ pub(crate) fn did_save(gs: &mut GlobalState, params: DidSaveTextDocumentParams) 
     reload_execution_contexts(gs);
     // Save is the heavy pass: external linters for the saved document. Debounced
     // like every other settle so a save-all burst coalesces into one pass.
-    gs.arm_settle_external(uri);
+    if gs
+        .document_map
+        .get(uri.as_str())
+        .is_none_or(|s| s.notebook_uri.is_none())
+    {
+        gs.arm_settle_external(uri);
+    } else {
+        gs.arm_settle();
+    }
 }
 
 /// Handle `textDocument/didClose`.

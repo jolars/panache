@@ -430,6 +430,7 @@ pub(crate) enum OutgoingRequest {
 
 /// The synchronous, single-threaded-mutation server state.
 pub(crate) struct GlobalState {
+    pub(crate) notebooks: HashMap<Uri, lsp_types::NotebookDocument>,
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) execution_roots: Arc<Vec<crate::linter::execution_context::ExecutionRoot>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -567,6 +568,7 @@ impl GlobalState {
             #[cfg(not(target_arch = "wasm32"))]
             execution_read_errors: Arc::default(),
             document_map: Arc::new(DocumentMap::new()),
+            notebooks: HashMap::new(),
             workspace_folders: Vec::new(),
             runtime_settings: LspRuntimeSettings::default(),
             supports_pull_diagnostics: false,

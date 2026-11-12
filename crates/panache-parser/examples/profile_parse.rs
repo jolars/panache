@@ -12,6 +12,7 @@ fn main() {
     let options = args.get(3).map(|flavor| {
         ParserOptions::for_flavor(match flavor.as_str() {
             "hugo" => Flavor::Hugo,
+            "jupyter" => Flavor::Jupyter,
             "commonmark" => Flavor::CommonMark,
             "pandoc" => Flavor::Pandoc,
             other => panic!("unsupported profiling flavor: {other}"),

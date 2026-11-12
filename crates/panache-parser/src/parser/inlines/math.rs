@@ -476,6 +476,240 @@ pub fn emit_double_backslash_display_math(
     builder.finish_node();
 }
 
+/// Cheap candidate gate for block lookahead. Only the full matcher can verify
+/// whether an opener actually matches, including its brace and escape rules.
+fn may_open_jupyter_math(text: &str) -> bool {
+    text.contains('$')
+        || text.contains(r"\\(")
+        || text.contains(r"\\[")
+        || text.contains(r"\begin{")
+}
+
+/// Note openers that might continue onto another line without treating a
+/// brace-depth fallback as a definite closer. Complete single-line math and
+/// code spans need no block lookahead.
+pub(crate) fn pending_jupyter_math(text: &str) -> bool {
+    if !may_open_jupyter_math(text) {
+        return false;
+    }
+    let mut pos = 0;
+    while pos < text.len() {
+        let rest = &text[pos..];
+        if rest.starts_with('$')
+            || rest.starts_with(r"\\(")
+            || rest.starts_with(r"\\[")
+            || rest.starts_with(r"\begin{")
+        {
+            if let Some((len, ..)) = match_jupyter_math(rest, false) {
+                pos += len;
+                continue;
+            }
+            return true;
+        }
+        if rest.starts_with('`')
+            && let Some((len, ..)) = super::code_spans::try_parse_code_span(rest)
+        {
+            pos += len;
+            continue;
+        }
+        pos += if let Some(after_escape) = rest.strip_prefix('\\') {
+            1 + after_escape.chars().next().map_or(0, char::len_utf8)
+        } else {
+            rest.chars().next().expect("character boundary").len_utf8()
+        };
+    }
+    false
+}
+
+/// JupyterLab's math boundaries (rendermime/src/latex.ts). Unlike Pandoc,
+/// dollar delimiters allow adjacent whitespace/digits and single line breaks.
+/// Markdown source uses doubled backslashes for bracket delimiters.
+pub(crate) fn jupyter_math(text: &str) -> Option<(usize, &str, &str, &str)> {
+    match_jupyter_math(text, true)
+}
+
+/// The physical lines occupied by one logical line after Jupyter extracts math.
+/// A closer can share a line with another opener, so scan through the end of
+/// each claimed line before deciding where a heading or table row ends.
+pub(crate) fn jupyter_logical_line_len(text: &str) -> Option<usize> {
+    let line_end = |pos: usize| text[pos..].find('\n').map_or(text.len(), |i| pos + i + 1);
+    let first_end = line_end(0);
+    if !pending_jupyter_math(&text[..first_end]) {
+        return None;
+    }
+    let mut end = first_end;
+    let mut pos = 0;
+    while pos < end {
+        let rest = &text[pos..];
+        if matches!(rest.as_bytes()[0], b'$' | b'\\')
+            && let Some((len, ..)) = jupyter_math(rest)
+        {
+            pos += len;
+            if pos > end {
+                end = line_end(pos);
+            }
+            continue;
+        }
+        if rest.starts_with("$$") {
+            pos += 2;
+            continue;
+        }
+        if rest.starts_with('`')
+            && let Some((len, ..)) = super::code_spans::try_parse_code_span(rest)
+        {
+            pos += len;
+            continue;
+        }
+        pos += if let Some(after_escape) = rest.strip_prefix('\\') {
+            1 + after_escape.chars().next().map_or(0, char::len_utf8)
+        } else {
+            rest.chars().next()?.len_utf8()
+        };
+    }
+    (end > first_end).then_some(end)
+}
+
+fn match_jupyter_math(text: &str, allow_fallback: bool) -> Option<(usize, &str, &str, &str)> {
+    let (open, close) = if text.starts_with("$$") {
+        ("$$", "$$")
+    } else if text.starts_with('$') {
+        ("$", "$")
+    } else if text.starts_with(r"\\(") {
+        (r"\\(", r"\\)")
+    } else if text.starts_with(r"\\[") {
+        (r"\\[", r"\\]")
+    } else {
+        let rest = text.strip_prefix(r"\begin{")?;
+        let end = rest.find('}')?;
+        let name = &rest[..end];
+        if name.is_empty()
+            || !name
+                .trim_end_matches('*')
+                .bytes()
+                .all(|b| b.is_ascii_alphabetic())
+        {
+            return None;
+        }
+        let opening = &text[..7 + end + 1];
+        let closing = format!(r"\end{{{name}}}");
+        let body = &text[opening.len()..];
+        let at = body.find(&closing)?;
+        if body[..at]
+            .split_inclusive('\n')
+            .skip(1)
+            .any(|line| line.ends_with('\n') && line.trim().is_empty())
+        {
+            return None;
+        }
+        return Some((
+            opening.len() + at + closing.len(),
+            &body[..at],
+            opening,
+            &text[opening.len() + at..opening.len() + at + closing.len()],
+        ));
+    };
+    let mut pos = open.len();
+    let mut depth = 0usize;
+    let mut fallback = None;
+    while pos < text.len() {
+        let rest = &text[pos..];
+        if close == "$" && rest.starts_with("$$") {
+            pos += 2;
+            continue;
+        }
+        if rest.starts_with(close) {
+            let result = (pos + close.len(), &text[open.len()..pos], open, close);
+            if depth == 0 {
+                return Some(result);
+            }
+            fallback = Some(result);
+        }
+        let ch = rest.chars().next()?;
+        if ch == '\n'
+            && (rest[1..]
+                .trim_start_matches([' ', '\t', '\r'])
+                .starts_with('\n'))
+        {
+            break;
+        }
+        if matches!(ch, '`' | '~') {
+            let run = rest.bytes().take_while(|b| *b == ch as u8).count();
+            if run >= 3
+                && text[..pos]
+                    .rsplit('\n')
+                    .next()
+                    .is_some_and(|line| line.trim().is_empty())
+            {
+                let marker = &rest[..run];
+                if let Some((end, _)) = rest[run..].match_indices(marker).find(|(at, _)| {
+                    rest[..run + at]
+                        .rsplit('\n')
+                        .next()
+                        .is_some_and(|line| line.trim().is_empty())
+                }) {
+                    pos += run + end + run;
+                    continue;
+                }
+            }
+        }
+        if ch == '`' {
+            let run = rest.bytes().take_while(|b| *b == b'`').count();
+            let marker = &rest[..run];
+            if let Some(end) = rest[run..].find(marker)
+                && !rest[run..run + end].contains('\n')
+            {
+                pos += run + end + run;
+                continue;
+            }
+        }
+        if ch == '\\' {
+            let next = rest[1..].chars().next();
+            if next.is_some_and(|c| matches!(c, '{' | '}' | '$' | '\\')) {
+                pos += 1 + next?.len_utf8();
+                continue;
+            }
+        }
+        if ch == '{' {
+            depth += 1;
+        }
+        if ch == '}' {
+            depth = depth.saturating_sub(1);
+        }
+        pos += ch.len_utf8();
+    }
+    if allow_fallback { fallback } else { None }
+}
+
+pub(crate) fn emit_jupyter_math(
+    builder: &mut impl InlineSink,
+    text: &str,
+    len: usize,
+    content: &str,
+    open: &str,
+    close: &str,
+    opts: MathParseOptions,
+) {
+    if open.starts_with(r"\begin{") {
+        super::latex::parse_latex_command(builder, text, len);
+    } else {
+        let kind = if open == "$$" || open == r"\\[" {
+            SyntaxKind::DISPLAY_MATH
+        } else {
+            SyntaxKind::INLINE_MATH
+        };
+        let marker = if kind == SyntaxKind::DISPLAY_MATH {
+            SyntaxKind::DISPLAY_MATH_MARKER
+        } else {
+            SyntaxKind::INLINE_MATH_MARKER
+        };
+        builder.start_node(kind.into());
+        builder.token(marker.into(), open);
+        emit_math_content(builder, content, opts);
+        builder.token(marker.into(), close);
+        builder.finish_node();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489,6 +723,29 @@ mod tests {
         let mut builder = rowan::GreenNodeBuilder::new();
         emit_inline_math(&mut builder, content, BOOKDOWN_MATH);
         SyntaxNode::new_root(builder.finish())
+    }
+
+    #[test]
+    fn jupyter_environment_closer_indentation_is_not_a_blank_line() {
+        for indent in ["  ", "\t"] {
+            let text = format!("\\begin{{align}}\nx &= y\n{indent}\\end{{align}}");
+            assert_eq!(jupyter_math(&text).map(|(len, ..)| len), Some(text.len()));
+        }
+        for newline in ["\n", "\r\n"] {
+            let text = format!("\\begin{{align}}{newline}x{newline}  {newline}y\\end{{align}}");
+            assert!(jupyter_math(&text).is_none());
+        }
+    }
+
+    #[test]
+    fn jupyter_math_only_masks_complete_fences() {
+        for marker in ["~~~", "```"] {
+            let text = format!("$$\n\\text{{a\n{marker}b}}\n$$");
+            assert_eq!(jupyter_math(&text).map(|(len, ..)| len), Some(text.len()));
+
+            let text = format!("$$\na\n{marker}\n$$\n{marker}\nb\n$$");
+            assert_eq!(jupyter_math(&text).map(|(len, ..)| len), Some(text.len()));
+        }
     }
 
     #[test]

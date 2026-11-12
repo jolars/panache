@@ -74,6 +74,7 @@ pub fn linter_uses_project_config(name: &str, definition: Option<&LinterDefiniti
 // still use the shorter gitignore style (`target/`, `*.md`); `GlobMatcher`
 // normalizes them the same way (see `expand_glob_pattern`).
 pub const DEFAULT_EXCLUDE_PATTERNS: &[&str] = &[
+    "**/.ipynb_checkpoints/**",
     "**/.Rproj.user/**",
     "**/.bzr/**",
     "**/.cache/**",
@@ -345,6 +346,7 @@ const KNOWN_FLAVOR_KEYS: &[&str] = &[
     "rmarkdown",
     "r-markdown",
     "gfm",
+    "jupyter",
     "commonmark",
     "common-mark",
     "multimarkdown",
@@ -906,6 +908,7 @@ fn parse_flavor_key(s: &str) -> Option<Flavor> {
         "quarto" => Some(Flavor::Quarto),
         "rmarkdown" | "r-markdown" => Some(Flavor::RMarkdown),
         "gfm" => Some(Flavor::Gfm),
+        "jupyter" => Some(Flavor::Jupyter),
         "common-mark" | "commonmark" => Some(Flavor::CommonMark),
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
         "mdsvex" => Some(Flavor::Mdsvex),
@@ -1066,6 +1069,7 @@ fn detect_flavor(input_file: Option<&Path>, anchor: Option<&Path>, cfg: &Config)
     let ext_lower = ext.to_lowercase();
 
     match ext_lower.as_str() {
+        "ipynb" => Some(Flavor::Jupyter),
         "qmd" => Some(Flavor::Quarto),
         "rmd" | "rmarkdown" => Some(Flavor::RMarkdown),
         "svx" => Some(Flavor::Mdsvex),

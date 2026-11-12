@@ -55,6 +55,15 @@ pub(crate) fn server_capabilities() -> ServerCapabilities {
                 ..Default::default()
             },
         )),
+        notebook_document_sync: Some(OneOf::Left(NotebookDocumentSyncOptions {
+            notebook_selector: vec![NotebookSelector::ByNotebook {
+                notebook: Notebook::String("jupyter-notebook".into()),
+                cells: Some(vec![NotebookCellSelector {
+                    language: "markdown".into(),
+                }]),
+            }],
+            save: Some(true),
+        })),
         document_formatting_provider: Some(OneOf::Left(true)),
         document_range_formatting_provider: Some(OneOf::Left(true)),
         // Newline trigger: continuation indentation inside list items. The
@@ -556,6 +565,10 @@ impl GlobalState {
             };
         }
 
+        handle!(n::DidOpenNotebookDocument, super::notebooks::did_open);
+        handle!(n::DidChangeNotebookDocument, super::notebooks::did_change);
+        handle!(n::DidSaveNotebookDocument, super::notebooks::did_save);
+        handle!(n::DidCloseNotebookDocument, super::notebooks::did_close);
         handle!(n::DidOpenTextDocument, documents::did_open);
         handle!(n::DidChangeTextDocument, documents::did_change);
         handle!(n::DidSaveTextDocument, documents::did_save);
@@ -815,6 +828,11 @@ impl GlobalState {
         let uris: Vec<Uri> = self
             .document_map
             .keys()
+            .filter(|key| {
+                self.document_map
+                    .get(*key)
+                    .is_none_or(|s| s.notebook_uri.is_none())
+            })
             .filter_map(|key| key.parse::<Uri>().ok())
             .collect();
         self.pool.spawn(move || {

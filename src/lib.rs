@@ -14,6 +14,8 @@ pub mod linter;
 #[cfg(feature = "lsp")]
 pub mod lsp;
 pub mod metadata;
+pub mod notebook;
+pub use notebook::{NotebookError, format_notebook};
 pub mod parser;
 pub mod range_utils;
 pub mod salsa;

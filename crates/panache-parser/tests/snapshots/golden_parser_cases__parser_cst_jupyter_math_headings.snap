@@ -1,0 +1,207 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..201
+  HEADING@0..10
+    ATX_HEADING_MARKER@0..1
+      ATX_HEADING_MARKER@0..1 "#"
+    WHITESPACE@1..2 " "
+    HEADING_CONTENT@2..9
+      INLINE_MATH@2..9
+        INLINE_MATH_MARKER@2..3 "$"
+        MATH_CONTENT@3..8
+          MATH_WORD@3..4 "x"
+          MATH_NEWLINE@4..5 "\n"
+          MATH_WORD@5..6 "+"
+          MATH_SPACE@6..7 " "
+          MATH_WORD@7..8 "y"
+        INLINE_MATH_MARKER@8..9 "$"
+    NEWLINE@9..10 "\n"
+  BLANK_LINE@10..11
+    BLANK_LINE@10..11 "\n"
+  BLOCK_QUOTE@11..25
+    BLOCK_QUOTE_MARKER@11..12 ">"
+    WHITESPACE@12..13 " "
+    HEADING@13..25
+      ATX_HEADING_MARKER@13..14
+        ATX_HEADING_MARKER@13..14 "#"
+      WHITESPACE@14..15 " "
+      HEADING_CONTENT@15..24
+        INLINE_MATH@15..24
+          INLINE_MATH_MARKER@15..16 "$"
+          MATH_CONTENT@16..23
+            MATH_WORD@16..17 "x"
+            MATH_NEWLINE@17..18 "\n"
+            LINE_PREFIX@18..20 "> "
+            MATH_WORD@20..21 "+"
+            MATH_SPACE@21..22 " "
+            MATH_WORD@22..23 "y"
+          INLINE_MATH_MARKER@23..24 "$"
+      NEWLINE@24..25 "\n"
+  BLANK_LINE@25..26
+    BLANK_LINE@25..26 "\n"
+  LIST@26..40
+    LIST_ITEM@26..40
+      LIST_MARKER@26..27 "-"
+      WHITESPACE@27..28 " "
+      HEADING@28..40
+        ATX_HEADING_MARKER@28..29
+          ATX_HEADING_MARKER@28..29 "#"
+        WHITESPACE@29..30 " "
+        HEADING_CONTENT@30..39
+          INLINE_MATH@30..39
+            INLINE_MATH_MARKER@30..31 "$"
+            MATH_CONTENT@31..38
+              MATH_WORD@31..32 "x"
+              MATH_NEWLINE@32..33 "\n"
+              LINE_PREFIX@33..35 "  "
+              MATH_WORD@35..36 "+"
+              MATH_SPACE@36..37 " "
+              MATH_WORD@37..38 "y"
+            INLINE_MATH_MARKER@38..39 "$"
+        NEWLINE@39..40 "\n"
+  BLANK_LINE@40..41
+    BLANK_LINE@40..41 "\n"
+  BLOCK_QUOTE@41..59
+    BLOCK_QUOTE_MARKER@41..42 ">"
+    WHITESPACE@42..43 " "
+    LIST@43..59
+      LIST_ITEM@43..59
+        LIST_MARKER@43..44 "-"
+        WHITESPACE@44..45 " "
+        HEADING@45..59
+          ATX_HEADING_MARKER@45..46
+            ATX_HEADING_MARKER@45..46 "#"
+          WHITESPACE@46..47 " "
+          HEADING_CONTENT@47..58
+            INLINE_MATH@47..58
+              INLINE_MATH_MARKER@47..48 "$"
+              MATH_CONTENT@48..57
+                MATH_WORD@48..49 "x"
+                MATH_NEWLINE@49..50 "\n"
+                LINE_PREFIX@50..51 ">"
+                LINE_PREFIX@51..52 " "
+                LINE_PREFIX@52..54 "  "
+                MATH_WORD@54..55 "+"
+                MATH_SPACE@55..56 " "
+                MATH_WORD@56..57 "y"
+              INLINE_MATH_MARKER@57..58 "$"
+          NEWLINE@58..59 "\n"
+  BLANK_LINE@59..60
+    BLANK_LINE@59..60 "\n"
+  LIST@60..78
+    LIST_ITEM@60..78
+      LIST_MARKER@60..61 "-"
+      WHITESPACE@61..62 " "
+      BLOCK_QUOTE@62..78
+        BLOCK_QUOTE_MARKER@62..63 ">"
+        WHITESPACE@63..64 " "
+        HEADING@64..78
+          ATX_HEADING_MARKER@64..65
+            ATX_HEADING_MARKER@64..65 "#"
+          WHITESPACE@65..66 " "
+          HEADING_CONTENT@66..77
+            INLINE_MATH@66..77
+              INLINE_MATH_MARKER@66..67 "$"
+              MATH_CONTENT@67..76
+                MATH_WORD@67..68 "x"
+                MATH_NEWLINE@68..69 "\n"
+                LINE_PREFIX@69..73 "  > "
+                MATH_WORD@73..74 "+"
+                MATH_SPACE@74..75 " "
+                MATH_WORD@75..76 "y"
+              INLINE_MATH_MARKER@76..77 "$"
+          NEWLINE@77..78 "\n"
+  BLANK_LINE@78..79
+    BLANK_LINE@78..79 "\n"
+  HEADING@79..96
+    ATX_HEADING_MARKER@79..80
+      ATX_HEADING_MARKER@79..80 "#"
+    WHITESPACE@80..81 " "
+    HEADING_CONTENT@81..92
+      INLINE_MATH@81..92
+        INLINE_MATH_MARKER@81..84 "\\\\("
+        MATH_CONTENT@84..89
+          MATH_WORD@84..85 "x"
+          MATH_NEWLINE@85..86 "\n"
+          MATH_WORD@86..87 "+"
+          MATH_SPACE@87..88 " "
+          MATH_WORD@88..89 "y"
+        INLINE_MATH_MARKER@89..92 "\\\\)"
+    WHITESPACE@92..93 " "
+    ATX_HEADING_MARKER@93..95 "##"
+    NEWLINE@95..96 "\n"
+  BLANK_LINE@96..97
+    BLANK_LINE@96..97 "\n"
+  HEADING@97..139
+    ATX_HEADING_MARKER@97..98
+      ATX_HEADING_MARKER@97..98 "#"
+    WHITESPACE@98..99 " "
+    HEADING_CONTENT@99..138
+      TEXT@99..104 "Here "
+      LATEX_COMMAND@104..138
+        TEXT@104..138 "\\begin{align}\n+ x &=  ..."
+    NEWLINE@138..139 "\n"
+  BLANK_LINE@139..140
+    BLANK_LINE@139..140 "\n"
+  HEADING@140..162
+    ATX_HEADING_MARKER@140..141
+      ATX_HEADING_MARKER@140..141 "#"
+    WHITESPACE@141..142 " "
+    HEADING_CONTENT@142..161
+      INLINE_MATH@142..149
+        INLINE_MATH_MARKER@142..143 "$"
+        MATH_CONTENT@143..148
+          MATH_WORD@143..144 "x"
+          MATH_NEWLINE@144..145 "\n"
+          MATH_WORD@145..146 "+"
+          MATH_SPACE@146..147 " "
+          MATH_WORD@147..148 "y"
+        INLINE_MATH_MARKER@148..149 "$"
+      TEXT@149..154 " and "
+      INLINE_MATH@154..161
+        INLINE_MATH_MARKER@154..155 "$"
+        MATH_CONTENT@155..160
+          MATH_WORD@155..156 "z"
+          MATH_NEWLINE@156..157 "\n"
+          MATH_WORD@157..158 "#"
+          MATH_SPACE@158..159 " "
+          MATH_WORD@159..160 "w"
+        INLINE_MATH_MARKER@160..161 "$"
+    NEWLINE@161..162 "\n"
+  BLANK_LINE@162..163
+    BLANK_LINE@162..163 "\n"
+  HEADING@163..176
+    ATX_HEADING_MARKER@163..164
+      ATX_HEADING_MARKER@163..164 "#"
+    WHITESPACE@164..165 " "
+    HEADING_CONTENT@165..175
+      TEXT@165..175 "$unmatched"
+    NEWLINE@175..176 "\n"
+  LIST@176..183
+    LIST_ITEM@176..183
+      LIST_MARKER@176..177 "+"
+      WHITESPACE@177..178 " "
+      PLAIN@178..183
+        TEXT@178..182 "item"
+        NEWLINE@182..183 "\n"
+  BLANK_LINE@183..184
+    BLANK_LINE@183..184 "\n"
+  HEADING@184..194
+    ATX_HEADING_MARKER@184..185
+      ATX_HEADING_MARKER@184..185 "#"
+    WHITESPACE@185..186 " "
+    HEADING_CONTENT@186..193
+      INLINE_CODE@186..193
+        INLINE_CODE_MARKER@186..187 "`"
+        INLINE_CODE_CONTENT@187..192 "$code"
+        INLINE_CODE_MARKER@192..193 "`"
+    NEWLINE@193..194 "\n"
+  LIST@194..201
+    LIST_ITEM@194..201
+      LIST_MARKER@194..195 "+"
+      WHITESPACE@195..196 " "
+      PLAIN@196..201
+        TEXT@196..200 "item"
+        NEWLINE@200..201 "\n"

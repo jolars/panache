@@ -5,7 +5,7 @@
 
 use crate::options::{Dialect, ParserOptions};
 use crate::parser::blocks::container_prefix::{
-    ContainerPrefixLine, ContainerPrefixState, emit_grafted_token,
+    ContainerPrefix, ContainerPrefixLine, ContainerPrefixState, emit_grafted_token,
 };
 use crate::parser::blocks::figures::paragraph_is_standalone_image;
 use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
@@ -13,7 +13,7 @@ use crate::parser::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_ho
 use crate::parser::blocks::html_blocks::{
     HtmlBlockType, count_tag_balance, is_pandoc_matched_pair_tag, try_parse_html_block_start,
 };
-use crate::parser::blocks::paragraphs::update_display_math_state;
+use crate::parser::blocks::paragraphs::{JupyterMathLookahead, update_display_math_state};
 use crate::parser::blocks::tables::try_parse_pipe_separator;
 use crate::parser::inlines::code_spans::pending_code_span_openers;
 use crate::parser::utils::container_stack::{
@@ -53,11 +53,12 @@ pub(crate) struct ListItemBuffer {
     /// The already-emitted checkbox starts a paragraph even when the
     /// remaining text resembles a heading or thematic break.
     has_task_checkbox: bool,
-    /// Display-math region (`$$ ... $$`, `\[ ... \]`, `\\[ ... \\]`) left
-    /// open by the buffered lines. Consulted by the parser's list-item hold
-    /// so block detection cannot split an open region into a `TEX_BLOCK`
+    /// Display-math region left open by the buffered lines, or a possible
+    /// Jupyter opener awaiting verification. Consulted by the parser's list-item
+    /// hold so block detection cannot split an open region into a `TEX_BLOCK`
     /// (same failure mode the paragraph tracker fixes at top level).
     open_display_math: Option<OpenDisplayMath>,
+    jupyter_math_lookahead: Option<Box<JupyterMathLookahead>>,
     /// Matched-pair HTML open tag surviving a mid-item partial flush.
     ///
     /// `clear()` folds the segments' unclosed tag in here before draining,
@@ -75,6 +76,7 @@ impl ListItemBuffer {
             segments: Vec::new(),
             has_task_checkbox: false,
             open_display_math: None,
+            jupyter_math_lookahead: None,
             carried_unclosed_html_tag: None,
         }
     }
@@ -107,9 +109,35 @@ impl ListItemBuffer {
         }
     }
 
-    /// Whether the buffered lines left a display-math region open.
+    /// Whether the buffered lines left math open or pending verification.
     pub(crate) fn has_open_display_math(&self) -> bool {
         self.open_display_math.is_some()
+    }
+
+    pub(crate) fn clear_open_math(&mut self) {
+        self.open_display_math = None;
+    }
+
+    pub(crate) fn jupyter_math_closing_line(
+        &mut self,
+        line: usize,
+        prefix: &ContainerPrefix,
+        following: &[&str],
+        gobble: &[usize],
+    ) -> Option<usize> {
+        if self
+            .jupyter_math_lookahead
+            .as_ref()
+            .is_none_or(|lookahead| !lookahead.contains(line, prefix))
+        {
+            self.jupyter_math_lookahead = Some(Box::new(JupyterMathLookahead::new(
+                self.to_paragraph_buffer(gobble).get_text_for_parsing(),
+                line,
+                prefix,
+                following.iter().copied(),
+            )));
+        }
+        self.jupyter_math_lookahead.as_mut()?.closing_line(line)
     }
 
     /// Backtick runs in the buffered text that are still waiting for a closer.
@@ -554,10 +582,10 @@ impl ListItemBuffer {
             let line0_has_bq = bq_prefixes.first().is_some_and(|p| !p.is_empty());
 
             if !line0_has_bq
-                && config.extensions.hugo_shortcodes
+                && (config.extensions.hugo_shortcodes || config.extensions.tex_math_jupyter)
                 && let Some(tail) = self
                     .to_paragraph_buffer(gobble)
-                    .try_emit_hugo_heading(builder, config)
+                    .try_emit_multiline_heading(builder, config)
             {
                 if !tail.is_empty() {
                     builder.start_node(
@@ -623,7 +651,19 @@ impl ListItemBuffer {
                 return;
             }
 
-            if try_emit_table_or_div_lift(builder, &text, config, gobble, &bq_prefixes) {
+            let held_buffer = self
+                .segments
+                .iter()
+                .any(|segment| matches!(segment, ListItemContent::Prefix(_)))
+                .then(|| self.to_paragraph_buffer(gobble));
+            if try_emit_table_or_div_lift(
+                builder,
+                &text,
+                config,
+                gobble,
+                &bq_prefixes,
+                held_buffer.as_ref(),
+            ) {
                 return;
             }
         }
@@ -723,6 +763,7 @@ impl ListItemBuffer {
         self.segments.clear();
         self.has_task_checkbox = false;
         self.open_display_math = None;
+        self.jupyter_math_lookahead = None;
     }
 }
 
@@ -907,6 +948,7 @@ fn try_emit_table_or_div_lift(
     config: &ParserOptions,
     gobble: &[usize],
     bq_prefixes: &[String],
+    held_buffer: Option<&ParagraphBuffer>,
 ) -> bool {
     let leading_newline = if text.starts_with("\r\n") {
         "\r\n"
@@ -922,7 +964,14 @@ fn try_emit_table_or_div_lift(
         bq_prefixes.get(1..).unwrap_or_default()
     };
 
-    let (parse_text, list_prefixes) = if gobble.is_empty() {
+    let (parse_text, list_prefixes) = if let Some(buffer) = held_buffer {
+        // Opaque holds already stripped some continuation prefixes. Use the
+        // shared buffer's text and exact per-line map rather than losing them.
+        (
+            buffer.get_text_for_parsing()[leading_newline.len()..].to_string(),
+            Vec::new(),
+        )
+    } else if gobble.is_empty() {
         (body.to_string(), Vec::new())
     } else {
         strip_list_item_indent_from(body, gobble, leading_newline.is_empty())
@@ -949,14 +998,22 @@ fn try_emit_table_or_div_lift(
         return false;
     }
 
-    let prefix_lines: Vec<ContainerPrefixLine> = (0..list_prefixes.len().max(bq_prefixes.len()))
-        .map(|i| {
-            ContainerPrefixLine::bq_then_list(
-                bq_prefixes.get(i).cloned().unwrap_or_default(),
-                list_prefixes.get(i).cloned().unwrap_or_default(),
-            )
-        })
-        .collect();
+    let prefix_lines = if let Some(buffer) = held_buffer {
+        buffer
+            .container_prefix_lines()
+            .into_iter()
+            .skip(usize::from(!leading_newline.is_empty()))
+            .collect()
+    } else {
+        (0..list_prefixes.len().max(bq_prefixes.len()))
+            .map(|i| {
+                ContainerPrefixLine::bq_then_list(
+                    bq_prefixes.get(i).cloned().unwrap_or_default(),
+                    list_prefixes.get(i).cloned().unwrap_or_default(),
+                )
+            })
+            .collect()
+    };
     let mut prefix_state = ContainerPrefixState::new(prefix_lines);
     if !leading_newline.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), leading_newline);

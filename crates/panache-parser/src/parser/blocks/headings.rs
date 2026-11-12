@@ -11,6 +11,30 @@ use crate::parser::utils::attributes::{
 };
 use crate::parser::utils::helpers::trim_end_spaces_tabs;
 use crate::parser::utils::inline_emission;
+use crate::parser::utils::text_buffer::ParagraphBuffer;
+
+pub(crate) fn prepare_jupyter_heading(
+    lines: &super::container_prefix::StrippedLines<'_, '_>,
+) -> Option<(ParagraphBuffer, usize)> {
+    let first = lines.first();
+    if !crate::parser::inlines::math::pending_jupyter_math(first) {
+        return None;
+    }
+    let lookahead = lines.jupyter_lookahead(lines.pos(), first, false);
+    let text = lookahead.text_at(lines.pos());
+    let end = crate::parser::inlines::math::jupyter_logical_line_len(text)?;
+    let count = text[..end].bytes().filter(|&b| b == b'\n').count()
+        + usize::from(!text[..end].ends_with('\n'));
+    let mut buffer = ParagraphBuffer::new();
+    buffer.push_text(first);
+    for i in 1..count {
+        let raw = lines.raw_at(i);
+        let tail = lines.peek_prefix_at(lines.pos() + i);
+        buffer.push_indent(&raw[..raw.len() - tail.len()]);
+        buffer.push_text(tail);
+    }
+    Some((buffer, count))
+}
 
 fn try_parse_mmd_header_identifier_with_pos(content: &str) -> Option<(String, usize, usize)> {
     let trimmed = trim_end_spaces_tabs(content);

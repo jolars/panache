@@ -73,7 +73,7 @@ pub enum Requirement {
     Emoji,
     /// Needs `extensions.raw-html`.
     RawHtml,
-    /// Needs any `tex-math-*` extension (dollars, gfm, single/double backslash).
+    /// Needs any `tex-math-*` extension (dollars, gfm, jupyter, single/double backslash).
     TexMath,
     /// Needs `extensions.tex-math-dollars`.
     TexMathDollars,
@@ -108,6 +108,7 @@ impl Requirement {
                     || ext.tex_math_gfm
                     || ext.tex_math_single_backslash
                     || ext.tex_math_double_backslash
+                    || ext.tex_math_jupyter
             }
             Requirement::TexMathDollars => ext.tex_math_dollars,
             Requirement::ChunkFlavor => {

@@ -5,13 +5,14 @@ use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 use unicode_width::UnicodeWidthChar;
 
+use crate::parser::inlines::sink::{InjectedMarker, InlineSink, MarkerInjectingSink};
 use crate::parser::utils::attributes::{
     emit_attribute_node, try_parse_trailing_attributes_with_pos,
 };
 use crate::parser::utils::helpers::{emit_line_tokens, emit_separator_tokens, strip_newline};
 use crate::parser::utils::inline_emission;
 
-use super::container_prefix::{ContainerPrefix, FrameVerdict, StrippedLines};
+use super::container_prefix::{ContainerPrefix, FrameVerdict, StrippedLines, strip_list_indent};
 use super::reference_links::try_parse_footnote_marker;
 
 /// Read-only indexed view over lines for table detection scans. Two
@@ -900,11 +901,7 @@ fn emit_table_caption(
     builder.finish_node(); // TABLE_CAPTION
 }
 
-fn emit_table_cell(
-    builder: &mut GreenNodeBuilder<'static>,
-    cell_text: &str,
-    config: &ParserOptions,
-) {
+fn emit_table_cell(builder: &mut impl InlineSink, cell_text: &str, config: &ParserOptions) {
     builder.start_node(SyntaxKind::TABLE_CELL.into());
 
     if !cell_text.is_empty() {
@@ -1298,7 +1295,7 @@ pub fn try_parse_pipe_separator(line: &str) -> Option<Vec<Alignment>> {
 }
 
 /// Find cell boundaries before inline emission. Pandoc protects literal code
-/// and math, whereas CommonMark table delimiters take precedence over inlines.
+/// and math. Jupyter also protects math before applying CommonMark table rules.
 fn pipe_delimiters(line: &str, config: &ParserOptions) -> Vec<usize> {
     use crate::parser::inlines::{
         code_spans::try_parse_code_span, hugo::HugoIndex, inline_ir::try_pandoc_math_opaque,
@@ -1311,6 +1308,7 @@ fn pipe_delimiters(line: &str, config: &ParserOptions) -> Vec<usize> {
         .then(|| HugoIndex::new(line));
     let mut positions = Vec::new();
     let mut pos = 0;
+    let mut jupyter_code_end = 0;
     while pos < line.len() {
         let rest = &line[pos..];
         if let Some(hugo) = &hugo
@@ -1318,6 +1316,27 @@ fn pipe_delimiters(line: &str, config: &ParserOptions) -> Vec<usize> {
             && span.opening.complete
         {
             pos += span.end;
+            continue;
+        }
+        if config.extensions.tex_math_jupyter
+            && pos >= jupyter_code_end
+            && rest.starts_with('`')
+            && let Some((_, content, backticks, _)) = try_parse_code_span(rest)
+        {
+            // GFM still counts pipes inside code, but dollars there cannot
+            // start math any more than they can during inline emission.
+            jupyter_code_end = pos + content.len() + backticks * 2;
+        }
+        if config.extensions.tex_math_jupyter
+            && pos >= jupyter_code_end
+            && matches!(rest.as_bytes()[0], b'$' | b'\\')
+            && let Some((len, ..)) = crate::parser::inlines::math::jupyter_math(rest)
+        {
+            pos += len;
+            continue;
+        }
+        if config.extensions.tex_math_jupyter && rest.starts_with("$$") {
+            pos += 2;
             continue;
         }
         if config.dialect == Dialect::Pandoc {
@@ -1379,19 +1398,84 @@ fn parse_pipe_table_row(line: &str, config: &ParserOptions) -> Vec<String> {
         .collect()
 }
 
+struct PipeTableRow<'a> {
+    start: usize,
+    end: usize,
+    text: &'a str,
+}
+
+/// Jupyter extracts multiline math before Markdown sees a table's logical
+/// rows. Keep the physical range so emission can restore container prefixes.
+fn prepare_pipe_table_row<'a>(
+    window: &StrippedLines<'a, '_>,
+    start: usize,
+    config: &ParserOptions,
+    jupyter_lines: &'a std::cell::OnceCell<std::sync::Arc<super::jupyter::Lookahead>>,
+) -> PipeTableRow<'a> {
+    let first = window.strip_at(start);
+    let single = PipeTableRow {
+        start,
+        end: start + 1,
+        text: first,
+    };
+    if !config.extensions.tex_math_jupyter
+        || !crate::parser::inlines::math::pending_jupyter_math(first)
+    {
+        return single;
+    }
+
+    // Ordinary rows never materialize a suffix. Reuse the parser's stripped
+    // view across tables when multiline math does need the full matcher.
+    let lines = jupyter_lines.get_or_init(|| window.jupyter_lookahead(start, first, true));
+    let text = lines.text_at(start);
+    let Some(len) = crate::parser::inlines::math::jupyter_logical_line_len(text) else {
+        return single;
+    };
+    let text = &text[..len];
+    let count = text.bytes().filter(|&b| b == b'\n').count() + usize::from(!text.ends_with('\n'));
+    PipeTableRow {
+        start,
+        end: start + count,
+        text,
+    }
+}
+
 /// Emit a pipe table row with inline-parsed cells.
 /// Preserves losslessness by emitting exact byte representation while parsing cell content inline.
 fn emit_pipe_table_row(
     builder: &mut GreenNodeBuilder<'static>,
     window: &StrippedLines<'_, '_>,
-    abs_idx: usize,
+    row: &PipeTableRow<'_>,
     row_kind: SyntaxKind,
     config: &ParserOptions,
 ) {
     builder.start_node(row_kind.into());
 
-    let line = window.emit_or_dispatch_tail(builder, abs_idx);
+    let first = window.emit_or_dispatch_tail(builder, row.start);
+    if row.end == row.start + 1 {
+        emit_pipe_table_row_content(builder, first, config);
+    } else {
+        let row_indent = crate::parser::utils::container_stack::leading_indent(first).0;
+        let mut text = first.to_owned();
+        let mut markers = Vec::new();
+        for i in row.start + 1..row.end {
+            let raw = window.raw()[i];
+            let tail = strip_list_indent(window.peek_prefix_at(i), row_indent);
+            let prefix = &raw[..raw.len() - tail.len()];
+            if !prefix.is_empty() {
+                markers.push((text.len(), InjectedMarker::Indent(prefix)));
+            }
+            text.push_str(tail);
+        }
+        let mut sink = MarkerInjectingSink::new(builder, &markers);
+        emit_pipe_table_row_content(&mut sink, &text, config);
+        sink.finish();
+    }
 
+    builder.finish_node();
+}
+
+fn emit_pipe_table_row_content(builder: &mut impl InlineSink, line: &str, config: &ParserOptions) {
     let (line_without_newline, newline_str) = strip_newline(line);
     let trimmed = line_without_newline.trim();
 
@@ -1445,8 +1529,6 @@ fn emit_pipe_table_row(
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
-
-    builder.finish_node();
 }
 
 /// Probe for a pipe table opening at the window's first line whose header
@@ -1483,7 +1565,11 @@ pub(crate) fn try_parse_pipe_table(
 
     let starts_with_caption =
         config.extensions.table_captions && is_caption_followed_by_table(window, start_pos);
-    if !window.strip_at(start_pos).contains('|') && !starts_with_caption {
+    if !window.strip_at(start_pos).contains('|')
+        && !starts_with_caption
+        && !(config.extensions.tex_math_jupyter
+            && crate::parser::inlines::math::pending_jupyter_math(window.strip_at(start_pos)))
+    {
         return None;
     }
 
@@ -1502,7 +1588,17 @@ pub(crate) fn try_parse_pipe_table(
         return None;
     }
 
-    if pipe_delimiters(window.line(actual_start).trim(), config).is_empty() {
+    // Reject ordinary non-table lines before materializing Jupyter lookahead.
+    let header_may_span_lines = config.extensions.tex_math_jupyter
+        && crate::parser::inlines::math::pending_jupyter_math(window.line(actual_start));
+    if !header_may_span_lines && try_parse_pipe_separator(window.line(actual_start + 1)).is_none() {
+        return None;
+    }
+
+    let jupyter_lines = std::cell::OnceCell::new();
+    let header = prepare_pipe_table_row(window, actual_start, config, &jupyter_lines);
+    let separator_pos = header.end;
+    if separator_pos >= lines.len() || pipe_delimiters(header.text.trim(), config).is_empty() {
         return None;
     }
 
@@ -1511,30 +1607,32 @@ pub(crate) fn try_parse_pipe_table(
         return None;
     }
 
-    if config.dialect != Dialect::CommonMark
-        && !within_nonindent_spaces(frame.line(actual_start + 1))
+    if config.dialect != Dialect::CommonMark && !within_nonindent_spaces(frame.line(separator_pos))
     {
         return None;
     }
 
-    let alignments = try_parse_pipe_separator(window.line(actual_start + 1))?;
+    let alignments = try_parse_pipe_separator(window.line(separator_pos))?;
 
-    let header_cells = parse_pipe_table_row(window.line(actual_start), config);
+    let header_cells = parse_pipe_table_row(header.text, config);
 
     if config.dialect == Dialect::CommonMark && header_cells.len() != alignments.len() {
         return None;
     }
 
-    let mut end_pos = actual_start + 2;
+    let mut rows = Vec::new();
+    let mut end_pos = separator_pos + 1;
     while end_pos < window.line_count() {
         let line = window.line(end_pos);
         if line.trim().is_empty() || window.ends_container_lines(end_pos) {
             break;
         }
-        if !line.contains('|') {
+        let row = prepare_pipe_table_row(window, end_pos, config, &jupyter_lines);
+        if !row.text.contains('|') {
             break;
         }
-        end_pos += 1;
+        end_pos = row.end;
+        rows.push(row);
     }
 
     let caption_before = caption_before.or_else(|| {
@@ -1558,21 +1656,15 @@ pub(crate) fn try_parse_pipe_table(
         emit_caption_blank_lines(builder, window, cap_end, actual_start);
     }
 
-    emit_pipe_table_row(
-        builder,
-        window,
-        actual_start,
-        SyntaxKind::TABLE_HEADER,
-        config,
-    );
+    emit_pipe_table_row(builder, window, &header, SyntaxKind::TABLE_HEADER, config);
 
     builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-    let separator_tail = window.emit_or_dispatch_tail(builder, actual_start + 1);
+    let separator_tail = window.emit_or_dispatch_tail(builder, separator_pos);
     emit_separator_tokens(builder, separator_tail);
     builder.finish_node();
 
-    for idx in (actual_start + 2)..end_pos {
-        emit_pipe_table_row(builder, window, idx, SyntaxKind::TABLE_ROW, config);
+    for row in &rows {
+        emit_pipe_table_row(builder, window, row, SyntaxKind::TABLE_ROW, config);
     }
 
     if let Some((cap_start, cap_end)) = caption_after {

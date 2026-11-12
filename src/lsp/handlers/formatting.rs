@@ -20,23 +20,41 @@ pub(crate) fn format_document(
     params: DocumentFormattingParams,
 ) -> Option<Vec<TextEdit>> {
     let uri = params.text_document.uri;
+    if snap
+        .document_state(&uri)
+        .is_some_and(|s| s.notebook_cell_kind == Some(lsp_types::NotebookCellKind::Code))
+    {
+        return None;
+    }
     log::debug!("format_document uri={}", uri.as_str());
 
+    let config_uri = snap
+        .document_state(&uri)
+        .and_then(|s| s.notebook_uri)
+        .map(|u| crate::lsp::notebooks::config_uri(&snap.workspace_folders, &u));
+    let config_uri = config_uri.as_ref().unwrap_or(&uri);
     let text = snap.document_content(&uri)?;
+    if text.is_empty()
+        && snap
+            .document_state(&uri)
+            .is_some_and(|s| s.notebook_uri.is_some())
+    {
+        return None;
+    }
     // Refuse to format under a broken `panache.toml` rather than silently
     // applying default formatting. The error is surfaced as a diagnostic on the
     // config file (settle pass) and a one-shot toast (main-loop config reload).
     let (config, source) =
-        match crate::lsp::config::try_load_config(&snap.workspace_folders, Some(&uri)) {
+        match crate::lsp::config::try_load_config(&snap.workspace_folders, Some(config_uri)) {
             Ok(loaded) => loaded,
             Err(err) => {
                 log::warn!("Refusing to format {}: {err}", uri.as_str());
                 return None;
             }
         };
-    let workspace_root = snap.workspace_root_for(&uri);
+    let workspace_root = snap.workspace_root_for(config_uri);
 
-    if is_uri_excluded(&uri, &config, &source, workspace_root.as_deref()) {
+    if is_uri_excluded(config_uri, &config, &source, workspace_root.as_deref()) {
         log::info!(
             "Skipping formatting (matched exclude pattern): {}",
             uri.as_str()
@@ -90,10 +108,23 @@ pub(crate) fn format_on_type(
     }
 
     let uri = params.text_document_position.text_document.uri;
+    if snap
+        .document_state(&uri)
+        .is_some_and(|s| s.notebook_cell_kind == Some(lsp_types::NotebookCellKind::Code))
+    {
+        return None;
+    }
     let position = params.text_document_position.position;
     log::debug!("format_on_type uri={} pos={:?}", uri.as_str(), position);
 
     let text = snap.document_content(&uri)?;
+    if text.is_empty()
+        && snap
+            .document_state(&uri)
+            .is_some_and(|s| s.notebook_uri.is_some())
+    {
+        return None;
+    }
     // Salsa-cached tree; already reflects the just-typed newline. Probing the
     // *previous* line's marker (below) keeps us off the unstable new line.
     let tree = snap.parsed_tree(&uri)?;
@@ -131,6 +162,12 @@ pub(crate) fn format_range(
     params: DocumentRangeFormattingParams,
 ) -> Option<Vec<TextEdit>> {
     let uri = params.text_document.uri;
+    if snap
+        .document_state(&uri)
+        .is_some_and(|s| s.notebook_cell_kind == Some(lsp_types::NotebookCellKind::Code))
+    {
+        return None;
+    }
     let range = params.range;
     log::debug!(
         "format_range uri={} start={:?} end={:?}",
@@ -139,15 +176,28 @@ pub(crate) fn format_range(
         range.end
     );
 
+    let config_uri = snap
+        .document_state(&uri)
+        .and_then(|s| s.notebook_uri)
+        .map(|u| crate::lsp::notebooks::config_uri(&snap.workspace_folders, &u));
+    let config_uri = config_uri.as_ref().unwrap_or(&uri);
     let text = snap.document_content(&uri)?;
+    if text.is_empty()
+        && snap
+            .document_state(&uri)
+            .is_some_and(|s| s.notebook_uri.is_some())
+    {
+        return None;
+    }
     // Refuse to range-format under a broken config (see `format_document`).
-    let config = match crate::lsp::config::try_load_config(&snap.workspace_folders, Some(&uri)) {
-        Ok((config, _source)) => config,
-        Err(err) => {
-            log::warn!("Refusing to range-format {}: {err}", uri.as_str());
-            return None;
-        }
-    };
+    let config =
+        match crate::lsp::config::try_load_config(&snap.workspace_folders, Some(config_uri)) {
+            Ok((config, _source)) => config,
+            Err(err) => {
+                log::warn!("Refusing to range-format {}: {err}", uri.as_str());
+                return None;
+            }
+        };
 
     // Convert LSP range (0-indexed lines, end-exclusive) to panache range
     // (1-indexed, inclusive).

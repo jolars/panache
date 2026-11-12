@@ -16,6 +16,12 @@ pub(crate) fn code_action(
     params: CodeActionParams,
 ) -> Option<CodeActionResponse> {
     let uri = params.text_document.uri.clone();
+    if snap
+        .document_state(&uri)
+        .is_some_and(|s| s.notebook_uri.is_some())
+    {
+        return None;
+    }
     let (text, config) = snap.document_and_config(&uri)?;
     let line_index = snap.line_index(&uri)?;
     let request_range = params.range;

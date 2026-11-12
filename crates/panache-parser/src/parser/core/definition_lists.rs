@@ -691,7 +691,7 @@ pub(super) fn emit_definition_plain_or_heading(
     config: &ParserOptions,
     suppress_footnote_refs: bool,
 ) {
-    if let Some(tail) = buffer.try_emit_hugo_heading(builder, config) {
+    if let Some(tail) = buffer.try_emit_multiline_heading(builder, config) {
         if !tail.is_empty() {
             builder.start_node(SyntaxKind::PLAIN.into());
             tail.emit_with_inlines(builder, config, suppress_footnote_refs);

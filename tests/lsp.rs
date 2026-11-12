@@ -44,3 +44,6 @@ mod lsp {
     pub(super) mod test_table_conversion;
     pub(super) mod test_workspace_folders;
 }
+
+#[path = "lsp/test_notebooks.rs"]
+mod test_notebooks;

@@ -1,5 +1,5 @@
 use super::FormatContext;
-use crate::config::MathDelimiterStyle;
+use crate::config::{MathDelimiterStyle, MathMode};
 use crate::formatter::Formatter;
 use crate::formatter::core::{normalize_attribute_text, normalize_span_attributes};
 use crate::formatter::math::{self, MathContext, MathFormatOptions};
@@ -572,6 +572,13 @@ fn format_inline_node_with_options(
                         ("$", "$")
                     }
                 }
+                MathDelimiterStyle::Backslash if config.parser_extensions.tex_math_jupyter => {
+                    if is_display_math {
+                        (r"\\[", r"\\]")
+                    } else {
+                        (r"\\(", r"\\)")
+                    }
+                }
                 MathDelimiterStyle::Backslash => {
                     if is_display_math {
                         (r"\[", r"\]")
@@ -596,10 +603,40 @@ fn format_inline_node_with_options(
             } else {
                 let opts = MathFormatOptions::from_config(config, MathContext::Inline);
                 let clean = content.clone();
-                match math::format_math(&clean, &opts) {
-                    Some(body) => format!("{}{}{}", open, body, close),
-                    None => format!("{}{}{}", open, collapse_internal_newlines(&content), close),
-                }
+                let body = match math::format_math(&clean, &opts) {
+                    Some(body) => Cow::Owned(body),
+                    None if config.parser_extensions.tex_math_jupyter
+                        && config.math == MathMode::Verbatim =>
+                    {
+                        Cow::Borrowed(content.as_str())
+                    }
+                    None => collapse_internal_newlines(&content),
+                };
+                // Adjacent dollars are a display opener in Jupyter. Keep a
+                // separator even when normalization leaves no math content.
+                let body = if config.parser_extensions.tex_math_jupyter
+                    && open == "$"
+                    && body.is_empty()
+                {
+                    " "
+                } else {
+                    &body
+                };
+                // Jupyter skips a `$$` run while looking for an inline
+                // closer. Separate normalized spans so they stay distinct.
+                let separator = if config.parser_extensions.tex_math_jupyter
+                    && config.math_delimiter_style == MathDelimiterStyle::Dollars
+                    && node
+                        .prev_sibling_or_token()
+                        .and_then(NodeOrToken::into_node)
+                        .and_then(InlineMath::cast)
+                        .is_some()
+                {
+                    " "
+                } else {
+                    ""
+                };
+                format!("{separator}{open}{body}{close}")
             }
         }
         SyntaxKind::DISPLAY_MATH => {
@@ -623,6 +660,13 @@ fn format_inline_node_with_options(
             let is_environment = display_math.is_environment_form();
 
             if in_single_line_table_cell(node) {
+                // A TeX comment pins its line break even within a logical row.
+                if config.parser_extensions.tex_math_jupyter
+                    && (config.math == MathMode::Verbatim
+                        || content.contains('\n') && content.contains('%'))
+                {
+                    return format!("{opening}{content}{closing}");
+                }
                 let inline_content = content.split_whitespace().collect::<Vec<_>>().join(" ");
                 return format!("{opening}{inline_content}{closing}");
             }
@@ -633,6 +677,9 @@ fn format_inline_node_with_options(
                 match config.math_delimiter_style {
                     MathDelimiterStyle::Preserve => (opening, closing),
                     MathDelimiterStyle::Dollars => ("$$", "$$"),
+                    MathDelimiterStyle::Backslash if config.parser_extensions.tex_math_jupyter => {
+                        (r"\\[", r"\\]")
+                    }
                     MathDelimiterStyle::Backslash => (r"\[", r"\]"),
                 }
             };
@@ -749,8 +796,14 @@ fn format_inline_node_with_options(
             format!("^[{}]", normalized)
         }
         SyntaxKind::CITATION | SyntaxKind::CROSSREF => format_citation_like(node, config),
-        SyntaxKind::LATEX_COMMAND => math::format_latex_math_environment(node, config)
-            .unwrap_or_else(|| node.text().to_string()),
+        SyntaxKind::LATEX_COMMAND => {
+            if in_single_line_table_cell(node) {
+                text_without_line_prefixes(node)
+            } else {
+                math::format_latex_math_environment(node, config)
+                    .unwrap_or_else(|| text_without_line_prefixes(node))
+            }
+        }
         _ if UnresolvedReference::can_cast(node.kind()) => {
             // Containers add their own prefixes to every physical output line.
             text_without_line_prefixes(node)

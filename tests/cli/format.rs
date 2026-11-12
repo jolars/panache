@@ -1166,3 +1166,99 @@ fn test_format_discovers_parent_config_from_relative_target() {
         .assert()
         .success();
 }
+
+#[test]
+fn notebook_format_check_discovery_and_stdin() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.ipynb");
+    let input = r##"{"nbformat":4,"nbformat_minor":0,"cells":[{"cell_type":"markdown","source":"#   Hello"},{"cell_type":"code","source":"x=  1"}]}"##;
+    fs::write(&path, input).unwrap();
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--no-cache", "--check"])
+        .arg(&path)
+        .assert()
+        .code(1);
+    assert_eq!(fs::read_to_string(&path).unwrap(), input);
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--no-cache"])
+        .arg(dir.path())
+        .assert()
+        .success();
+    let output = fs::read_to_string(&path).unwrap();
+    assert_eq!(output, input.replace("#   Hello", "# Hello\\n"));
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--no-cache", "--check"])
+        .arg(&path)
+        .assert()
+        .success();
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--stdin-filename", "test.ipynb"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(output);
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--range", "1:2"])
+        .arg(&path)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--range"));
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--isolated", "--no-cache"])
+        .arg(&path)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("formatting only"));
+}
+
+#[test]
+fn notebook_checkpoints_and_invalid_sources_are_not_rewritten() {
+    let dir = TempDir::new().unwrap();
+    let checkpoints = dir.path().join(".ipynb_checkpoints");
+    fs::create_dir(&checkpoints).unwrap();
+    let path = checkpoints.join("test.ipynb");
+    let invalid =
+        r#"{"nbformat":4,"nbformat_minor":0,"cells":[{"cell_type":"markdown","source":[1]}]}"#;
+    fs::write(&path, invalid).unwrap();
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--no-cache"])
+        .arg(dir.path())
+        .assert()
+        .success();
+    assert_eq!(fs::read_to_string(&path).unwrap(), invalid);
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--no-cache"])
+        .arg(&path)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cell 1"));
+    assert_eq!(fs::read_to_string(&path).unwrap(), invalid);
+}
+
+#[test]
+fn notebook_container_detection_is_independent_of_flavor_override() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("test.ipynb");
+    let input = r##"{"nbformat":4,"nbformat_minor":0,"cells":[{"cell_type":"markdown","source":"#   Hello"}]}"##;
+    fs::write(&path, input).unwrap();
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--isolated",
+            "--no-cache",
+            "--flavor",
+            "commonmark",
+        ])
+        .arg(&path)
+        .assert()
+        .success();
+    let parsed: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    assert_eq!(parsed["cells"][0]["source"], "# Hello\n");
+    cargo_bin_cmd!("panache")
+        .args(["format", "--isolated", "--flavor", "jupyter"])
+        .write_stdin("#   Hello")
+        .assert()
+        .success()
+        .stdout("# Hello\n");
+}

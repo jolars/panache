@@ -149,6 +149,7 @@ pub(crate) fn default_config_for_uri(document_uri: Option<&Uri>) -> crate::Confi
     if let Some(flavor) = crate::config::detect_flavor_from_path(&file_path, &config) {
         config.flavor = flavor;
         config.extensions = crate::config::Extensions::for_flavor(flavor);
+        config.formatter_extensions = crate::config::FormatterExtensions::for_flavor(flavor);
     }
     config
 }

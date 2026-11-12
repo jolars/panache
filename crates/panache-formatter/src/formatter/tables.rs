@@ -717,7 +717,12 @@ fn extract_pipe_table_data(node: &SyntaxNode, config: &FormatContext) -> TableDa
     }
 }
 
-/// Calculate the maximum width needed for each column
+fn pipe_cell_width(cell: &str) -> usize {
+    cell.lines().map(UnicodeWidthStr::width).max().unwrap_or(0)
+}
+
+/// Calculate each column's width from physical lines, including opaque math
+/// continuations. Summing across newlines would inflate the whole table.
 pub(super) fn calculate_column_widths(rows: &[Vec<String>]) -> Vec<usize> {
     if rows.is_empty() {
         return Vec::new();
@@ -729,7 +734,7 @@ pub(super) fn calculate_column_widths(rows: &[Vec<String>]) -> Vec<usize> {
     for row in rows {
         for (col_idx, cell) in row.iter().enumerate() {
             if col_idx < num_cols {
-                widths[col_idx] = widths[col_idx].max(cell.width());
+                widths[col_idx] = widths[col_idx].max(pipe_cell_width(cell));
             }
         }
     }
@@ -869,7 +874,8 @@ fn pipe_table_layout(
         // Aligning individually narrow rows can introduce explicit widths.
         // Even without padding, growing literal content might not fit safely.
         if rows.iter().any(|row| {
-            row.iter().map(|cell| cell.width()).sum::<usize>() + cols + 1 > PANDOC_READER_COLUMNS
+            row.iter().map(|cell| pipe_cell_width(cell)).sum::<usize>() + cols + 1
+                > PANDOC_READER_COLUMNS
         }) {
             return None;
         }
@@ -909,7 +915,7 @@ pub(super) fn format_pipe_table(
 
     for (row_idx, row) in table_data.rows.iter().enumerate() {
         let padding = if !layout.align_columns
-            && row.iter().map(|cell| cell.width()).sum::<usize>() + 3 * row.len() + 1
+            && row.iter().map(|cell| pipe_cell_width(cell)).sum::<usize>() + 3 * row.len() + 1
                 > PANDOC_READER_COLUMNS
         {
             ""
@@ -917,12 +923,14 @@ pub(super) fn format_pipe_table(
             " "
         };
         output.push('|');
+        let mut column = 1;
 
         for (col_idx, cell) in row.iter().enumerate() {
+            let cell_width = pipe_cell_width(cell);
             let width = if layout.align_columns {
                 layout.cell_widths.get(col_idx).copied().unwrap_or(3)
             } else {
-                cell.width()
+                cell_width
             };
             let alignment = table_data
                 .alignments
@@ -931,36 +939,35 @@ pub(super) fn format_pipe_table(
                 .unwrap_or(Alignment::Default);
 
             output.push_str(padding);
+            column += padding.len();
+            let cell_start = column;
 
-            let cell_width = cell.width();
             let total_padding = width.saturating_sub(cell_width);
 
-            let padded_cell = if row_idx == 0 {
-                format!("{}{}", cell, " ".repeat(total_padding))
+            let leading_padding = if row_idx == 0 {
+                0
             } else {
                 match alignment {
-                    Alignment::Left | Alignment::Default => {
-                        format!("{}{}", cell, " ".repeat(total_padding))
-                    }
-                    Alignment::Right => {
-                        format!("{}{}", " ".repeat(total_padding), cell)
-                    }
-                    Alignment::Center => {
-                        let left_padding = total_padding / 2;
-                        let right_padding = total_padding - left_padding;
-                        format!(
-                            "{}{}{}",
-                            " ".repeat(left_padding),
-                            cell,
-                            " ".repeat(right_padding)
-                        )
-                    }
+                    Alignment::Left | Alignment::Default => 0,
+                    Alignment::Right => total_padding,
+                    Alignment::Center => total_padding / 2,
                 }
             };
 
-            output.push_str(&padded_cell);
+            output.extend(std::iter::repeat_n(' ', leading_padding));
+            output.push_str(cell);
+            column = cell
+                .rsplit_once('\n')
+                .map_or(column + leading_padding + cell_width, |(_, last)| {
+                    last.width()
+                });
+            // A math newline resets the physical column. Align the delimiter
+            // from that final line without inserting padding into the body.
+            let trailing_padding = (cell_start + width).saturating_sub(column);
+            output.extend(std::iter::repeat_n(' ', trailing_padding));
             output.push_str(padding);
             output.push('|');
+            column += trailing_padding + padding.len() + 1;
         }
 
         output.push('\n');

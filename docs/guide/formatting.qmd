@@ -705,3 +705,24 @@ Output
 
 Captions follow the document's wrapping mode. Use a folded scalar (`>-`) for a
 long caption that should wrap across lines.
+
+## Jupyter Notebooks
+
+`panache format notebook.ipynb` formats each Markdown cell independently.
+Directory commands discover notebooks automatically and skip
+`.ipynb_checkpoints` directories. Use `--check` for CI, or
+`--stdin-filename notebook.ipynb` when piping notebook JSON through stdin.
+
+Panache supports notebook format version 4. It preserves notebook JSON outside
+changed Markdown source values, including executable code cells, outputs,
+metadata, IDs, and attachments. Nonempty Markdown cells end with a newline.
+Notebook linting and CLI line ranges are not supported.
+
+The `jupyter` flavor uses GFM with JupyterLab math conventions. It recognizes
+`$...$`, `$$...$$`, doubled-backslash bracket delimiters in Markdown source, and
+bare TeX environments. Math can span consecutive nonblank lines, including lines
+that resemble Markdown blocks, including continuations inside headings. Pipes
+inside math do not split table cells. A blank line ends the math region. It does
+not interpret leading `---` as YAML metadata. Use `--flavor jupyter` to format
+standalone Markdown with these rules. Heading whitespace is preserved to keep
+GFM-style anchor links valid.

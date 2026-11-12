@@ -36,6 +36,7 @@
   ],
   "activationEvents": [
     "onLanguage:markdown",
+    "onNotebook:jupyter-notebook",
     "onLanguage:rmarkdown",
     "onLanguage:quarto",
     "onLanguage:mdsvex",

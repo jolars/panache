@@ -226,9 +226,9 @@ pub enum ConstructKind {
     Autolink,
     /// `<tag ...>` and friends (§6.6).
     InlineHtml,
-    /// Pandoc opaque construct that doesn't have a dedicated kind yet
+    /// Opaque math construct that does not have a dedicated IR kind yet
     /// (currently: math spans and raw TeX math environments). Pre-recognised in `build_ir` under
-    /// `Dialect::Pandoc` solely so the emphasis pass treats the entire
+    /// `Dialect::Pandoc` or Jupyter math so the emphasis pass treats the entire
     /// construct as opaque and delim runs inside don't cross its
     /// boundary. Emission re-parses the construct via the dispatcher's
     /// existing `try_parse_*` chain.
@@ -423,6 +423,26 @@ pub(super) fn build_ir_into(
         }
         let in_pandoc_bracket = !is_commonmark && pos < pandoc_bracket_extent;
 
+        if exts.tex_math_jupyter
+            && matches!(b, b'$' | b'\\')
+            && let Some((len, _, _, _)) = super::math::jupyter_math(&text[pos..end])
+        {
+            flush_text!();
+            events.push(IrEvent::Construct {
+                start: pos,
+                end: pos + len,
+                kind: ConstructKind::PandocOpaque,
+            });
+            pos += len;
+            text_run_start = pos;
+            continue;
+        }
+        if exts.tex_math_jupyter && text[pos..end].starts_with("$$") {
+            // A failed display opener remains Markdown. Do not retry its
+            // second dollar as an inline opener.
+            pos += 2;
+            continue;
+        }
         if b == b'\\'
             && let Some((len, _ch, escape_type)) = try_parse_escape(&text[pos..])
             && pos + len <= end
@@ -813,11 +833,12 @@ fn build_ir_byte_mask(config: &ParserOptions) -> [bool; 256] {
         mask[b'-' as usize] = true;
     }
 
-    if !is_commonmark
-        && (exts.tex_math_dollars
-            || exts.tex_math_gfm
-            || exts.tex_math_single_backslash
-            || exts.tex_math_double_backslash)
+    if exts.tex_math_jupyter
+        || (!is_commonmark
+            && (exts.tex_math_dollars
+                || exts.tex_math_gfm
+                || exts.tex_math_single_backslash
+                || exts.tex_math_double_backslash))
     {
         mask[b'$' as usize] = true;
     }

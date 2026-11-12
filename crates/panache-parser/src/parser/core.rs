@@ -57,6 +57,8 @@ mod definition_list_protocol;
 mod html_interruption_protocol;
 #[path = "core/list_items.rs"]
 mod list_item_protocol;
+#[path = "core/math.rs"]
+mod math_protocol;
 
 use blockquote_protocol::{LazyFold, LazyInterruptContext};
 use definition_list_protocol::{
@@ -100,6 +102,9 @@ pub struct Parser<'a> {
     diagnostics: Diagnostics,
     origin: ParseOrigin,
     hugo_lookahead: std::cell::RefCell<super::blocks::hugo::LookaheadCache>,
+    jupyter_lookahead: std::cell::RefCell<super::blocks::jupyter::LookaheadCache>,
+    /// Verified closing line and owning container depth of a Jupyter math span.
+    jupyter_math_end: Option<(usize, usize)>,
 }
 
 /// Whether a parse covers a whole document or a fragment lifted out of one.
@@ -135,6 +140,8 @@ impl<'a> Parser<'a> {
             diagnostics: Diagnostics::new(),
             origin,
             hugo_lookahead: std::cell::RefCell::default(),
+            jupyter_lookahead: std::cell::RefCell::default(),
+            jupyter_math_end: None,
         }
     }
 
@@ -729,6 +736,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_line(&mut self, line: &'a str) -> LineDispatch {
+        if let Some(dispatch) = self.try_append_jupyter_math_continuation(line) {
+            return dispatch;
+        }
         self.close_non_lazy_list_items(line);
         let (mut bq_depth, mut inner_content) = count_blockquote_markers(line);
         let mut bq_marker_line = line;
@@ -807,7 +817,8 @@ impl<'a> Parser<'a> {
         let mut blockquote_payload = if let Some(dispatcher_ctx) = dispatcher_ctx.as_ref() {
             let prefix = ContainerPrefix::from_ctx(dispatcher_ctx);
             let stripped = StrippedLines::new(&self.lines, self.pos, &prefix)
-                .with_hugo_lookahead(&self.hugo_lookahead);
+                .with_hugo_lookahead(&self.hugo_lookahead)
+                .with_jupyter_lookahead(&self.jupyter_lookahead);
             self.block_registry
                 .detect_prepared(dispatcher_ctx, &stripped)
                 .and_then(|prepared| {
@@ -850,7 +861,8 @@ impl<'a> Parser<'a> {
         let is_blank = is_blank_line(line) || inner_blank_in_blockquote;
 
         if is_blank {
-            if self.is_paragraph_open()
+            if !self.config.extensions.tex_math_jupyter
+                && self.is_paragraph_open()
                 && paragraphs::has_open_inline_math_environment(&self.containers)
             {
                 paragraphs::append_paragraph_line(
@@ -1113,7 +1125,8 @@ impl<'a> Parser<'a> {
             {
                 let prefix = ContainerPrefix::from_ctx(dispatcher_ctx);
                 let stripped = StrippedLines::new(&self.lines, self.pos, &prefix)
-                    .with_hugo_lookahead(&self.hugo_lookahead);
+                    .with_hugo_lookahead(&self.hugo_lookahead)
+                    .with_jupyter_lookahead(&self.jupyter_lookahead);
                 let _ = self.block_registry.parse_prepared(
                     prepared,
                     dispatcher_ctx,
@@ -2090,7 +2103,8 @@ impl<'a> Parser<'a> {
 
         let content = stripped_content;
 
-        if self.is_paragraph_open()
+        if !self.config.extensions.tex_math_jupyter
+            && self.is_paragraph_open()
             && (paragraphs::has_open_inline_math_environment(&self.containers)
                 || paragraphs::has_open_display_math(&self.containers))
         {
@@ -2104,10 +2118,12 @@ impl<'a> Parser<'a> {
             return LineDispatch::consumed(1);
         }
 
-        if matches!(
-            self.containers.last(),
-            Some(Container::ListItem { buffer, .. }) if buffer.has_open_display_math()
-        ) {
+        if !self.config.extensions.tex_math_jupyter
+            && matches!(
+                self.containers.last(),
+                Some(Container::ListItem { buffer, .. }) if buffer.has_open_display_math()
+            )
+        {
             use super::blocks::lists;
             let is_sibling_marker = try_parse_list_marker(
                 content,
@@ -2231,7 +2247,8 @@ impl<'a> Parser<'a> {
 
         let dispatcher_match = {
             let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
-                .with_hugo_lookahead(&self.hugo_lookahead);
+                .with_hugo_lookahead(&self.hugo_lookahead)
+                .with_jupyter_lookahead(&self.jupyter_lookahead);
             self.block_registry
                 .detect_prepared(&dispatcher_ctx, &stripped)
         };
@@ -2282,7 +2299,8 @@ impl<'a> Parser<'a> {
         let dispatcher_match =
             if dispatcher_ctx.has_blank_before || dispatcher_ctx.at_document_start {
                 let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
-                    .with_hugo_lookahead(&self.hugo_lookahead);
+                    .with_hugo_lookahead(&self.hugo_lookahead)
+                    .with_jupyter_lookahead(&self.jupyter_lookahead);
                 self.block_registry
                     .detect_prepared(&dispatcher_ctx, &stripped)
             } else {
@@ -2339,7 +2357,8 @@ impl<'a> Parser<'a> {
 
                 let lines_consumed = {
                     let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
-                        .with_hugo_lookahead(&self.hugo_lookahead);
+                        .with_hugo_lookahead(&self.hugo_lookahead)
+                        .with_jupyter_lookahead(&self.jupyter_lookahead);
                     self.block_registry.parse_prepared(
                         block_match,
                         &dispatcher_ctx,
@@ -2576,7 +2595,8 @@ impl<'a> Parser<'a> {
 
                 let lines_consumed = {
                     let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
-                        .with_hugo_lookahead(&self.hugo_lookahead);
+                        .with_hugo_lookahead(&self.hugo_lookahead)
+                        .with_jupyter_lookahead(&self.jupyter_lookahead);
                     self.block_registry.parse_prepared(
                         block_match,
                         &dispatcher_ctx,
@@ -2706,7 +2726,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 let underline = (!self.config.extensions.blank_before_header || has_blank_before)
-                    && self.try_fold_held_shortcode_into_setext(&prefix, prepared.line_count);
+                    && self.try_fold_held_inline_into_setext(&prefix, prepared.line_count);
                 return LineDispatch::consumed(prepared.line_count + usize::from(underline));
             }
         }

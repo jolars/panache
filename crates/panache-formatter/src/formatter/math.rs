@@ -89,8 +89,17 @@ impl Formatter {
                 _ => None,
             })
             .unwrap_or_else(|| "$".to_string());
-        let (open, close) =
+        let (mut open, mut close) =
             inline_delimiters(self.config.math_delimiter_style, is_display_math, &marker);
+        if self.config.parser_extensions.tex_math_jupyter
+            && self.config.math_delimiter_style == MathDelimiterStyle::Backslash
+        {
+            (open, close) = if is_display_math {
+                (r"\\[", r"\\]")
+            } else {
+                (r"\\(", r"\\)")
+            };
+        }
 
         self.output.push_str(open);
         if is_display_math {
@@ -122,6 +131,9 @@ impl Formatter {
             match self.config.math_delimiter_style {
                 MathDelimiterStyle::Preserve => (opening.as_str(), closing.as_str()),
                 MathDelimiterStyle::Dollars => ("$$", "$$"),
+                MathDelimiterStyle::Backslash if self.config.parser_extensions.tex_math_jupyter => {
+                    (r"\\[", r"\\]")
+                }
                 MathDelimiterStyle::Backslash => (r"\[", r"\]"),
             }
         };
@@ -172,6 +184,9 @@ impl Formatter {
 /// Renderers may retain an authored final newline for TeX parity, while the
 /// host still needs exactly one separator before its closing delimiter.
 pub(super) fn push_body_with_trailing_newline(output: &mut String, body: &str) {
+    if body.is_empty() {
+        return;
+    }
     output.push_str(&trim_trailing_whitespace_per_line(body));
     if !body.ends_with('\n') {
         output.push('\n');

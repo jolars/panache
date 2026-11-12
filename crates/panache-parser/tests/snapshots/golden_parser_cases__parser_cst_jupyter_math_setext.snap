@@ -1,0 +1,124 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..113
+  HEADING@0..10
+    HEADING_CONTENT@0..5
+      INLINE_MATH@0..5
+        INLINE_MATH_MARKER@0..1 "$"
+        MATH_CONTENT@1..4
+          MATH_WORD@1..2 "x"
+          MATH_NEWLINE@2..3 "\n"
+          MATH_WORD@3..4 "y"
+        INLINE_MATH_MARKER@4..5 "$"
+    NEWLINE@5..6 "\n"
+    SETEXT_HEADING_UNDERLINE@6..9
+      SETEXT_HEADING_UNDERLINE@6..9 "---"
+    NEWLINE@9..10 "\n"
+  BLANK_LINE@10..11
+    BLANK_LINE@10..11 "\n"
+  HEADING@11..21
+    HEADING_CONTENT@11..16
+      INLINE_MATH@11..16
+        INLINE_MATH_MARKER@11..12 "$"
+        MATH_CONTENT@12..15
+          MATH_WORD@12..13 "x"
+          MATH_NEWLINE@13..14 "\n"
+          MATH_WORD@14..15 "y"
+        INLINE_MATH_MARKER@15..16 "$"
+    NEWLINE@16..17 "\n"
+    SETEXT_HEADING_UNDERLINE@17..20
+      SETEXT_HEADING_UNDERLINE@17..20 "==="
+    NEWLINE@20..21 "\n"
+  BLANK_LINE@21..22
+    BLANK_LINE@21..22 "\n"
+  BLOCK_QUOTE@22..38
+    BLOCK_QUOTE_MARKER@22..23 ">"
+    WHITESPACE@23..24 " "
+    HEADING@24..38
+      HEADING_CONTENT@24..31
+        INLINE_MATH@24..31
+          INLINE_MATH_MARKER@24..25 "$"
+          MATH_CONTENT@25..30
+            MATH_WORD@25..26 "x"
+            MATH_NEWLINE@26..27 "\n"
+            LINE_PREFIX@27..28 ">"
+            LINE_PREFIX@28..29 " "
+            MATH_WORD@29..30 "y"
+          INLINE_MATH_MARKER@30..31 "$"
+      NEWLINE@31..32 "\n"
+      LINE_PREFIX@32..33 ">"
+      LINE_PREFIX@33..34 " "
+      SETEXT_HEADING_UNDERLINE@34..37
+        SETEXT_HEADING_UNDERLINE@34..37 "---"
+      NEWLINE@37..38 "\n"
+  BLANK_LINE@38..39
+    BLANK_LINE@38..39 "\n"
+  LIST@39..55
+    LIST_ITEM@39..55
+      LIST_MARKER@39..40 "-"
+      WHITESPACE@40..41 " "
+      HEADING@41..55
+        HEADING_CONTENT@41..48
+          INLINE_MATH@41..48
+            INLINE_MATH_MARKER@41..42 "$"
+            MATH_CONTENT@42..47
+              MATH_WORD@42..43 "x"
+              MATH_NEWLINE@43..44 "\n"
+              LINE_PREFIX@44..46 "  "
+              MATH_WORD@46..47 "y"
+            INLINE_MATH_MARKER@47..48 "$"
+        NEWLINE@48..49 "\n"
+        LINE_PREFIX@49..51 "  "
+        SETEXT_HEADING_UNDERLINE@51..54
+          SETEXT_HEADING_UNDERLINE@51..54 "==="
+        NEWLINE@54..55 "\n"
+  BLANK_LINE@55..56
+    BLANK_LINE@55..56 "\n"
+  HEADING@56..83
+    HEADING_CONTENT@56..78
+      TEXT@56..63 "Before "
+      INLINE_MATH@63..68
+        INLINE_MATH_MARKER@63..64 "$"
+        MATH_CONTENT@64..67
+          MATH_WORD@64..65 "x"
+          MATH_NEWLINE@65..66 "\n"
+          MATH_WORD@66..67 "y"
+        INLINE_MATH_MARKER@67..68 "$"
+      TEXT@68..73 " and "
+      INLINE_MATH@73..78
+        INLINE_MATH_MARKER@73..74 "$"
+        MATH_CONTENT@74..77
+          MATH_WORD@74..75 "z"
+          MATH_NEWLINE@75..76 "\n"
+          MATH_WORD@76..77 "w"
+        INLINE_MATH_MARKER@77..78 "$"
+    NEWLINE@78..79 "\n"
+    SETEXT_HEADING_UNDERLINE@79..82
+      SETEXT_HEADING_UNDERLINE@79..82 "---"
+    NEWLINE@82..83 "\n"
+  BLANK_LINE@83..84
+    BLANK_LINE@83..84 "\n"
+  HEADING@84..97
+    HEADING_CONTENT@84..92
+      DISPLAY_MATH@84..92
+        DISPLAY_MATH_MARKER@84..86 "$$"
+        MATH_CONTENT@86..90
+          MATH_WORD@86..87 "x"
+          MATH_NEWLINE@87..88 "\n"
+          MATH_WORD@88..90 "+y"
+        DISPLAY_MATH_MARKER@90..92 "$$"
+    NEWLINE@92..93 "\n"
+    SETEXT_HEADING_UNDERLINE@93..96
+      SETEXT_HEADING_UNDERLINE@93..96 "---"
+    NEWLINE@96..97 "\n"
+  BLANK_LINE@97..98
+    BLANK_LINE@97..98 "\n"
+  HEADING@98..113
+    HEADING_CONTENT@98..108
+      TEXT@98..108 "$unmatched"
+    NEWLINE@108..109 "\n"
+    SETEXT_HEADING_UNDERLINE@109..112
+      SETEXT_HEADING_UNDERLINE@109..112 "---"
+    NEWLINE@112..113 "\n"

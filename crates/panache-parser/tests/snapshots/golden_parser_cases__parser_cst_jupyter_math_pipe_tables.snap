@@ -1,0 +1,206 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..294
+  PIPE_TABLE@0..197
+    TABLE_HEADER@0..17
+      TEXT@0..1 "|"
+      WHITESPACE@1..2 " "
+      TABLE_CELL@2..7
+        INLINE_MATH@2..7
+          INLINE_MATH_MARKER@2..3 "$"
+          MATH_CONTENT@3..6
+            MATH_WORD@3..6 "a|b"
+          INLINE_MATH_MARKER@6..7 "$"
+      WHITESPACE@7..8 " "
+      TEXT@8..9 "|"
+      WHITESPACE@9..10 " "
+      TABLE_CELL@10..14
+        TEXT@10..14 "note"
+      WHITESPACE@14..15 " "
+      TEXT@15..16 "|"
+      NEWLINE@16..17 "\n"
+    TABLE_SEPARATOR@17..31
+      TABLE_SEP_DELIM@17..18 "|"
+      TABLE_SEP_WHITESPACE@18..19 " "
+      TABLE_SEP_DASHES@19..22 "---"
+      TABLE_SEP_WHITESPACE@22..23 " "
+      TABLE_SEP_DELIM@23..24 "|"
+      TABLE_SEP_WHITESPACE@24..25 " "
+      TABLE_SEP_DASHES@25..28 "---"
+      TABLE_SEP_WHITESPACE@28..29 " "
+      TABLE_SEP_DELIM@29..30 "|"
+      NEWLINE@30..31 "\n"
+    TABLE_ROW@31..53
+      TEXT@31..32 "|"
+      WHITESPACE@32..33 " "
+      TABLE_CELL@33..40
+        DISPLAY_MATH@33..40
+          DISPLAY_MATH_MARKER@33..35 "$$"
+          MATH_CONTENT@35..38
+            MATH_WORD@35..38 "c|d"
+          DISPLAY_MATH_MARKER@38..40 "$$"
+      WHITESPACE@40..41 " "
+      TEXT@41..42 "|"
+      WHITESPACE@42..43 " "
+      TABLE_CELL@43..50
+        TEXT@43..50 "display"
+      WHITESPACE@50..51 " "
+      TEXT@51..52 "|"
+      NEWLINE@52..53 "\n"
+    TABLE_ROW@53..81
+      TEXT@53..54 "|"
+      WHITESPACE@54..55 " "
+      TABLE_CELL@55..64
+        INLINE_MATH@55..64
+          INLINE_MATH_MARKER@55..58 "\\\\("
+          MATH_CONTENT@58..61
+            MATH_WORD@58..61 "e|f"
+          INLINE_MATH_MARKER@61..64 "\\\\)"
+      WHITESPACE@64..65 " "
+      TEXT@65..66 "|"
+      WHITESPACE@66..67 " "
+      TABLE_CELL@67..78
+        TEXT@67..78 "parentheses"
+      WHITESPACE@78..79 " "
+      TEXT@79..80 "|"
+      NEWLINE@80..81 "\n"
+    TABLE_ROW@81..106
+      TEXT@81..82 "|"
+      WHITESPACE@82..83 " "
+      TABLE_CELL@83..92
+        DISPLAY_MATH@83..92
+          DISPLAY_MATH_MARKER@83..86 "\\\\["
+          MATH_CONTENT@86..89
+            MATH_WORD@86..89 "g|h"
+          DISPLAY_MATH_MARKER@89..92 "\\\\]"
+      WHITESPACE@92..93 " "
+      TEXT@93..94 "|"
+      WHITESPACE@94..95 " "
+      TABLE_CELL@95..103
+        TEXT@95..103 "brackets"
+      WHITESPACE@103..104 " "
+      TEXT@104..105 "|"
+      NEWLINE@105..106 "\n"
+    TABLE_ROW@106..152
+      TEXT@106..107 "|"
+      WHITESPACE@107..108 " "
+      TABLE_CELL@108..135
+        LATEX_COMMAND@108..135
+          TEXT@108..135 "\\begin{align}i|j\\end{ ..."
+      WHITESPACE@135..136 " "
+      TEXT@136..137 "|"
+      WHITESPACE@137..138 " "
+      TABLE_CELL@138..149
+        TEXT@138..149 "environment"
+      WHITESPACE@149..150 " "
+      TEXT@150..151 "|"
+      NEWLINE@151..152 "\n"
+    TABLE_ROW@152..197
+      TEXT@152..153 "|"
+      WHITESPACE@153..154 " "
+      TABLE_CELL@154..185
+        INLINE_MATH@154..185
+          INLINE_MATH_MARKER@154..155 "$"
+          MATH_CONTENT@155..184
+            MATH_ENVIRONMENT@155..184
+              MATH_BEGIN@155..169
+                MATH_CONTROL_WORD@155..161 "\\begin"
+                MATH_NAME_GROUP@161..169
+                  MATH_GROUP_OPEN@161..162 "{"
+                  MATH_WORD@162..168 "matrix"
+                  MATH_GROUP_CLOSE@168..169 "}"
+              MATH_CONTENT@169..172
+                MATH_WORD@169..172 "k|l"
+              MATH_END@172..184
+                MATH_CONTROL_WORD@172..176 "\\end"
+                MATH_NAME_GROUP@176..184
+                  MATH_GROUP_OPEN@176..177 "{"
+                  MATH_WORD@177..183 "matrix"
+                  MATH_GROUP_CLOSE@183..184 "}"
+          INLINE_MATH_MARKER@184..185 "$"
+      WHITESPACE@185..186 " "
+      TEXT@186..187 "|"
+      WHITESPACE@187..188 " "
+      TABLE_CELL@188..194
+        TEXT@188..194 "nested"
+      WHITESPACE@194..195 " "
+      TEXT@195..196 "|"
+      NEWLINE@196..197 "\n"
+  BLANK_LINE@197..198
+    BLANK_LINE@197..198 "\n"
+  PIPE_TABLE@198..254
+    TABLE_HEADER@198..220
+      TEXT@198..199 "|"
+      WHITESPACE@199..200 " "
+      TABLE_CELL@200..210
+        TEXT@200..210 "$unmatched"
+      WHITESPACE@210..211 " "
+      TEXT@211..212 "|"
+      WHITESPACE@212..213 " "
+      TABLE_CELL@213..217
+        TEXT@213..217 "note"
+      WHITESPACE@217..218 " "
+      TEXT@218..219 "|"
+      NEWLINE@219..220 "\n"
+    TABLE_SEPARATOR@220..234
+      TABLE_SEP_DELIM@220..221 "|"
+      TABLE_SEP_WHITESPACE@221..222 " "
+      TABLE_SEP_DASHES@222..225 "---"
+      TABLE_SEP_WHITESPACE@225..226 " "
+      TABLE_SEP_DELIM@226..227 "|"
+      TABLE_SEP_WHITESPACE@227..228 " "
+      TABLE_SEP_DASHES@228..231 "---"
+      TABLE_SEP_WHITESPACE@231..232 " "
+      TABLE_SEP_DELIM@232..233 "|"
+      NEWLINE@233..234 "\n"
+    TABLE_ROW@234..254
+      TEXT@234..235 "|"
+      WHITESPACE@235..236 " "
+      TABLE_CELL@236..247
+        TEXT@236..244 "escaped "
+        ESCAPED_CHAR@244..246 "\\$"
+        TEXT@246..247 "a"
+      WHITESPACE@247..248 " "
+      TEXT@248..249 "|"
+      WHITESPACE@249..250 " "
+      TABLE_CELL@250..251
+        TEXT@250..251 "b"
+      WHITESPACE@251..252 " "
+      TEXT@252..253 "|"
+      NEWLINE@253..254 "\n"
+  BLANK_LINE@254..255
+    BLANK_LINE@254..255 "\n"
+  PIPE_TABLE@255..294
+    TABLE_HEADER@255..274
+      TEXT@255..256 "|"
+      WHITESPACE@256..257 " "
+      TABLE_CELL@257..260
+        TEXT@257..260 "`$a"
+      TEXT@260..261 "|"
+      TABLE_CELL@261..264
+        TEXT@261..264 "b$`"
+      WHITESPACE@264..265 " "
+      TEXT@265..266 "|"
+      WHITESPACE@266..267 " "
+      TABLE_CELL@267..271
+        TEXT@267..271 "note"
+      WHITESPACE@271..272 " "
+      TEXT@272..273 "|"
+      NEWLINE@273..274 "\n"
+    TABLE_SEPARATOR@274..294
+      TABLE_SEP_DELIM@274..275 "|"
+      TABLE_SEP_WHITESPACE@275..276 " "
+      TABLE_SEP_DASHES@276..279 "---"
+      TABLE_SEP_WHITESPACE@279..280 " "
+      TABLE_SEP_DELIM@280..281 "|"
+      TABLE_SEP_WHITESPACE@281..282 " "
+      TABLE_SEP_DASHES@282..285 "---"
+      TABLE_SEP_WHITESPACE@285..286 " "
+      TABLE_SEP_DELIM@286..287 "|"
+      TABLE_SEP_WHITESPACE@287..288 " "
+      TABLE_SEP_DASHES@288..291 "---"
+      TABLE_SEP_WHITESPACE@291..292 " "
+      TABLE_SEP_DELIM@292..293 "|"
+      NEWLINE@293..294 "\n"

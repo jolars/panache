@@ -240,6 +240,12 @@ impl LspTester {
         self.gs.runtime_settings.experimental_incremental_parsing
     }
 
+    /// Feed a protocol notification through production dispatch.
+    pub fn notify(&mut self, method: &str, params: serde_json::Value) {
+        self.gs
+            .on_notification(lsp_server::Notification::new(method.into(), params));
+    }
+
     pub fn open_document(&mut self, uri: &str, content: &str, language_id: &str) {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {

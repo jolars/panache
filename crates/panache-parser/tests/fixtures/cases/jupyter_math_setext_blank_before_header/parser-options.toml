@@ -1,0 +1,4 @@
+flavor = "jupyter"
+
+[extensions]
+blank-before-header = true

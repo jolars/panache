@@ -1,0 +1,39 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..41
+  PARAGRAPH@0..20
+    DISPLAY_MATH@0..19
+      DISPLAY_MATH_MARKER@0..2 "$$"
+      MATH_CONTENT@2..17
+        MATH_NEWLINE@2..3 "\n"
+        MATH_COMMAND@3..16
+          MATH_CONTROL_WORD@3..8 "\\text"
+          MATH_GROUP@8..16
+            MATH_GROUP_OPEN@8..9 "{"
+            MATH_WORD@9..10 "a"
+            MATH_NEWLINE@10..11 "\n"
+            MATH_WORD@11..15 "~~~b"
+            MATH_GROUP_CLOSE@15..16 "}"
+        MATH_NEWLINE@16..17 "\n"
+      DISPLAY_MATH_MARKER@17..19 "$$"
+    NEWLINE@19..20 "\n"
+  BLANK_LINE@20..21
+    BLANK_LINE@20..21 "\n"
+  PARAGRAPH@21..41
+    DISPLAY_MATH@21..40
+      DISPLAY_MATH_MARKER@21..23 "$$"
+      MATH_CONTENT@23..38
+        MATH_NEWLINE@23..24 "\n"
+        MATH_COMMAND@24..37
+          MATH_CONTROL_WORD@24..29 "\\text"
+          MATH_GROUP@29..37
+            MATH_GROUP_OPEN@29..30 "{"
+            MATH_WORD@30..31 "a"
+            MATH_NEWLINE@31..32 "\n"
+            MATH_WORD@32..36 "```b"
+            MATH_GROUP_CLOSE@36..37 "}"
+        MATH_NEWLINE@37..38 "\n"
+      DISPLAY_MATH_MARKER@38..40 "$$"
+    NEWLINE@40..41 "\n"
