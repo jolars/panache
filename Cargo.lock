@@ -121,9 +121,9 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "badness-formatter"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc7954f6b8f0fb0571f4a7a933288e2c92a80309298d6b0686b68e3102c3a2dc"
+checksum = "ce0b95b17b46d109f7e7bc57d8f8847d2cb14c1b01b5410131af5c18b7468205"
 dependencies = [
  "badness-parser",
  "rowan 0.17.0",
@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "badness-parser"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59890aa9f05b632ce68b2cf5d1efaba0726a9e3afc76ea2df8a7c1aab5fec8b1"
+checksum = "a65b8351971515da8168049767694552cb1f13b1508ebffabdff822f77412909"
 dependencies = [
  "phf 0.14.0",
  "phf_codegen",
@@ -1987,9 +1987,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.29.1"
+version = "1.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a06f08a856b009bc7bbaf7d3e79808595d032dd19074c0c2ef26e49e03e6bdc"
+checksum = "bed99139f7dac9b5cfe5f17be4d66dc7079a34dee1d74bcc77217119240e267c"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
