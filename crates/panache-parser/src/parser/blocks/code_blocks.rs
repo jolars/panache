@@ -681,10 +681,7 @@ fn is_hashpipe_option_line(line_without_newline: &str, prefix: &str) -> bool {
         return false;
     };
     let key = trim_end_spaces_tabs(&rest[..colon_idx]);
-    if key.is_empty() {
-        return false;
-    }
-    true
+    !key.is_empty()
 }
 
 fn is_hashpipe_continuation_line(line_without_newline: &str, prefix: &str) -> bool {

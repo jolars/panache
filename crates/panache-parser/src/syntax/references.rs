@@ -338,15 +338,10 @@ impl FootnoteDefinition {
             }
         }
 
-        if self
+        !self
             .0
             .descendants()
             .any(|node| node.kind() == SyntaxKind::LIST)
-        {
-            return false;
-        }
-
-        true
     }
 }
 

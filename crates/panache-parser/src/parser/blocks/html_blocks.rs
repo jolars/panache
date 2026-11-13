@@ -1369,17 +1369,13 @@ pub(crate) fn parse_html_block_with_wrapper(
     });
     let strict_block_lift = strict_block_tag_name.is_some_and(|name| {
         let (line_no_nl, _) = strip_newline(first_inner);
-        let shape_ok = if multiline_open_end.is_some() {
+        if multiline_open_end.is_some() {
             true
         } else if depth > 0 {
             probe_open_tag_line_has_close_gt(line_no_nl, name)
         } else {
             same_line_strict_lift_safe
-        };
-        if !shape_ok {
-            return false;
         }
-        true
     });
 
     let same_line_bq_lift_tag: Option<&str> = if bq_depth > 0
@@ -1819,13 +1815,9 @@ pub(crate) fn parse_html_block_with_wrapper(
                 }
                 let close_stripped = prefix.strip(line);
                 let (close_no_nl, _) = strip_newline(close_stripped);
-                if !close_no_nl
+                close_no_nl
                     .trim_start_matches([' ', '\t'])
                     .starts_with("</")
-                {
-                    return false;
-                }
-                true
             });
 
             if bq_clean_lift {
