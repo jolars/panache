@@ -2810,17 +2810,12 @@ fn is_supported_bare_command(command: &MathCommand, scope: &SignatureScope) -> b
     let Some(name) = command.name() else {
         return false;
     };
-    if matches!(name.as_str(), "left" | "right")
-        || scope.is_redefined(&name)
-        || command
+    !matches!(name.as_str(), "left" | "right")
+        && !scope.is_redefined(&name)
+        && command
             .syntax()
             .children_with_tokens()
-            .any(|element| element.kind() != SyntaxKind::MATH_CONTROL_WORD)
-    {
-        return false;
-    }
-
-    true
+            .all(|element| element.kind() == SyntaxKind::MATH_CONTROL_WORD)
 }
 
 fn matched_command_arguments(

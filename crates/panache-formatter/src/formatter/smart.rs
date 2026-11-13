@@ -302,10 +302,7 @@ fn escape_conflicting_reference_brackets(
                 return false;
             }
             false
-        } else if let Some(image) = ImageLink::cast(node.clone()) {
-            if image.dest().is_some() {
-                return false;
-            }
+        } else if ImageLink::cast(node.clone()).is_some_and(|image| image.dest().is_none()) {
             true
         } else {
             return false;
