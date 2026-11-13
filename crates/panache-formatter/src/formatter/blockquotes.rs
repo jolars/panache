@@ -3,7 +3,7 @@ use crate::formatter::Formatter;
 use crate::formatter::core::BlockquoteContext;
 use crate::formatter::preserve::{preserve_lines, preserve_lines_unprefixed};
 use crate::formatter::utils::is_block_element;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, MystDirective, SyntaxKind, SyntaxNode};
 
 impl Formatter {
     pub(super) fn format_block_quote(&mut self, node: &SyntaxNode, indent: usize) {
@@ -218,6 +218,23 @@ impl Formatter {
                     }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
+                    }
+                }
+                SyntaxKind::MYST_DIRECTIVE
+                    if MystDirective::cast(child.clone())
+                        .is_some_and(|directive| directive.body().is_some()) =>
+                {
+                    let rendered = self.render_to_buffer(child, 0, content_prefix.len());
+                    // A literal `>` in the body is content, so every line
+                    // still needs the enclosing blockquote prefix.
+                    self.append_blockquote_prefixed_block(
+                        &rendered,
+                        &content_prefix,
+                        &blank_prefix,
+                        None,
+                    );
+                    if let Some(ctx) = self.blockquote_context.as_mut() {
+                        ctx.in_list_continuation = false;
                     }
                 }
                 SyntaxKind::TEX_BLOCK => {
