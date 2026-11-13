@@ -5,15 +5,16 @@ description: >
   and code.
 ---
 
-Panache formats Markdown source to make it easy to read and consistent across a
-project. It preserves the meaning of your document, and running it again on an
-already formatted document produces the same output.
+Panache makes your Markdown source easier to read and keeps formatting
+consistent across your project. It preserves your document's meaning. Once
+you've formatted a document, running Panache again produces the same output.
 
 ## Using the Formatter
 
 ### Format and Check Files
 
-Format a document in place, or pass a directory to format its supported files:
+Format a document in place, or give Panache a directory to format the supported
+files inside it:
 
 ```sh
 panache format document.qmd
@@ -26,23 +27,24 @@ To check formatting without writing changes:
 panache format --check .
 ```
 
-The command exits with a nonzero status when files need formatting. Both modes
-follow the project's configuration and file exclusions. See
-[Configuration](configure.qmd).
+When files need formatting, `--check` exits with a nonzero status. Whether you
+format or check, Panache follows your project's configuration and respects its
+file exclusions. See [Configuration](configure.qmd).
 
-To read from standard input and write the result to standard output, supply a
-filename so Panache can select the document's flavor:
+To pipe a document through Panache, use `--stdin-filename` to give it a
+filename. Panache uses that name to choose the Markdown flavor, reads from
+standard input, and writes the formatted result to standard output:
 
 ```sh
 panache --stdin-filename=document.qmd format <document.qmd
 ```
 
-See [Editor Setup](lsp.qmd) for formatting while editing and
-[Integrations](integrations.qmd) for CI, pre-commit, and dprint.
+See [Editor Setup](lsp.qmd) to format documents as you edit and
+[Integrations](integrations.qmd) to use Panache with CI, pre-commit, and dprint.
 
 ### Choose a Wrapping Mode
 
-By default, Panache reflows paragraphs to a line width of 80 columns. Put your
+By default, Panache wraps paragraphs to a line width of 80 columns. Put your
 project's preferences in `panache.toml`:
 
 ```toml
@@ -60,10 +62,11 @@ Choose a wrapping mode to suit how you write:
   | `sentence` | Put each sentence on its own line.                    |
   | `semantic` | Keep line breaks and add a break after each sentence. |
 
-`sentence` and `semantic` do not limit line length. Sentence detection accounts
-for common abbreviations and the document's language. See [Sentence-Wrapping
+The `sentence` and `semantic` modes don't limit line length. When finding
+sentence boundaries, Panache takes common abbreviations and your document's
+language into account. See [Sentence-Wrapping
 Abbreviations](../reference/configuration.qmd#no-break-abbreviations) to
-customize the abbreviations.
+customize which abbreviations it recognizes.
 
 For a single run, you can override a setting on the command line:
 
@@ -76,16 +79,16 @@ lists all formatting options and their defaults.
 
 ### Format Embedded Code
 
-Panache formats code fences and their attributes. To format the code inside
-those fences, configure an external formatter and make it available on `PATH`.
-See [Configure Linting and Embedded
+Panache formats code fences and their attributes. To format the code inside them
+as well, configure an external formatter and make sure its command is available
+on your `PATH`. See [Configure Linting and Embedded
 Code](configure.qmd#configure-linting-and-embedded-code) for setup and the
 [formatter presets](../reference/formatter-presets.qmd) for supported tools.
 
 ### Ignore Directives
 
-Use HTML comments to preserve a region's formatting. This is useful for ASCII
-diagrams or other content whose spacing matters:
+Use HTML comments to leave the formatting in part of your document untouched.
+This is useful for ASCII diagrams or other content whose spacing matters:
 
 ```markdown
 <!-- panache-ignore-format-start -->
@@ -94,21 +97,21 @@ that  will   be   preserved   exactly.
 <!-- panache-ignore-format-end -->
 ```
 
-To disable both formatting and linting for a region, use
+To turn off both formatting and linting for part of a document, use
 `<!-- panache-ignore-start -->` and `<!-- panache-ignore-end -->` instead.
 
 ## Formatting Examples
 
-The examples below show Panache's default formatting for Quarto documents,
-unless another setting or flavor is specified. The aim is readable source:
-consistent markers, clear indentation, and spacing that makes the document's
-structure visible. Some constructs, such as definition lists and fenced divs,
-are available only in [flavors](../reference/configuration.qmd#flavor) that
-support them.
+These examples use Panache's default settings for Quarto documents unless they
+specify another setting or Markdown flavor. Panache uses consistent markers,
+clear indentation, and spacing to make your document's structure easy to see in
+the source. Some features, such as definition lists and fenced divs, require a
+[flavor](../reference/configuration.qmd#flavor) that supports them.
 
 ### Text Wrapping
 
-Paragraphs wrap to `line-width`. With `line-width = 60`:
+Panache wraps paragraphs to `line-width`. Here's how a paragraph looks with
+`line-width = 60`:
 
 Input
 
@@ -130,10 +133,10 @@ spaces.
 
 ### Headings
 
-Panache uses ATX headings (`#`, `##`, and so on), removes decorative closing
-hashes, and adds blank lines around headings. It separates attribute entries
-with a single space. In Pandoc, Quarto, and R Markdown, it expands the `{-}`
-heading attribute shorthand to `{.unnumbered}`.
+Panache writes headings with `#`, `##`, and so on (ATX headings). It removes
+decorative hashes at the end and adds blank lines around each heading. It also
+separates attributes with a single space. In Pandoc, Quarto, and R Markdown, it
+expands the `{-}` shorthand to the heading attribute `{.unnumbered}`.
 
 Input
 
@@ -175,14 +178,15 @@ Output
     An *important* point and a **strong** claim.
     ```
 
-Panache may escape literal emphasis markers so they remain text when the
-document is parsed again.
+Panache may escape literal emphasis markers so they stay as text when the
+document is read as Markdown again.
 
 ### Code
 
-Panache chooses enough backticks to enclose inline code. Code blocks use
-backtick fences, with the language first and any remaining attributes in braces.
-Indented code blocks become fenced blocks.
+Panache uses enough backticks to enclose inline code, even when the code itself
+contains backticks. For code blocks, it uses backtick fences, puts the language
+first, and encloses any other attributes in braces. Indented code blocks become
+fenced blocks.
 
 Input
 
@@ -205,21 +209,22 @@ Tabs become spaces by default. To keep tabs in code, set
 
 ### Lists
 
-Bullet lists use `-` and two spaces of indentation per level. Panache removes
-blank lines between items when each item contains only a single paragraph.
-
-Under CommonMark, a list item can start with its marker on a line of its own.
-Once the item contains a block, later blocks stay inside it when they meet its
-required indentation, including after a blank line.
-
-In CommonMark and GFM, a nested ordered list can start at any number immediately
-after a heading or thematic break. After paragraph text, it must start at `1` or
-be separated by a blank line. An empty nested list marker stays part of an open
+Bullet lists use `-`, with two spaces of indentation for each nesting level.
+Panache removes blank lines between items when each item contains just one
 paragraph.
 
-In CommonMark and GFM, an HTML block can start immediately after the list
-marker. Panache preserves its raw content and relative indentation when it
-adjusts the list indentation.
+In CommonMark, you can put a list marker on a line of its own. Once that item
+contains a block of content, later blocks stay in the item if they have the
+indentation that item requires, even after a blank line.
+
+In CommonMark and GitHub-Flavored Markdown (GFM), a nested ordered list can
+start at any number if it immediately follows a heading or horizontal rule. If
+it follows paragraph text, it must start at `1` or have a blank line before it.
+A nested list marker with no content stays part of the current paragraph.
+
+CommonMark and GFM also allow an HTML block immediately after a list marker.
+When Panache adjusts the list's indentation, it keeps the raw HTML and its
+relative indentation.
 
 Input
 
@@ -239,19 +244,21 @@ Output
     - Item 2
     ```
 
-Panache preserves the numbering style of ordered and fancy lists and aligns
-continuation text with the item text. Task lists use `- [ ]` and `- [x]` for
-both top-level and nested tasks. For parsers that require four spaces of
-indentation per nesting level, enable the
+Panache keeps your numbering style in ordered and fancy lists and aligns
+continuation lines with the text after the list marker. Task lists use `- [ ]`
+and `- [x]` for both top-level and nested tasks. If your Markdown parser
+requires four spaces of indentation for each nesting level, enable the
 [`four-space-rule`](../reference/configuration.qmd#lists) extension.
 
 #### Definition Lists
 
-Definition markers use three spaces after `:`. Definitions with several blocks
-have blank lines between them, and continuation blocks are indented four spaces.
-Tables and HTML comments in definition bodies stay inside the definition when
-formatted, including in Hugo documents. Continuation HTML moves with the
-definition's indentation so blocks that follow it stay in the same body.
+Each definition starts with `:` followed by three spaces. When a definition
+contains several blocks, Panache separates them with blank lines and indents
+continuation blocks by four spaces.
+
+Tables and HTML comments stay inside the definition they belong to, including in
+Hugo documents. Panache adjusts the indentation of HTML that continues a
+definition so that later blocks remain in the same definition.
 
 Input
 
@@ -272,12 +279,14 @@ Output
 Each line in a block quote starts with `>`, followed by a space. Paragraphs
 inside the quote follow the chosen wrapping mode.
 
-Panache preserves the blank line between a list and a following block quote. To
-place a quote inside a list item, indent its `>` markers to align with the
-item's text. In CommonMark and GFM, a quote indented less than the item's text
-ends the item even without a blank line. Inside a list item, Panache also
-preserves the blank line between a quote and a following paragraph so the
-paragraph stays outside the quote.
+Panache keeps the blank line between a list and a block quote that follows it.
+To put a quote inside a list item, indent its `>` markers to line up with the
+item's text.
+
+In CommonMark and GFM, a quote ends the list item if it's indented less than the
+item's text, even without a blank line. Inside a list item, Panache also keeps
+the blank line between a quote and a following paragraph so the paragraph stays
+outside the quote.
 
 Input
 
@@ -300,17 +309,21 @@ pipe, simple, and multiline tables by two spaces. Set
 them at the left margin. Grid tables stay at the left margin so Pandoc
 recognizes them as tables.
 
-Multiline tables use tab-expanded columns to locate cell boundaries. When an
-inline code span collapses onto one line, Panache removes any empty continuation
-lines it leaves in the row, including with `wrap = "preserve"`.
+For multiline tables, Panache finds cell boundaries using the column positions
+after tabs have been expanded. When inline code is joined onto a single line,
+Panache removes any continuation lines in the row that this leaves empty, even
+with `wrap = "preserve"`.
 
 #### Pipe Tables
 
-Panache pads cells to show each column's alignment in the source and discards
-excess source padding. In Pandoc-based flavors, it preserves separator dash
-counts when they control the rendered column proportions. Pandoc uses these
-proportions only when a source row exceeds its reader width (72 columns by
-default), so Panache keeps enough padding to stay above that threshold.
+Panache adds padding to show each column's alignment in the source and removes
+excess padding. In Pandoc-based flavors, the number of dashes in the separator
+row can control the relative widths of the rendered columns. Panache keeps those
+dash counts when they affect the layout.
+
+When Pandoc reads a table, it uses these proportions only if a source row is
+longer than its configured width (72 columns by default). Panache keeps enough
+padding to stay above that threshold.
 
 Input
 
@@ -393,8 +406,9 @@ Output
 
 Panache wraps prose within the existing column widths and removes extra blank
 lines between rows. It keeps the widths because they affect the rendered layout.
-Code spans, links, and math stay intact when cells wrap. Panache reads cell text
-from the original column positions before normalizing punctuation or whitespace.
+Code spans, links, and math stay intact when cells wrap. Panache uses the
+original column positions to read the text in each cell before it adjusts
+punctuation or whitespace.
 
 Input
 
@@ -431,9 +445,10 @@ Output
 
 ### Math
 
-Panache adds spaces around operators and keeps subscripts and superscripts
-tight. In display math, it indents environment bodies and aligns `&` columns and
-row endings so the source is easier to follow.
+Panache adds spaces around operators and keeps subscripts and superscripts next
+to the terms they apply to. In display math, it indents the contents of
+environments, aligns columns at `&` markers, and lines up row endings so the
+source is easier to follow.
 
 Input
 
@@ -459,19 +474,21 @@ Output
     $$
     ```
 
-By default, long display equations wrap at relations and operators to fit
-`line-width`. Content after a multiline environment starts on a new line at the
-display indent, with scripts and punctuation attached to the closing marker. Use
-`math = "preserve"` to keep your line breaks, or `math = "verbatim"` to leave
-the math content untouched. Panache leaves malformed math and command arguments
-it cannot interpret unchanged. See [Math
+By default, Panache wraps long display equations at relation signs and operators
+to fit `line-width`. Content after a multiline environment starts on a new line
+at the display's indentation level. Subscripts, superscripts, and punctuation
+stay attached to the environment's closing marker.
+
+Use `math = "preserve"` to keep your line breaks, or `math = "verbatim"` to
+leave the math content untouched. Panache also leaves malformed math untouched,
+along with any command arguments it can't interpret. See [Math
 Formatting](../reference/configuration.qmd#math-formatting) for modes, delimiter
 styles, and indentation settings.
 
 ### Links
 
-Link text and destinations are preserved. Panache normalizes spacing and quotes
-around titles and attributes.
+Panache keeps link text and destinations as they are. It normalizes spacing and
+quotation marks around titles and attributes.
 
 Input
 
@@ -487,9 +504,10 @@ Output
 
 ### Fenced Divs
 
-Panache normalizes attributes and removes blank lines at the start and end of
-the body. Nested divs use two more colons than their parent, making their
-boundaries easy to distinguish.
+Fenced divs group content between lines of colons. Panache normalizes their
+attributes and removes blank lines at the start and end of their content. A
+nested div uses two more colons than its parent, so you can tell their
+boundaries apart.
 
 Input
 
@@ -517,16 +535,21 @@ Output
 
 ### MyST Directives
 
-In the MyST flavor, Panache normalizes directive options and separates them from
-the body with a blank line. It formats Markdown bodies in known directives, such
-as admonitions and figures. It preserves unknown directive bodies and literal
-content, such as code, math, and `eval-rst` blocks. It also keeps each `toctree`
-entry on its own line. Literal bodies keep their internal indentation and the
-opener's indentation offset, including inside lists and blockquotes. Fenced code
-in Markdown bodies preserves whitespace-only payload lines. Panache lengthens
-directive fences when needed to contain formatted code blocks or nested
-directives, keeping the opener and closer matched. Unfinished fenced code keeps
-its content and indentation.
+In the MyST flavor, Panache formats directive options and separates them from
+the body with a blank line. It formats Markdown content in directives it
+recognizes, such as admonitions and figures.
+
+Panache leaves the bodies of unknown directives as you've written them. It also
+preserves literal content, such as code, math, and `eval-rst` blocks, and keeps
+each `toctree` entry on its own line. Literal content keeps its internal
+indentation, as well as any indentation from the directive's opening fence, even
+inside lists and block quotes.
+
+For fenced code within Markdown bodies, Panache preserves lines that contain
+only whitespace. If a code block has no closing fence, Panache keeps its content
+and indentation. It lengthens directive fences when needed to enclose formatted
+code blocks or nested directives, keeping the opening and closing fences the
+same length.
 
 Input
 
@@ -556,11 +579,10 @@ Output
 
 ### Admonitions
 
-Enable
-[`python-markdown-admonitions`](../reference/configuration.qmd#admonitions) to
-format `!!!` admonitions and `pymdownx-details` to format collapsible `???` and
-`???+` blocks. Panache indents the body by four spaces and formats it like
-ordinary content.
+To format `!!!` admonitions, enable
+[`python-markdown-admonitions`](../reference/configuration.qmd#admonitions). For
+collapsible `???` and `???+` blocks, enable `pymdownx-details`. Panache indents
+the body by four spaces and formats it like ordinary content.
 
 Input
 
@@ -580,8 +602,8 @@ Output
 
 ### Footnotes
 
-Footnote text follows the chosen wrapping mode. Continuation blocks are indented
-four spaces, as in list items.
+Footnote text follows your chosen wrapping mode. Panache indents continuation
+blocks by four spaces, as in list items.
 
 Input
 
@@ -652,9 +674,9 @@ Output
 
 ### Frontmatter
 
-Panache normalizes YAML spacing and indentation. Prose in plain and folded (`>`)
-scalars follows the document's wrapping mode; literal (`|`) scalars keep their
-line breaks.
+Panache normalizes YAML spacing and indentation. It wraps prose in plain YAML
+values and folded text blocks (`>`) using your document's wrapping mode. Literal
+text blocks (`|`) keep their line breaks.
 
 Input
 
@@ -683,9 +705,10 @@ Output
 
 ### Chunk Options
 
-For Quarto and R Markdown code chunks, Panache converts simple header options to
-`#|` comments and formats them as YAML. Options containing R expressions stay in
-the header, including expressions with spaces such as `eval = n > 1`.
+In Quarto and R Markdown code chunks, Panache moves simple options from the
+header into `#|` comments and formats them as YAML. Options that contain R
+expressions stay in the header, even when the expressions contain spaces, as in
+`eval = n > 1`.
 
 Input
 
@@ -709,26 +732,29 @@ Output
     ```
     ````
 
-Captions follow the document's wrapping mode. Use a folded scalar (`>-`) for a
-long caption that should wrap across lines.
+Captions follow your document's wrapping mode. Use a folded YAML text block
+(`>-`) for a long caption that should wrap across lines.
 
 ## Jupyter Notebooks
 
-`panache format notebook.ipynb` formats each Markdown cell independently.
-Directory commands discover notebooks automatically and skip
-`.ipynb_checkpoints` directories. Use `--check` for CI, or
-`--stdin-filename notebook.ipynb` when piping notebook JSON through stdin.
+Run `panache format notebook.ipynb` to format each Markdown cell independently.
+When you pass a directory, Panache finds notebooks automatically and skips
+`.ipynb_checkpoints` directories. Use `--check` to check formatting in CI, or
+`--stdin-filename notebook.ipynb` to pipe notebook JSON through standard input.
 
-Panache supports notebook format version 4. It preserves notebook JSON outside
-changed Markdown source values, including executable code cells, outputs,
-metadata, IDs, and attachments. Nonempty Markdown cells end with a newline.
-Notebook linting and CLI line ranges are not supported.
+Panache supports notebook format version 4. It changes only the Markdown source
+values that need formatting and preserves the rest of the notebook JSON,
+including executable code cells, outputs, metadata, IDs, and attachments.
+Nonempty Markdown cells end with a newline. You can't lint notebooks or select
+line ranges for notebook formatting from the command line.
 
 The `jupyter` flavor uses GFM with JupyterLab math conventions. It recognizes
-`$...$`, `$$...$$`, doubled-backslash bracket delimiters in Markdown source, and
-bare TeX environments. Math can span consecutive nonblank lines, including lines
-that resemble Markdown blocks, including continuations inside headings. Pipes
-inside math do not split table cells. A blank line ends the math region. It does
-not interpret leading `---` as YAML metadata. Use `--flavor jupyter` to format
-standalone Markdown with these rules. Heading whitespace is preserved to keep
-GFM-style anchor links valid.
+`$...$`, `$$...$$`, bracket delimiters with doubled backslashes in the Markdown
+source, and TeX environments without surrounding math delimiters. Math can span
+several nonblank lines, even when those lines look like Markdown blocks. It can
+also continue onto later lines within a heading. A blank line ends the math
+region. Pipes inside math don't split table cells.
+
+Panache doesn't treat a leading `---` as YAML metadata in this flavor. It also
+keeps heading whitespace as you've written it so GFM-style anchor links stay
+valid. Use `--flavor jupyter` to apply these rules to standalone Markdown files.
