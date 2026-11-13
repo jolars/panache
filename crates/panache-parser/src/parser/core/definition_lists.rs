@@ -416,6 +416,7 @@ impl<'a> Parser<'a> {
                             self.config.dialect,
                         );
                         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+                        let myst_directive_closer = self.innermost_myst_directive_closer();
                         let new_pos = if self.config.extensions.tex_math_gfm
                             && code_blocks::is_gfm_math_fence(&fence)
                         {
@@ -434,6 +435,7 @@ impl<'a> Parser<'a> {
                                 Some(&fence_line),
                                 &self.diagnostics,
                                 self.config.flavor,
+                                myst_directive_closer.as_ref(),
                             )
                         };
                         extras = new_pos.saturating_sub(self.pos).saturating_sub(1);

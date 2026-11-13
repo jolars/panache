@@ -1,7 +1,7 @@
 use crate::config::{Config, Flavor};
 use crate::syntax::{
-    AstNode, CellOptionResolution, CodeBlock, SyntaxKind, SyntaxNode, YamlMetadata, YamlNode,
-    parse_yaml_document,
+    AstNode, CellOptionResolution, CodeBlock, MystDirective, SyntaxKind, SyntaxNode, YamlMetadata,
+    YamlNode, parse_yaml_document, text_without_line_prefixes,
 };
 use panache_parser::parser::blocks::code_blocks::{CodeBlockType, InfoString};
 use rowan::NodeOrToken;
@@ -11,7 +11,7 @@ use super::Formatter;
 use super::hashpipe;
 
 impl Formatter {
-    pub(super) fn format_block_code(&mut self, node: &SyntaxNode) {
+    pub(super) fn format_block_code(&mut self, node: &SyntaxNode, indent: usize) {
         log::trace!("Formatting code block");
         if let Some(previous) = node.prev_sibling()
             && previous.kind() == SyntaxKind::PARAGRAPH
@@ -20,7 +20,52 @@ impl Formatter {
         {
             self.output.push('\n');
         }
-        self.format_code_block(node);
+        if let Some(directive) = node.parent().and_then(MystDirective::cast) {
+            let directive_offset = self.myst_directive_fence_offset(directive.syntax());
+            if is_unclosed_fenced_code_block(node) {
+                // Raw fenced blocks already carry container prefixes. Replace
+                // those prefixes once without changing the unfinished payload.
+                let indent_str = " ".repeat(indent);
+                for line in text_without_line_prefixes(node).split_inclusive('\n') {
+                    self.output.push_str(&indent_str);
+                    self.output
+                        .push_str(strip_leading_spaces_budget(line, directive_offset));
+                }
+                return;
+            }
+            let is_fenced = node
+                .children()
+                .any(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN);
+            // Moving the directive fence removes MyST's body dedent. Fenced
+            // code already spends part of that budget on its own opener.
+            let content_offset = self.container_content_offset(node) + directive_offset;
+            let strip_content_columns = if is_fenced {
+                let fence_indent: String = node
+                    .children_with_tokens()
+                    .take_while(|element| {
+                        matches!(element, NodeOrToken::Token(token)
+                            if matches!(token.kind(), SyntaxKind::WHITESPACE | SyntaxKind::LINE_PREFIX))
+                    })
+                    .filter_map(NodeOrToken::into_token)
+                    .map(|token| token.text().to_string())
+                    .collect();
+                content_offset.saturating_sub(indent_columns(&fence_indent))
+            } else {
+                content_offset
+            };
+            let strip_content_columns =
+                (strip_content_columns > 0).then_some(strip_content_columns);
+            self.format_container_code_block(
+                node,
+                &" ".repeat(indent),
+                indent,
+                false,
+                strip_content_columns,
+                true,
+            );
+        } else {
+            self.format_code_block(node);
+        }
     }
 }
 
@@ -191,7 +236,7 @@ fn strip_indent_columns_budget(indent: &str, columns: usize) -> (&str, usize) {
 /// Spaces only: a tab is worth four columns at a four-column stop but fewer
 /// mid-stop, and dropping one for a smaller budget would delete code bytes the
 /// formatter has no way to put back. Leaving it is the lossless direction.
-fn strip_leading_spaces_budget(text: &str, columns: usize) -> &str {
+pub(super) fn strip_leading_spaces_budget(text: &str, columns: usize) -> &str {
     let n = text.chars().take(columns).take_while(|&c| c == ' ').count();
     &text[n..]
 }
@@ -386,7 +431,7 @@ fn split_hashpipe_header(content: &str, code_block_node: &SyntaxNode) -> Option<
     ))
 }
 
-fn determine_fence_length(content: &str, fence_char: char) -> usize {
+pub(super) fn determine_fence_length(content: &str, fence_char: char) -> usize {
     let mut max_sequence = 0;
     let mut current_sequence = 0;
 
@@ -751,30 +796,17 @@ fn format_attributes(attrs: &[(String, Option<String>)], preserve_unquoted: bool
 }
 
 /// Extract the language (directive argument) and verbatim body text from a
-/// `MYST_DIRECTIVE` node. Returns `None` when the directive has no
-/// `MYST_DIRECTIVE_BODY` child (i.e. it is a non-verbatim directive whose body
-/// is parsed recursively as markdown). The body text is taken byte-for-byte so
-/// it matches the lookup key used when substituting formatted output.
+/// code directive. Other opaque directive bodies are not source code. The body
+/// text is taken byte-for-byte so it matches the lookup key used when
+/// substituting formatted output.
 pub(crate) fn extract_myst_directive_parts(node: &SyntaxNode) -> Option<(String, String)> {
-    let mut language = String::new();
-    let mut body = None;
-    for child in node.children() {
-        match child.kind() {
-            SyntaxKind::MYST_DIRECTIVE_OPEN => {
-                for token in child.children_with_tokens() {
-                    if let NodeOrToken::Token(t) = token
-                        && t.kind() == SyntaxKind::MYST_DIRECTIVE_ARG
-                    {
-                        let raw = t.text();
-                        language = raw.strip_prefix('.').unwrap_or(raw).to_string();
-                    }
-                }
-            }
-            SyntaxKind::MYST_DIRECTIVE_BODY => body = Some(child.text().to_string()),
-            _ => {}
-        }
+    let directive = MystDirective::cast(node.clone())?;
+    if !directive.is_code() {
+        return None;
     }
-    body.map(|body| (language, body))
+    let argument = directive.argument().unwrap_or_default();
+    let language = argument.strip_prefix('.').unwrap_or(&argument).to_string();
+    Some((language, directive.body()?))
 }
 
 /// Collect all code blocks from the syntax tree for external formatting.

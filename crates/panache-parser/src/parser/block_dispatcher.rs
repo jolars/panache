@@ -55,8 +55,8 @@ use super::blocks::metadata::{
     try_parse_pandoc_title_block, try_parse_yaml_block,
 };
 use super::blocks::myst_directives::{
-    DirectiveOpen, DirectiveOption, is_directive_closing_fence, try_parse_directive_open,
-    try_parse_directive_option,
+    DirectiveCloser, DirectiveOpen, DirectiveOption, is_directive_closing_fence,
+    try_parse_directive_open, try_parse_directive_option,
 };
 use super::blocks::myst_targets::{
     BlockBreak, Target, is_comment_line, try_parse_block_break, try_parse_target,
@@ -108,10 +108,9 @@ pub(crate) struct BlockContext<'a> {
     /// (pandoc rule); see `FencedDivCloseParser::detect_prepared`.
     pub fenced_div_open_indent: Option<usize>,
 
-    /// Expected closer of the innermost open MyST directive, as
-    /// `(fence_char, min_count)`. `None` when not inside a directive. Lets
-    /// `MystDirectiveCloseParser` match a closing fence against the opener.
-    pub myst_directive_closer: Option<(u8, usize)>,
+    /// Expected closer of the innermost open MyST directive, including its
+    /// outer container prefix. `None` when not inside a directive.
+    pub myst_directive_closer: Option<DirectiveCloser>,
 
     /// Whether we're at document start (pos == 0)
     pub at_document_start: bool,
@@ -1682,6 +1681,13 @@ impl BlockParser for FencedCodeBlockParser {
                 } else {
                     inner
                 };
+                if ctx
+                    .myst_directive_closer
+                    .as_ref()
+                    .is_some_and(|closer| closer.matches(raw_line))
+                {
+                    break;
+                }
                 if is_closing_fence(candidate, &fence) {
                     found = true;
                     break;
@@ -1744,7 +1750,15 @@ impl BlockParser for FencedCodeBlockParser {
         let new_pos = if ctx.config.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
             parse_fenced_math_block(builder, lines, fence, None, ctx.config.dialect)
         } else {
-            parse_fenced_code_block(builder, lines, fence, None, &ctx.diags, ctx.config.flavor)
+            parse_fenced_code_block(
+                builder,
+                lines,
+                fence,
+                None,
+                &ctx.diags,
+                ctx.config.flavor,
+                ctx.myst_directive_closer.as_ref(),
+            )
         };
 
         new_pos - line_pos
@@ -1940,6 +1954,7 @@ impl BlockParser for HtmlBlockParser {
             fusion,
             ctx.config,
             None,
+            ctx.myst_directive_closer.as_ref(),
         );
         new_pos - line_pos
     }
@@ -2597,8 +2612,8 @@ impl BlockParser for MystDirectiveCloseParser {
         ctx: &BlockContext,
         lines: &StrippedLines<'_, '_>,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        let (fence_char, open_count) = ctx.myst_directive_closer?;
-        if is_directive_closing_fence(lines.first(), fence_char, open_count) {
+        let closer = ctx.myst_directive_closer.as_ref()?;
+        if is_directive_closing_fence(lines.first(), closer.fence_char, closer.fence_count) {
             Some((BlockDetectionResult::YesCanInterrupt, None))
         } else {
             None
@@ -2612,7 +2627,11 @@ impl BlockParser for MystDirectiveCloseParser {
         lines: &StrippedLines<'_, '_>,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        let fence_char = ctx.myst_directive_closer.map(|(c, _)| c).unwrap_or(b'`');
+        let fence_char = ctx
+            .myst_directive_closer
+            .as_ref()
+            .map(|closer| closer.fence_char)
+            .unwrap_or(b'`');
         emit_directive_close(builder, lines.first(), fence_char);
         1
     }

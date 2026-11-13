@@ -169,6 +169,14 @@ impl MystDirective {
         child_token_text(&open, SyntaxKind::MYST_DIRECTIVE_ARG).map(|text| text.trim().to_string())
     }
 
+    /// Whether the body contains source code and the argument names its language.
+    pub fn is_code(&self) -> bool {
+        matches!(
+            self.name().as_deref(),
+            Some("code" | "code-block" | "code-cell")
+        )
+    }
+
     /// Returns the directive's leading `:key: value` option lines.
     pub fn options(&self) -> Vec<MystDirectiveOption> {
         self.0
@@ -177,7 +185,7 @@ impl MystDirective {
             .collect()
     }
 
-    /// Returns the verbatim body of a verbatim directive (`code`, `math`, ...).
+    /// Returns the opaque body of a literal or unrecognized directive.
     ///
     /// Prose directives whose body is recursively parsed as ordinary blocks
     /// have no `MYST_DIRECTIVE_BODY` node and yield `None`.

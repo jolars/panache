@@ -467,6 +467,7 @@ impl Formatter {
             return 0;
         };
         match parent.kind() {
+            SyntaxKind::MYST_DIRECTIVE => self.container_content_offset(&parent),
             SyntaxKind::DEFINITION => {
                 self.marker_content_offset(&parent, SyntaxKind::DEFINITION_MARKER)
             }
@@ -894,7 +895,7 @@ impl Formatter {
 
             SyntaxKind::DISPLAY_MATH => self.format_display_math(node),
 
-            SyntaxKind::CODE_BLOCK => self.format_block_code(node),
+            SyntaxKind::CODE_BLOCK => self.format_block_code(node, indent),
 
             SyntaxKind::YAML_METADATA
             | SyntaxKind::PANDOC_TITLE_BLOCK

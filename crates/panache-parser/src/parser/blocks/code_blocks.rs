@@ -10,6 +10,7 @@ use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{
     StrippedLines, advance_emitted_marker_columns, content_line_prefix_tail,
 };
+use super::myst_directives::DirectiveCloser;
 use crate::options::{Dialect, Flavor};
 use crate::parser::utils::container_stack::{byte_index_at_column, leading_indent};
 use crate::parser::utils::tree_copy::copy_green_children;
@@ -1042,6 +1043,7 @@ pub(crate) fn parse_fenced_code_block(
     first_line_override: Option<&str>,
     diags: &Diagnostics,
     flavor: Flavor,
+    myst_directive_closer: Option<&DirectiveCloser>,
 ) -> usize {
     let lines = window.raw();
     let start_pos = window.pos();
@@ -1109,6 +1111,12 @@ pub(crate) fn parse_fenced_code_block(
         }
 
         let inner_stripped = window.peek_prefix_at(current_pos);
+
+        // The directive extracts its body before nested code is parsed, so
+        // its closer takes precedence over a code closer or unfinished code.
+        if myst_directive_closer.is_some_and(|closer| closer.matches(line)) {
+            break;
+        }
 
         if is_closing_fence(inner_stripped, &fence) {
             found_closing = true;

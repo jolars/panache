@@ -1,8 +1,11 @@
 use crate::directives::extract_directive_from_node;
 use crate::formatter::Formatter;
-use crate::syntax::{AstNode, SyntaxKind, SyntaxNode, TomlMetadata, text_without_line_prefixes};
+use crate::syntax::{
+    AstNode, MystDirective, SyntaxKind, SyntaxNode, TomlMetadata, text_without_line_prefixes,
+};
 use rowan::NodeOrToken;
 
+use super::code_blocks::{determine_fence_length, strip_leading_spaces_budget};
 use super::math;
 
 impl Formatter {
@@ -56,6 +59,17 @@ impl Formatter {
                 .is_some_and(|token| token.kind() == SyntaxKind::LINE_PREFIX)
         {
             text.push('\n');
+        }
+        if !self.directive_tracker.is_formatting_ignored()
+            && let Some(directive) = node.parent().and_then(MystDirective::cast)
+        {
+            let offset = self.myst_directive_fence_offset(directive.syntax());
+            if offset > 0 {
+                text = text
+                    .split_inclusive('\n')
+                    .map(|line| strip_leading_spaces_budget(line, offset))
+                    .collect();
+            }
         }
         let starts_on_marker_line = node
             .first_token()
@@ -175,10 +189,46 @@ fn format_directive_option(node: &SyntaxNode) -> String {
     }
 }
 
+fn format_directive_fence(node: &SyntaxNode, minimum_length: usize) -> String {
+    let mut text = String::new();
+    for element in node.children_with_tokens() {
+        if let NodeOrToken::Token(token) = element {
+            match token.kind() {
+                SyntaxKind::MYST_DIRECTIVE_FENCE => {
+                    let fence_char = token.text().chars().next().expect("directive fence");
+                    text.push_str(
+                        &fence_char
+                            .to_string()
+                            .repeat(minimum_length.max(token.text().len())),
+                    );
+                }
+                SyntaxKind::NEWLINE | SyntaxKind::LINE_PREFIX => {}
+                SyntaxKind::WHITESPACE if text.is_empty() => {}
+                _ => text.push_str(token.text()),
+            }
+        }
+    }
+    text
+}
+
 impl Formatter {
+    pub(super) fn myst_directive_fence_offset(&self, node: &SyntaxNode) -> usize {
+        node.children()
+            .find(|child| child.kind() == SyntaxKind::MYST_DIRECTIVE_OPEN)
+            .map_or(0, |open| {
+                open.children_with_tokens()
+                    .filter_map(NodeOrToken::into_token)
+                    .take_while(|token| token.kind() != SyntaxKind::MYST_DIRECTIVE_FENCE)
+                    .filter(|token| token.kind() == SyntaxKind::WHITESPACE)
+                    .map(|token| token.text().len())
+                    .sum::<usize>()
+                    .saturating_sub(self.container_content_offset(node))
+            })
+    }
+
     pub(super) fn format_myst_directive(&mut self, node: &SyntaxNode, indent: usize) {
-        let mut open_text: Option<String> = None;
-        let mut close_text: Option<String> = None;
+        let mut open_node: Option<SyntaxNode> = None;
+        let mut close_node: Option<SyntaxNode> = None;
         let mut options = Vec::new();
         let mut body = Vec::new();
         let mut verbatim_body: Option<SyntaxNode> = None;
@@ -186,10 +236,10 @@ impl Formatter {
             if let NodeOrToken::Node(child) = element {
                 match child.kind() {
                     SyntaxKind::MYST_DIRECTIVE_OPEN => {
-                        open_text = Some(child.text().to_string());
+                        open_node = Some(child);
                     }
                     SyntaxKind::MYST_DIRECTIVE_CLOSE => {
-                        close_text = Some(child.text().to_string());
+                        close_node = Some(child);
                     }
                     SyntaxKind::MYST_DIRECTIVE_OPTION => options.push(child),
                     SyntaxKind::MYST_DIRECTIVE_BODY => verbatim_body = Some(child),
@@ -198,12 +248,24 @@ impl Formatter {
             }
         }
 
-        if let Some(open) = &open_text {
-            self.output.push_str(open.trim_end_matches('\n'));
-            self.output.push('\n');
-        }
+        // Nested code blocks and directives may grow their fences while
+        // formatting, so size the enclosing fence from the rendered body.
+        let saved_output = std::mem::take(&mut self.output);
+        // Include the opener's newline so blocks can request a separator
+        // even when they are the first content in the scratch buffer.
+        self.output.push('\n');
+        let indent_str = " ".repeat(indent);
+        // Literal content keeps the opener's offset because MyST removes that
+        // offset when extracting the body, independently of container prefixes.
+        let fence_offset = if verbatim_body.is_some() {
+            self.myst_directive_fence_offset(node)
+        } else {
+            0
+        };
+        let fence_indent = " ".repeat(indent + fence_offset);
 
         for option in &options {
+            self.output.push_str(&fence_indent);
             self.output.push_str(&format_directive_option(option));
             self.output.push('\n');
         }
@@ -214,62 +276,79 @@ impl Formatter {
                 .get(&usize::from(node.text_range().start()))
                 .cloned()
                 .unwrap_or_else(|| text_without_line_prefixes(&body_node));
-            // Containers own their prefixes; retain only the literal body's
-            // indentation before applying the current list indentation.
-            let indent_str = " ".repeat(indent);
-            for line in body_text.trim_end_matches('\n').split('\n') {
-                if !line.is_empty() {
+            for line in body_text.split_inclusive('\n') {
+                if line != "\n" {
                     self.output.push_str(&indent_str);
                 }
                 self.output.push_str(line);
+            }
+            if !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
-            if let Some(close) = &close_text {
-                self.output.push_str(&indent_str);
-                self.output.push_str(close.trim_end_matches('\n'));
+        } else {
+            let leading = body
+                .iter()
+                .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
+                .count();
+            let trailing = body
+                .iter()
+                .rev()
+                .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
+                .count();
+            let end = body.len().saturating_sub(trailing).max(leading);
+
+            if !options.is_empty() && leading < end {
                 self.output.push('\n');
             }
-            self.consecutive_blank_lines = 0;
-            return;
+
+            let mut prev_blank = false;
+            for child in &body[leading..end] {
+                if child.kind() == SyntaxKind::BLANK_LINE {
+                    if !prev_blank {
+                        self.output.push('\n');
+                        prev_blank = true;
+                    }
+                    continue;
+                }
+                self.format_node_sync(child, indent);
+                if !self.output.ends_with('\n') {
+                    self.output.push('\n');
+                }
+                prev_blank = false;
+            }
         }
 
-        let leading = body
-            .iter()
-            .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
-            .count();
-        let trailing = body
-            .iter()
-            .rev()
-            .take_while(|c| c.kind() == SyntaxKind::BLANK_LINE)
-            .count();
-        let end = body.len().saturating_sub(trailing).max(leading);
+        let rendered_body = std::mem::replace(&mut self.output, saved_output);
+        let rendered_body = &rendered_body[1..];
+        let minimum_length = open_node
+            .as_ref()
+            .and_then(|open| {
+                open.children_with_tokens().find_map(|element| {
+                    element
+                        .into_token()
+                        .filter(|token| token.kind() == SyntaxKind::MYST_DIRECTIVE_FENCE)
+                })
+            })
+            .and_then(|fence| fence.text().chars().next())
+            .map_or(3, |fence_char| {
+                determine_fence_length(rendered_body, fence_char)
+            });
 
-        if !options.is_empty() && leading < end {
+        if let Some(open) = &open_node {
+            self.output.push_str(&fence_indent);
+            self.output
+                .push_str(&format_directive_fence(open, minimum_length));
             self.output.push('\n');
         }
+        self.output.push_str(rendered_body);
 
-        let mut prev_blank = false;
-        for child in &body[leading..end] {
-            if child.kind() == SyntaxKind::BLANK_LINE {
-                if !prev_blank {
-                    self.output.push('\n');
-                    prev_blank = true;
-                }
-                continue;
-            }
-            self.format_node_sync(child, indent);
+        if let Some(close) = &close_node {
             if !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
-            prev_blank = false;
-        }
-
-        if let Some(close) = &close_text {
-            if !self.output.ends_with('\n') {
-                self.output.push('\n');
-            }
-            self.output.push_str(&" ".repeat(indent));
-            self.output.push_str(close.trim_end_matches('\n'));
+            self.output.push_str(&fence_indent);
+            self.output
+                .push_str(&format_directive_fence(close, minimum_length));
             self.output.push('\n');
         }
         self.consecutive_blank_lines = 0;

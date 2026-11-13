@@ -256,6 +256,7 @@ impl<'a> Parser<'a> {
             self.config.dialect,
         );
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+        let myst_directive_closer = self.innermost_myst_directive_closer();
         let new_pos = code_blocks::parse_fenced_code_block(
             &mut self.builder,
             &window,
@@ -263,6 +264,7 @@ impl<'a> Parser<'a> {
             Some(&text_owned),
             &self.diagnostics,
             self.config.flavor,
+            myst_directive_closer.as_ref(),
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
     }
@@ -293,6 +295,7 @@ impl<'a> Parser<'a> {
             buffer.clear();
         }
         let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config);
+        let myst_directive_closer = self.innermost_myst_directive_closer();
         let new_pos = html_blocks::parse_html_block_with_wrapper(
             &mut self.builder,
             &self.lines,
@@ -303,6 +306,7 @@ impl<'a> Parser<'a> {
             html_blocks::SoftbreakFusion::None,
             self.config,
             Some(&content),
+            myst_directive_closer.as_ref(),
         );
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
     }

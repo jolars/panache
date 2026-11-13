@@ -336,6 +336,37 @@ fn myst_directive_body_with_external_formatter() {
 }
 
 #[test]
+fn myst_non_code_directives_preserve_bodies_with_matching_formatter() {
+    let mut config = Config {
+        flavor: Flavor::Myst,
+        extensions: Extensions::for_flavor(Flavor::Myst),
+        ..Default::default()
+    };
+    config.formatters.insert(
+        "test".to_string(),
+        vec![panache::config::FormatterConfig {
+            cmd: "tr".to_string(),
+            args: vec!["[:lower:]".to_string(), "[:upper:]".to_string()],
+            stdin: true,
+            code_style_args: Default::default(),
+        }],
+    );
+
+    for name in [
+        "custom-directive",
+        "domain:custom",
+        "raw",
+        "eval-rst",
+        "math",
+        "toctree",
+    ] {
+        let input = format!("```{{{name}}} test\nhello   world\n    indented\n```\n");
+        let output = format(&input, Some(config.clone()), None);
+        assert_eq!(output, input, "{name} must not invoke a code formatter");
+    }
+}
+
+#[test]
 fn formatter_args_substitute_lang_placeholder() {
     // `sed s/{lang}/REPL/g` should rewrite the language literal in the code
     // body, proving the {lang} placeholder is substituted at dispatch time.

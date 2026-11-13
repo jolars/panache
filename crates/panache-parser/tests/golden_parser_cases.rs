@@ -111,6 +111,117 @@ fn run_golden_case(case_name: &str) {
 }
 
 #[test]
+fn myst_html_blocks_stop_at_directive_closers() {
+    use panache_parser::syntax::{AstNode, MystDirective, SyntaxKind};
+
+    for fence in ["```", "~~~", ":::"] {
+        for (prefix, suffix) in [("", ""), ("- Item\n\n  ", "  "), ("> ", "> ")] {
+            for html in ["<div>body</div>", "<script>", "<!-- open"] {
+                let input =
+                    format!("{prefix}{fence}{{note}}\n{suffix}{html}\n{suffix}{fence}\n\nAfter.\n");
+                let tree = parse(
+                    &input,
+                    Some(ParserOptions {
+                        flavor: Flavor::Myst,
+                        dialect: Dialect::CommonMark,
+                        extensions: Extensions {
+                            myst_colon_fence: true,
+                            ..Extensions::for_flavor(Flavor::Myst)
+                        },
+                        ..Default::default()
+                    }),
+                );
+                assert_eq!(tree.text().to_string(), input);
+                let directive = tree.descendants().find_map(MystDirective::cast).unwrap();
+                assert!(
+                    directive
+                        .syntax()
+                        .children()
+                        .any(|child| child.kind() == SyntaxKind::MYST_DIRECTIVE_CLOSE),
+                    "missing directive closer: {input:?}"
+                );
+                assert!(!directive.syntax().text().to_string().contains("After."));
+            }
+        }
+    }
+}
+
+#[test]
+fn myst_code_blocks_stop_at_directive_closers() {
+    use panache_parser::syntax::{AstNode, CodeBlock, MystDirective, SyntaxKind};
+
+    for fence in ["~~~", ":::", "````"] {
+        for (prefix, code_prefix, content_prefix, close_prefix) in [
+            ("", "", "", ""),
+            ("- Item\n\n  ", "  ", "  ", "  "),
+            ("> ", "> ", "> ", "> "),
+            ("", "- ", "  ", ""),
+        ] {
+            let input = format!(
+                "{prefix}{fence}{{note}}\n{code_prefix}```python\n{content_prefix}x = 1\n{close_prefix}{fence}\n\nAfter.\n"
+            );
+            let tree = parse(
+                &input,
+                Some(ParserOptions {
+                    flavor: Flavor::Myst,
+                    dialect: Dialect::CommonMark,
+                    extensions: Extensions {
+                        myst_colon_fence: true,
+                        ..Extensions::for_flavor(Flavor::Myst)
+                    },
+                    ..Default::default()
+                }),
+            );
+            assert_eq!(tree.text().to_string(), input);
+            let directive = tree.descendants().find_map(MystDirective::cast).unwrap();
+            assert!(
+                directive
+                    .syntax()
+                    .children()
+                    .any(|child| child.kind() == SyntaxKind::MYST_DIRECTIVE_CLOSE),
+                "missing directive closer: {input:?}"
+            );
+            let code = directive
+                .syntax()
+                .descendants()
+                .find_map(CodeBlock::cast)
+                .unwrap();
+            assert!(
+                !code
+                    .syntax()
+                    .children()
+                    .any(|child| child.kind() == SyntaxKind::CODE_FENCE_CLOSE)
+            );
+            assert!(!directive.syntax().text().to_string().contains("After."));
+        }
+    }
+}
+
+#[test]
+fn myst_code_keeps_directive_fences_indented_inside_lists() {
+    use panache_parser::syntax::{AstNode, CodeBlock, SyntaxKind};
+
+    let input = "~~~{note}\n- ```python\n  x\n    ~~~\n  y\n  ```\n~~~\n\nAfter.\n";
+    let tree = parse(
+        input,
+        Some(ParserOptions {
+            flavor: Flavor::Myst,
+            dialect: Dialect::CommonMark,
+            extensions: Extensions::for_flavor(Flavor::Myst),
+            ..Default::default()
+        }),
+    );
+    assert_eq!(tree.text().to_string(), input);
+    let code = tree.descendants().find_map(CodeBlock::cast).unwrap();
+    assert!(code.syntax().text().to_string().contains("~~~"));
+    assert!(
+        code.syntax()
+            .children()
+            .any(|child| child.kind() == SyntaxKind::CODE_FENCE_CLOSE)
+    );
+}
+
+#[test]
 fn raw_html_trailing_container_markers_are_lossless() {
     for input in [
         "> <script>\n>",
@@ -1232,6 +1343,10 @@ golden_test_cases!(
     myst_directive_options_no_blank,
     myst_directive_colon_fence,
     myst_directive_nested,
+    myst_directive_unknown,
+    myst_directive_code_fences,
+    myst_directive_html_closer,
+    myst_directive_outer_closer,
     myst_directive_vs_codeblock,
     myst_directive_disabled,
     myst_directive_code_verbatim,

@@ -1,9 +1,9 @@
 use crate::config::Extensions;
 use crate::linter::code_block_collector::SnippetKind;
 use crate::syntax::{
-    AstNode, CellOptionResolution, CodeBlock, Heading, InlineExecutable, SyntaxKind, SyntaxNode,
+    AstNode, CellOptionResolution, CodeBlock, Heading, InlineExecutable, MystDirective, SyntaxKind,
+    SyntaxNode,
 };
-use rowan::NodeOrToken;
 use std::collections::HashMap;
 
 /// A block or inline expression with its location in the document.
@@ -118,34 +118,22 @@ fn extract_inline_expression(inline: &InlineExecutable, input: &str) -> Option<C
     })
 }
 
-/// Extract a verbatim MyST directive body as a lintable code block, keyed by the
+/// Extract a MyST code directive body as a lintable code block, keyed by the
 /// directive argument (e.g. `python` in `` ```{code-block} python ``). Returns
-/// `None` for non-verbatim directives (no `MYST_DIRECTIVE_BODY` child) or when
-/// the language or body is empty. The body's byte range is preserved so external
+/// `None` for other directives or when the language or body is empty.
+/// The body's byte range is preserved so external
 /// diagnostics map back onto the original source.
 fn extract_myst_directive_block(node: &SyntaxNode, input: &str) -> Option<CodeSnippet> {
-    let mut language = None;
-    let mut body_node = None;
-
-    for child in node.children() {
-        match child.kind() {
-            SyntaxKind::MYST_DIRECTIVE_OPEN => {
-                for token in child.children_with_tokens() {
-                    if let NodeOrToken::Token(t) = token
-                        && t.kind() == SyntaxKind::MYST_DIRECTIVE_ARG
-                    {
-                        let raw = t.text();
-                        language = Some(raw.strip_prefix('.').unwrap_or(raw).to_string());
-                    }
-                }
-            }
-            SyntaxKind::MYST_DIRECTIVE_BODY => body_node = Some(child),
-            _ => {}
-        }
+    let directive = MystDirective::cast(node.clone())?;
+    if !directive.is_code() {
+        return None;
     }
-
-    let language = language?;
-    let body_node = body_node?;
+    let argument = directive.argument()?;
+    let language = argument.strip_prefix('.').unwrap_or(&argument).to_string();
+    let body_node = directive
+        .syntax()
+        .children()
+        .find(|child| child.kind() == SyntaxKind::MYST_DIRECTIVE_BODY)?;
     let (content, line_starts) = dedented_text_with_line_starts(&body_node);
 
     if language.is_empty() || content.is_empty() {
@@ -420,6 +408,30 @@ mod tests {
     #[cfg(feature = "lsp")]
     use super::crossref_symbol_labels;
     use super::{crossref_resolution_labels, implicit_heading_ids};
+
+    #[test]
+    fn myst_non_code_directives_are_not_code_snippets() {
+        let config = crate::Config {
+            flavor: crate::config::Flavor::Myst,
+            extensions: crate::config::Extensions::for_flavor(crate::config::Flavor::Myst),
+            ..Default::default()
+        };
+        for name in [
+            "custom-directive",
+            "domain:custom",
+            "raw",
+            "eval-rst",
+            "math",
+            "toctree",
+        ] {
+            let input = format!("```{{{name}}} python\nx = 1\n```\n");
+            let tree = crate::parse(&input, Some(config.clone()));
+            assert!(
+                super::collect_code_snippets(&tree, &input).is_empty(),
+                "{name}"
+            );
+        }
+    }
 
     #[test]
     fn crossref_resolution_labels_keep_exact_match() {

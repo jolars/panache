@@ -22,6 +22,7 @@ use super::blocks::horizontal_rules::try_parse_horizontal_rule;
 use super::blocks::html_blocks;
 use super::blocks::line_blocks;
 use super::blocks::lists;
+use super::blocks::myst_directives::DirectiveCloser;
 use super::blocks::paragraphs;
 use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use super::blocks::tables;
@@ -2873,13 +2874,23 @@ impl<'a> Parser<'a> {
         });
     }
 
-    fn innermost_myst_directive_closer(&self) -> Option<(u8, usize)> {
-        self.containers.stack.iter().rev().find_map(|c| match c {
-            Container::MystDirective {
-                fence_char,
-                fence_count,
-            } => Some((*fence_char, *fence_count)),
-            _ => None,
+    fn innermost_myst_directive_closer(&self) -> Option<DirectiveCloser> {
+        let index = self.myst_directive_container_index()?;
+        let Container::MystDirective {
+            fence_char,
+            fence_count,
+        } = &self.containers.stack[index]
+        else {
+            unreachable!();
+        };
+        Some(DirectiveCloser {
+            fence_char: *fence_char,
+            fence_count: *fence_count,
+            prefix: ContainerPrefix::from_stack(
+                &self.containers.stack[..index],
+                false,
+                self.config,
+            ),
         })
     }
 

@@ -1,0 +1,152 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..317
+  MYST_DIRECTIVE@0..30
+    MYST_DIRECTIVE_OPEN@0..10
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..9 "{note}"
+      NEWLINE@9..10 "\n"
+    HTML_BLOCK@10..26
+      HTML_BLOCK_TAG@10..26
+        TEXT@10..25 "<div>body</div>"
+        NEWLINE@25..26 "\n"
+    MYST_DIRECTIVE_CLOSE@26..30
+      MYST_DIRECTIVE_FENCE@26..29 "```"
+      NEWLINE@29..30 "\n"
+  BLANK_LINE@30..31
+    BLANK_LINE@30..31 "\n"
+  PARAGRAPH@31..48
+    TEXT@31..47 "After backticks."
+    NEWLINE@47..48 "\n"
+  BLANK_LINE@48..49
+    BLANK_LINE@48..49 "\n"
+  MYST_DIRECTIVE@49..80
+    MYST_DIRECTIVE_OPEN@49..59
+      MYST_DIRECTIVE_FENCE@49..52 "~~~"
+      MYST_DIRECTIVE_NAME@52..58 "{note}"
+      NEWLINE@58..59 "\n"
+    HTML_BLOCK@59..75
+      HTML_BLOCK_TAG@59..75
+        TEXT@59..74 "<div>body</div>"
+        NEWLINE@74..75 "\n"
+    BLANK_LINE@75..76
+      BLANK_LINE@75..76 "\n"
+    MYST_DIRECTIVE_CLOSE@76..80
+      MYST_DIRECTIVE_FENCE@76..79 "~~~"
+      NEWLINE@79..80 "\n"
+  BLANK_LINE@80..81
+    BLANK_LINE@80..81 "\n"
+  PARAGRAPH@81..95
+    TEXT@81..94 "After tildes."
+    NEWLINE@94..95 "\n"
+  BLANK_LINE@95..96
+    BLANK_LINE@95..96 "\n"
+  MYST_DIRECTIVE@96..126
+    MYST_DIRECTIVE_OPEN@96..106
+      MYST_DIRECTIVE_FENCE@96..99 ":::"
+      MYST_DIRECTIVE_NAME@99..105 "{note}"
+      NEWLINE@105..106 "\n"
+    HTML_BLOCK@106..122
+      HTML_BLOCK_TAG@106..122
+        TEXT@106..121 "<div>body</div>"
+        NEWLINE@121..122 "\n"
+    MYST_DIRECTIVE_CLOSE@122..126
+      MYST_DIRECTIVE_FENCE@122..125 ":::"
+      NEWLINE@125..126 "\n"
+  BLANK_LINE@126..127
+    BLANK_LINE@126..127 "\n"
+  PARAGRAPH@127..141
+    TEXT@127..140 "After colons."
+    NEWLINE@140..141 "\n"
+  BLANK_LINE@141..142
+    BLANK_LINE@141..142 "\n"
+  LIST@142..186
+    LIST_ITEM@142..186
+      LIST_MARKER@142..143 "-"
+      WHITESPACE@143..144 " "
+      PLAIN@144..149
+        TEXT@144..148 "Item"
+        NEWLINE@148..149 "\n"
+      BLANK_LINE@149..150
+        BLANK_LINE@149..150 "\n"
+      MYST_DIRECTIVE@150..186
+        MYST_DIRECTIVE_OPEN@150..162
+          WHITESPACE@150..152 "  "
+          MYST_DIRECTIVE_FENCE@152..155 "```"
+          MYST_DIRECTIVE_NAME@155..161 "{note}"
+          NEWLINE@161..162 "\n"
+        HTML_BLOCK@162..180
+          HTML_BLOCK_TAG@162..180
+            TEXT@162..179 "  <div>body</div>"
+            NEWLINE@179..180 "\n"
+        MYST_DIRECTIVE_CLOSE@180..186
+          WHITESPACE@180..182 "  "
+          MYST_DIRECTIVE_FENCE@182..185 "```"
+          NEWLINE@185..186 "\n"
+  BLANK_LINE@186..187
+    BLANK_LINE@186..187 "\n"
+  PARAGRAPH@187..199
+    TEXT@187..198 "After list."
+    NEWLINE@198..199 "\n"
+  BLANK_LINE@199..200
+    BLANK_LINE@199..200 "\n"
+  BLOCK_QUOTE@200..253
+    BLOCK_QUOTE_MARKER@200..201 ">"
+    WHITESPACE@201..202 " "
+    MYST_DIRECTIVE@202..236
+      MYST_DIRECTIVE_OPEN@202..212
+        MYST_DIRECTIVE_FENCE@202..205 "```"
+        MYST_DIRECTIVE_NAME@205..211 "{note}"
+        NEWLINE@211..212 "\n"
+      BLOCK_QUOTE_MARKER@212..213 ">"
+      WHITESPACE@213..214 " "
+      HTML_BLOCK@214..230
+        HTML_BLOCK_TAG@214..230
+          TEXT@214..229 "<div>body</div>"
+          NEWLINE@229..230 "\n"
+      BLOCK_QUOTE_MARKER@230..231 ">"
+      WHITESPACE@231..232 " "
+      MYST_DIRECTIVE_CLOSE@232..236
+        MYST_DIRECTIVE_FENCE@232..235 "```"
+        NEWLINE@235..236 "\n"
+    BLOCK_QUOTE_MARKER@236..237 ">"
+    BLANK_LINE@237..238
+      BLANK_LINE@237..238 "\n"
+    BLOCK_QUOTE_MARKER@238..239 ">"
+    WHITESPACE@239..240 " "
+    PARAGRAPH@240..253
+      TEXT@240..252 "After quote."
+      NEWLINE@252..253 "\n"
+  BLANK_LINE@253..254
+    BLANK_LINE@253..254 "\n"
+  MYST_DIRECTIVE@254..294
+    MYST_DIRECTIVE_OPEN@254..264
+      MYST_DIRECTIVE_FENCE@254..257 "```"
+      MYST_DIRECTIVE_NAME@257..263 "{note}"
+      NEWLINE@263..264 "\n"
+    PARAGRAPH@264..266
+      TEXT@264..265 "a"
+      NEWLINE@265..266 "\n"
+    BLANK_LINE@266..267
+      BLANK_LINE@266..267 "\n"
+    CODE_BLOCK@267..273
+      CODE_CONTENT@267..273
+        WHITESPACE@267..271 "    "
+        TEXT@271..272 "b"
+        NEWLINE@272..273 "\n"
+    BLANK_LINE@273..274
+      BLANK_LINE@273..274 "\n"
+    HTML_BLOCK@274..290
+      HTML_BLOCK_TAG@274..290
+        TEXT@274..289 "<div>body</div>"
+        NEWLINE@289..290 "\n"
+    MYST_DIRECTIVE_CLOSE@290..294
+      MYST_DIRECTIVE_FENCE@290..293 "```"
+      NEWLINE@293..294 "\n"
+  BLANK_LINE@294..295
+    BLANK_LINE@294..295 "\n"
+  PARAGRAPH@295..317
+    TEXT@295..316 "After growing fences."
+    NEWLINE@316..317 "\n"

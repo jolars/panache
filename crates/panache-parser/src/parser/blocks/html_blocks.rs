@@ -1201,6 +1201,7 @@ pub(crate) fn parse_html_block_with_wrapper(
     fusion: SoftbreakFusion,
     config: &ParserOptions,
     first_line_content: Option<&str>,
+    myst_directive_closer: Option<&super::myst_directives::DirectiveCloser>,
 ) -> usize {
     if config.dialect == crate::options::Dialect::CommonMark {
         return parse_commonmark_html_block(
@@ -1210,6 +1211,7 @@ pub(crate) fn parse_html_block_with_wrapper(
             &block_type,
             prefix,
             first_line_content,
+            myst_directive_closer,
         );
     }
     let bq_depth = prefix.bq_depth();
@@ -2019,6 +2021,7 @@ fn parse_commonmark_html_block(
     block_type: &HtmlBlockType,
     prefix: &ContainerPrefix,
     first_line_content: Option<&str>,
+    myst_directive_closer: Option<&super::myst_directives::DirectiveCloser>,
 ) -> usize {
     use crate::parser::inlines::sink::{InjectedMarker, InlineSink, MarkerInjectingSink};
     use crate::parser::utils::raw_html;
@@ -2034,6 +2037,10 @@ fn parse_commonmark_html_block(
     if !is_closing_marker(first, block_type) {
         while let Some(&line) = lines.get(end_pos) {
             let (depth, inner) = count_blockquote_markers(line);
+            // An outer directive fence also bounds opaque HTML in its body.
+            if myst_directive_closer.is_some_and(|closer| closer.matches(line)) {
+                break;
+            }
             // Raw HTML accepts no lazy continuation outside its container.
             if depth < prefix.bq_depth()
                 || (prefix.list_content_col() > 0
@@ -3830,6 +3837,7 @@ mod tests {
             SoftbreakFusion::ToDocEnd,
             &opts,
             None,
+            None,
         );
 
         assert_eq!(new_pos, 1);
@@ -3853,6 +3861,7 @@ mod tests {
             SoftbreakFusion::ToDocEnd,
             &opts,
             None,
+            None,
         );
 
         assert_eq!(new_pos, 3);
@@ -3875,6 +3884,7 @@ mod tests {
             SyntaxKind::HTML_BLOCK,
             SoftbreakFusion::ToDocEnd,
             &opts,
+            None,
             None,
         );
 
@@ -3906,6 +3916,7 @@ mod tests {
             SoftbreakFusion::ToDocEnd,
             &opts,
             None,
+            None,
         );
 
         // 9 lines: outer-open, blank, inner-open, blank, content, blank,
@@ -3933,6 +3944,7 @@ mod tests {
             SoftbreakFusion::ToDocEnd,
             &opts,
             None,
+            None,
         );
         assert_eq!(new_pos, 1);
     }
@@ -3959,6 +3971,7 @@ mod tests {
             SyntaxKind::HTML_BLOCK,
             SoftbreakFusion::ToDocEnd,
             &opts,
+            None,
             None,
         );
         // Three lines, closed at first `</script>` (line 2). new_pos = 3.
@@ -3994,6 +4007,7 @@ mod tests {
             SyntaxKind::HTML_BLOCK_DIV,
             SoftbreakFusion::ToDocEnd,
             &opts,
+            None,
             None,
         );
 
@@ -4041,6 +4055,7 @@ mod tests {
             SoftbreakFusion::ToDocEnd,
             &opts,
             None,
+            None,
         );
 
         // 5 lines: open-line 0, open-line 1, open-line 2 (with `>`), foo,
@@ -4080,6 +4095,7 @@ mod tests {
             SyntaxKind::HTML_BLOCK,
             SoftbreakFusion::ToDocEnd,
             &opts,
+            None,
             None,
         );
 

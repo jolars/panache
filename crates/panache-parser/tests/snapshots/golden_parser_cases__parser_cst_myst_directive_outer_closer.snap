@@ -1,0 +1,184 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..326
+  MYST_DIRECTIVE@0..30
+    MYST_DIRECTIVE_OPEN@0..10
+      MYST_DIRECTIVE_FENCE@0..3 "~~~"
+      MYST_DIRECTIVE_NAME@3..9 "{note}"
+      NEWLINE@9..10 "\n"
+    CODE_BLOCK@10..26
+      CODE_FENCE_OPEN@10..20
+        CODE_FENCE_MARKER@10..13 "```"
+        CODE_INFO@13..19
+          CODE_LANGUAGE@13..19 "python"
+        NEWLINE@19..20 "\n"
+      CODE_CONTENT@20..26
+        TEXT@20..25 "x = 1"
+        NEWLINE@25..26 "\n"
+    MYST_DIRECTIVE_CLOSE@26..30
+      MYST_DIRECTIVE_FENCE@26..29 "~~~"
+      NEWLINE@29..30 "\n"
+  BLANK_LINE@30..31
+    BLANK_LINE@30..31 "\n"
+  PARAGRAPH@31..45
+    TEXT@31..44 "After tildes."
+    NEWLINE@44..45 "\n"
+  BLANK_LINE@45..46
+    BLANK_LINE@45..46 "\n"
+  MYST_DIRECTIVE@46..76
+    MYST_DIRECTIVE_OPEN@46..56
+      MYST_DIRECTIVE_FENCE@46..49 ":::"
+      MYST_DIRECTIVE_NAME@49..55 "{note}"
+      NEWLINE@55..56 "\n"
+    CODE_BLOCK@56..72
+      CODE_FENCE_OPEN@56..66
+        CODE_FENCE_MARKER@56..59 "```"
+        CODE_INFO@59..65
+          CODE_LANGUAGE@59..65 "python"
+        NEWLINE@65..66 "\n"
+      CODE_CONTENT@66..72
+        TEXT@66..71 "x = 2"
+        NEWLINE@71..72 "\n"
+    MYST_DIRECTIVE_CLOSE@72..76
+      MYST_DIRECTIVE_FENCE@72..75 ":::"
+      NEWLINE@75..76 "\n"
+  BLANK_LINE@76..77
+    BLANK_LINE@76..77 "\n"
+  PARAGRAPH@77..91
+    TEXT@77..90 "After colons."
+    NEWLINE@90..91 "\n"
+  BLANK_LINE@91..92
+    BLANK_LINE@91..92 "\n"
+  MYST_DIRECTIVE@92..124
+    MYST_DIRECTIVE_OPEN@92..103
+      MYST_DIRECTIVE_FENCE@92..96 "````"
+      MYST_DIRECTIVE_NAME@96..102 "{note}"
+      NEWLINE@102..103 "\n"
+    CODE_BLOCK@103..119
+      CODE_FENCE_OPEN@103..113
+        CODE_FENCE_MARKER@103..106 "```"
+        CODE_INFO@106..112
+          CODE_LANGUAGE@106..112 "python"
+        NEWLINE@112..113 "\n"
+      CODE_CONTENT@113..119
+        TEXT@113..118 "x = 3"
+        NEWLINE@118..119 "\n"
+    MYST_DIRECTIVE_CLOSE@119..124
+      MYST_DIRECTIVE_FENCE@119..123 "````"
+      NEWLINE@123..124 "\n"
+  BLANK_LINE@124..125
+    BLANK_LINE@124..125 "\n"
+  PARAGRAPH@125..142
+    TEXT@125..141 "After backticks."
+    NEWLINE@141..142 "\n"
+  BLANK_LINE@142..143
+    BLANK_LINE@142..143 "\n"
+  LIST@143..189
+    LIST_ITEM@143..189
+      LIST_MARKER@143..144 "-"
+      WHITESPACE@144..145 " "
+      PLAIN@145..150
+        TEXT@145..149 "Item"
+        NEWLINE@149..150 "\n"
+      BLANK_LINE@150..151
+        BLANK_LINE@150..151 "\n"
+      MYST_DIRECTIVE@151..189
+        MYST_DIRECTIVE_OPEN@151..163
+          WHITESPACE@151..153 "  "
+          MYST_DIRECTIVE_FENCE@153..156 "~~~"
+          MYST_DIRECTIVE_NAME@156..162 "{note}"
+          NEWLINE@162..163 "\n"
+        CODE_BLOCK@163..183
+          LINE_PREFIX@163..165 "  "
+          CODE_FENCE_OPEN@165..175
+            CODE_FENCE_MARKER@165..168 "```"
+            CODE_INFO@168..174
+              CODE_LANGUAGE@168..174 "python"
+            NEWLINE@174..175 "\n"
+          CODE_CONTENT@175..183
+            LINE_PREFIX@175..177 "  "
+            TEXT@177..182 "x = 4"
+            NEWLINE@182..183 "\n"
+        MYST_DIRECTIVE_CLOSE@183..189
+          WHITESPACE@183..185 "  "
+          MYST_DIRECTIVE_FENCE@185..188 "~~~"
+          NEWLINE@188..189 "\n"
+  BLANK_LINE@189..190
+    BLANK_LINE@189..190 "\n"
+  PARAGRAPH@190..202
+    TEXT@190..201 "After list."
+    NEWLINE@201..202 "\n"
+  BLANK_LINE@202..203
+    BLANK_LINE@202..203 "\n"
+  BLOCK_QUOTE@203..241
+    BLOCK_QUOTE_MARKER@203..204 ">"
+    WHITESPACE@204..205 " "
+    MYST_DIRECTIVE@205..241
+      MYST_DIRECTIVE_OPEN@205..215
+        MYST_DIRECTIVE_FENCE@205..208 "~~~"
+        MYST_DIRECTIVE_NAME@208..214 "{note}"
+        NEWLINE@214..215 "\n"
+      BLOCK_QUOTE_MARKER@215..216 ">"
+      WHITESPACE@216..217 " "
+      CODE_BLOCK@217..235
+        CODE_FENCE_OPEN@217..227
+          CODE_FENCE_MARKER@217..220 "```"
+          CODE_INFO@220..226
+            CODE_LANGUAGE@220..226 "python"
+          NEWLINE@226..227 "\n"
+        CODE_CONTENT@227..235
+          LINE_PREFIX@227..228 ">"
+          LINE_PREFIX@228..229 " "
+          TEXT@229..234 "x = 5"
+          NEWLINE@234..235 "\n"
+      BLOCK_QUOTE_MARKER@235..236 ">"
+      WHITESPACE@236..237 " "
+      MYST_DIRECTIVE_CLOSE@237..241
+        MYST_DIRECTIVE_FENCE@237..240 "~~~"
+        NEWLINE@240..241 "\n"
+  BLANK_LINE@241..242
+    BLANK_LINE@241..242 "\n"
+  PARAGRAPH@242..255
+    TEXT@242..254 "After quote."
+    NEWLINE@254..255 "\n"
+  BLANK_LINE@255..256
+    BLANK_LINE@255..256 "\n"
+  MYST_DIRECTIVE@256..304
+    MYST_DIRECTIVE_OPEN@256..266
+      MYST_DIRECTIVE_FENCE@256..259 "~~~"
+      MYST_DIRECTIVE_NAME@259..265 "{note}"
+      NEWLINE@265..266 "\n"
+    LIST@266..300
+      LIST_ITEM@266..300
+        LIST_MARKER@266..267 "-"
+        WHITESPACE@267..268 " "
+        CODE_BLOCK@268..300
+          CODE_FENCE_OPEN@268..278
+            CODE_FENCE_MARKER@268..271 "```"
+            CODE_INFO@271..277
+              CODE_LANGUAGE@271..277 "python"
+            NEWLINE@277..278 "\n"
+          CODE_CONTENT@278..294
+            LINE_PREFIX@278..280 "  "
+            TEXT@280..281 "x"
+            NEWLINE@281..282 "\n"
+            LINE_PREFIX@282..284 "  "
+            TEXT@284..289 "  ~~~"
+            NEWLINE@289..290 "\n"
+            LINE_PREFIX@290..292 "  "
+            TEXT@292..293 "y"
+            NEWLINE@293..294 "\n"
+          LINE_PREFIX@294..296 "  "
+          CODE_FENCE_CLOSE@296..300
+            CODE_FENCE_MARKER@296..299 "```"
+            NEWLINE@299..300 "\n"
+    MYST_DIRECTIVE_CLOSE@300..304
+      MYST_DIRECTIVE_FENCE@300..303 "~~~"
+      NEWLINE@303..304 "\n"
+  BLANK_LINE@304..305
+    BLANK_LINE@304..305 "\n"
+  PARAGRAPH@305..326
+    TEXT@305..325 "After literal fence."
+    NEWLINE@325..326 "\n"

@@ -1,0 +1,108 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..348
+  MYST_DIRECTIVE@0..112
+    MYST_DIRECTIVE_OPEN@0..29
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..21 "{custom-directive}"
+      WHITESPACE@21..22 " "
+      MYST_DIRECTIVE_ARG@22..28 "python"
+      NEWLINE@28..29 "\n"
+    MYST_DIRECTIVE_OPTION@29..43
+      MYST_DIRECTIVE_OPTION_MARKER@29..30 ":"
+      MYST_DIRECTIVE_OPTION_NAME@30..34 "name"
+      MYST_DIRECTIVE_OPTION_MARKER@34..35 ":"
+      WHITESPACE@35..36 " "
+      MYST_DIRECTIVE_OPTION_VALUE@36..42 "custom"
+      NEWLINE@42..43 "\n"
+    MYST_DIRECTIVE_BODY@43..108
+      NEWLINE@43..44 "\n"
+      TEXT@44..66 "Body   with   spacing."
+      NEWLINE@66..67 "\n"
+      TEXT@67..88 "    Indented content."
+      NEWLINE@88..89 "\n"
+      NEWLINE@89..90 "\n"
+      TEXT@90..105 "Another   line."
+      NEWLINE@105..106 "\n"
+      NEWLINE@106..107 "\n"
+      NEWLINE@107..108 "\n"
+    MYST_DIRECTIVE_CLOSE@108..112
+      MYST_DIRECTIVE_FENCE@108..111 "```"
+      NEWLINE@111..112 "\n"
+  BLANK_LINE@112..113
+    BLANK_LINE@112..113 "\n"
+  LIST@113..200
+    LIST_ITEM@113..200
+      LIST_MARKER@113..114 "-"
+      WHITESPACE@114..115 " "
+      PLAIN@115..120
+        TEXT@115..119 "Item"
+        NEWLINE@119..120 "\n"
+      BLANK_LINE@120..121
+        BLANK_LINE@120..121 "\n"
+      MYST_DIRECTIVE@121..200
+        MYST_DIRECTIVE_OPEN@121..145
+          WHITESPACE@121..123 "  "
+          MYST_DIRECTIVE_FENCE@123..126 "```"
+          MYST_DIRECTIVE_NAME@126..144 "{custom-directive}"
+          NEWLINE@144..145 "\n"
+        MYST_DIRECTIVE_BODY@145..194
+          LINE_PREFIX@145..147 "  "
+          TEXT@147..169 "Body   with   spacing."
+          NEWLINE@169..170 "\n"
+          LINE_PREFIX@170..172 "  "
+          TEXT@172..193 "    Indented content."
+          NEWLINE@193..194 "\n"
+        LINE_PREFIX@194..196 "  "
+        MYST_DIRECTIVE_CLOSE@196..200
+          MYST_DIRECTIVE_FENCE@196..199 "```"
+          NEWLINE@199..200 "\n"
+  BLANK_LINE@200..201
+    BLANK_LINE@200..201 "\n"
+  BLOCK_QUOTE@201..296
+    BLOCK_QUOTE_MARKER@201..202 ">"
+    WHITESPACE@202..203 " "
+    MYST_DIRECTIVE@203..296
+      MYST_DIRECTIVE_OPEN@203..222
+        MYST_DIRECTIVE_FENCE@203..206 "```"
+        MYST_DIRECTIVE_NAME@206..221 "{domain:custom}"
+        NEWLINE@221..222 "\n"
+      MYST_DIRECTIVE_BODY@222..290
+        LINE_PREFIX@222..223 ">"
+        LINE_PREFIX@223..224 " "
+        TEXT@224..246 "Body   with   spacing."
+        NEWLINE@246..247 "\n"
+        LINE_PREFIX@247..248 ">"
+        LINE_PREFIX@248..249 " "
+        TEXT@249..270 "    Indented content."
+        NEWLINE@270..271 "\n"
+        LINE_PREFIX@271..272 ">"
+        LINE_PREFIX@272..273 " "
+        TEXT@273..289 "> literal marker"
+        NEWLINE@289..290 "\n"
+      LINE_PREFIX@290..291 ">"
+      LINE_PREFIX@291..292 " "
+      MYST_DIRECTIVE_CLOSE@292..296
+        MYST_DIRECTIVE_FENCE@292..295 "```"
+        NEWLINE@295..296 "\n"
+  BLANK_LINE@296..297
+    BLANK_LINE@296..297 "\n"
+  MYST_DIRECTIVE@297..348
+    MYST_DIRECTIVE_OPEN@297..311
+      MYST_DIRECTIVE_FENCE@297..300 "```"
+      MYST_DIRECTIVE_NAME@300..305 "{raw}"
+      WHITESPACE@305..306 " "
+      MYST_DIRECTIVE_ARG@306..310 "html"
+      NEWLINE@310..311 "\n"
+    MYST_DIRECTIVE_BODY@311..344
+      TEXT@311..316 "<div>"
+      NEWLINE@316..317 "\n"
+      TEXT@317..336 "    preserve   this"
+      NEWLINE@336..337 "\n"
+      TEXT@337..343 "</div>"
+      NEWLINE@343..344 "\n"
+    MYST_DIRECTIVE_CLOSE@344..348
+      MYST_DIRECTIVE_FENCE@344..347 "```"
+      NEWLINE@347..348 "\n"

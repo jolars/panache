@@ -1,7 +1,7 @@
 //! MyST directive opener/closer detection.
 //!
-//! MyST directives are fence-delimited blocks whose body is parsed recursively
-//! as markdown:
+//! MyST directives are fence-delimited blocks. Known Markdown-body directives
+//! are parsed recursively, while other bodies are preserved verbatim:
 //!
 //! ````text
 //! ```{note}
@@ -21,6 +21,25 @@
 
 use crate::options::Extensions;
 use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
+
+use super::container_prefix::ContainerPrefix;
+
+/// A directive's closer, checked in the frame where its opener appeared.
+pub(crate) struct DirectiveCloser {
+    pub fence_char: u8,
+    pub fence_count: usize,
+    pub prefix: ContainerPrefix,
+}
+
+impl DirectiveCloser {
+    pub(crate) fn matches(&self, source_line: &str) -> bool {
+        is_directive_closing_fence(
+            self.prefix.strip(source_line),
+            self.fence_char,
+            self.fence_count,
+        )
+    }
+}
 
 /// A detected MyST directive opener.
 ///
@@ -43,25 +62,33 @@ pub(crate) struct DirectiveOpen {
     pub is_verbatim: bool,
 }
 
-/// Whether a directive `name` (without braces) has a verbatim body that must be
-/// passed through formatting unchanged rather than reflowed as prose.
-///
-/// Two kinds of directive qualify:
-///
-/// - **Literal source** (`code`, `code-block`, `code-cell`, `math`,
-///   `eval-rst`): mirror `myst-parser`/MyST-NB directives that capture a
-///   literal source `value` (code, math, or reStructuredText) rather than
-///   nested markdown. Reflowing them joins lines and drops the indentation the
-///   content depends on.
-/// - **Line-oriented entry lists** (`toctree`): the body is a newline-delimited
-///   list of entries (document references, optionally `Title <target>`), not
-///   prose. Parsing it as a paragraph and reflowing collapses each entry onto
-///   one line, which fuses five separate toc entries into a single malformed
-///   one. Preserving the body verbatim keeps one entry per line.
+/// Only known directives that parse nested Markdown can expose block children.
+/// Custom directives may interpret their bodies as any language or as
+/// line-oriented data, so an unrecognized name must keep an opaque body.
 fn is_verbatim_directive(name: &str) -> bool {
-    matches!(
+    !matches!(
         name,
-        "code" | "code-block" | "code-cell" | "math" | "eval-rst" | "toctree"
+        "admonition"
+            | "attention"
+            | "caution"
+            | "danger"
+            | "error"
+            | "hint"
+            | "important"
+            | "note"
+            | "seealso"
+            | "tip"
+            | "warning"
+            | "figure"
+            | "table"
+            | "list-table"
+            | "compound"
+            | "container"
+            | "topic"
+            | "sidebar"
+            | "epigraph"
+            | "highlights"
+            | "pull-quote"
     )
 }
 
@@ -239,6 +266,21 @@ mod tests {
             let line = format!("```{{{name}}}\n");
             let d = try_parse_directive_open(&line, &ext_backtick()).unwrap();
             assert!(!d.is_verbatim, "{name} body is markdown, not verbatim");
+        }
+    }
+
+    #[test]
+    fn unknown_and_non_markdown_directives_are_verbatim() {
+        for name in [
+            "custom-directive",
+            "domain:custom",
+            "raw",
+            "csv-table",
+            "parsed-literal",
+        ] {
+            let line = format!("```{{{name}}}\n");
+            let d = try_parse_directive_open(&line, &ext_backtick()).unwrap();
+            assert!(d.is_verbatim, "{name} body must be preserved");
         }
     }
 

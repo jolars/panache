@@ -1,0 +1,244 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..454
+  MYST_DIRECTIVE@0..23
+    MYST_DIRECTIVE_OPEN@0..10
+      MYST_DIRECTIVE_FENCE@0..3 "```"
+      MYST_DIRECTIVE_NAME@3..9 "{note}"
+      NEWLINE@9..10 "\n"
+    PARAGRAPH@10..12
+      TEXT@10..11 "a"
+      NEWLINE@11..12 "\n"
+    BLANK_LINE@12..13
+      BLANK_LINE@12..13 "\n"
+    CODE_BLOCK@13..19
+      CODE_CONTENT@13..19
+        WHITESPACE@13..17 "    "
+        TEXT@17..18 "b"
+        NEWLINE@18..19 "\n"
+    MYST_DIRECTIVE_CLOSE@19..23
+      MYST_DIRECTIVE_FENCE@19..22 "```"
+      NEWLINE@22..23 "\n"
+  BLANK_LINE@23..24
+    BLANK_LINE@23..24 "\n"
+  MYST_DIRECTIVE@24..79
+    MYST_DIRECTIVE_OPEN@24..34
+      MYST_DIRECTIVE_FENCE@24..27 "```"
+      MYST_DIRECTIVE_NAME@27..33 "{note}"
+      NEWLINE@33..34 "\n"
+    CODE_BLOCK@34..75
+      CODE_CONTENT@34..75
+        WHITESPACE@34..38 "    "
+        TEXT@38..47 "```python"
+        NEWLINE@47..48 "\n"
+        WHITESPACE@48..52 "    "
+        TEXT@52..66 "print(\"hello\")"
+        NEWLINE@66..67 "\n"
+        WHITESPACE@67..71 "    "
+        TEXT@71..74 "```"
+        NEWLINE@74..75 "\n"
+    MYST_DIRECTIVE_CLOSE@75..79
+      MYST_DIRECTIVE_FENCE@75..78 "```"
+      NEWLINE@78..79 "\n"
+  BLANK_LINE@79..80
+    BLANK_LINE@79..80 "\n"
+  MYST_DIRECTIVE@80..122
+    MYST_DIRECTIVE_OPEN@80..91
+      MYST_DIRECTIVE_FENCE@80..84 "````"
+      MYST_DIRECTIVE_NAME@84..90 "{note}"
+      NEWLINE@90..91 "\n"
+    MYST_DIRECTIVE@91..117
+      MYST_DIRECTIVE_OPEN@91..104
+        MYST_DIRECTIVE_FENCE@91..94 "```"
+        MYST_DIRECTIVE_NAME@94..103 "{warning}"
+        NEWLINE@103..104 "\n"
+      PARAGRAPH@104..106
+        TEXT@104..105 "a"
+        NEWLINE@105..106 "\n"
+      BLANK_LINE@106..107
+        BLANK_LINE@106..107 "\n"
+      CODE_BLOCK@107..113
+        CODE_CONTENT@107..113
+          WHITESPACE@107..111 "    "
+          TEXT@111..112 "b"
+          NEWLINE@112..113 "\n"
+      MYST_DIRECTIVE_CLOSE@113..117
+        MYST_DIRECTIVE_FENCE@113..116 "```"
+        NEWLINE@116..117 "\n"
+    MYST_DIRECTIVE_CLOSE@117..122
+      MYST_DIRECTIVE_FENCE@117..121 "````"
+      NEWLINE@121..122 "\n"
+  BLANK_LINE@122..123
+    BLANK_LINE@122..123 "\n"
+  MYST_DIRECTIVE@123..146
+    MYST_DIRECTIVE_OPEN@123..133
+      MYST_DIRECTIVE_FENCE@123..126 "~~~"
+      MYST_DIRECTIVE_NAME@126..132 "{note}"
+      NEWLINE@132..133 "\n"
+    PARAGRAPH@133..135
+      TEXT@133..134 "a"
+      NEWLINE@134..135 "\n"
+    BLANK_LINE@135..136
+      BLANK_LINE@135..136 "\n"
+    CODE_BLOCK@136..142
+      CODE_CONTENT@136..142
+        WHITESPACE@136..140 "    "
+        TEXT@140..141 "b"
+        NEWLINE@141..142 "\n"
+    MYST_DIRECTIVE_CLOSE@142..146
+      MYST_DIRECTIVE_FENCE@142..145 "~~~"
+      NEWLINE@145..146 "\n"
+  BLANK_LINE@146..147
+    BLANK_LINE@146..147 "\n"
+  MYST_DIRECTIVE@147..170
+    MYST_DIRECTIVE_OPEN@147..157
+      MYST_DIRECTIVE_FENCE@147..150 ":::"
+      MYST_DIRECTIVE_NAME@150..156 "{note}"
+      NEWLINE@156..157 "\n"
+    PARAGRAPH@157..159
+      TEXT@157..158 "a"
+      NEWLINE@158..159 "\n"
+    BLANK_LINE@159..160
+      BLANK_LINE@159..160 "\n"
+    CODE_BLOCK@160..166
+      CODE_CONTENT@160..166
+        WHITESPACE@160..164 "    "
+        TEXT@164..165 "b"
+        NEWLINE@165..166 "\n"
+    MYST_DIRECTIVE_CLOSE@166..170
+      MYST_DIRECTIVE_FENCE@166..169 ":::"
+      NEWLINE@169..170 "\n"
+  BLANK_LINE@170..171
+    BLANK_LINE@170..171 "\n"
+  LIST@171..293
+    LIST_ITEM@171..293
+      LIST_MARKER@171..172 "-"
+      WHITESPACE@172..173 " "
+      PLAIN@173..178
+        TEXT@173..177 "Item"
+        NEWLINE@177..178 "\n"
+      BLANK_LINE@178..179
+        BLANK_LINE@178..179 "\n"
+      MYST_DIRECTIVE@179..293
+        MYST_DIRECTIVE_OPEN@179..191
+          WHITESPACE@179..181 "  "
+          MYST_DIRECTIVE_FENCE@181..184 "```"
+          MYST_DIRECTIVE_NAME@184..190 "{note}"
+          NEWLINE@190..191 "\n"
+        PARAGRAPH@191..195
+          TEXT@191..194 "  a"
+          NEWLINE@194..195 "\n"
+        BLANK_LINE@195..196
+          BLANK_LINE@195..196 "\n"
+        CODE_BLOCK@196..204
+          CODE_CONTENT@196..204
+            WHITESPACE@196..202 "      "
+            TEXT@202..203 "b"
+            NEWLINE@203..204 "\n"
+        BLANK_LINE@204..205
+          BLANK_LINE@204..205 "\n"
+        HTML_BLOCK@205..237
+          HTML_BLOCK_TAG@205..237
+            TEXT@205..236 "  <!-- panache-ignore ..."
+            NEWLINE@236..237 "\n"
+        BLANK_LINE@237..238
+          BLANK_LINE@237..238 "\n"
+        CODE_BLOCK@238..256
+          CODE_CONTENT@238..256
+            WHITESPACE@238..244 "      "
+            TEXT@244..255 "keep   this"
+            NEWLINE@255..256 "\n"
+        BLANK_LINE@256..257
+          BLANK_LINE@256..257 "\n"
+        HTML_BLOCK@257..287
+          HTML_BLOCK_TAG@257..287
+            TEXT@257..286 "  <!-- panache-ignore ..."
+            NEWLINE@286..287 "\n"
+        MYST_DIRECTIVE_CLOSE@287..293
+          WHITESPACE@287..289 "  "
+          MYST_DIRECTIVE_FENCE@289..292 "```"
+          NEWLINE@292..293 "\n"
+  BLANK_LINE@293..294
+    BLANK_LINE@293..294 "\n"
+  BLOCK_QUOTE@294..326
+    BLOCK_QUOTE_MARKER@294..295 ">"
+    WHITESPACE@295..296 " "
+    MYST_DIRECTIVE@296..326
+      MYST_DIRECTIVE_OPEN@296..306
+        MYST_DIRECTIVE_FENCE@296..299 "```"
+        MYST_DIRECTIVE_NAME@299..305 "{note}"
+        NEWLINE@305..306 "\n"
+      BLOCK_QUOTE_MARKER@306..307 ">"
+      WHITESPACE@307..308 " "
+      PARAGRAPH@308..310
+        TEXT@308..309 "a"
+        NEWLINE@309..310 "\n"
+      BLOCK_QUOTE_MARKER@310..311 ">"
+      BLANK_LINE@311..312
+        BLANK_LINE@311..312 "\n"
+      BLOCK_QUOTE_MARKER@312..313 ">"
+      WHITESPACE@313..314 " "
+      CODE_BLOCK@314..320
+        CODE_CONTENT@314..320
+          WHITESPACE@314..318 "    "
+          TEXT@318..319 "b"
+          NEWLINE@319..320 "\n"
+      BLOCK_QUOTE_MARKER@320..321 ">"
+      WHITESPACE@321..322 " "
+      MYST_DIRECTIVE_CLOSE@322..326
+        MYST_DIRECTIVE_FENCE@322..325 "```"
+        NEWLINE@325..326 "\n"
+  BLANK_LINE@326..327
+    BLANK_LINE@326..327 "\n"
+  MYST_DIRECTIVE@327..363
+    MYST_DIRECTIVE_OPEN@327..337
+      MYST_DIRECTIVE_FENCE@327..330 "~~~"
+      MYST_DIRECTIVE_NAME@330..336 "{note}"
+      NEWLINE@336..337 "\n"
+    PARAGRAPH@337..339
+      TEXT@337..338 "a"
+      NEWLINE@338..339 "\n"
+    CODE_BLOCK@339..359
+      CODE_FENCE_OPEN@339..349
+        CODE_FENCE_MARKER@339..342 "```"
+        CODE_INFO@342..348
+          CODE_LANGUAGE@342..348 "python"
+        NEWLINE@348..349 "\n"
+      CODE_CONTENT@349..355
+        TEXT@349..354 "x = 1"
+        NEWLINE@354..355 "\n"
+      CODE_FENCE_CLOSE@355..359
+        CODE_FENCE_MARKER@355..358 "```"
+        NEWLINE@358..359 "\n"
+    MYST_DIRECTIVE_CLOSE@359..363
+      MYST_DIRECTIVE_FENCE@359..362 "~~~"
+      NEWLINE@362..363 "\n"
+  BLANK_LINE@363..364
+    BLANK_LINE@363..364 "\n"
+  MYST_DIRECTIVE@364..454
+    MYST_DIRECTIVE_OPEN@364..374
+      MYST_DIRECTIVE_FENCE@364..367 "```"
+      MYST_DIRECTIVE_NAME@367..373 "{note}"
+      NEWLINE@373..374 "\n"
+    HTML_BLOCK@374..404
+      HTML_BLOCK_TAG@374..404
+        TEXT@374..403 "<!-- panache-ignore-s ..."
+        NEWLINE@403..404 "\n"
+    BLANK_LINE@404..405
+      BLANK_LINE@404..405 "\n"
+    CODE_BLOCK@405..421
+      CODE_CONTENT@405..421
+        WHITESPACE@405..409 "    "
+        TEXT@409..420 "keep   this"
+        NEWLINE@420..421 "\n"
+    BLANK_LINE@421..422
+      BLANK_LINE@421..422 "\n"
+    HTML_BLOCK@422..450
+      HTML_BLOCK_TAG@422..450
+        TEXT@422..449 "<!-- panache-ignore-e ..."
+        NEWLINE@449..450 "\n"
+    MYST_DIRECTIVE_CLOSE@450..454
+      MYST_DIRECTIVE_FENCE@450..453 "```"
+      NEWLINE@453..454 "\n"

@@ -518,10 +518,15 @@ Output
 ### MyST Directives
 
 In the MyST flavor, Panache normalizes directive options and separates them from
-the body with a blank line. It formats prose in directive bodies but preserves
-literal content, such as code, math, and `eval-rst` blocks. It also keeps each
-`toctree` entry on its own line. Literal bodies keep their internal indentation
-inside lists and blockquotes.
+the body with a blank line. It formats Markdown bodies in known directives, such
+as admonitions and figures. It preserves unknown directive bodies and literal
+content, such as code, math, and `eval-rst` blocks. It also keeps each `toctree`
+entry on its own line. Literal bodies keep their internal indentation and the
+opener's indentation offset, including inside lists and blockquotes. Fenced code
+in Markdown bodies preserves whitespace-only payload lines. Panache lengthens
+directive fences when needed to contain formatted code blocks or nested
+directives, keeping the opener and closer matched. Unfinished fenced code keeps
+its content and indentation.
 
 Input
 
