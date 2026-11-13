@@ -280,6 +280,7 @@ golden_test_cases!(
     alerts_disabled,
     myst_directive,
     myst_toctree,
+    myst_eval_rst,
     myst_block_break,
     myst_code_block_body,
     blankline_concatenation,

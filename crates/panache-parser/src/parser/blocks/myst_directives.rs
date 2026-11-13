@@ -48,10 +48,11 @@ pub(crate) struct DirectiveOpen {
 ///
 /// Two kinds of directive qualify:
 ///
-/// - **Literal source** (`code`, `code-block`, `code-cell`, `math`): mirror
-///   `myst-parser`/MyST-NB directives that capture a literal source `value`
-///   (code or math) rather than nested markdown. Reflowing them joins lines and
-///   drops the indentation the content depends on.
+/// - **Literal source** (`code`, `code-block`, `code-cell`, `math`,
+///   `eval-rst`): mirror `myst-parser`/MyST-NB directives that capture a
+///   literal source `value` (code, math, or reStructuredText) rather than
+///   nested markdown. Reflowing them joins lines and drops the indentation the
+///   content depends on.
 /// - **Line-oriented entry lists** (`toctree`): the body is a newline-delimited
 ///   list of entries (document references, optionally `Title <target>`), not
 ///   prose. Parsing it as a paragraph and reflowing collapses each entry onto
@@ -60,7 +61,7 @@ pub(crate) struct DirectiveOpen {
 fn is_verbatim_directive(name: &str) -> bool {
     matches!(
         name,
-        "code" | "code-block" | "code-cell" | "math" | "toctree"
+        "code" | "code-block" | "code-cell" | "math" | "eval-rst" | "toctree"
     )
 }
 
