@@ -385,6 +385,15 @@ fn render_man_directives(help: &str) -> Result<String> {
         .to_owned())
 }
 
+// Updated by Versionary alongside the package version.
+const MAN_PAGE_DATE: &str = "2026-11-11";
+
+fn man_page(cmd: clap::Command) -> Man {
+    Man::new(cmd)
+        .date(MAN_PAGE_DATE)
+        .source(format!("Panache {}", env!("CARGO_PKG_VERSION")))
+}
+
 fn generate_man_pages() -> Result<()> {
     // Create man directory if it doesn't exist
     let out_dir = PathBuf::from("target/man");
@@ -401,7 +410,7 @@ fn generate_man_pages() -> Result<()> {
         .collect();
 
     // Generate main page
-    let man = Man::new(cmd.clone());
+    let man = man_page(cmd.clone());
     let mut buffer = Vec::new();
     man.render(&mut buffer)?;
     let main_content =
@@ -416,7 +425,7 @@ fn generate_man_pages() -> Result<()> {
         }
 
         let name = format!("panache-{}", subcommand_name);
-        let man = Man::new(subcommand.clone().version(env!("CARGO_PKG_VERSION"))).title(&name);
+        let man = man_page(subcommand.clone().version(env!("CARGO_PKG_VERSION"))).title(&name);
         let mut buffer = Vec::new();
         man.render(&mut buffer)?;
 
@@ -468,7 +477,7 @@ fn generate_man_pages() -> Result<()> {
             }
 
             let full_name = format!("panache-{}-{}", subcommand_name, nested_name);
-            let man = Man::new(nested.clone().version(env!("CARGO_PKG_VERSION"))).title(&full_name);
+            let man = man_page(nested.clone().version(env!("CARGO_PKG_VERSION"))).title(&full_name);
             let mut buffer = Vec::new();
             man.render(&mut buffer)?;
 

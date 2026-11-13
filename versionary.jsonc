@@ -20,6 +20,12 @@
       ],
       "extra-files": [
         {
+          "type": "regex",
+          "path": "build.rs",
+          "pattern": "const MAN_PAGE_DATE: &str = \"[^\"]+\";",
+          "replacement": "const MAN_PAGE_DATE: &str = \"{{date}}\";"
+        },
+        {
           "type": "json",
           "path": "npm/panache-cli/package.json",
           "field-path": "$.version"
