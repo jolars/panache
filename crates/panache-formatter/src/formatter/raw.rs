@@ -213,10 +213,19 @@ impl Formatter {
                 .formatted_code
                 .get(&usize::from(node.text_range().start()))
                 .cloned()
-                .unwrap_or_else(|| body_node.text().to_string());
-            self.output.push_str(body_text.trim_end_matches('\n'));
-            self.output.push('\n');
+                .unwrap_or_else(|| text_without_line_prefixes(&body_node));
+            // Containers own their prefixes; retain only the literal body's
+            // indentation before applying the current list indentation.
+            let indent_str = " ".repeat(indent);
+            for line in body_text.trim_end_matches('\n').split('\n') {
+                if !line.is_empty() {
+                    self.output.push_str(&indent_str);
+                }
+                self.output.push_str(line);
+                self.output.push('\n');
+            }
             if let Some(close) = &close_text {
+                self.output.push_str(&indent_str);
                 self.output.push_str(close.trim_end_matches('\n'));
                 self.output.push('\n');
             }
@@ -259,6 +268,7 @@ impl Formatter {
             if !self.output.ends_with('\n') {
                 self.output.push('\n');
             }
+            self.output.push_str(&" ".repeat(indent));
             self.output.push_str(close.trim_end_matches('\n'));
             self.output.push('\n');
         }

@@ -281,6 +281,8 @@ golden_test_cases!(
     myst_directive,
     myst_toctree,
     myst_eval_rst,
+    myst_eval_rst_list,
+    myst_eval_rst_blockquote_list,
     myst_block_break,
     myst_code_block_body,
     blankline_concatenation,
