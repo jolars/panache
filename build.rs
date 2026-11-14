@@ -386,7 +386,7 @@ fn render_man_directives(help: &str) -> Result<String> {
 }
 
 // Updated by Versionary alongside the package version.
-const MAN_PAGE_DATE: &str = "2026-11-11";
+const MAN_PAGE_DATE: &str = "2026-11-14";
 
 fn man_page(cmd: clap::Command) -> Man {
     Man::new(cmd)

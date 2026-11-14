@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.19.0](https://github.com/jolars/panache/compare/panache-code-v3.18.0...panache-code-v3.19.0) (2026-11-14)
+
+### Features
+
+- support Jupyter notebook Markdown formatting ([`8e07e70`](https://github.com/jolars/panache/commit/8e07e7099d50159b629c4c281cc9299d4f0b8243)), closes [#619](https://github.com/jolars/panache/issues/619)
+
+### Dependencies
+
+- updated panache to v3.19.0
+
 ## [3.18.0](https://github.com/jolars/panache/compare/panache-code-v3.17.2...panache-code-v3.18.0) (2026-11-11)
 
 ### Dependencies

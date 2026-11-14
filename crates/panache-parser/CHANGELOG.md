@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.36.0](https://github.com/jolars/panache/compare/panache-parser-v0.35.0...panache-parser-v0.36.0) (2026-11-14)
+
+### Features
+
+- support Jupyter notebook Markdown formatting ([`8e07e70`](https://github.com/jolars/panache/commit/8e07e7099d50159b629c4c281cc9299d4f0b8243)), closes [#619](https://github.com/jolars/panache/issues/619)
+
+### Bug Fixes
+
+- preserve myst directive bodies and fences ([`6ee8f12`](https://github.com/jolars/panache/commit/6ee8f12eb582ff7711aa4a2ecb86e7a5a028bdd9)), fixes [#620](https://github.com/jolars/panache/issues/620)
+- **parser:** preserve eval-rst directive bodies (#622) ([`fb920e5`](https://github.com/jolars/panache/commit/fb920e5c746662bfd1e411413fe48f74606b8211)), ref [#620](https://github.com/jolars/panache/issues/620)
+- **parser:** simplify boolean returns ([`29e5f36`](https://github.com/jolars/panache/commit/29e5f3635a32f9f2440d6096dba7ae61fc9199bd))
+
 ## [0.35.0](https://github.com/jolars/panache/compare/panache-parser-v0.34.2...panache-parser-v0.35.0) (2026-11-11)
 
 ### Features
