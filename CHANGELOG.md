@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.19.0](https://github.com/jolars/panache/compare/v3.18.0...v3.19.0) (2026-11-14)
+
+### Features
+
+- support Jupyter notebook Markdown formatting ([`8e07e70`](https://github.com/jolars/panache/commit/8e07e7099d50159b629c4c281cc9299d4f0b8243)), closes [#619](https://github.com/jolars/panache/issues/619)
+
+### Bug Fixes
+
+- use consistent man page footer metadata ([`2c156a7`](https://github.com/jolars/panache/commit/2c156a7cb7f2a31b29703c74a170a282267d05d3)), fixes [#623](https://github.com/jolars/panache/issues/623)
+- preserve myst directive bodies and fences ([`6ee8f12`](https://github.com/jolars/panache/commit/6ee8f12eb582ff7711aa4a2ecb86e7a5a028bdd9)), fixes [#620](https://github.com/jolars/panache/issues/620)
+- **parser:** preserve eval-rst directive bodies (#622) ([`fb920e5`](https://github.com/jolars/panache/commit/fb920e5c746662bfd1e411413fe48f74606b8211)), ref [#620](https://github.com/jolars/panache/issues/620)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.30.0
+- updated crates/panache-parser to v0.36.0
+
 ## [3.18.0](https://github.com/jolars/panache/compare/v3.17.2...v3.18.0) (2026-11-11)
 
 ### Highlights
