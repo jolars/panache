@@ -213,7 +213,7 @@ macro_rules! node_projections {
 /// Declare a newtype CST-node wrapper with the standard hand-written
 /// [`AstNode`] impl for a single `SyntaxKind`.
 macro_rules! ast_node {
-    ($(#[$meta:meta])* $name:ident, $kind:ident) => {
+    ($(#[$meta:meta])* $name:ident, $kind:ident $(,)?) => {
         $(#[$meta])*
         #[derive(Debug, Clone, PartialEq, Eq, Hash)]
         pub struct $name(SyntaxNode);
@@ -238,7 +238,8 @@ macro_rules! ast_node {
 
 ast_node!(
     /// A single YAML document inside the stream.
-    YamlDocument, YAML_DOCUMENT
+    YamlDocument,
+    YAML_DOCUMENT,
 );
 
 impl YamlDocument {
@@ -270,7 +271,8 @@ impl YamlDocument {
 
 ast_node!(
     /// A block mapping (`key: value` entries).
-    YamlBlockMap, YAML_BLOCK_MAP
+    YamlBlockMap,
+    YAML_BLOCK_MAP,
 );
 
 impl YamlBlockMap {
@@ -296,7 +298,8 @@ impl YamlBlockMap {
 
 ast_node!(
     /// One `key: value` pair in a block mapping.
-    YamlBlockMapEntry, YAML_BLOCK_MAP_ENTRY
+    YamlBlockMapEntry,
+    YAML_BLOCK_MAP_ENTRY,
 );
 
 impl YamlBlockMapEntry {
@@ -318,7 +321,8 @@ impl YamlBlockMapEntry {
 ast_node!(
     /// The key side of a block-map entry. Holds the `YAML_SCALAR` node AND the
     /// trailing `YAML_COLON` token.
-    YamlBlockMapKey, YAML_BLOCK_MAP_KEY
+    YamlBlockMapKey,
+    YAML_BLOCK_MAP_KEY,
 );
 
 impl YamlBlockMapKey {
@@ -331,7 +335,8 @@ impl YamlBlockMapKey {
 ast_node!(
     /// The value side of a block-map entry: a scalar, a nested container, or
     /// empty.
-    YamlBlockMapValue, YAML_BLOCK_MAP_VALUE
+    YamlBlockMapValue,
+    YAML_BLOCK_MAP_VALUE,
 );
 
 impl YamlBlockMapValue {
@@ -340,7 +345,8 @@ impl YamlBlockMapValue {
 
 ast_node!(
     /// A block sequence (`- item` entries).
-    YamlBlockSequence, YAML_BLOCK_SEQUENCE
+    YamlBlockSequence,
+    YAML_BLOCK_SEQUENCE,
 );
 
 impl YamlBlockSequence {
@@ -357,7 +363,8 @@ impl YamlBlockSequence {
 ast_node!(
     /// One `- item` in a block sequence. The leading `-` is a
     /// `YAML_BLOCK_SEQ_ENTRY` token, skipped by the content projections.
-    YamlBlockSequenceItem, YAML_BLOCK_SEQUENCE_ITEM
+    YamlBlockSequenceItem,
+    YAML_BLOCK_SEQUENCE_ITEM,
 );
 
 impl YamlBlockSequenceItem {
@@ -366,7 +373,8 @@ impl YamlBlockSequenceItem {
 
 ast_node!(
     /// A flow sequence (`[a, b, c]`).
-    YamlFlowSequence, YAML_FLOW_SEQUENCE
+    YamlFlowSequence,
+    YAML_FLOW_SEQUENCE,
 );
 
 impl YamlFlowSequence {
@@ -382,7 +390,8 @@ impl YamlFlowSequence {
 
 ast_node!(
     /// One item in a flow sequence.
-    YamlFlowSequenceItem, YAML_FLOW_SEQUENCE_ITEM
+    YamlFlowSequenceItem,
+    YAML_FLOW_SEQUENCE_ITEM,
 );
 
 impl YamlFlowSequenceItem {
@@ -391,7 +400,8 @@ impl YamlFlowSequenceItem {
 
 ast_node!(
     /// A flow mapping (`{k: v, ...}`).
-    YamlFlowMap, YAML_FLOW_MAP
+    YamlFlowMap,
+    YAML_FLOW_MAP,
 );
 
 impl YamlFlowMap {
@@ -416,7 +426,8 @@ impl YamlFlowMap {
 
 ast_node!(
     /// One `k: v` pair in a flow mapping.
-    YamlFlowMapEntry, YAML_FLOW_MAP_ENTRY
+    YamlFlowMapEntry,
+    YAML_FLOW_MAP_ENTRY,
 );
 
 impl YamlFlowMapEntry {
@@ -435,7 +446,8 @@ impl YamlFlowMapEntry {
 
 ast_node!(
     /// The key side of a flow-map entry.
-    YamlFlowMapKey, YAML_FLOW_MAP_KEY
+    YamlFlowMapKey,
+    YAML_FLOW_MAP_KEY,
 );
 
 impl YamlFlowMapKey {
@@ -446,7 +458,8 @@ impl YamlFlowMapKey {
 
 ast_node!(
     /// The value side of a flow-map entry.
-    YamlFlowMapValue, YAML_FLOW_MAP_VALUE
+    YamlFlowMapValue,
+    YAML_FLOW_MAP_VALUE,
 );
 
 impl YamlFlowMapValue {
