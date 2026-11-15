@@ -38,6 +38,31 @@ fn test_document_symbols_hierarchical() {
 }
 
 #[test]
+fn test_document_symbols_heading_ranges_cover_their_sections() {
+    let mut server = TestLspServer::new();
+    let content = "# H1\n\ntext\n\n## H2\n\ntext\n\n## H2 Again\n\n# H1 Again\n\ntext\n";
+    server.open_document("file:///test.qmd", content, "quarto");
+
+    let Some(DocumentSymbolResponse::Nested(syms)) = server.get_symbols("file:///test.qmd") else {
+        panic!("Expected nested document symbols");
+    };
+    // (range start, range end, selection range end), as lines
+    let lines = |symbol: &DocumentSymbol| {
+        (
+            symbol.range.start.line,
+            symbol.range.end.line,
+            symbol.selection_range.end.line,
+        )
+    };
+
+    assert_eq!(lines(&syms[0]), (0, 10, 1));
+    let children = syms[0].children.as_ref().unwrap();
+    assert_eq!(lines(&children[0]), (4, 8, 5));
+    assert_eq!(lines(&children[1]), (8, 10, 9));
+    assert_eq!(lines(&syms[1]), (10, 13, 11));
+}
+
+#[test]
 fn test_document_symbols_with_table() {
     let mut server = TestLspServer::new();
 
