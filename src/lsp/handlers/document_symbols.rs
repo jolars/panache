@@ -65,17 +65,8 @@ fn build_document_symbols(
                 if let Some(symbol) = extract_heading_symbol(&node, index) {
                     let level = heading_levels.get(&node.text_range()).copied().unwrap_or(1);
 
-                    while let Some((stack_level, _)) = heading_stack.last() {
-                        if *stack_level < level {
-                            break;
-                        }
-                        let (_, completed) = heading_stack.pop().unwrap();
-
-                        if let Some((_, parent)) = heading_stack.last_mut() {
-                            parent.children.get_or_insert_with(Vec::new).push(completed);
-                        } else {
-                            symbols.push(completed);
-                        }
+                    while heading_stack.last().is_some_and(|(l, _)| *l >= level) {
+                        close_heading(&mut heading_stack, &mut symbols, symbol.range.start);
                     }
 
                     heading_stack.push((level, symbol));
@@ -113,16 +104,28 @@ fn build_document_symbols(
         }
     }
 
-    // Flush remaining headings from stack
-    while let Some((_, completed)) = heading_stack.pop() {
-        if let Some((_, parent)) = heading_stack.last_mut() {
-            parent.children.get_or_insert_with(Vec::new).push(completed);
-        } else {
-            symbols.push(completed);
-        }
+    let end = offset_to_position(index, index.len());
+    while !heading_stack.is_empty() {
+        close_heading(&mut heading_stack, &mut symbols, end);
     }
 
     symbols
+}
+
+/// Pops the innermost heading, whose section extends to `end`, into its parent or the root.
+fn close_heading(
+    heading_stack: &mut Vec<(usize, DocumentSymbol)>,
+    symbols: &mut Vec<DocumentSymbol>,
+    end: Position,
+) {
+    let Some((_, mut completed)) = heading_stack.pop() else {
+        return;
+    };
+    completed.range.end = end;
+    match heading_stack.last_mut() {
+        Some((_, parent)) => parent.children.get_or_insert_with(Vec::new).push(completed),
+        None => symbols.push(completed),
+    }
 }
 
 fn extract_yaml_region_symbol(
