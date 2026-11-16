@@ -39,13 +39,23 @@ class ScanTests(unittest.TestCase):
         self.calls: list[tuple[list[str], dict]] = []
         self.clones: list[str] = []
 
-    def run_scan(self, outcomes: list[tuple[int, str]]) -> list[dict]:
+    def run_scan(
+        self,
+        outcomes: list[tuple[int, str]],
+        clone_codes: list[int] | None = None,
+    ) -> list[dict]:
         pending = iter(outcomes)
+        clones = iter(clone_codes or [])
 
         def run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
             if command[:2] == ["git", "clone"]:
                 self.clones.append(command[4])
-                Path(command[5]).mkdir()
+                checkout = Path(command[5])
+                checkout.mkdir()
+                code = next(clones, 0)
+                if code:
+                    (checkout / "partial-clone").write_text("incomplete")
+                    raise subprocess.CalledProcessError(code, command)
                 return subprocess.CompletedProcess(command, 0)
             self.calls.append((command, kwargs))
             code, output = next(pending)
@@ -79,6 +89,54 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(list(pending), [], "unused mocked Panache results")
         with (self.results / "failures.tsv").open(newline="") as stream:
             return list(csv.DictReader(stream, delimiter="\t"))
+
+    def test_clone_retries_clean_partial_checkouts_and_resume_scan(self) -> None:
+        with patch("time.sleep") as sleep:
+            rows = self.run_scan([(0, "passed")], clone_codes=[128, 128, 0])
+        self.assertEqual(rows, [])
+        self.assertEqual(len(self.clones), 3)
+        self.assertEqual([args[0] for args, _ in sleep.call_args_list], [5, 10])
+        self.assertEqual(list(self.repos.rglob("partial-clone")), [])
+
+    def test_clone_exhaustion_preserves_prior_failure_records(self) -> None:
+        with self.manifest.open("a") as stream:
+            stream.write('\n[[repositories]]\nrepo = "owner/unavailable"\n')
+        with (
+            patch("time.sleep") as sleep,
+            self.assertRaises(subprocess.CalledProcessError),
+        ):
+            self.run_scan(
+                [
+                    (1, "Debug check failed (idempotency) in content/a page.md\n"),
+                    (1, "regression report"),
+                ],
+                clone_codes=[0, 128, 128, 128],
+            )
+        self.assertEqual(len(self.clones), 4)
+        self.assertEqual(sleep.call_count, 2)
+        with (self.results / "failures.tsv").open(newline="") as stream:
+            rows = list(csv.DictReader(stream, delimiter="\t"))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["repo"], "owner/site")
+        self.assertEqual(rows[0]["failure_type"], "idempotency")
+        self.assertEqual(
+            (self.results / rows[0]["report_path"]).read_text(), "regression report"
+        )
+        self.assertTrue((self.results / "configs/hugo.toml").is_file())
+
+    def test_clone_does_not_modify_existing_checkout(self) -> None:
+        checkout = self.root / "existing"
+        checkout.mkdir()
+        marker = checkout / "keep"
+        marker.write_text("existing checkout")
+        repository = scan.Repository("owner/site", Path("configs/default.toml"))
+        with (
+            patch.object(scan.subprocess, "run") as run,
+            self.assertRaises(FileExistsError),
+        ):
+            scan.clone_repository(repository, checkout)
+        run.assert_not_called()
+        self.assertEqual(marker.read_text(), "existing checkout")
 
     def test_scan_preserves_urls_and_archives_fallbacks_and_failures(self) -> None:
         url = "https://gitlab.example.org/group/subgroup/site.git"

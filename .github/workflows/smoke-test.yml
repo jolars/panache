@@ -46,12 +46,19 @@ jobs:
             --repos-dir "$RUNNER_TEMP/panache-debug-format-repos"
 
       - name: Summarize scan results
+        if: ${{ !cancelled() && steps.scan.outcome != 'skipped' }}
         id: summarize
+        env:
+          SCAN_OUTCOME: ${{ steps.scan.outcome }}
         shell: bash
         run: |
           set -euo pipefail
           RESULTS_DIR="$RUNNER_TEMP/panache-debug-format-scan"
           FAILURES_TSV="$RESULTS_DIR/failures.tsv"
+          if [ ! -f "$FAILURES_TSV" ]; then
+            echo "The scan failed before producing results." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           failure_count="$(($(wc -l < "$FAILURES_TSV") - 1))"
           if [ "$failure_count" -lt 0 ]; then
             failure_count=0
@@ -61,11 +68,16 @@ jobs:
           {
             echo "### Panache debug format repo scan"
             echo ""
+            if [ "$SCAN_OUTCOME" != 'success' ]; then
+              echo "The scan failed; these results are partial."
+              echo ""
+            fi
             echo "- Failure records: $failure_count"
             echo "- Scanned extensions: \`.md\`, \`.qmd\`, \`.Rmd\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload scan results artifact
+        if: ${{ !cancelled() && steps.scan.outcome != 'skipped' }}
         uses: actions/upload-artifact@v7
         with:
           name: debug-format-repo-scan-results

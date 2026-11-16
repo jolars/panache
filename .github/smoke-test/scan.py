@@ -10,6 +10,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -83,6 +84,31 @@ def git(*arguments: str, cwd: Path | None = None) -> bytes:
     return subprocess.check_output(["git", *arguments], cwd=cwd)
 
 
+def clone_repository(repository: Repository, repo_dir: Path) -> None:
+    if repo_dir.exists() or repo_dir.is_symlink():
+        raise FileExistsError(f"Checkout path already exists: {repo_dir}")
+    for attempt in range(1, 4):
+        try:
+            subprocess.run(
+                ["git", "clone", "--depth", "1", repository.url, str(repo_dir)],
+                check=True,
+            )
+            return
+        except subprocess.CalledProcessError:
+            # A failed clone can leave files that prevent the next attempt.
+            if repo_dir.exists():
+                shutil.rmtree(repo_dir)
+            if attempt == 3:
+                raise
+            delay = 5 * attempt
+            print(
+                f"warning: clone of {repository.url} failed (attempt {attempt}/3); "
+                f"retrying in {delay} seconds",
+                flush=True,
+            )
+            time.sleep(delay)
+
+
 def run_panache(
     panache: Path,
     arguments: list[str],
@@ -150,10 +176,7 @@ def scan(
         for repository in repositories:
             repo_key = hashlib.sha256(repository.repo.encode()).hexdigest()
             repo_dir = repos_dir / repo_key
-            subprocess.run(
-                ["git", "clone", "--depth", "1", repository.url, str(repo_dir)],
-                check=True,
-            )
+            clone_repository(repository, repo_dir)
             repo_sha = git("rev-parse", "HEAD", cwd=repo_dir).decode().strip()
             config = results_dir / repository.fallback_config
             files = git("ls-files", "-z", "--", *EXTENSIONS, cwd=repo_dir).split(b"\0")
