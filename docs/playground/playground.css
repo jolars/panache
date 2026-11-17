@@ -1,0 +1,99 @@
+.panache-playground .playground-panel {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.9rem;
+}
+
+.panache-playground .playground-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.panache-playground .playground-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  grid-column: 1 / -1;
+}
+
+.panache-playground .playground-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.panache-playground .playground-pane {
+  min-width: 0;
+}
+
+.panache-playground .pane-title {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bs-secondary-color);
+  font-weight: 700;
+}
+
+.panache-playground .editor {
+  width: 100%;
+  min-height: clamp(18rem, 58vh, 45rem);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.7rem;
+  color: var(--bs-body-color);
+  background: var(--bs-body-bg);
+  padding: 0.75rem;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.panache-playground .editor:focus {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.panache-playground .editor[readonly] {
+  background: color-mix(in srgb, var(--bs-body-bg) 95%, var(--bs-body-color));
+}
+
+.panache-playground .status-message {
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--bs-secondary-color);
+}
+
+.panache-playground .status-message.error {
+  color: var(--bs-danger);
+}
+
+@media (min-width: 992px) {
+  .panache-playground .playground-options {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .panache-playground .playground-actions,
+  .panache-playground .playground-wide {
+    grid-column: span 2;
+  }
+
+  .panache-playground .playground-actions {
+    justify-content: end;
+  }
+
+  .panache-playground .playground-panes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .panache-playground .editor {
+    min-height: 16rem;
+  }
+}

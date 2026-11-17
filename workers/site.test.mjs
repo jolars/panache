@@ -162,6 +162,8 @@ test("serves search and the playground's JavaScript and WebAssembly", async () =
   assert.equal(playground.status, 200);
   assert.match(playground.headers.get("Content-Type"), /text\/html/);
   for (const [path, type] of [
+    ["/playground/playground.js", /javascript/],
+    ["/playground/playground.css", /text\/css/],
     ["/playground/pkg/panache_wasm.js", /javascript/],
     ["/playground/pkg/panache_wasm_bg.wasm", /application\/wasm/],
   ]) {

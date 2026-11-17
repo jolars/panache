@@ -1,0 +1,140 @@
+---
+title: Playground
+description-meta: >-
+  Try Panache in your browser: format Quarto and other Markdown flavors with
+  live output and configurable formatting options.
+image: /images/og.png
+format:
+  html:
+    page-layout: full
+    sidebar: false
+    toc: false
+    body-classes: panache-playground
+    css: playground.css
+    repo-actions: false
+---
+
+Format Quarto and Markdown in real time. Your text stays in your browser. Shared
+links include formatting settings only.
+
+```{=html}
+<section class="playground-panel" aria-label="Markdown formatter">
+  <div class="p-3 p-md-4">
+    <div class="playground-options">
+      <div>
+        <label class="form-label fw-semibold mb-1" for="flavor">Flavor</label>
+        <select id="flavor" class="form-select">
+          <option value="pandoc">Pandoc</option>
+          <option value="quarto" selected>Quarto</option>
+          <option value="rmarkdown">R Markdown</option>
+          <option value="jupyter">Jupyter</option>
+          <option value="gfm">GFM</option>
+          <option value="hugo">Hugo</option>
+          <option value="common-mark">CommonMark</option>
+          <option value="myst">MyST</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="lw">Line width</label>
+        <input id="lw" class="form-control" type="number" min="10" max="200" value="80">
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="wrap">Wrap</label>
+        <select id="wrap" class="form-select">
+          <option value="reflow" selected>Reflow</option>
+          <option value="preserve">Preserve</option>
+          <option value="sentence">Sentence</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="line-ending">Line ending</label>
+        <select id="line-ending" class="form-select">
+          <option value="auto" selected>Auto</option>
+          <option value="lf">LF</option>
+          <option value="crlf">CRLF</option>
+        </select>
+      </div>
+      <div class="playground-actions">
+        <button id="copy-output" class="btn btn-outline-primary" type="button">Copy output</button>
+        <button id="reset-input" class="btn btn-outline-secondary" type="button">
+          Reset sample
+        </button>
+      </div>
+    </div>
+
+    <div class="playground-options">
+      <div>
+        <label class="form-label fw-semibold mb-1" for="math">Math</label>
+        <select id="math" class="form-select">
+          <option value="reflow" selected>Reflow</option>
+          <option value="preserve">Preserve lines</option>
+          <option value="single-line">Single line</option>
+          <option value="verbatim">Verbatim</option>
+        </select>
+      </div>
+      <div class="playground-wide">
+        <label class="form-label fw-semibold mb-1" for="math-delimiter-style"
+          >Math delimiters</label
+        >
+        <select id="math-delimiter-style" class="form-select">
+          <option value="preserve" selected>Preserve</option>
+          <option value="dollars">Dollars ($)</option>
+          <option value="backslash">Backslash (\\)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="math-indent">Math indent</label>
+        <input id="math-indent" class="form-control" type="number" min="0" max="20" value="2">
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="tab-stops">Tab stops</label>
+        <select id="tab-stops" class="form-select">
+          <option value="normalize" selected>Normalize</option>
+          <option value="preserve">Preserve</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label fw-semibold mb-1" for="tab-width">Tab width</label>
+        <input id="tab-width" class="form-control" type="number" min="1" max="16" value="4">
+      </div>
+    </div>
+
+    <div class="playground-extensions">
+      <div>
+        <label class="form-label fw-semibold mb-1" for="extensions">Extensions</label>
+        <input
+          id="extensions"
+          class="form-control font-monospace"
+          type="text"
+          spellcheck="false"
+          placeholder="+definition-lists -strikeout"
+          aria-describedby="extensions-help"
+        >
+        <div id="extensions-help" class="form-text">
+          Override the flavor's default extensions: <code>+name</code> enables,
+          <code>-name</code> disables. Names match the <code>[extensions]</code> config keys.
+        </div>
+      </div>
+    </div>
+
+    <div class="playground-panes">
+      <div class="playground-pane">
+        <label class="pane-title" for="input">Input</label>
+        <textarea
+          id="input"
+          class="editor"
+          placeholder="Paste Quarto or Markdown here..."
+        ></textarea>
+      </div>
+      <div class="playground-pane">
+        <label class="pane-title" for="output">Formatted output</label>
+        <textarea id="output" class="editor" readonly></textarea>
+      </div>
+    </div>
+
+    <p id="status" class="status-message mb-0" role="status" aria-live="polite"></p>
+  </div>
+</section>
+<noscript>The playground requires JavaScript and WebAssembly.</noscript>
+<script type="module" src="./playground.js"></script>
+```

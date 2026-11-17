@@ -12,10 +12,3 @@ sitemap="$out_dir/sitemap.xml"
 [ -f "$sitemap" ] || exit 0
 
 sed -i 's|/index\.html</loc>|/</loc>|g' "$sitemap"
-
-# Quarto copies the standalone playground as a resource without adding it to
-# the sitemap, so include its canonical URL explicitly.
-if [ -f "$out_dir/playground/index.html" ] \
-  && ! grep -Fq '<loc>https://panache.bz/playground/</loc>' "$sitemap"; then
-  sed -i 's|</urlset>|  <url>\n    <loc>https://panache.bz/playground/</loc>\n  </url>\n</urlset>|' "$sitemap"
-fi

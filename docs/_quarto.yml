@@ -73,10 +73,8 @@ website:
           - text: Ask a question
             icon: "chat-right-text"
             href: "https://github.com/jolars/panache/discussions"
-      - href: playground/
+      - href: playground/index.qmd
         text: "Playground"
-        icon: box-arrow-up-right
-        target: _blank
 
   sidebar:
     - id: guide
@@ -133,7 +131,7 @@ website:
               text: Contributing
 
 resources:
-  - "playground/**"
+  - "playground/pkg/**"
   - "panache.schema.json"
   - "apple-touch-icon.png"
   - "favicon-96x96.png"

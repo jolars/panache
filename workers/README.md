@@ -37,6 +37,11 @@ canonical URLs, old links, Markdown GET and HEAD requests, search, downloads,
 WebAssembly, and missing pages. `docs-preview` still supports Quarto's authoring
 preview.
 
+The playground at `/playground/` is a Quarto page that shares the site's
+navigation and light and dark themes. Its browser code and styles live beside
+`docs/playground/index.qmd`; `task playground-serve` builds WebAssembly and
+previews the page within the site. Shared links retain formatting settings.
+
 On Linux, devenv supplies a loader wrapper for npm's pinned `workerd` binary.
 Use `devenv shell -- <command>` when a noninteractive shell has not loaded the
 environment. This keeps the runtime version aligned with the lockfile on NixOS.

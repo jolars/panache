@@ -198,10 +198,10 @@ tasks:
       - rm -f docs/playground/pkg/.gitignore
 
   playground-serve:
-    desc: Serve playground locally
+    desc: Preview the playground within the documentation site
     deps: [wasm-build]
     cmds:
-      - cd docs/playground && python3 -m http.server
+      - quarto preview docs/playground/index.qmd --no-browser
 
   update-golden-expected:
     desc: Update expected golden test outputs
