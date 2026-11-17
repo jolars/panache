@@ -20,10 +20,10 @@ use std::path::Path;
 use crate::config::Config;
 use crate::salsa::SymbolUsageIndex;
 use crate::syntax::{
-    AstNode, AttributeNode, Citation, FootnoteReference, ImageLink, Link, SyntaxKind, SyntaxNode,
-    UnresolvedReference,
+    AstNode, AttributeNode, Citation, FootnoteReference, ImageLink, Link, MystTarget, SyntaxKind,
+    SyntaxNode, UnresolvedReference,
 };
-use crate::utils::{implicit_heading_ids, normalize_label};
+use crate::utils::{implicit_heading_ids, normalize_anchor_label, normalize_label};
 
 /// Definition-side labels a document contributes: the targets that references,
 /// footnotes, and cross-references may resolve against.
@@ -200,6 +200,16 @@ pub fn extend_anchors(
             .map(|(label, _)| label.clone())
             .filter(|label| !label.is_empty()),
     );
+
+    if config.extensions.myst_targets {
+        anchors.extend(
+            tree.descendants()
+                .filter_map(MystTarget::cast)
+                .filter_map(|target| target.label())
+                .map(|label| normalize_anchor_label(&label))
+                .filter(|label| !label.is_empty()),
+        );
+    }
 
     if config.extensions.auto_identifiers {
         for entry in implicit_heading_ids(tree, &config.extensions) {

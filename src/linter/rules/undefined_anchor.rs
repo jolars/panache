@@ -111,6 +111,72 @@ mod tests {
     }
 
     #[test]
+    fn resolves_myst_targets_with_and_without_blank_lines() {
+        let input = "See [a](#tgt) and [b](#tgt2).\n\n(tgt)=\n\n## Foo\n\n(tgt2)=\n## Bar\n";
+        let config = Config {
+            flavor: Flavor::Myst,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Myst),
+            ..Default::default()
+        };
+        let diagnostics = parse_and_lint_with_config(input, config);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    }
+
+    #[test]
+    fn resolves_myst_targets_in_blockquotes() {
+        let input = "> (saved)=\n>\n> Content.\n\nSee [link](#saved).\n";
+        let config = Config {
+            flavor: Flavor::Myst,
+            extensions: crate::config::Extensions::for_flavor(Flavor::Myst),
+            ..Default::default()
+        };
+        let diagnostics = parse_and_lint_with_config(input, config);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    }
+
+    #[test]
+    fn myst_targets_respect_extension_overrides() {
+        let input = "(saved)=\n\nContent.\n\nSee [link](#saved).\n";
+        for flavor in [Flavor::Myst, Flavor::CommonMark] {
+            for enabled in [false, true] {
+                let mut config = Config {
+                    flavor,
+                    extensions: crate::config::Extensions::for_flavor(flavor),
+                    ..Default::default()
+                };
+                config.extensions.myst_targets = enabled;
+                let diagnostics = parse_and_lint_with_config(input, config);
+                assert_eq!(
+                    diagnostics.len(),
+                    usize::from(!enabled),
+                    "{flavor:?}, myst-targets={enabled}: {diagnostics:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn myst_targets_in_literal_content_do_not_resolve() {
+        for content in [
+            "`(saved)=`",
+            "```markdown\n(saved)=\n```",
+            "    (saved)=",
+            "\\(saved)=",
+            "```{code} markdown\n(saved)=\n```",
+        ] {
+            let input = format!("{content}\n\nSee [link](#saved).\n");
+            let config = Config {
+                flavor: Flavor::Myst,
+                extensions: crate::config::Extensions::for_flavor(Flavor::Myst),
+                ..Default::default()
+            };
+            let diagnostics = parse_and_lint_with_config(&input, config);
+            assert_eq!(diagnostics.len(), 1, "{content:?}: {diagnostics:?}");
+            assert!(diagnostics[0].message.contains("#saved"));
+        }
+    }
+
+    #[test]
     fn resolves_explicit_id_on_fenced_div() {
         let input = "::: {#note}\nSome content.\n:::\n\nSee [the note](#note).\n";
         assert!(parse_and_lint(input).is_empty());

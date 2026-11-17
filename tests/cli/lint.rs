@@ -10,6 +10,24 @@ use std::time::Duration;
 use tempfile::TempDir;
 
 #[test]
+fn myst_targets_resolve_as_anchors() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("panache.toml"), "flavor = \"myst\"\n").unwrap();
+    fs::write(
+        dir.path().join("targets.md"),
+        "See [a](#tgt) and [b](#tgt2).\n\n(tgt)=\n\n## Foo\n\n(tgt2)=\n## Bar\n",
+    )
+    .unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(dir.path())
+        .args(["lint", "--no-cache", "targets.md"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("undefined-anchor").not());
+}
+
+#[test]
 fn jupyter_markdown_lint_runs_shared_math_rules() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("math.md"), "$x^{a$\n\n$x\\\\y$\n").unwrap();
