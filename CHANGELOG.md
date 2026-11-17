@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Highlights
+
+This release brings formatting support for Jupyter notebooks! Linter support hasn't been added yet, but will eventually be added. Now, by default, Panache will format `.ipynb` files from your editor or when run on the command line.
+
 ## [3.18.0](https://github.com/jolars/panache/compare/v3.17.2...v3.18.0) (2026-11-11)
 
 ### Highlights
