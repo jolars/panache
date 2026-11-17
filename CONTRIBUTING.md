@@ -297,6 +297,14 @@ RUST_LOG=info ./target/release/panache lsp
 - To build the extension locally: `npm ci && npm run compile` in
   `editors/code/`; `npm run package` produces a `.vsix`.
 
+The extension scopes its `minimatch` overrides by consumer to avoid
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+`@vscode/vsce` uses version 11, while `vscode-languageclient` uses version 6.2.3
+or a later version 6 patch. Version 6 lacks the affected preprocessing code and
+preserves `Minimatch.makeRe()`, which the language client still calls and
+version 11 removed. Revisit these overrides when the upstream packages support
+version 11.
+
 ### Neovim
 
 - Confirm your LSP config uses `cmd = { "panache", "lsp" }`.

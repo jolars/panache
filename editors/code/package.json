@@ -251,6 +251,12 @@
   "overrides": {
     "@azure/identity": {
       "@azure/msal-node": "^7.1.0"
+    },
+    "@vscode/vsce": {
+      "minimatch": "^11.0.9"
+    },
+    "vscode-languageclient": {
+      "minimatch": "^6.2.3"
     }
   }
 }
