@@ -79,9 +79,10 @@ lists all formatting options and their defaults.
 
 ### Format Embedded Code
 
-Panache formats code fences and their attributes. To format the code inside them
-as well, configure an external formatter and make sure its command is available
-on your `PATH`. See [Configure Linting and Embedded
+Panache formats code fences and their attributes. It adds a blank line between a
+code block and a following paragraph. To format the code inside them as well,
+configure an external formatter and make sure its command is available on your
+`PATH`. See [Configure Linting and Embedded
 Code](configure.qmd#configure-linting-and-embedded-code) for setup and the
 [formatter presets](../reference/formatter-presets.qmd) for supported tools.
 

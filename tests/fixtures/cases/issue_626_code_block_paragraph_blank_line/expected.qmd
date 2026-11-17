@@ -1,0 +1,20 @@
+```{r}
+a <- 2
+```
+
+We have some thing.
+
+```{r}
+a <- 2
+```
+
+We have some thing.
+
+```text
+Ordinary fenced code.
+```
+
+A paragraph after ordinary code.
+
+```
+```

@@ -1,7 +1,7 @@
 use crate::config::{Config, Flavor};
 use crate::syntax::{
-    AstNode, CellOptionResolution, CodeBlock, MystDirective, SyntaxKind, SyntaxNode, YamlMetadata,
-    YamlNode, parse_yaml_document, text_without_line_prefixes,
+    AstNode, CellOptionResolution, CodeBlock, MystDirective, Paragraph, SyntaxKind, SyntaxNode,
+    YamlMetadata, YamlNode, parse_yaml_document, text_without_line_prefixes,
 };
 use panache_parser::parser::blocks::code_blocks::{CodeBlockType, InfoString};
 use rowan::NodeOrToken;
@@ -65,6 +65,11 @@ impl Formatter {
             );
         } else {
             self.format_code_block(node);
+        }
+
+        if node.next_sibling().and_then(Paragraph::cast).is_some() && !self.output.ends_with("\n\n")
+        {
+            self.output.push('\n');
         }
     }
 }
