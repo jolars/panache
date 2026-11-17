@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.30.0](https://github.com/jolars/panache/compare/panache-formatter-v0.29.0...panache-formatter-v0.30.0) (2026-11-17)
+
+### Features
+
+- support Jupyter notebook Markdown formatting ([`8e07e70`](https://github.com/jolars/panache/commit/8e07e7099d50159b629c4c281cc9299d4f0b8243)), closes [#619](https://github.com/jolars/panache/issues/619)
+
+### Bug Fixes
+
+- **formatter:** add blank line after code blocks before paragraphs ([`de56ebf`](https://github.com/jolars/panache/commit/de56ebfcd0013189c22e31624e6d90adbe9b84bc)), fixes [#626](https://github.com/jolars/panache/issues/626)
+- preserve myst directive bodies and fences ([`6ee8f12`](https://github.com/jolars/panache/commit/6ee8f12eb582ff7711aa4a2ecb86e7a5a028bdd9)), fixes [#620](https://github.com/jolars/panache/issues/620)
+- **parser:** preserve eval-rst directive bodies (#622) ([`fb920e5`](https://github.com/jolars/panache/commit/fb920e5c746662bfd1e411413fe48f74606b8211)), ref [#620](https://github.com/jolars/panache/issues/620)
+
+### Dependencies
+
+- updated crates/panache-parser to v0.36.0
+
 ## [0.29.0](https://github.com/jolars/panache/compare/panache-formatter-v0.28.2...panache-formatter-v0.29.0) (2026-11-11)
 
 ### Features
