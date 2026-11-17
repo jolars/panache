@@ -164,6 +164,16 @@ fn ordered_sublist_after_heading_preserves_commonmark_html() {
 }
 
 #[test]
+fn html_block_multiline_tag_closer_preserves_commonmark_html() {
+    for flavor in [Flavor::CommonMark, Flavor::Gfm] {
+        assert_commonmark_html_preserved(
+            include_str!("fixtures/cases/html_block_multiline_tag_closer_commonmark/input.md"),
+            flavor,
+        );
+    }
+}
+
+#[test]
 fn html_block_on_list_marker_line_preserves_commonmark_html() {
     for flavor in [Flavor::CommonMark, Flavor::Gfm] {
         assert_commonmark_html_preserved(
@@ -243,6 +253,7 @@ golden_test_cases!(
     jupyter_math_setext_blank_before_header,
     html_raw_trailing_container_marker_commonmark,
     html_raw_multiline_child_attributes_commonmark,
+    html_block_multiline_tag_closer_commonmark,
     html_raw_attributes_commonmark,
     html_raw_attributes_mdsvex,
     list_leading_block_multiline_code_preserve,

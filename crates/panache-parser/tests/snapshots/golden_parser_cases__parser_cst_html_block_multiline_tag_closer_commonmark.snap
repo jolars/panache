@@ -1,0 +1,105 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..311
+  HTML_BLOCK@0..203
+    HTML_BLOCK_TAG@0..21
+      TEXT@0..4 "<div"
+      HTML_ATTRS@4..19
+        WHITESPACE@4..5 " "
+        ATTR_KEY_VALUE@5..19
+          ATTR_KEY@5..10 "align"
+          TEXT@10..11 "="
+          ATTR_VALUE@11..19 "\"center\""
+      TEXT@19..20 ">"
+      NEWLINE@20..21 "\n"
+    HTML_BLOCK_CONTENT@21..203
+      TEXT@21..23 "<a"
+      HTML_ATTRS@23..67
+        WHITESPACE@23..24 " "
+        ATTR_KEY_VALUE@24..67
+          ATTR_KEY@24..28 "href"
+          TEXT@28..29 "="
+          ATTR_VALUE@29..67 "\"https://numfocus.org ..."
+      TEXT@67..68 ">"
+      NEWLINE@68..69 "\n"
+      TEXT@69..75 "  <img"
+      HTML_ATTRS@75..189
+        NEWLINE@75..76 "\n"
+        WHITESPACE@76..80 "    "
+        ATTR_KEY_VALUE@80..170
+          ATTR_KEY@80..83 "src"
+          TEXT@83..84 "="
+          ATTR_VALUE@84..170 "\"https://raw.githubus ..."
+        NEWLINE@170..171 "\n"
+        WHITESPACE@171..175 "    "
+        ATTR_KEY_VALUE@175..186
+          ATTR_KEY@175..180 "width"
+          TEXT@180..181 "="
+          ATTR_VALUE@181..186 "\"200\""
+        NEWLINE@186..187 "\n"
+        WHITESPACE@187..189 "  "
+      TEXT@189..190 ">"
+      NEWLINE@190..191 "\n"
+      TEXT@191..195 "</a>"
+      NEWLINE@195..196 "\n"
+      TEXT@196..202 "</div>"
+      NEWLINE@202..203 "\n"
+  BLANK_LINE@203..204
+    BLANK_LINE@203..204 "\n"
+  BLOCK_QUOTE@204..257
+    BLOCK_QUOTE_MARKER@204..205 ">"
+    WHITESPACE@205..206 " "
+    HTML_BLOCK@206..257
+      HTML_BLOCK_TAG@206..212
+        TEXT@206..211 "<div>"
+        NEWLINE@211..212 "\n"
+      HTML_BLOCK_CONTENT@212..257
+        LINE_PREFIX@212..213 ">"
+        LINE_PREFIX@213..214 " "
+        TEXT@214..220 "  <img"
+        HTML_ATTRS@220..246
+          NEWLINE@220..221 "\n"
+          LINE_PREFIX@221..222 ">"
+          LINE_PREFIX@222..223 " "
+          WHITESPACE@223..227 "    "
+          ATTR_KEY_VALUE@227..241
+            ATTR_KEY@227..230 "src"
+            TEXT@230..231 "="
+            ATTR_VALUE@231..241 "\"logo.png\""
+          NEWLINE@241..242 "\n"
+          LINE_PREFIX@242..243 ">"
+          LINE_PREFIX@243..244 " "
+          WHITESPACE@244..246 "  "
+        TEXT@246..247 ">"
+        NEWLINE@247..248 "\n"
+        LINE_PREFIX@248..249 ">"
+        LINE_PREFIX@249..250 " "
+        TEXT@250..256 "</div>"
+        NEWLINE@256..257 "\n"
+  BLANK_LINE@257..258
+    BLANK_LINE@257..258 "\n"
+  LIST@258..311
+    LIST_ITEM@258..311
+      LIST_MARKER@258..259 "-"
+      WHITESPACE@259..260 " "
+      HTML_BLOCK@260..311
+        HTML_BLOCK_TAG@260..266
+          TEXT@260..265 "<div>"
+          NEWLINE@265..266 "\n"
+        HTML_BLOCK_CONTENT@266..311
+          TEXT@266..274 "    <img"
+          HTML_ATTRS@274..300
+            NEWLINE@274..275 "\n"
+            WHITESPACE@275..281 "      "
+            ATTR_KEY_VALUE@281..295
+              ATTR_KEY@281..284 "src"
+              TEXT@284..285 "="
+              ATTR_VALUE@285..295 "\"logo.png\""
+            NEWLINE@295..296 "\n"
+            WHITESPACE@296..300 "    "
+          TEXT@300..301 ">"
+          NEWLINE@301..302 "\n"
+          TEXT@302..310 "  </div>"
+          NEWLINE@310..311 "\n"

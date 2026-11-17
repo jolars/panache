@@ -2036,7 +2036,10 @@ fn parse_commonmark_html_block(
     let mut close_start = None;
     if !is_closing_marker(first, block_type) {
         while let Some(&line) = lines.get(end_pos) {
-            let (depth, inner) = count_blockquote_markers(line);
+            let (depth, _) = count_blockquote_markers(line);
+            // Only enclosing quote markers are structural here. Any further
+            // `>` belongs to the HTML, including a multiline tag's closer.
+            let content = strip_n_blockquote_markers(line, prefix.bq_depth());
             // An outer directive fence also bounds opaque HTML in its body.
             if myst_directive_closer.is_some_and(|closer| closer.matches(line)) {
                 break;
@@ -2044,15 +2047,14 @@ fn parse_commonmark_html_block(
             // Raw HTML accepts no lazy continuation outside its container.
             if depth < prefix.bq_depth()
                 || (prefix.list_content_col() > 0
-                    && !inner.trim().is_empty()
+                    && !content.trim().is_empty()
                     && !prefix.resolve(line).reaches_frame())
-                || (ends_at_blank_line(block_type) && inner.trim().is_empty())
+                || (ends_at_blank_line(block_type) && content.trim().is_empty())
             {
                 break;
             }
             // List indentation remains raw HTML content. The formatter needs
             // those bytes when it adjusts the enclosing list's indentation.
-            let content = strip_n_blockquote_markers(line, prefix.bq_depth());
             let prefix_len = line.len() - content.len();
             for (offset, ch) in line[..prefix_len].char_indices() {
                 markers.push((
@@ -2060,7 +2062,7 @@ fn parse_commonmark_html_block(
                     InjectedMarker::Indent(&line[offset..offset + ch.len_utf8()]),
                 ));
             }
-            let closes = is_closing_marker(inner, block_type);
+            let closes = is_closing_marker(content, block_type);
             if closes {
                 close_start = Some(source.len());
             }

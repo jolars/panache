@@ -86,6 +86,9 @@ configure an external formatter and make sure its command is available on your
 Code](configure.qmd#configure-linting-and-embedded-code) for setup and the
 [formatter presets](../reference/formatter-presets.qmd) for supported tools.
 
+In CommonMark and GFM, Panache preserves indentation inside HTML blocks,
+including a multiline tag's closing `>` on its own line.
+
 ### Ignore Directives
 
 Use HTML comments to leave the formatting in part of your document untouched.

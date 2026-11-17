@@ -591,6 +591,7 @@ golden_test_cases!(
     html_raw_trailing_container_marker_commonmark,
     html_raw_trailing_container_marker_pandoc,
     html_raw_multiline_child_attributes_commonmark,
+    html_block_multiline_tag_closer_commonmark,
     html_raw_multiline_child_attributes_pandoc,
     html_raw_attributes_commonmark,
     html_raw_template_commonmark,
