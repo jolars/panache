@@ -1,0 +1,301 @@
+/* This stylesheet is loaded only by the landing page. */
+body.panache-home {
+  --home-bg: #fff;
+  --home-text: #303038;
+  --home-title: #000;
+  --home-muted: #60606b;
+  --home-surface: #f6f6f7;
+  --home-border: #dedee3;
+  --home-accent: #98394d;
+  --home-accent-hover: #7f2e40;
+  --home-accent-soft: #f1e3e7;
+  color: var(--home-text);
+}
+
+body.panache-home.quarto-dark {
+  --home-bg: #151515;
+  --home-text: #f1f1f3;
+  --home-title: var(--home-text);
+  --home-muted: #b6b6bf;
+  --home-surface: #242426;
+  --home-border: #3d3d43;
+  --home-accent: #e68ea1;
+  --home-accent-hover: #f4afbe;
+  --home-accent-soft: #3b252c;
+}
+
+.panache-home #quarto-header .navbar {
+  --bs-navbar-color: var(--home-text);
+  --bs-navbar-hover-color: var(--home-accent);
+  --bs-navbar-active-color: var(--home-accent);
+  --bs-navbar-toggler-border-color: var(--home-border);
+  background: var(--home-bg);
+  border-bottom: 1px solid var(--home-border);
+}
+
+.panache-home #quarto-header .navbar a,
+.panache-home #quarto-header .quarto-color-scheme-toggle,
+.panache-home #quarto-header .aa-SubmitIcon {
+  color: var(--home-text);
+}
+
+.panache-home #quarto-header .navbar a:hover {
+  color: var(--home-accent);
+}
+
+.panache-home #quarto-header .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='%23888' stroke-linecap='round' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+}
+
+.panache-home #title-block-header {
+  display: none;
+}
+
+.panache-home .home {
+  width: min(100% - 64px, 1152px);
+  margin-inline: auto;
+  padding-bottom: 72px;
+}
+
+.panache-home .home a {
+  color: var(--home-accent);
+  text-underline-offset: 3px;
+}
+
+.panache-home .home a:hover {
+  color: var(--home-accent-hover);
+}
+
+.panache-home a:focus-visible {
+  outline: 3px solid var(--home-accent);
+  outline-offset: 5px;
+}
+
+.panache-home .home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 64px;
+  padding-block: 80px 64px;
+}
+
+.panache-home .home-hero h1 {
+  margin: 0 0 16px;
+  color: var(--home-title);
+  font-size: clamp(3rem, 5vw, 4rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.panache-home .home-lead {
+  margin-bottom: 16px;
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.panache-home .home-intro {
+  max-width: 36rem;
+  margin-bottom: 28px;
+  color: var(--home-muted);
+  font-size: 1.125rem;
+}
+
+.panache-home .home-hero-art {
+  display: flex;
+  justify-content: center;
+}
+
+.panache-home .home-hero-art img {
+  width: min(100%, 240px);
+  height: auto;
+}
+
+.panache-home .home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.panache-home .home a.home-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 22px;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.panache-home .home a.home-button-primary {
+  background: var(--home-accent);
+  color: var(--home-bg);
+}
+
+.panache-home .home a.home-button-primary:hover {
+  background: var(--home-accent-hover);
+}
+
+.panache-home .home a.home-button-secondary {
+  background: var(--home-surface);
+  color: var(--home-text);
+}
+
+.panache-home .home a.home-button-secondary:hover {
+  border-color: var(--home-accent);
+}
+
+.panache-home .home-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.panache-home .home-feature {
+  display: block;
+  padding: 26px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--home-surface);
+  color: var(--home-text);
+}
+
+.panache-home .home-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  background: var(--home-accent-soft);
+  color: var(--home-accent);
+  font-size: 1.4rem;
+}
+
+.panache-home .home-feature h2 {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.panache-home .home-feature p {
+  margin: 0;
+  color: var(--home-muted);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.panache-home .home-start,
+.panache-home .home-details {
+  display: grid;
+  gap: 48px;
+  margin-top: 56px;
+  padding-top: 40px;
+  border-top: 1px solid var(--home-border);
+}
+
+.panache-home .home-start {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+.panache-home .home-details {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panache-home .home-start h2,
+.panache-home .home-details h2 {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+
+.panache-home .home-start-intro p,
+.panache-home .home-detail p {
+  color: var(--home-muted);
+  line-height: 1.7;
+}
+
+.panache-home .home-start-commands {
+  min-width: 0;
+}
+
+.panache-home .home-start-commands .panel-tabset {
+  margin-bottom: 20px;
+}
+
+.panache-home .home-start-commands .nav-link {
+  color: var(--home-muted);
+}
+
+.panache-home .home-start-commands .nav-link.active {
+  color: var(--home-accent);
+}
+
+@media (max-width: 991px) {
+  .panache-home .home-hero {
+    gap: 32px;
+    padding-block: 56px 48px;
+  }
+
+  .panache-home .home-hero-art img {
+    width: min(100%, 190px);
+  }
+
+  .panache-home .home-start {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .panache-home .home {
+    width: calc(100% - 40px);
+    padding-bottom: 40px;
+  }
+
+  .panache-home .home-hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-block: 32px;
+  }
+
+  .panache-home .home-hero-art {
+    grid-row: 1;
+  }
+
+  .panache-home .home-hero-art img {
+    width: 100px;
+  }
+
+  .panache-home .home-hero-copy {
+    text-align: center;
+  }
+
+  .panache-home .home-actions {
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .panache-home .home-features,
+  .panache-home .home-details {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .panache-home .home-start,
+  .panache-home .home-details {
+    margin-top: 36px;
+    padding-top: 28px;
+  }
+}

@@ -24,75 +24,119 @@ twitter-card:
 format:
   html:
     toc: false
+    page-layout: custom
+    body-classes: panache-home
+    css: landing.css
+    anchor-sections: false
+    title-block-style: none
+    repo-actions: false
 ---
 
-<img src="images/logo.svg" alt="Panache logo" class="float-end ms-3"
-width="330" height="375" style="max-width: 20%; height: auto;">
+::: {.home role="main"}
+```{=html}
+<section class="home-hero" aria-labelledby="home-title">
+  <div class="home-hero-copy">
+    <h1 id="home-title">Panache</h1>
+    <p class="home-lead">A fast formatter, linter, and language server for Quarto
+    and other Markdown flavors.</p>
+    <p class="home-intro">From fenced divs to citations and code chunks, keep
+    your documents tidy without leaving your editor.</p>
+    <div class="home-actions">
+      <a class="home-button home-button-primary" href="getting-started.html">Get started</a>
+      <a class="home-button home-button-secondary" href="playground/">Try the playground</a>
+      <a class="home-button home-button-secondary" href="https://github.com/jolars/panache">View on GitHub</a>
+    </div>
+  </div>
+  <div class="home-hero-art">
+    <img src="images/logo.svg" alt="" width="330" height="375" fetchpriority="high">
+  </div>
+</section>
 
-Panache is a language server, formatter, and linter for Quarto and other
-Markdown flavors. It is built for fast, reliable formatting, linting, and
-language services across syntax that many generic Markdown tools struggle with,
-including fenced divs, grid tables, definition lists, citations, and inline
-footnotes.
-
-Panache supports CommonMark, GitHub Flavored Markdown, MyST, Pandoc, R Markdown,
-and Quarto. It handles everything from simple Markdown to documents with
-embedded code chunks and fenced divs. You can use it in your editor, on the
-command line, and in CI, with consistent behavior across all environments.
-
-<div style="clear: both;"></div>
-
-## Why Panache
-
-- **Flavor-aware**: understands Quarto, Pandoc, R Markdown, MyST, and other
-  Markdown syntax directly.
-- **Formatter + linter + LSP in one tool**: consistent behavior in your CLI,
-  editor, and CI.
-- **Configurable defaults**: tune wrapping, flavor, extensions, and linting to
-  match your project.
-- **External tool support**: plug in external formatters and linters for code
-  blocks to enable language-aware formatting and linting of embedded code.
-- **Fast and reliable**: built in Rust for speed and stability, with a focus on
-  correctness and consistent formatting. See the
-  [Comparisons](guide/comparison.qmd) and [Performance](guide/performance.qmd)
-  articles for comparisons and benchmarks against other tools.
-
-## Quick Start
-
-Install with Homebrew on macOS or Linux:
-
-```bash
-brew install panache
+<div id="why-panache" class="home-features">
+  <div class="home-feature">
+    <i class="bi bi-text-paragraph home-feature-icon" aria-hidden="true"></i>
+    <h2>Format your documents</h2>
+    <p>Consistent prose, tables, math, and metadata. Format the syntax you use,
+    including fenced divs, definition lists, and footnotes.</p>
+  </div>
+  <div class="home-feature">
+    <i class="bi bi-check2-circle home-feature-icon" aria-hidden="true"></i>
+    <h2>Catch mistakes early</h2>
+    <p>Find problems with precise diagnostics, apply fixes, and run the same
+    checks in your editor, on the command line, and in CI.</p>
+  </div>
+  <div class="home-feature">
+    <i class="bi bi-cursor-text home-feature-icon" aria-hidden="true"></i>
+    <h2>Stay in your editor</h2>
+    <p>Format on save, jump to references, and get diagnostics and code actions
+    as you write. One language server connects it all.</p>
+  </div>
+</div>
 ```
 
-Or install with Cargo:
+::::: {.home-start}
+::::::: {.home-start-intro}
+## Quick start
 
-```bash
-cargo install --locked panache
+Install Panache, then format and lint your first document.
+
+Prefer a package manager? See the [installation
+guide](getting-started.qmd#installation) for Homebrew, npm, uv, Cargo, and other
+options.
+
+Using VS Code or Positron? The [Panache
+extension](https://marketplace.visualstudio.com/items?itemName=jolars.panache)
+installs the CLI and starts the language server for you. See [editor
+setup](guide/lsp.qmd) for other editors.
+:::::::
+
+::::::: {.home-start-commands}
+::::::::: {.panel-tabset}
+### macOS and Linux
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://panache.bz/install | sh
 ```
 
-Format your first document:
+### Windows
 
-```bash
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://panache.bz/install.ps1 | iex"
+```
+:::::::::
+
+Then put Panache to work:
+
+```sh
 panache format document.qmd
-```
-
-Lint a document:
-
-```bash
 panache lint document.qmd
 ```
+:::::::
+:::::
 
-To get the most out of Panache, you will want to set up the language server in
-your editor. See [Getting Started](getting-started.qmd) for instructions on how
-to do that.
+::::: {#where-to-go-next .home-details}
+::::::: {.home-detail}
+## Your Markdown, understood
 
-## Where to Go Next
+Quarto, Pandoc, R Markdown, MyST, CommonMark, and GitHub Flavored Markdown each
+have their own syntax. Panache parses your document with its flavor in mind,
+from a simple README to a paper with citations, grid tables, and inline
+footnotes.
 
-- [Getting Started](getting-started.qmd): A slightly more detailed guide on how
-  to get up and running with Panache, including integrating the language server
-  into your editor.
-- [User Guide](guide/index.qmd): detailed docs for formatting, linting, CLI, and
-  editor integration.
-- [Configuration](guide/configure.qmd): tune behavior with `panache.toml`.
-- [Playground](playground/): try formatting directly in the browser.
+[Explore the user guide](guide/index.qmd) or see how Panache [compares with
+other tools](guide/comparison.qmd).
+:::::::
+
+::::::: {.home-detail}
+## Bring your code tools along
+
+Use your preferred formatters and linters inside code blocks, including Ruff for
+Python and Air for R. Panache handles the surrounding document and maps code
+diagnostics back to their source.
+
+[Configure embedded code
+tools](guide/configure.qmd#configure-linting-and-embedded-code) and [tune
+Panache for your project](guide/configure.qmd).
+:::::::
+:::::
+:::
