@@ -236,14 +236,14 @@
   },
   "dependencies": {
     "adm-zip": "^0.6.1",
-    "tar": "^7.5.22",
+    "tar": "^7.5.23",
     "vscode-languageclient": "^11.0.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.6.0",
     "@types/node": "^26.6.6",
     "@types/vscode": "1.91.0",
-    "@vscode/vsce": "^4.1.0",
+    "@vscode/vsce": "^4.1.1",
     "esbuild": "^0.28.2",
     "npm-run-all2": "^9.0.4",
     "typescript": "^7.0.2"
