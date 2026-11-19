@@ -649,6 +649,7 @@ golden_test_cases!(
     math_relation_chain_hardbreak_experimental,
     math_malformed_delimiter_experimental,
     math_reflow_default,
+    issue_632_inline_math_delimiter,
     math_punctuation_reflow,
     grid_table,
     grid_table_column_span,

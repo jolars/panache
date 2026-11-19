@@ -1,0 +1,38 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..54
+  LIST@0..54
+    LIST_ITEM@0..28
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..28
+        TEXT@2..10 "We have "
+        TEXT@10..11 "$"
+        TEXT@11..17 "a = b "
+        TEXT@17..18 "$"
+        TEXT@18..23 " and "
+        INLINE_MATH@23..26
+          INLINE_MATH_MARKER@23..24 "$"
+          MATH_CONTENT@24..25
+            MATH_WORD@24..25 "l"
+          INLINE_MATH_MARKER@25..26 "$"
+        TEXT@26..27 "."
+        NEWLINE@27..28 "\n"
+    LIST_ITEM@28..54
+      LIST_MARKER@28..29 "-"
+      WHITESPACE@29..30 " "
+      PLAIN@30..54
+        TEXT@30..38 "We have "
+        TEXT@38..39 "$"
+        TEXT@39..40 "x"
+        TEXT@40..41 "$"
+        TEXT@41..47 "5 and "
+        INLINE_MATH@47..52
+          INLINE_MATH_MARKER@47..48 "$"
+          MATH_CONTENT@48..51
+            MATH_WORD@48..51 "y+z"
+          INLINE_MATH_MARKER@51..52 "$"
+        TEXT@52..53 "."
+        NEWLINE@53..54 "\n"

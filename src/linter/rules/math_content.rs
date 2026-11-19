@@ -233,6 +233,12 @@ mod tests {
     }
 
     #[test]
+    fn invalid_inline_closer_does_not_trigger_math_diagnostic() {
+        let diags = parse_and_lint("- We have $a = b $ and $l$.\n");
+        assert!(diags.is_empty());
+    }
+
+    #[test]
     fn well_formed_math_is_clean() {
         let diags = parse_and_lint("$\\frac{1}{2} + x^{2}$\n");
         assert!(diags.is_empty());

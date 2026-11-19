@@ -167,16 +167,15 @@ pub fn try_parse_inline_math(text: &str, allow_multiline: bool) -> Option<(usize
                 continue;
             }
 
+            // An unescaped dollar ends the attempt even when it cannot close the span.
             if pos == 0 || rest[..pos].ends_with(char::is_whitespace) {
-                pos += 1;
-                continue;
+                return None;
             }
 
             if let Some(next_ch) = rest[pos + 1..].chars().next()
                 && next_ch.is_ascii_digit()
             {
-                pos += 1;
-                continue;
+                return None;
             }
 
             let math_content = &rest[..pos];

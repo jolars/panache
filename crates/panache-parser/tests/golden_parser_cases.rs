@@ -1211,6 +1211,7 @@ golden_test_cases!(
     inline_math_multiline_dollars,
     inline_math_multiline_dollars_gfm,
     inline_math_operators,
+    issue_632_inline_math_delimiter,
     math_definition_colon,
     blockquote_list_item_grid_table_rowspan,
     grid_table,
