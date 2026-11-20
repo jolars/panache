@@ -1,6 +1,6 @@
 # Fallback configs apply only when Panache finds no upstream project config.
 # Paths are relative to this manifest. See README.md for precedence and reproduction.
-# Build evidence below was checked against the upstream repositories on 2026-10-15.
+# Build evidence for the initial corpus was checked on 2026-10-15.
 
 [[repositories]]
 # Quarto: _quarto.yml. Upstream config: .panache.toml.
@@ -78,6 +78,11 @@ repo = "jeroenjanssens/data-science-at-the-command-line"
 fallback-config = "configs/rmarkdown.toml"
 
 [[repositories]]
+# Jupyter: book chapters in notebooks/.
+repo = "jakevdp/PythonDataScienceHandbook"
+fallback-config = "configs/github-docs.toml"
+
+[[repositories]]
 # Pandoc: Makefile and the doc/ sources; test/ also contains dialect fixtures.
 repo = "jgm/pandoc"
 fallback-config = "configs/pandoc.toml"
@@ -91,6 +96,11 @@ fallback-config = "configs/quarto.toml"
 # R Markdown/bookdown: _output.yml.
 repo = "juliasilge/tidy-text-mining"
 fallback-config = "configs/rmarkdown.toml"
+
+[[repositories]]
+# Jupyter: example notebooks in docs/source/examples/Notebook/.
+repo = "jupyter/notebook"
+fallback-config = "configs/github-docs.toml"
 
 [[repositories]]
 # Quarto: book/_quarto.yml.

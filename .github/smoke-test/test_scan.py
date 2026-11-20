@@ -43,6 +43,7 @@ class ScanTests(unittest.TestCase):
         self,
         outcomes: list[tuple[int, str]],
         clone_codes: list[int] | None = None,
+        tracked_file: str = "content/a page.md",
     ) -> list[dict]:
         pending = iter(outcomes)
         clones = iter(clone_codes or [])
@@ -72,7 +73,7 @@ class ScanTests(unittest.TestCase):
             if arguments == ("rev-parse", "HEAD"):
                 return b"upstream-sha\n"
             self.assertEqual(arguments, ("ls-files", "-z", "--", *scan.EXTENSIONS))
-            return b"content/a page.md\0"
+            return os.fsencode(tracked_file) + b"\0"
 
         with (
             patch.object(scan.subprocess, "run", side_effect=run),
@@ -89,6 +90,15 @@ class ScanTests(unittest.TestCase):
         self.assertEqual(list(pending), [], "unused mocked Panache results")
         with (self.results / "failures.tsv").open(newline="") as stream:
             return list(csv.DictReader(stream, delimiter="\t"))
+
+    def test_notebook_scan_omits_pass_dumps_on_success(self) -> None:
+        notebook = "examples/Markdown cells.ipynb"
+        rows = self.run_scan([(0, "passed")], tracked_file=notebook)
+        self.assertEqual(rows, [])
+        command, _ = self.calls[0]
+        self.assertEqual(command[-2:], ["--", notebook])
+        self.assertIn("--dump-dir", command)
+        self.assertNotIn("--dump-passes", command)
 
     def test_clone_retries_clean_partial_checkouts_and_resume_scan(self) -> None:
         with patch("time.sleep") as sleep:

@@ -31,7 +31,7 @@ FIELDS = (
     "fallback_config_path",
     "reproduction_path",
 )
-EXTENSIONS = ("*.md", "*.qmd", "*.Rmd")
+EXTENSIONS = ("*.md", "*.qmd", "*.Rmd", "*.ipynb")
 
 
 @dataclass(frozen=True)
@@ -191,10 +191,12 @@ def scan(
                 dump_arguments = [
                     "--dump-dir",
                     str(passes),
-                    "--dump-passes",
-                    "--",
-                    rel_file,
                 ]
+                # Notebook dumps can include large embedded outputs. The CLI
+                # still writes the relevant passes when a notebook check fails.
+                if Path(rel_file).suffix != ".ipynb":
+                    dump_arguments.append("--dump-passes")
+                dump_arguments.extend(["--", rel_file])
                 config_arguments: list[str] = []
                 if run_panache(panache, dump_arguments, repo_dir, config, log):
                     continue

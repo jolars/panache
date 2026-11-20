@@ -934,7 +934,12 @@ fn run_debug_checks_for_content(
     cfg: &panache::Config,
     checks: DebugChecks,
     target_label: &str,
-) -> DebugRunArtifacts {
+    path: Option<&Path>,
+) -> io::Result<DebugRunArtifacts> {
+    let notebook = path.is_some_and(panache::notebook::is_notebook_path);
+    let notebook_error = |error| io::Error::other(format!("{target_label}: {error}"));
+    let check_losslessness = matches!(checks, DebugChecks::Losslessness | DebugChecks::All);
+    let check_idempotency = matches!(checks, DebugChecks::Idempotency | DebugChecks::All);
     let mut artifacts = DebugRunArtifacts::default();
     log::debug!(
         "debug format: start checks={} target={}",
@@ -942,9 +947,13 @@ fn run_debug_checks_for_content(
         target_label
     );
 
-    if matches!(checks, DebugChecks::Losslessness | DebugChecks::All) {
+    if check_losslessness {
         log::debug!("debug format: losslessness start target={}", target_label);
-        let tree_text = parse(input, Some(cfg.clone())).text().to_string();
+        let tree_text = if notebook {
+            panache::notebook::reparse_notebook(input, cfg).map_err(notebook_error)?
+        } else {
+            parse(input, Some(cfg.clone())).text().to_string()
+        };
         artifacts.losslessness = Some((input.to_string(), tree_text.clone()));
         if input != tree_text {
             artifacts.failures.push(DebugFailure {
@@ -956,32 +965,50 @@ fn run_debug_checks_for_content(
         log::debug!("debug format: losslessness end target={}", target_label);
     }
 
-    if matches!(checks, DebugChecks::Idempotency | DebugChecks::All) {
+    let check_container = notebook && check_losslessness;
+    if check_idempotency || check_container {
         log::debug!(
-            "debug format: idempotency pass1 start target={}",
+            "debug format: first format pass start target={}",
             target_label
         );
-        let once = format(input, Some(cfg.clone()), None);
+        let once = format_input(input, cfg, None, path)?;
         log::debug!(
-            "debug format: idempotency pass1 end target={}",
+            "debug format: first format pass end target={}",
             target_label
         );
-        log::debug!(
-            "debug format: idempotency pass2 start target={}",
-            target_label
-        );
-        let twice = format(&once, Some(cfg.clone()), None);
-        log::debug!(
-            "debug format: idempotency pass2 end target={}",
-            target_label
-        );
-        artifacts.idempotency = Some((input.to_string(), once.clone(), twice.clone()));
-        if once != twice {
-            artifacts.failures.push(DebugFailure {
-                kind: CheckKind::Idempotency,
-                left: once,
-                right: twice,
-            });
+        if check_container {
+            let mask = |content| {
+                panache::notebook::notebook_without_markdown(content).map_err(notebook_error)
+            };
+            let before = mask(input)?;
+            let after = mask(&once)?;
+            if before != after {
+                artifacts.failures.push(DebugFailure {
+                    kind: CheckKind::Losslessness,
+                    left: before,
+                    right: after,
+                });
+            }
+        }
+
+        if check_idempotency {
+            log::debug!(
+                "debug format: idempotency pass2 start target={}",
+                target_label
+            );
+            let twice = format_input(&once, cfg, None, path)?;
+            log::debug!(
+                "debug format: idempotency pass2 end target={}",
+                target_label
+            );
+            artifacts.idempotency = Some((input.to_string(), once.clone(), twice.clone()));
+            if once != twice {
+                artifacts.failures.push(DebugFailure {
+                    kind: CheckKind::Idempotency,
+                    left: once,
+                    right: twice,
+                });
+            }
         }
     }
 
@@ -990,7 +1017,7 @@ fn run_debug_checks_for_content(
         target_label,
         artifacts.failures.len()
     );
-    artifacts
+    Ok(artifacts)
 }
 
 fn main() -> ExitCode {
@@ -1532,13 +1559,6 @@ fn run() -> io::Result<()> {
                 dump_passes,
                 force_exclude,
             } => {
-                if cli
-                    .stdin_filename
-                    .as_deref()
-                    .is_some_and(panache::notebook::is_notebook_path)
-                {
-                    return Err(io::Error::other("notebooks support formatting only"));
-                }
                 if json && report {
                     eprintln!("Error: --json and --report cannot be used together");
                     std::process::exit(1);
@@ -1583,7 +1603,7 @@ fn run() -> io::Result<()> {
                         &anchor,
                         force_exclude,
                         cli.flavor.is_some(),
-                        false,
+                        true,
                     )?
                 };
 
@@ -1627,7 +1647,13 @@ fn run() -> io::Result<()> {
                     let input = read_all(None)?;
                     files_checked += 1;
 
-                    let artifacts = run_debug_checks_for_content(&input, &cfg, checks, "<stdin>");
+                    let artifacts = run_debug_checks_for_content(
+                        &input,
+                        &cfg,
+                        checks,
+                        "<stdin>",
+                        cli.stdin_filename.as_deref(),
+                    )?;
                     if let Some(dir) = dump_dir.as_ref() {
                         write_debug_artifacts(dir, "stdin", &artifacts, dump_passes)?;
                     }
@@ -1661,8 +1687,13 @@ fn run() -> io::Result<()> {
                         files_checked += 1;
                         let file_label = file_path.to_str().unwrap_or("<unknown>");
 
-                        let artifacts =
-                            run_debug_checks_for_content(&input, &cfg, checks, file_label);
+                        let artifacts = run_debug_checks_for_content(
+                            &input,
+                            &cfg,
+                            checks,
+                            file_label,
+                            Some(file_path),
+                        )?;
                         if let Some(dir) = dump_dir.as_ref() {
                             let safe = sanitize_path_for_filename(file_label);
                             write_debug_artifacts(dir, &safe, &artifacts, dump_passes)?;

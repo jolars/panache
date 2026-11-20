@@ -42,6 +42,35 @@ enum Source {
 /// Format Markdown cells using the supplied, already resolved configuration.
 /// Every byte outside changed `source` values is retained verbatim.
 pub fn format_notebook(input: &str, config: &Config) -> Result<String, NotebookError> {
+    map_markdown_sources(input, |text| {
+        crate::format(text, Some(config.clone()), None)
+    })
+}
+
+/// Reconstruct the notebook from each Markdown cell's lossless syntax tree.
+#[doc(hidden)]
+pub fn reparse_notebook(input: &str, config: &Config) -> Result<String, NotebookError> {
+    map_markdown_sources(input, |text| {
+        crate::parse(text, Some(config.clone())).text().to_string()
+    })
+}
+
+/// Replace Markdown source payloads with empty values of the same JSON type.
+#[doc(hidden)]
+pub fn notebook_without_markdown(input: &str) -> Result<String, NotebookError> {
+    rewrite_sources(input, |raw, source| {
+        let empty = match source {
+            Source::Text(_) => r#""""#,
+            Source::Lines(_) => "[]",
+        };
+        (raw != empty).then(|| empty.to_owned())
+    })
+}
+
+fn rewrite_sources(
+    input: &str,
+    mut replacement: impl FnMut(&str, Source) -> Option<String>,
+) -> Result<String, NotebookError> {
     let notebook: Notebook<'_> =
         serde_json::from_str(input).map_err(|e| NotebookError(format!("invalid notebook: {e}")))?;
     if notebook.nbformat != 4 {
@@ -67,16 +96,35 @@ pub fn format_notebook(input: &str, config: &Config) -> Result<String, NotebookE
             .ok_or_else(|| invalid("missing source".into()))?
             .get();
         let source: Source = serde_json::from_str(raw).map_err(|e| invalid(e.to_string()))?;
+        let Some(replacement) = replacement(raw, source) else {
+            continue;
+        };
+        // RawValue borrows this precise slice from `input`; offsets remain UTF-8 boundaries.
+        let start = raw.as_ptr() as usize - input.as_ptr() as usize;
+        edits.push((start..start + raw.len(), replacement));
+    }
+    let mut output = input.to_owned();
+    for (range, replacement) in edits.into_iter().rev() {
+        output.replace_range(range, &replacement);
+    }
+    Ok(output)
+}
+
+fn map_markdown_sources(
+    input: &str,
+    mut transform: impl FnMut(&str) -> String,
+) -> Result<String, NotebookError> {
+    rewrite_sources(input, |raw, source| {
         let (text, array) = match source {
             Source::Text(s) => (s, false),
             Source::Lines(v) => (v.concat(), true),
         };
         if text.is_empty() {
-            continue;
+            return None;
         }
-        let formatted = crate::format(&text, Some(config.clone()), None);
+        let formatted = transform(&text);
         if formatted == text {
-            continue;
+            return None;
         }
         let replacement = if array {
             let lines: Vec<_> = formatted.split_inclusive('\n').collect();
@@ -107,13 +155,6 @@ pub fn format_notebook(input: &str, config: &Config) -> Result<String, NotebookE
         } else {
             serde_json::to_string(&formatted).expect("string serialization")
         };
-        // RawValue borrows this precise slice from `input`; offsets remain UTF-8 boundaries.
-        let start = raw.as_ptr() as usize - input.as_ptr() as usize;
-        edits.push((start..start + raw.len(), replacement));
-    }
-    let mut output = input.to_owned();
-    for (range, replacement) in edits.into_iter().rev() {
-        output.replace_range(range, &replacement);
-    }
-    Ok(output)
+        Some(replacement)
+    })
 }

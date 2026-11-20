@@ -2,7 +2,11 @@
 
 The [smoke-test workflow](../workflows/smoke-test.yml) builds Panache and runs
 `scan.py` against the repositories in `repositories.toml`. The scanner checks
-tracked `.md`, `.qmd`, and `.Rmd` files for losslessness and idempotency.
+tracked `.md`, `.qmd`, `.Rmd`, and `.ipynb` files for losslessness and
+idempotency. For notebooks, it checks Markdown-cell parsing, preservation of the
+surrounding JSON, and idempotency of whole-notebook formatting. It saves
+notebook pass dumps only for failed checks because they can include large
+embedded outputs.
 
 Add a repository with GitHub's `owner/repo` shorthand or a full HTTPS clone URL:
 

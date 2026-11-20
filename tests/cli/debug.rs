@@ -18,6 +18,48 @@ fn test_debug_format_stdin_success() {
 }
 
 #[test]
+fn test_debug_format_notebook_dumps_container_passes() {
+    let temp_dir = TempDir::new().unwrap();
+    let file = temp_dir.path().join("example.ipynb");
+    let dumps = temp_dir.path().join("passes");
+    let input = r##"{"nbformat":4,"nbformat_minor":5,"cells":[{"cell_type":"markdown","source":["#   Title"],"attachments":{"a":{"text/plain":"keep"}}},{"cell_type":"code","source":"x=  1","outputs":[{"text":"keep"}]}]}"##;
+    fs::write(&file, input).unwrap();
+
+    cargo_bin_cmd!("panache")
+        .current_dir(temp_dir.path())
+        .args([
+            "debug",
+            "format",
+            "--dump-dir",
+            "passes",
+            "--dump-passes",
+            "example.ipynb",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("All checks passed"));
+
+    let read_pass = |suffix: &str| {
+        fs::read_to_string(dumps.join(format!("example.ipynb.{suffix}.txt"))).unwrap()
+    };
+    let formatted = input.replace("#   Title", r"# Title\n");
+    assert_eq!(read_pass("losslessness.parsed"), input);
+    assert_eq!(read_pass("idempotency.once"), formatted);
+    assert_eq!(read_pass("idempotency.twice"), formatted);
+    assert_eq!(fs::read_to_string(file).unwrap(), input);
+}
+
+#[test]
+fn test_debug_format_notebook_stdin_rejects_invalid_container() {
+    cargo_bin_cmd!("panache")
+        .args(["--stdin-filename", "example.ipynb", "debug", "format"])
+        .write_stdin("{}")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid notebook"));
+}
+
+#[test]
 fn test_debug_format_json_output() {
     cargo_bin_cmd!("panache")
         .args(["debug", "format", "--json"])
