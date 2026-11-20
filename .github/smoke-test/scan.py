@@ -182,6 +182,11 @@ def scan(
             files = git("ls-files", "-z", "--", *EXTENSIONS, cwd=repo_dir).split(b"\0")
             for file in filter(None, files):
                 rel_file = os.fsdecode(file)
+                path = Path(rel_file)
+                is_notebook = path.suffix == ".ipynb"
+                # JupyterLab can store plain-text cell exports under this name.
+                if is_notebook and ".virtual_documents" in path.parts[:-1]:
+                    continue
                 file_key = hashlib.sha256(
                     f"{repository.repo}:{rel_file}".encode()
                 ).hexdigest()
@@ -194,7 +199,7 @@ def scan(
                 ]
                 # Notebook dumps can include large embedded outputs. The CLI
                 # still writes the relevant passes when a notebook check fails.
-                if Path(rel_file).suffix != ".ipynb":
+                if not is_notebook:
                     dump_arguments.append("--dump-passes")
                 dump_arguments.extend(["--", rel_file])
                 config_arguments: list[str] = []

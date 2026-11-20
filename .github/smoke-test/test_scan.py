@@ -100,6 +100,13 @@ class ScanTests(unittest.TestCase):
         self.assertIn("--dump-dir", command)
         self.assertNotIn("--dump-passes", command)
 
+    def test_scan_skips_jupyterlab_virtual_notebooks(self) -> None:
+        rows = self.run_scan(
+            [], tracked_file="notebooks/.virtual_documents/Example.ipynb"
+        )
+        self.assertEqual(rows, [])
+        self.assertEqual(self.calls, [])
+
     def test_clone_retries_clean_partial_checkouts_and_resume_scan(self) -> None:
         with patch("time.sleep") as sleep:
             rows = self.run_scan([(0, "passed")], clone_codes=[128, 128, 0])
