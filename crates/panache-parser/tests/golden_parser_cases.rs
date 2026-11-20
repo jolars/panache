@@ -572,6 +572,7 @@ macro_rules! golden_test_cases {
 
 golden_test_cases!(
     jupyter_markdown,
+    jupyter_bare_uri_footnote_boundary,
     jupyter_math_block_precedence,
     jupyter_math_unmatched_blocks,
     jupyter_math_environment_blank_line,

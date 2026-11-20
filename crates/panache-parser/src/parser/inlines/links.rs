@@ -633,6 +633,10 @@ pub(super) fn try_parse_bare_uri_with_hugo(
     let bytes = text.as_bytes();
     while end < text.len() {
         let b = bytes[end];
+        // Leave footnote markers and their escaped spelling outside bare URIs.
+        if bytes[end..].starts_with(b"[^") || bytes[end..].starts_with(br"\[^") {
+            break;
+        }
         if hugo_shortcodes
             && b == b'{'
             && (bytes[end..].starts_with(b"{{<") || bytes[end..].starts_with(b"{{%"))

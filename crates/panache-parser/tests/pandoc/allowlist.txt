@@ -938,3 +938,6 @@
 # A loose definition keeps its content-indented pipe table instead of
 # losing its marker to caption lookahead (issue #576).
 607
+
+# A footnote marker can follow a URI scheme name in plain prose (issue #634).
+608
