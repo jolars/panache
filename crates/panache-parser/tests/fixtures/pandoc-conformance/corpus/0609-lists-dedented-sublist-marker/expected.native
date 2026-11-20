@@ -1,0 +1,7 @@
+[ BulletList
+    [ [ Plain [ Str "A" ]
+      , BulletList
+          [ [ Plain [ Str "B" ] ] , [ Plain [ Str "C" ] ] ]
+      ]
+    ]
+]

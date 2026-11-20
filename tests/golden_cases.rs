@@ -519,6 +519,7 @@ golden_test_cases!(
     blockquote_list_no_marker_closes_commonmark,
     empty_list_marker_blank_then_content_commonmark,
     empty_list_marker_blank_then_block_commonmark,
+    list_dedented_sublist_marker_commonmark,
     empty_list_marker_block_then_dedent_commonmark,
     empty_list_marker_block_then_indented_code_commonmark,
     empty_list_marker_empty_blockquote_commonmark,

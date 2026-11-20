@@ -1520,9 +1520,10 @@ pub(in crate::parser) struct BandFence {
     pub marker_matches: bool,
 }
 
-/// Locate the band fence for a marker at `indent_cols`, under pandoc's
-/// per-level `listStart` rule (verified against `pandoc -f markdown -t
-/// native`; see the `list_start` band pins in `tests/frame_pinning.rs`).
+/// Locate the list level where a dedented marker can start an item.
+/// CommonMark checks for a list marker relative to the enclosing item
+/// after matching its indentation. Pandoc applies its per-level `listStart`
+/// rule in the same indentation bands (see `tests/frame_pinning.rs`).
 ///
 /// Pandoc parses each nested list inside the enclosing item's content
 /// reparse, so within the innermost run of nested items — content
@@ -1533,8 +1534,7 @@ pub(in crate::parser) struct BandFence {
 /// level `j`'s own continuation gobble can't reach it, and `listStart`
 /// fires in level `j`'s frame. Past the tolerance it is a lazy
 /// continuation, and at or past `c_n` it is nested content; both
-/// return `None`, as does any marker under a dialect other than
-/// Pandoc — this is pandoc's raw-collection model, not CommonMark's.
+/// return `None`.
 ///
 /// The walk stops at the containers that break a list section
 /// (mirroring `ContainerPrefix::from_stack`'s ladder): their content
@@ -1545,9 +1545,6 @@ pub(in crate::parser) fn band_fence_level(
     indent_cols: usize,
     dialect: crate::Dialect,
 ) -> Option<BandFence> {
-    if dialect != crate::Dialect::Pandoc {
-        return None;
-    }
     let mut levels: SmallVec<[(usize, usize); 4]> = SmallVec::new();
     let mut open_item_col: Option<usize> = None;
     for (i, c) in containers.stack.iter().enumerate().rev() {

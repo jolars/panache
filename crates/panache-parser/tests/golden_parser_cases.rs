@@ -814,6 +814,7 @@ golden_test_cases!(
     emphasis_skips_shortcut_reference_link,
     emphasis_underscore_run_5_commonmark,
     empty_list_marker_blank_then_block_commonmark,
+    list_dedented_sublist_marker_commonmark,
     empty_list_marker_blank_then_content_commonmark,
     empty_list_marker_blank_then_content_pandoc,
     empty_list_marker_block_then_dedent_commonmark,

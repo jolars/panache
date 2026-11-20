@@ -941,3 +941,6 @@
 
 # A footnote marker can follow a URI scheme name in plain prose (issue #634).
 608
+
+# A dedented marker can continue a nested list at a different indent (issue #635).
+609
