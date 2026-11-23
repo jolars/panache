@@ -2284,6 +2284,51 @@ fn lint_cli_selection_applies_to_explicit_quarto_manifests() {
 }
 
 #[test]
+fn jarl_discovers_config_from_the_document_path() {
+    let Ok(jarl) = which::which("jarl") else {
+        return;
+    };
+    let help = std::process::Command::new(jarl)
+        .args(["check", "--help"])
+        .output()
+        .unwrap();
+    if !String::from_utf8_lossy(&help.stdout).contains("--stdin-file-path") {
+        return;
+    }
+
+    let project = TempDir::new().unwrap();
+    let caller = TempDir::new().unwrap();
+    let nested = project.path().join("notebooks");
+    fs::create_dir(&nested).unwrap();
+    fs::write(
+        project.path().join("panache.toml"),
+        "flavor = \"quarto\"\n[lint]\nselect = []\n[linters]\nr = \"jarl\"\n",
+    )
+    .unwrap();
+    let document = nested.join("doc.qmd");
+    fs::write(&document, "```{r}\na <<- 1\n```\n").unwrap();
+    let run = || {
+        let mut command = cargo_bin_cmd!("panache");
+        command
+            .current_dir(caller.path())
+            .args(["lint", "--no-cache"])
+            .arg(&document);
+        command
+    };
+
+    run()
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("undesirable_operator"));
+    fs::write(
+        project.path().join("jarl.toml"),
+        "[lint.undesirable_operator]\noperators = [\"->>\"]\n",
+    )
+    .unwrap();
+    run().assert().success();
+}
+
+#[test]
 fn ruff_project_config_changes_refresh_cached_diagnostics() {
     if which::which("ruff").is_err() {
         return;

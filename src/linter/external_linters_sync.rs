@@ -3,7 +3,7 @@
 //! This module provides blocking versions of external linter functions for use in
 //! the CLI without requiring a tokio runtime.
 
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 use crate::linter::diagnostics::Diagnostic;
@@ -86,31 +86,60 @@ fn run_linter_in_document(
     } else {
         command.to_path_buf()
     };
-    let mut cmd = Command::new(command);
-    cmd.args(linter_info.args.iter().map(|arg| arg.as_ref()));
-    crate::linter::external_linters::append_language_specific_args(&mut cmd, linter_name, language);
-    if (linter_name.eq_ignore_ascii_case("eslint") || linter_name.eq_ignore_ascii_case("clippy"))
-        && let Some(parent) = temp_path.parent()
-    {
-        cmd.current_dir(parent);
-    }
-    if !matches!(linter_name, "eslint" | "clippy")
-        && let Some(parent) = document_path.and_then(std::path::Path::parent)
-        && !parent.as_os_str().is_empty()
-    {
-        cmd.current_dir(parent);
-    }
-    cmd.arg(&temp_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    let working_dir = if matches!(linter_name, "eslint" | "clippy") {
+        temp_path.parent()
+    } else {
+        document_path.and_then(std::path::Path::parent)
+    };
+    let make_command = || {
+        let mut cmd = Command::new(&command);
+        cmd.args(linter_info.args.iter().map(|arg| arg.as_ref()));
+        crate::linter::external_linters::append_language_specific_args(
+            &mut cmd,
+            linter_name,
+            language,
+        );
+        if let Some(directory) = working_dir.filter(|path| !path.as_os_str().is_empty()) {
+            cmd.current_dir(directory);
+        }
+        cmd
+    };
 
     // Execute with timeout (manual timeout implementation)
     let start = Instant::now();
     let timeout = Duration::from_secs(30);
 
-    let output = cmd
-        .output()
-        .map_err(|e| LinterError::SpawnFailed(format!("{}: {}", linter_info.command, e)))?;
+    let run = |cmd: &mut Command| {
+        cmd.output()
+            .map_err(|e| LinterError::SpawnFailed(format!("{}: {}", linter_info.command, e)))
+    };
+    let output = if linter_name == "jarl"
+        && let Some(document_path) = document_path
+    {
+        // Jarl discovers configuration from the input path. Give stdin a
+        // virtual R filename next to the document so Jarl recognizes the input.
+        let path = std::path::absolute(document_path)?;
+        let mut r_path = path.into_os_string();
+        r_path.push(".R");
+        let output = run(make_command()
+            .arg("--stdin-file-path")
+            .arg(r_path)
+            .stdin(std::fs::File::open(&temp_path)?))?;
+        if output.status.code() == Some(2)
+            && String::from_utf8_lossy(&output.stderr)
+                .contains("unexpected argument '--stdin-file-path'")
+        {
+            // Older Jarl releases only accept files.
+            run(make_command().arg(&temp_path))?
+        } else if output.status.success() && output.stdout.is_empty() && output.stderr.is_empty() {
+            // Jarl can return an empty successful response for excluded paths.
+            return Ok(Vec::new());
+        } else {
+            output
+        }
+    } else {
+        run(make_command().arg(&temp_path))?
+    };
 
     if start.elapsed() > timeout {
         return Err(LinterError::Timeout);
