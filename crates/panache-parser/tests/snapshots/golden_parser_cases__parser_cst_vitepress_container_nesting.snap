@@ -1,0 +1,240 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..613
+  VITEPRESS_CONTAINER@0..125
+    VITEPRESS_CONTAINER_OPEN@0..17
+      VITEPRESS_CONTAINER_FENCE@0..5 ":::::"
+      WHITESPACE@5..6 " "
+      VITEPRESS_CONTAINER_TYPE@6..10 "info"
+      WHITESPACE@10..11 " "
+      VITEPRESS_CONTAINER_TITLE@11..16 "Outer"
+      NEWLINE@16..17 "\n"
+    PARAGRAPH@17..53
+      TEXT@17..31 "This paragraph"
+      NEWLINE@31..32 "\n"
+      TEXT@32..52 "has two short lines."
+      NEWLINE@52..53 "\n"
+    BLANK_LINE@53..54
+      BLANK_LINE@53..54 "\n"
+    VITEPRESS_CONTAINER@54..88
+      VITEPRESS_CONTAINER_OPEN@54..62
+        VITEPRESS_CONTAINER_FENCE@54..57 ":::"
+        WHITESPACE@57..58 " "
+        VITEPRESS_CONTAINER_TYPE@58..61 "tip"
+        NEWLINE@61..62 "\n"
+      PARAGRAPH@62..84
+        TEXT@62..71 "This is a"
+        NEWLINE@71..72 "\n"
+        TEXT@72..83 "nested tip."
+        NEWLINE@83..84 "\n"
+      VITEPRESS_CONTAINER_CLOSE@84..88
+        VITEPRESS_CONTAINER_FENCE@84..87 ":::"
+        NEWLINE@87..88 "\n"
+    BLANK_LINE@88..89
+      BLANK_LINE@88..89 "\n"
+    PARAGRAPH@89..118
+      TEXT@89..112 "A short run is literal:"
+      NEWLINE@112..113 "\n"
+      TEXT@113..117 "::::"
+      NEWLINE@117..118 "\n"
+    BLANK_LINE@118..119
+      BLANK_LINE@118..119 "\n"
+    VITEPRESS_CONTAINER_CLOSE@119..125
+      VITEPRESS_CONTAINER_FENCE@119..124 ":::::"
+      NEWLINE@124..125 "\n"
+  BLANK_LINE@125..126
+    BLANK_LINE@125..126 "\n"
+  LIST@126..197
+    LIST_ITEM@126..197
+      LIST_MARKER@126..127 "-"
+      WHITESPACE@127..128 " "
+      VITEPRESS_CONTAINER@128..197
+        VITEPRESS_CONTAINER_OPEN@128..150
+          VITEPRESS_CONTAINER_FENCE@128..131 ":::"
+          WHITESPACE@131..132 " "
+          VITEPRESS_CONTAINER_TYPE@132..139 "warning"
+          WHITESPACE@139..140 " "
+          VITEPRESS_CONTAINER_TITLE@140..149 "In a list"
+          NEWLINE@149..150 "\n"
+        PARAGRAPH@150..191
+          TEXT@150..170 "  Keep the container"
+          NEWLINE@170..171 "\n"
+          TEXT@171..190 "  in the list item."
+          NEWLINE@190..191 "\n"
+        VITEPRESS_CONTAINER_CLOSE@191..197
+          LINE_PREFIX@191..193 "  "
+          VITEPRESS_CONTAINER_FENCE@193..196 ":::"
+          NEWLINE@196..197 "\n"
+  BLANK_LINE@197..198
+    BLANK_LINE@197..198 "\n"
+  BLOCK_QUOTE@198..282
+    BLOCK_QUOTE_MARKER@198..199 ">"
+    WHITESPACE@199..200 " "
+    VITEPRESS_CONTAINER@200..282
+      VITEPRESS_CONTAINER_OPEN@200..221
+        VITEPRESS_CONTAINER_FENCE@200..204 "::::"
+        WHITESPACE@204..205 " "
+        VITEPRESS_CONTAINER_TYPE@205..209 "info"
+        WHITESPACE@209..210 " "
+        VITEPRESS_CONTAINER_TITLE@210..220 "In a quote"
+        NEWLINE@220..221 "\n"
+      BLOCK_QUOTE_MARKER@221..222 ">"
+      WHITESPACE@222..223 " "
+      VITEPRESS_CONTAINER@223..275
+        VITEPRESS_CONTAINER_OPEN@223..242
+          VITEPRESS_CONTAINER_FENCE@223..226 ":::"
+          WHITESPACE@226..227 " "
+          VITEPRESS_CONTAINER_TYPE@227..234 "details"
+          WHITESPACE@234..235 " "
+          VITEPRESS_CONTAINER_TITLE@235..241 "Inside"
+          NEWLINE@241..242 "\n"
+        BLOCK_QUOTE_MARKER@242..243 ">"
+        WHITESPACE@243..244 " "
+        PARAGRAPH@244..269
+          TEXT@244..260 "Details continue"
+          NEWLINE@260..261 "\n"
+          LINE_PREFIX@261..262 ">"
+          LINE_PREFIX@262..263 " "
+          TEXT@263..268 "here."
+          NEWLINE@268..269 "\n"
+        VITEPRESS_CONTAINER_CLOSE@269..275
+          LINE_PREFIX@269..270 ">"
+          LINE_PREFIX@270..271 " "
+          VITEPRESS_CONTAINER_FENCE@271..274 ":::"
+          NEWLINE@274..275 "\n"
+      VITEPRESS_CONTAINER_CLOSE@275..282
+        LINE_PREFIX@275..276 ">"
+        LINE_PREFIX@276..277 " "
+        VITEPRESS_CONTAINER_FENCE@277..281 "::::"
+        NEWLINE@281..282 "\n"
+  BLANK_LINE@282..283
+    BLANK_LINE@282..283 "\n"
+  LIST@283..373
+    LIST_ITEM@283..354
+      LIST_MARKER@283..284 "-"
+      WHITESPACE@284..285 " "
+      BLOCK_QUOTE@285..354
+        BLOCK_QUOTE_MARKER@285..286 ">"
+        WHITESPACE@286..287 " "
+        VITEPRESS_CONTAINER@287..354
+          VITEPRESS_CONTAINER_OPEN@287..318
+            VITEPRESS_CONTAINER_FENCE@287..290 ":::"
+            WHITESPACE@290..291 " "
+            VITEPRESS_CONTAINER_TYPE@291..295 "info"
+            WHITESPACE@295..296 " "
+            VITEPRESS_CONTAINER_TITLE@296..317 "In a quoted list item"
+            NEWLINE@317..318 "\n"
+          WHITESPACE@318..320 "  "
+          BLOCK_QUOTE_MARKER@320..321 ">"
+          WHITESPACE@321..322 " "
+          PARAGRAPH@322..346
+            TEXT@322..330 "A quoted"
+            NEWLINE@330..331 "\n"
+            LINE_PREFIX@331..333 "  "
+            LINE_PREFIX@333..334 ">"
+            LINE_PREFIX@334..335 " "
+            TEXT@335..345 "paragraph."
+            NEWLINE@345..346 "\n"
+          VITEPRESS_CONTAINER_CLOSE@346..354
+            LINE_PREFIX@346..348 "  "
+            LINE_PREFIX@348..349 ">"
+            LINE_PREFIX@349..350 " "
+            VITEPRESS_CONTAINER_FENCE@350..353 ":::"
+            NEWLINE@353..354 "\n"
+    LIST_ITEM@354..373
+      LIST_MARKER@354..355 "-"
+      WHITESPACE@355..356 " "
+      PLAIN@356..373
+        TEXT@356..372 "A tight sibling."
+        NEWLINE@372..373 "\n"
+  BLANK_LINE@373..374
+    BLANK_LINE@373..374 "\n"
+  BLOCK_QUOTE@374..466
+    BLOCK_QUOTE_MARKER@374..375 ">"
+    WHITESPACE@375..376 " "
+    VITEPRESS_CONTAINER@376..466
+      VITEPRESS_CONTAINER_OPEN@376..420
+        VITEPRESS_CONTAINER_FENCE@376..379 ":::"
+        WHITESPACE@379..380 " "
+        VITEPRESS_CONTAINER_TYPE@380..384 "info"
+        WHITESPACE@384..385 " "
+        VITEPRESS_CONTAINER_TITLE@385..419 "Keep literal quote ma ..."
+        NEWLINE@419..420 "\n"
+      BLOCK_QUOTE_MARKER@420..421 ">"
+      WHITESPACE@421..422 " "
+      CODE_BLOCK@422..460
+        CODE_FENCE_OPEN@422..430
+          CODE_FENCE_MARKER@422..425 "```"
+          CODE_INFO@425..429
+            CODE_LANGUAGE@425..429 "text"
+          NEWLINE@429..430 "\n"
+        CODE_CONTENT@430..454
+          LINE_PREFIX@430..431 ">"
+          LINE_PREFIX@431..432 " "
+          TEXT@432..453 "> quoted-looking code"
+          NEWLINE@453..454 "\n"
+        LINE_PREFIX@454..455 ">"
+        LINE_PREFIX@455..456 " "
+        CODE_FENCE_CLOSE@456..460
+          CODE_FENCE_MARKER@456..459 "```"
+          NEWLINE@459..460 "\n"
+      VITEPRESS_CONTAINER_CLOSE@460..466
+        LINE_PREFIX@460..461 ">"
+        LINE_PREFIX@461..462 " "
+        VITEPRESS_CONTAINER_FENCE@462..465 ":::"
+        NEWLINE@465..466 "\n"
+  BLANK_LINE@466..467
+    BLANK_LINE@466..467 "\n"
+  LIST@467..591
+    LIST_ITEM@467..591
+      LIST_MARKER@467..468 "-"
+      WHITESPACE@468..469 " "
+      PLAIN@469..502
+        TEXT@469..501 "Before a continuation ..."
+        NEWLINE@501..502 "\n"
+      VITEPRESS_CONTAINER@502..591
+        VITEPRESS_CONTAINER_OPEN@502..537
+          LINE_PREFIX@502..504 "  "
+          VITEPRESS_CONTAINER_FENCE@504..507 ":::"
+          WHITESPACE@507..508 " "
+          VITEPRESS_CONTAINER_TYPE@508..515 "warning"
+          WHITESPACE@515..516 " "
+          VITEPRESS_CONTAINER_TITLE@516..536 "Inside the same item"
+          NEWLINE@536..537 "\n"
+        CODE_BLOCK@537..585
+          LINE_PREFIX@537..539 "  "
+          CODE_FENCE_OPEN@539..547
+            CODE_FENCE_MARKER@539..542 "```"
+            CODE_INFO@542..546
+              CODE_LANGUAGE@542..546 "text"
+            NEWLINE@546..547 "\n"
+          CODE_CONTENT@547..579
+            LINE_PREFIX@547..549 "  "
+            TEXT@549..578 "Fenced code in the li ..."
+            NEWLINE@578..579 "\n"
+          LINE_PREFIX@579..581 "  "
+          CODE_FENCE_CLOSE@581..585
+            CODE_FENCE_MARKER@581..584 "```"
+            NEWLINE@584..585 "\n"
+        VITEPRESS_CONTAINER_CLOSE@585..591
+          LINE_PREFIX@585..587 "  "
+          VITEPRESS_CONTAINER_FENCE@587..590 ":::"
+          NEWLINE@590..591 "\n"
+  BLANK_LINE@591..592
+    BLANK_LINE@591..592 "\n"
+  VITEPRESS_CONTAINER@592..613
+    VITEPRESS_CONTAINER_OPEN@592..601
+      VITEPRESS_CONTAINER_FENCE@592..595 ":::"
+      WHITESPACE@595..596 " "
+      VITEPRESS_CONTAINER_TYPE@596..600 "info"
+      NEWLINE@600..601 "\n"
+    CODE_BLOCK@601..609
+      CODE_CONTENT@601..609
+        WHITESPACE@601..605 "    "
+        TEXT@605..608 ":::"
+        NEWLINE@608..609 "\n"
+    VITEPRESS_CONTAINER_CLOSE@609..613
+      VITEPRESS_CONTAINER_FENCE@609..612 ":::"
+      NEWLINE@612..613 "\n"

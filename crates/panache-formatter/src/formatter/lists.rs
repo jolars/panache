@@ -639,9 +639,14 @@ impl Formatter {
         });
         let has_blockquote_children = list_children.iter().any(|child| {
             child.kind() == SyntaxKind::LIST_ITEM
-                && child
-                    .children()
-                    .any(|item_child| matches!(item_child.kind(), SyntaxKind::BLOCK_QUOTE))
+                && child.children().any(|item_child| {
+                    item_child.kind() == SyntaxKind::BLOCK_QUOTE
+                        // Keep tight lists around quoted VitePress containers.
+                        && (!self.config.parser_extensions.vitepress_containers
+                            || !item_child
+                                .descendants()
+                                .any(|node| node.kind() == SyntaxKind::VITEPRESS_CONTAINER))
+                })
         });
         let has_blank_within_item = list_children.iter().any(|child| {
             if child.kind() != SyntaxKind::LIST_ITEM {
@@ -1065,6 +1070,10 @@ impl Formatter {
             && matches!(
                 leading_block.kind(),
                 SyntaxKind::FENCED_DIV
+                    | SyntaxKind::VITEPRESS_CONTAINER
+                    | SyntaxKind::ALERT
+                    | SyntaxKind::VITEPRESS_SNIPPET
+                    | SyntaxKind::VITEPRESS_TOC
                     | SyntaxKind::HUGO_SHORTCODE_BLOCK
                     | SyntaxKind::CODE_BLOCK
                     | SyntaxKind::LINE_BLOCK
@@ -1082,7 +1091,11 @@ impl Formatter {
                 self.output.push(' ');
             }
             let block_start = self.output.len();
-            if leading_block.kind() == SyntaxKind::CODE_BLOCK {
+            if leading_block.kind() == SyntaxKind::CODE_BLOCK
+                && super::code_blocks::preserve_vitepress_fence(leading_block)
+            {
+                self.format_container_code_block(leading_block, "", hanging, true, None, true);
+            } else if leading_block.kind() == SyntaxKind::CODE_BLOCK {
                 let raw = self.format_code_block_to_string(leading_block);
                 let raw = raw.strip_suffix('\n').unwrap_or(&raw);
                 let block_lines: Vec<&str> = raw.split('\n').collect();

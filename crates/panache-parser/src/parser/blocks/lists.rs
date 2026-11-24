@@ -1078,7 +1078,7 @@ mod tests {
             base_indent_cols: 0,
             has_blank_between_items: false,
         });
-        stack.stack.push(Container::BlockQuote {});
+        stack.stack.push(Container::BlockQuote { start_line: None });
         assert_eq!(open_list_hint_at_indent(&stack, 0), OpenListHint::None);
     }
 }
@@ -1905,7 +1905,7 @@ fn finish_list_item_with_optional_nested(
                 }
                 None => after_marker,
             };
-            containers.push(Container::BlockQuote {});
+            containers.push(Container::BlockQuote { start_line: None });
         }
 
         let trimmed = trim_end_newlines(remaining);

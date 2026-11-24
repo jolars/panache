@@ -31,8 +31,9 @@ pub(crate) fn prepare_rename(
     }
 
     let root = ctx.syntax_root();
+    let flavor = ctx.salsa_config.config(snap.db()).flavor;
     let range = helpers::example_label_range_at_offset(&root, offset)
-        .or_else(|| helpers::find_symbol_text_range_at_offset(&root, offset));
+        .or_else(|| helpers::find_symbol_text_range_at_offset(&root, offset, flavor));
     let Some(range) = range else {
         log::debug!(
             "prepare_rename: no symbol range uri={:?} line={} char={} offset={}",

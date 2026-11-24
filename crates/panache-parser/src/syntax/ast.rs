@@ -16,6 +16,13 @@ pub(super) fn raw_text(node: &SyntaxNode) -> String {
 }
 
 pub(super) fn visible_text_tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
+    visible_text_tokens_excluding(node, |_| false)
+}
+
+pub(super) fn visible_text_tokens_excluding(
+    node: &SyntaxNode,
+    exclude: impl Fn(SyntaxKind) -> bool,
+) -> impl Iterator<Item = SyntaxToken> {
     let mut walk = node.preorder_with_tokens();
     std::iter::from_fn(move || {
         loop {
@@ -24,7 +31,7 @@ pub(super) fn visible_text_tokens(node: &SyntaxNode) -> impl Iterator<Item = Syn
                     if matches!(
                         node.kind(),
                         SyntaxKind::HTML_ATTRS | SyntaxKind::INLINE_HTML
-                    ) =>
+                    ) || exclude(node.kind()) =>
                 {
                     walk.skip_subtree();
                 }

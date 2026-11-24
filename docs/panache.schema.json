@@ -82,7 +82,8 @@
         "multimarkdown",
         "mdsvex",
         "myst",
-        "hugo"
+        "hugo",
+        "vitepress"
       ],
       "type": "string"
     },
@@ -755,6 +756,7 @@
                 "tex-math-jupyter",
                 "tex-math-single-backslash",
                 "toml-metadata-block",
+                "vitepress-containers",
                 "wikilinks-title-after-pipe",
                 "wikilinks-title-before-pipe",
                 "yaml-metadata-block"
@@ -866,6 +868,8 @@
           "tex-math-jupyter",
           "tex-math-single-backslash",
           "toml-metadata-block",
+          "vitepress",
+          "vitepress-containers",
           "wikilinks-title-after-pipe",
           "wikilinks-title-before-pipe",
           "yaml-metadata-block"
@@ -919,7 +923,8 @@
           "multi-markdown",
           "mdsvex",
           "myst",
-          "hugo"
+          "hugo",
+          "vitepress"
         ]
       },
       "type": "object"

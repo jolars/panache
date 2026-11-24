@@ -9,7 +9,61 @@
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
-use crate::parser::utils::helpers::strip_newline;
+use super::{container_prefix::StrippedLines, vitepress_containers::frame_indent};
+use crate::parser::utils::helpers::{is_blank_line, strip_newline};
+
+pub(crate) fn vitepress_indented_code_start(lines: &StrippedLines<'_, '_>) -> bool {
+    let tail = lines.first_unconditional();
+    let raw = lines.raw_at(0);
+    !is_blank_line(tail) && frame_indent(tail, &raw[..raw.len() - tail.len()]).0 >= 4
+}
+
+pub(crate) fn parse_vitepress_indented_code(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &StrippedLines<'_, '_>,
+) -> usize {
+    let start = lines.pos();
+    let prefix = lines.prefix();
+    let mut end = start + 1;
+    for index in start + 1..lines.raw().len() {
+        let raw = lines.raw()[index];
+        let tail = lines.peek_prefix_at(index);
+        let consumed = &raw[..raw.len() - tail.len()];
+        if consumed.bytes().filter(|&byte| byte == b'>').count() < prefix.bq_depth() {
+            break;
+        }
+        if is_blank_line(tail) {
+            continue;
+        }
+        if !prefix.resolve(raw).reaches_frame() || frame_indent(tail, consumed).0 < 4 {
+            break;
+        }
+        end = index + 1;
+    }
+
+    builder.start_node(SyntaxKind::CODE_BLOCK.into());
+    builder.start_node(SyntaxKind::CODE_CONTENT.into());
+    for index in start..end {
+        let line = lines.emit_or_dispatch_tail(builder, index);
+        let (content, newline) = strip_newline(line);
+        let text = content.trim_start_matches([' ', '\t']);
+        if content.len() > text.len() {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &content[..content.len() - text.len()],
+            );
+        }
+        if !text.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), text);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+    }
+    builder.finish_node();
+    builder.finish_node();
+    end - start
+}
 
 /// Check if a line is indented enough to be part of an indented code block.
 /// Returns true if the leading whitespace expands to at least 4 columns

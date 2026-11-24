@@ -1,8 +1,90 @@
 //! Heading AST node wrappers.
 
-use super::ast::support;
-use super::{AstNode, PanacheLanguage, SyntaxKind, SyntaxNode};
+use std::collections::HashSet;
+use std::sync::LazyLock;
+use unicode_general_category::{GeneralCategory, get_general_category};
 
+use super::ast::support;
+use super::{AstNode, AttributeValue, CodeSpan, PanacheLanguage, SyntaxKind, SyntaxNode};
+use crate::parser::utils::attributes::decode_html_attr_entities;
+
+static VITEPRESS_EMOJI_ALIASES: LazyLock<HashSet<&str>> = LazyLock::new(|| {
+    include_str!("vitepress-emoji-aliases.txt")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .flat_map(str::split_whitespace)
+        .collect()
+});
+
+// Shortcuts from markdown-it-emoji 3.0.0 lib/data/shortcuts.mjs.
+// The alias data and shortcuts share the same license.
+const VITEPRESS_EMOJI_SHORTCUTS: &[&str] = &[
+    ">:-(", ">:(", ":-\"", ":\"", "</3", "<\\3", ":-/", ":/", ":'-(", ":'(", ":,-(", ":,(", ":-(",
+    ":(", "<3", "]:-(", "]:(", "o:-)", "o:)", "O:-)", "O:)", "0:-)", "0:)", ":'-)", ":')", ":,-)",
+    ":,)", ":'-D", ":'D", ":,-D", ":,D", ":-*", ":*", "x-)", "X-)", ":-|", ":|", ":-o", ":o",
+    ":-O", ":O", ":-@", ":@", ":-D", ":D", ":-)", ":)", "]:-)", "]:)", ":,'-(", ":,'(", ";-(",
+    ";(", ":-P", ":P", "8-)", "B-)", ",:-(", ",:(", ",:-)", ",:)", ":-S", ":s", ":-Z", ":z", ":-$",
+    ":$", ";-)", ";)",
+];
+
+fn vitepress_shortcut_boundary(ch: char) -> bool {
+    use GeneralCategory::*;
+    matches!(
+        get_general_category(ch),
+        SpaceSeparator
+            | LineSeparator
+            | ParagraphSeparator
+            | Control
+            | ConnectorPunctuation
+            | DashPunctuation
+            | OpenPunctuation
+            | ClosePunctuation
+            | InitialPunctuation
+            | FinalPunctuation
+            | OtherPunctuation
+    )
+}
+
+fn vitepress_emoji_len(text: &str, offset: usize, ch: char) -> Option<usize> {
+    if !matches!(
+        ch,
+        ':' | '>' | '<' | ']' | 'o' | 'O' | '0' | 'x' | 'X' | ';' | '8' | 'B' | ','
+    ) {
+        return None;
+    }
+    let rest = &text[offset..];
+    if ch == ':'
+        && let Some((alias, _)) = rest[1..].split_once(':')
+        && VITEPRESS_EMOJI_ALIASES.contains(alias)
+    {
+        return Some(alias.len() + 2);
+    }
+    VITEPRESS_EMOJI_SHORTCUTS
+        .iter()
+        .filter(|shortcut| shortcut.starts_with(ch) && rest.starts_with(**shortcut))
+        .map(|shortcut| shortcut.len())
+        .max()
+        .filter(|len| {
+            text[..offset]
+                .chars()
+                .next_back()
+                .is_none_or(vitepress_shortcut_boundary)
+                && rest[*len..]
+                    .chars()
+                    .next()
+                    .is_none_or(vitepress_shortcut_boundary)
+        })
+}
+
+fn append_vitepress_text(out: &mut String, raw: &str, standalone: bool) {
+    // VitePress restores the source spelling of entities when it joins
+    // adjacent text tokens. A single entity retains its decoded value.
+    if standalone && raw.starts_with('&') && raw.find(';') == raw.len().checked_sub(1) {
+        out.push_str(&decode_html_attr_entities(raw));
+    } else {
+        out.push_str(raw);
+    }
+}
 pub struct Heading(SyntaxNode);
 
 impl AstNode for Heading {
@@ -23,6 +105,49 @@ impl AstNode for Heading {
     fn syntax(&self) -> &SyntaxNode {
         &self.0
     }
+}
+
+// VitePress linkifies an explicit web URL before applying attributes.
+// When the URL ends at its authority, an adjacent attribute block is left
+// outside that URL and attaches to the generated link.
+fn ends_in_vitepress_linkified_authority(text: &str) -> bool {
+    let Some(url) = text
+        .rsplit(|ch: char| ch.is_whitespace() || matches!(ch, '(' | '[' | '<' | '"' | '\''))
+        .next()
+    else {
+        return false;
+    };
+    let Some((scheme, authority)) = url.split_once("://") else {
+        return false;
+    };
+    if !["http", "https", "ftp"]
+        .iter()
+        .any(|name| scheme.eq_ignore_ascii_case(name))
+    {
+        return false;
+    }
+    let authority = if let Some((auth, host)) = authority.split_once('@') {
+        if auth.is_empty() || auth.contains(['/', '[', ']', '(', ')']) {
+            return false;
+        }
+        host
+    } else {
+        authority
+    };
+    let host = if let Some((host, port)) = authority.rsplit_once(':') {
+        if port.parse::<u16>().is_err() {
+            return false;
+        }
+        host
+    } else {
+        authority
+    };
+    host.split('.').all(|label| {
+        !label.is_empty()
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label.chars().all(|ch| ch.is_alphanumeric() || ch == '-')
+    })
 }
 
 impl Heading {
@@ -56,6 +181,40 @@ impl Heading {
     /// Returns the heading content node if present.
     pub fn content(&self) -> Option<HeadingContent> {
         support::child(&self.0)
+    }
+
+    /// VitePress attaches an adjacent attribute block to the preceding inline
+    /// element. A whitespace-separated block belongs to the heading.
+    pub fn vitepress_attributes_attach_inline(&self) -> bool {
+        let Some(attrs) = self.attributes() else {
+            return false;
+        };
+        let Some(content) = self.content() else {
+            return false;
+        };
+        attrs.syntax().text_range().start() == content.syntax().text_range().end()
+            && content.syntax().last_child_or_token().is_some_and(|last| {
+                matches!(
+                    last.kind(),
+                    SyntaxKind::LINK
+                        | SyntaxKind::IMAGE_LINK
+                        | SyntaxKind::AUTO_LINK
+                        | SyntaxKind::INLINE_CODE
+                        | SyntaxKind::EMPHASIS
+                        | SyntaxKind::STRONG
+                        | SyntaxKind::STRIKEOUT
+                ) || (last.kind() == SyntaxKind::TEXT
+                    && ends_in_vitepress_linkified_authority(&super::ast::raw_text(
+                        content.syntax(),
+                    )))
+            })
+    }
+
+    pub fn vitepress_explicit_id(&self) -> Option<AttributeValue> {
+        if self.vitepress_attributes_attach_inline() {
+            return None;
+        }
+        self.attributes().and_then(|attrs| attrs.vitepress_id())
     }
 
     /// Returns the heading text as a string.
@@ -135,6 +294,115 @@ impl HeadingContent {
             })
             .map(|token| token.text().to_string())
             .collect()
+    }
+
+    /// Text and code from which VitePress derives the heading's identifier.
+    pub fn vitepress_anchor_text(&self, emoji: bool) -> String {
+        let mut text = String::new();
+        let mut after_break = false;
+        let tokens = super::ast::visible_text_tokens_excluding(&self.0, |kind| {
+            matches!(
+                kind,
+                SyntaxKind::IMAGE_LINK
+                    | SyntaxKind::LINK_DEST
+                    | SyntaxKind::LINK_REF
+                    | SyntaxKind::ATTRIBUTE
+            )
+        });
+        for token in tokens {
+            match token.kind() {
+                SyntaxKind::TEXT
+                    if token
+                        .parent()
+                        .is_none_or(|node| node.kind() != SyntaxKind::LINK) =>
+                {
+                    let prev = token.prev_sibling_or_token();
+                    let next = token.next_sibling_or_token();
+                    let mut raw = token.text();
+                    if after_break {
+                        raw = raw.trim_start_matches([' ', '\t']);
+                    }
+                    if next
+                        .as_ref()
+                        .is_some_and(|el| el.kind() == SyntaxKind::NEWLINE)
+                        || (next.is_none() && token.parent().as_ref() == Some(&self.0))
+                    {
+                        raw = raw.trim_end_matches([' ', '\t']);
+                    }
+                    after_break = false;
+
+                    let adjacent_text = |neighbor: Option<super::SyntaxElement>| {
+                        neighbor.is_some_and(|el| {
+                            matches!(el.kind(), SyntaxKind::TEXT | SyntaxKind::ESCAPED_CHAR)
+                        })
+                    };
+                    let joins_previous = adjacent_text(prev);
+                    let joins_next = adjacent_text(next);
+                    let mut start = 0;
+                    if emoji {
+                        for (offset, ch) in raw.char_indices() {
+                            if offset >= start
+                                && let Some(len) = vitepress_emoji_len(raw, offset, ch)
+                            {
+                                append_vitepress_text(
+                                    &mut text,
+                                    &raw[start..offset],
+                                    start > 0 || !joins_previous,
+                                );
+                                start = offset + len;
+                            }
+                        }
+                    }
+                    append_vitepress_text(
+                        &mut text,
+                        &raw[start..],
+                        (start > 0 || !joins_previous) && !joins_next,
+                    );
+                }
+                SyntaxKind::INLINE_CODE_MARKER => {
+                    if let Some(span) = token.parent().and_then(CodeSpan::cast)
+                        && span
+                            .content_range()
+                            .is_some_and(|range| range.start() == token.text_range().end())
+                    {
+                        after_break = false;
+                        let code = span
+                            .content()
+                            .replace("\r\n", " ")
+                            .replace(['\n', '\r'], " ");
+                        // CommonMark removes one space from each end unless the
+                        // span consists entirely of spaces.
+                        let content = if code.starts_with(' ')
+                            && code.ends_with(' ')
+                            && code.bytes().any(|byte| byte != b' ')
+                        {
+                            &code[1..code.len() - 1]
+                        } else {
+                            &code
+                        };
+                        text.push_str(content);
+                    }
+                }
+                SyntaxKind::ESCAPED_CHAR => {
+                    after_break = false;
+                    let escaped = token.text().strip_prefix('\\').unwrap_or(token.text());
+                    let joined_ampersand = escaped == "&"
+                        && [token.prev_sibling_or_token(), token.next_sibling_or_token()]
+                            .into_iter()
+                            .flatten()
+                            .any(|neighbor| {
+                                matches!(
+                                    neighbor.kind(),
+                                    SyntaxKind::TEXT | SyntaxKind::ESCAPED_CHAR
+                                )
+                            });
+                    text.push_str(if joined_ampersand { "&amp;" } else { escaped });
+                }
+                SyntaxKind::NEWLINE | SyntaxKind::HARD_LINE_BREAK => after_break = true,
+                _ => {}
+            }
+        }
+        text
     }
 }
 

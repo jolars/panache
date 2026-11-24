@@ -18,6 +18,7 @@ fn parse_flavor(value: &str) -> Option<Flavor> {
         "multimarkdown" | "multi-markdown" => Some(Flavor::MultiMarkdown),
         "mdsvex" => Some(Flavor::Mdsvex),
         "hugo" => Some(Flavor::Hugo),
+        "vitepress" => Some(Flavor::VitePress),
         "myst" => Some(Flavor::Myst),
         _ => None,
     }

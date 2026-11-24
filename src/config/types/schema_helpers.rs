@@ -109,25 +109,11 @@ fn known_extension_names_json() -> Vec<serde_json::Value> {
     names.into_iter().map(serde_json::Value::from).collect()
 }
 
-/// Canonical flavor table keys accepted under `[extensions]`. Kept aligned
-/// with `parse_flavor_key` in `src/config.rs`.
+/// Flavor keys shared with configuration parsing.
 fn known_flavor_keys_json() -> Vec<serde_json::Value> {
-    [
-        "pandoc",
-        "quarto",
-        "rmarkdown",
-        "r-markdown",
-        "gfm",
-        "jupyter",
-        "commonmark",
-        "common-mark",
-        "multimarkdown",
-        "multi-markdown",
-        "mdsvex",
-        "myst",
-        "hugo",
-    ]
-    .into_iter()
-    .map(serde_json::Value::from)
-    .collect()
+    crate::config::KNOWN_FLAVOR_KEYS
+        .iter()
+        .copied()
+        .map(serde_json::Value::from)
+        .collect()
 }

@@ -303,6 +303,18 @@ The available flavors are:
     `flavor = "myst"`, use `--flavor myst`, or a [`[flavors]`](#flavors)
     pattern); it is never auto-detected from the file extension.
 
+`vitepress`
+:   [VitePress](https://vitepress.dev/guide/markdown)-flavored Markdown, based
+    on CommonMark. Supports VitePress 1.x colon containers such as
+    `::: info My title` and `::: code-group`, code snippet imports such as
+    `<<< ./example.js [Example]`, the `[[toc]]` table of contents directive,
+    YAML front matter, pipe tables, strikethrough, emoji, GitHub-style alerts
+    with VitePress types and custom titles, and heading attributes. Anchor
+    checks recognize VitePress's automatically generated heading IDs and
+    explicit IDs on headings and callout containers. Select it with
+    `flavor = "vitepress"`, `--flavor vitepress`, or a [`[flavors]`](#flavors)
+    pattern for your site's Markdown files.
+
 The `--flavor` CLI flag (see the [CLI reference](cli.qmd)) overrides this
 setting for a single invocation. It also overrides [`[flavors]`](#flavors) and
 the flavor inferred from the file extension. `[extensions]` overrides from
@@ -934,9 +946,10 @@ implicit-header-references = true
 
 `auto-identifiers`
 :   Auto-generate heading identifiers (default: enabled for `pandoc`, `quarto`,
-    `rmarkdown`, `gfm`, and `multimarkdown`). Disabled for `mdsvex`, which
-    renders headings through rehype with no plugins of its own, so a heading
-    gets an `id` only if you add `rehype-slug` --- if you do, turn this back on.
+    `rmarkdown`, `gfm`, `multimarkdown`, and `vitepress`). Disabled for
+    `mdsvex`, which renders headings through rehype with no plugins of its own,
+    so a heading gets an `id` only if you add `rehype-slug` --- if you do, turn
+    this back on.
 
 `gfm-auto-identifiers`
 :   Use GitHub's heading identifier algorithm (default: disabled, enabled for
@@ -1335,8 +1348,8 @@ pandoc-title-block = true
 :   YAML frontmatter with `---` delimiters (default: enabled). Pandoc-family
     flavors also accept metadata blocks mid-document when preceded by a blank
     line; CommonMark-family flavors (`gfm`, `commonmark`, `mdsvex`, `myst`,
-    `hugo`) only recognize document-start frontmatter, matching pandoc's `gfm`
-    reader.
+    `hugo`, `vitepress`) only recognize document-start frontmatter, matching
+    pandoc's `gfm` reader.
 
 `pandoc-title-block`
 :   Pandoc title block `% Title`, `% Author`, `% Date` (default: enabled)
@@ -1436,6 +1449,16 @@ hugo-shortcodes = true
     `{{< ... >}}` and `{{% ... %}}`, multiline arguments, quoted and raw
     strings, closing and self-closing tags, nesting, inline shortcode templates,
     and escaped calls such as `{{</* foo */>}}`.
+
+### VitePress-Specific Extensions
+
+`vitepress-containers`
+:   Parse and format VitePress 1.x colon containers. Panache formats the
+    Markdown body and preserves the title and title attributes. It lengthens the
+    fences if formatting would otherwise expose a closing fence in the body.
+    Supported types are `info`, `tip`, `warning`, `danger`, `details`, `raw`,
+    `v-pre`, and `code-group`. Enabled by default for `vitepress`. Set
+    `vitepress-containers = false` under `[extensions]` to disable it.
 
 ### Quarto-Specific Extensions
 

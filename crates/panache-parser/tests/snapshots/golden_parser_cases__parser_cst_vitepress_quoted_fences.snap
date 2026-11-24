@@ -1,0 +1,147 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..235
+  BLOCK_QUOTE@0..33
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    LIST@2..33
+      LIST_ITEM@2..33
+        LIST_MARKER@2..3 "-"
+        WHITESPACE@3..4 " "
+        VITEPRESS_CONTAINER@4..33
+          VITEPRESS_CONTAINER_OPEN@4..13
+            VITEPRESS_CONTAINER_FENCE@4..7 ":::"
+            WHITESPACE@7..8 " "
+            VITEPRESS_CONTAINER_TYPE@8..12 "info"
+            NEWLINE@12..13 "\n"
+          BLOCK_QUOTE_MARKER@13..14 ">"
+          BLANK_LINE@14..15
+            BLANK_LINE@14..15 "\n"
+          BLOCK_QUOTE_MARKER@15..16 ">"
+          WHITESPACE@16..17 " "
+          PARAGRAPH@17..25
+            TEXT@17..24 "  Body."
+            NEWLINE@24..25 "\n"
+          VITEPRESS_CONTAINER_CLOSE@25..33
+            LINE_PREFIX@25..26 ">"
+            LINE_PREFIX@26..27 " "
+            LINE_PREFIX@27..29 "  "
+            VITEPRESS_CONTAINER_FENCE@29..32 ":::"
+            NEWLINE@32..33 "\n"
+  BLANK_LINE@33..34
+    BLANK_LINE@33..34 "\n"
+  BLOCK_QUOTE@34..87
+    BLOCK_QUOTE_MARKER@34..35 ">"
+    VITEPRESS_CONTAINER@35..76
+      VITEPRESS_CONTAINER_OPEN@35..62
+        WHITESPACE@35..36 "\t"
+        VITEPRESS_CONTAINER_FENCE@36..39 ":::"
+        WHITESPACE@39..40 " "
+        VITEPRESS_CONTAINER_TYPE@40..43 "tip"
+        WHITESPACE@43..44 " "
+        VITEPRESS_CONTAINER_TITLE@44..61 "Tab-padded opener"
+        NEWLINE@61..62 "\n"
+      BLOCK_QUOTE_MARKER@62..63 ">"
+      WHITESPACE@63..64 " "
+      PARAGRAPH@64..70
+        TEXT@64..69 "Body."
+        NEWLINE@69..70 "\n"
+      VITEPRESS_CONTAINER_CLOSE@70..76
+        LINE_PREFIX@70..71 ">"
+        WHITESPACE@71..72 "\t"
+        VITEPRESS_CONTAINER_FENCE@72..75 ":::"
+        NEWLINE@75..76 "\n"
+    BLOCK_QUOTE_MARKER@76..77 ">"
+    WHITESPACE@77..78 " "
+    PARAGRAPH@78..87
+      TEXT@78..86 "Outside."
+      NEWLINE@86..87 "\n"
+  BLANK_LINE@87..88
+    BLANK_LINE@87..88 "\n"
+  LIST@88..235
+    LIST_ITEM@88..153
+      LIST_MARKER@88..89 "-"
+      WHITESPACE@89..90 " "
+      BLOCK_QUOTE@90..153
+        BLOCK_QUOTE_MARKER@90..91 ">"
+        WHITESPACE@91..92 " "
+        VITEPRESS_CONTAINER@92..153
+          VITEPRESS_CONTAINER_OPEN@92..100
+            VITEPRESS_CONTAINER_FENCE@92..95 ":::"
+            WHITESPACE@95..96 " "
+            VITEPRESS_CONTAINER_TYPE@96..99 "tip"
+            NEWLINE@99..100 "\n"
+          WHITESPACE@100..102 "  "
+          BLOCK_QUOTE_MARKER@102..103 ">"
+          WHITESPACE@103..104 " "
+          CODE_BLOCK@104..145
+            CODE_FENCE_OPEN@104..112
+              CODE_FENCE_MARKER@104..107 "```"
+              CODE_INFO@107..111
+                CODE_LANGUAGE@107..111 "text"
+              NEWLINE@111..112 "\n"
+            CODE_CONTENT@112..137
+              LINE_PREFIX@112..114 "  "
+              LINE_PREFIX@114..115 ">"
+              LINE_PREFIX@115..116 " "
+              TEXT@116..121 "hello"
+              NEWLINE@121..122 "\n"
+              LINE_PREFIX@122..124 "  "
+              LINE_PREFIX@124..125 ">"
+              LINE_PREFIX@125..126 " "
+              TEXT@126..136 "  indented"
+              NEWLINE@136..137 "\n"
+            LINE_PREFIX@137..139 "  "
+            LINE_PREFIX@139..140 ">"
+            LINE_PREFIX@140..141 " "
+            CODE_FENCE_CLOSE@141..145
+              CODE_FENCE_MARKER@141..144 "```"
+              NEWLINE@144..145 "\n"
+          VITEPRESS_CONTAINER_CLOSE@145..153
+            LINE_PREFIX@145..147 "  "
+            LINE_PREFIX@147..148 ">"
+            LINE_PREFIX@148..149 " "
+            VITEPRESS_CONTAINER_FENCE@149..152 ":::"
+            NEWLINE@152..153 "\n"
+    BLANK_LINE@153..154
+      BLANK_LINE@153..154 "\n"
+    LIST_ITEM@154..235
+      LIST_MARKER@154..155 "-"
+      WHITESPACE@155..156 " "
+      BLOCK_QUOTE@156..235
+        BLOCK_QUOTE_MARKER@156..157 ">"
+        WHITESPACE@157..158 " "
+        VITEPRESS_CONTAINER@158..235
+          VITEPRESS_CONTAINER_OPEN@158..168
+            VITEPRESS_CONTAINER_FENCE@158..162 "::::"
+            WHITESPACE@162..163 " "
+            VITEPRESS_CONTAINER_TYPE@163..167 "info"
+            NEWLINE@167..168 "\n"
+          WHITESPACE@168..170 "  "
+          BLOCK_QUOTE_MARKER@170..171 ">"
+          WHITESPACE@171..172 " "
+          CODE_BLOCK@172..226
+            CODE_CONTENT@172..226
+              WHITESPACE@172..176 "    "
+              TEXT@176..183 "```text"
+              NEWLINE@183..184 "\n"
+              LINE_PREFIX@184..186 "  "
+              LINE_PREFIX@186..187 ">"
+              LINE_PREFIX@187..188 " "
+              WHITESPACE@188..194 "      "
+              TEXT@194..213 "literal indentation"
+              NEWLINE@213..214 "\n"
+              LINE_PREFIX@214..216 "  "
+              LINE_PREFIX@216..217 ">"
+              LINE_PREFIX@217..218 " "
+              WHITESPACE@218..222 "    "
+              TEXT@222..225 "```"
+              NEWLINE@225..226 "\n"
+          VITEPRESS_CONTAINER_CLOSE@226..235
+            LINE_PREFIX@226..228 "  "
+            LINE_PREFIX@228..229 ">"
+            LINE_PREFIX@229..230 " "
+            VITEPRESS_CONTAINER_FENCE@230..234 "::::"
+            NEWLINE@234..235 "\n"

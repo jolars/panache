@@ -92,6 +92,7 @@ wincode = { version = "0.6.0", features = ["derive"] }
 similar = { version = "3.0.0", features = ["text"] }
 tempfile = "3.27.0"
 toml = "1.1.2"
+unicode-normalization = "0.1"
 unicode-width = "0.2.2"
 
 [dev-dependencies]

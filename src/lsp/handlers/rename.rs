@@ -50,7 +50,7 @@ pub(crate) fn rename(snap: &StateSnapshot, params: RenameParams) -> Option<Works
     }
     let target = {
         let root = ctx.syntax_root();
-        resolve_symbol_target_at_offset(&root, offset)
+        resolve_symbol_target_at_offset(&root, offset, config.flavor)
     };
     log::debug!(
         "rename: uri={:?} req=({}, {}) offset={} new_name={:?} target={:?}",

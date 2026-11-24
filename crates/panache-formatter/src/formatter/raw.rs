@@ -72,9 +72,12 @@ impl Formatter {
             }
         }
         let starts_on_marker_line = node
-            .first_token()
-            .and_then(|token| token.prev_token())
-            .is_some_and(|prev| !prev.text().ends_with('\n'));
+            .parent()
+            .is_none_or(|parent| parent.kind() != SyntaxKind::VITEPRESS_CONTAINER)
+            && node
+                .first_token()
+                .and_then(|token| token.prev_token())
+                .is_some_and(|prev| !prev.text().ends_with('\n'));
         if let Some((from, to)) = reindent
             && !self.directive_tracker.is_formatting_ignored()
             && let Some(moved) = reindent_lines(&text, from, to, starts_on_marker_line)
@@ -132,7 +135,12 @@ impl Formatter {
 /// non-blank line of `text`, keeping any columns left by a partial tab.
 /// `None` when a non-blank line doesn't reach `from`, so the caller keeps
 /// the text as is.
-fn reindent_lines(text: &str, from: usize, to: usize, skip_first_line: bool) -> Option<String> {
+pub(super) fn reindent_lines(
+    text: &str,
+    from: usize,
+    to: usize,
+    skip_first_line: bool,
+) -> Option<String> {
     let mut out = String::with_capacity(text.len());
     for (i, line) in text.split_inclusive('\n').enumerate() {
         if i == 0 && skip_first_line {

@@ -1,0 +1,56 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..174
+  VITEPRESS_CONTAINER@0..58
+    VITEPRESS_CONTAINER_OPEN@0..15
+      VITEPRESS_CONTAINER_FENCE@0..3 ":::"
+      WHITESPACE@3..4 " "
+      VITEPRESS_CONTAINER_TYPE@4..14 "code-group"
+      NEWLINE@14..15 "\n"
+    VITEPRESS_SNIPPET@15..34
+      VITEPRESS_SNIPPET_MARKER@15..18 "<<<"
+      WHITESPACE@18..19 " "
+      VITEPRESS_SNIPPET_SOURCE@19..33 "./a.js [First]"
+      NEWLINE@33..34 "\n"
+    VITEPRESS_SNIPPET@34..54
+      VITEPRESS_SNIPPET_MARKER@34..37 "<<<"
+      WHITESPACE@37..38 " "
+      VITEPRESS_SNIPPET_SOURCE@38..53 "./b.js [Second]"
+      NEWLINE@53..54 "\n"
+    VITEPRESS_CONTAINER_CLOSE@54..58
+      VITEPRESS_CONTAINER_FENCE@54..57 ":::"
+      NEWLINE@57..58 "\n"
+  BLANK_LINE@58..59
+    BLANK_LINE@58..59 "\n"
+  BLOCK_QUOTE@59..107
+    BLOCK_QUOTE_MARKER@59..60 ">"
+    WHITESPACE@60..61 " "
+    LIST@61..107
+      LIST_ITEM@61..107
+        LIST_MARKER@61..62 "-"
+        WHITESPACE@62..63 " "
+        VITEPRESS_SNIPPET@63..107
+          VITEPRESS_SNIPPET_MARKER@63..66 "<<<"
+          WHITESPACE@66..67 " "
+          VITEPRESS_SNIPPET_SOURCE@67..106 "./included.js#demo {1 ..."
+          NEWLINE@106..107 "\n"
+  BLANK_LINE@107..108
+    BLANK_LINE@107..108 "\n"
+  LIST@108..126
+    LIST_ITEM@108..126
+      LIST_MARKER@108..109 "-"
+      WHITESPACE@109..110 " "
+      VITEPRESS_SNIPPET@110..126
+        VITEPRESS_SNIPPET_MARKER@110..113 "<<<"
+        WHITESPACE@113..114 " "
+        VITEPRESS_SNIPPET_SOURCE@114..125 "./listed.js"
+        NEWLINE@125..126 "\n"
+  BLANK_LINE@126..127
+    BLANK_LINE@126..127 "\n"
+  PARAGRAPH@127..174
+    TEXT@127..156 "Prose before a litera ..."
+    NEWLINE@156..157 "\n"
+    TEXT@157..173 "<<< ./literal.js"
+    NEWLINE@173..174 "\n"

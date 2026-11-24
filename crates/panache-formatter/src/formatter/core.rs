@@ -1,5 +1,5 @@
 use super::FormatContext;
-use crate::config::{Config, HorizontalRuleStyle, SmartPunctuation, WrapMode};
+use crate::config::{Config, Flavor, HorizontalRuleStyle, SmartPunctuation, WrapMode};
 use crate::directives::DirectiveTracker;
 use crate::syntax::{
     AstNode, Definition, ExampleListMarker, ListItem, SyntaxKind, SyntaxNode, TomlMetadata,
@@ -311,16 +311,13 @@ impl Formatter {
         code_blocks::format_code_block(node, &self.config, &self.formatted_code, &mut self.output);
     }
 
-    pub(super) fn format_code_block_to_string(&mut self, node: &SyntaxNode) -> String {
-        let saved_output = self.output.clone();
-        self.output.clear();
-        self.format_code_block(node);
-        let formatted = self.output.clone();
-        self.output = saved_output;
+    pub(super) fn format_code_block_to_string(&self, node: &SyntaxNode) -> String {
+        let mut formatted = String::new();
+        code_blocks::format_code_block(node, &self.config, &self.formatted_code, &mut formatted);
         formatted
     }
 
-    fn strip_leading_columns(line: &str, columns: usize) -> String {
+    pub(super) fn strip_leading_columns(line: &str, columns: usize) -> String {
         let mut cols = 0usize;
         let mut idx = 0usize;
 
@@ -436,7 +433,7 @@ impl Formatter {
 
         let indent_str = " ".repeat(indent);
 
-        let strip_content_columns = (!is_fenced)
+        let strip_content_columns = (!is_fenced && self.config.flavor != Flavor::VitePress)
             .then(|| self.container_content_offset(node))
             .filter(|cols| *cols > 0);
         self.format_container_code_block(
@@ -445,7 +442,7 @@ impl Formatter {
             indent,
             false,
             strip_content_columns,
-            false,
+            code_blocks::preserve_vitepress_fence(node),
         );
 
         if !self.output.ends_with('\n') {
@@ -467,7 +464,9 @@ impl Formatter {
             return 0;
         };
         match parent.kind() {
-            SyntaxKind::MYST_DIRECTIVE => self.container_content_offset(&parent),
+            SyntaxKind::MYST_DIRECTIVE | SyntaxKind::VITEPRESS_CONTAINER => {
+                self.container_content_offset(&parent)
+            }
             SyntaxKind::DEFINITION => {
                 self.marker_content_offset(&parent, SyntaxKind::DEFINITION_MARKER)
             }
@@ -832,7 +831,7 @@ impl Formatter {
 
             SyntaxKind::HORIZONTAL_RULE => self.format_horizontal_rule(node, indent),
 
-            SyntaxKind::REFERENCE_DEFINITION => self.format_reference_definition(node),
+            SyntaxKind::REFERENCE_DEFINITION => self.format_reference_definition(node, indent),
 
             SyntaxKind::ADMONITION => self.format_admonition(node, indent),
 
@@ -842,11 +841,14 @@ impl Formatter {
                 // Continuation HTML must move with its container's content
                 // column so it cannot detach the blocks that follow it.
                 let continues_container = node.parent().is_some_and(|parent| {
-                    ListItem::can_cast(parent.kind()) || Definition::can_cast(parent.kind())
-                }) && node
-                    .first_token()
-                    .and_then(|token| token.prev_token())
-                    .is_some_and(|prev| prev.text().ends_with('\n'));
+                    parent.kind() == SyntaxKind::VITEPRESS_CONTAINER
+                        || ((ListItem::can_cast(parent.kind())
+                            || Definition::can_cast(parent.kind()))
+                            && node
+                                .first_token()
+                                .and_then(|token| token.prev_token())
+                                .is_some_and(|prev| prev.text().ends_with('\n')))
+                });
                 let reindent = continues_container
                     .then(|| (self.container_content_offset(node), indent))
                     .filter(|(from, to)| from != to);
@@ -890,6 +892,18 @@ impl Formatter {
             }
 
             SyntaxKind::FENCED_DIV => self.format_fenced_div(node, indent),
+            SyntaxKind::VITEPRESS_CONTAINER => self.format_vitepress_container(node, indent),
+            SyntaxKind::ALERT if self.config.flavor == Flavor::VitePress => {
+                self.format_vitepress_alert(node, indent);
+            }
+
+            SyntaxKind::VITEPRESS_SNIPPET | SyntaxKind::VITEPRESS_TOC => {
+                self.output.push_str(&" ".repeat(indent));
+                let text = crate::syntax::text_without_line_prefixes(node);
+                self.output
+                    .push_str(text.trim_matches([' ', '\t', '\r', '\n']));
+                self.output.push('\n');
+            }
 
             SyntaxKind::INLINE_MATH_MARKER => self.format_inline_math_marker(node),
 

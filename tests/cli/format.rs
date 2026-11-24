@@ -21,6 +21,56 @@ fn test_format_stdin_to_stdout() {
 }
 
 #[test]
+fn vitepress_flavor_formats_container_bodies() {
+    let input = "::: info Note\nKeep the fence and\njoin this paragraph.\n:::\n";
+    let expected = "::: info Note\nKeep the fence and join this paragraph.\n:::\n";
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--isolated",
+            "--no-cache",
+            "--flavor",
+            "vitepress",
+        ])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(expected);
+
+    let project = TempDir::new().unwrap();
+    fs::write(
+        project.path().join("panache.toml"),
+        "flavor = \"commonmark\"\n[flavors]\nvitepress = [\"docs/*.md\"]\n",
+    )
+    .unwrap();
+    cargo_bin_cmd!("panache")
+        .current_dir(project.path())
+        .args(["format", "--no-cache", "--stdin-filename", "docs/guide.md"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(expected);
+}
+
+#[test]
+fn vitepress_reflow_does_not_create_a_closing_fence() {
+    let input = "::: info\naaaaaaaaaa :::\n:::\n";
+    cargo_bin_cmd!("panache")
+        .args([
+            "format",
+            "--isolated",
+            "--flavor",
+            "vitepress",
+            "-o",
+            "line-width=10",
+        ])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(input);
+}
+
+#[test]
 fn test_format_stdin_preserves_punctuation_by_default() {
     let input = "„Hallo“ ”Hej” “hello” ‘hi’ it's it’s -- --- ... – — …\n";
     for flavor in [

@@ -63,7 +63,7 @@ pub(crate) fn goto_definition(
         let content = ctx.content.clone();
         let root = ctx.syntax_root();
 
-        let pending = match resolve_symbol_target_at_offset(&root, offset) {
+        let pending = match resolve_symbol_target_at_offset(&root, offset, config.flavor) {
             Some(SymbolTarget::Citation(key)) => Some(PendingDefinition::Citation(key)),
             Some(SymbolTarget::Crossref(label)) => Some(PendingDefinition::Crossref(label)),
             Some(SymbolTarget::ChunkLabel(label)) => Some(PendingDefinition::ChunkLabel(label)),
@@ -128,10 +128,7 @@ pub(crate) fn goto_definition(
                     return Some(GotoDefinitionResponse::Scalar(location));
                 }
             }
-        }
-
-        if config.extensions.implicit_header_references && config.extensions.auto_identifiers {
-            if heading_link_is_explicit_anchor {
+            if config.extensions.auto_identifiers {
                 for doc in &doc_indices {
                     if let Some(ranges) = doc.symbol_index.heading_implicit_definition_ranges(label)
                         && let Some(range) = ranges.first()
@@ -143,7 +140,12 @@ pub(crate) fn goto_definition(
                     }
                 }
             }
+        }
 
+        if !heading_link_is_explicit_anchor
+            && config.extensions.implicit_header_references
+            && config.extensions.auto_identifiers
+        {
             for doc in &doc_indices {
                 if let Some(ranges) = doc.symbol_index.heading_label_ranges(label)
                     && let Some(range) = ranges.first()
@@ -171,9 +173,9 @@ pub(crate) fn goto_definition(
 
                 if config.extensions.implicit_header_references
                     && config.extensions.auto_identifiers
-                    && let Some(ranges) = doc
-                        .symbol_index
-                        .heading_implicit_definition_ranges(&candidate)
+                    && let Some(ranges) = doc.symbol_index.heading_implicit_definition_ranges(
+                        &crate::utils::normalize_label(&candidate),
+                    )
                     && let Some(range) = ranges.first()
                 {
                     let location =

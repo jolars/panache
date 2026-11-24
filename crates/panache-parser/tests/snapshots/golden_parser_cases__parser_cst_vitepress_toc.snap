@@ -1,0 +1,41 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..92
+  HEADING@0..12
+    ATX_HEADING_MARKER@0..2
+      ATX_HEADING_MARKER@0..2 "##"
+    WHITESPACE@2..3 " "
+    HEADING_CONTENT@3..11
+      TEXT@3..11 "Overview"
+    NEWLINE@11..12 "\n"
+  BLANK_LINE@12..13
+    BLANK_LINE@12..13 "\n"
+  PARAGRAPH@13..27
+    TEXT@13..26 "Introduction."
+    NEWLINE@26..27 "\n"
+  VITEPRESS_TOC@27..53
+    VITEPRESS_TOC_MARKER@27..34 "[[toc]]"
+    VITEPRESS_TOC_SUFFIX@34..52 " Extra source text"
+    NEWLINE@52..53 "\n"
+  PARAGRAPH@53..70
+    TEXT@53..69 "After the table."
+    NEWLINE@69..70 "\n"
+  BLANK_LINE@70..71
+    BLANK_LINE@70..71 "\n"
+  BLOCK_QUOTE@71..81
+    BLOCK_QUOTE_MARKER@71..72 ">"
+    WHITESPACE@72..73 " "
+    VITEPRESS_TOC@73..81
+      VITEPRESS_TOC_MARKER@73..80 "[[TOC]]"
+      NEWLINE@80..81 "\n"
+  BLANK_LINE@81..82
+    BLANK_LINE@81..82 "\n"
+  LIST@82..92
+    LIST_ITEM@82..92
+      LIST_MARKER@82..83 "-"
+      WHITESPACE@83..84 " "
+      VITEPRESS_TOC@84..92
+        VITEPRESS_TOC_MARKER@84..91 "[[toc]]"
+        NEWLINE@91..92 "\n"

@@ -66,8 +66,18 @@ impl Formatter {
         }
     }
 
-    pub(super) fn format_reference_definition(&mut self, node: &SyntaxNode) {
-        self.output.push_str(node.text().to_string().trim_end());
+    pub(super) fn format_reference_definition(&mut self, node: &SyntaxNode, indent: usize) {
+        let text = if node
+            .parent()
+            .is_some_and(|parent| parent.kind() == SyntaxKind::VITEPRESS_CONTAINER)
+        {
+            let text = crate::syntax::text_without_line_prefixes(node);
+            let source_indent = self.container_content_offset(node);
+            super::raw::reindent_lines(&text, source_indent, indent, false).unwrap_or(text)
+        } else {
+            node.text().to_string()
+        };
+        self.output.push_str(text.trim_end());
         if !self.output.ends_with('\n') {
             self.output.push('\n');
         }

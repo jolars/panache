@@ -1,13 +1,13 @@
 //! ATX heading parsing utilities.
 
-use crate::options::{Dialect, ParserOptions};
+use crate::options::{Dialect, Flavor, ParserOptions};
 use crate::parser::inlines::hard_breaks;
 use crate::parser::inlines::sink::InlineSink;
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
 
 use crate::parser::utils::attributes::{
-    emit_attribute_node, try_parse_trailing_attributes_with_pos,
+    emit_attribute_node, try_parse_trailing_attributes_allow_after_bracket,
 };
 use crate::parser::utils::helpers::trim_end_spaces_tabs;
 use crate::parser::utils::inline_emission;
@@ -260,7 +260,10 @@ pub(crate) fn emit_setext_heading_text(
     }
 
     let trailing_attrs = if config.extensions.header_attributes {
-        try_parse_trailing_attributes_with_pos(text_trimmed)
+        try_parse_trailing_attributes_allow_after_bracket(
+            text_trimmed,
+            config.flavor == Flavor::VitePress,
+        )
     } else {
         None
     };
@@ -338,8 +341,8 @@ pub(crate) fn emit_setext_underline(builder: &mut GreenNodeBuilder<'static>, und
 /// The tail of an ATX heading line --- everything after the opening marker and
 /// the spaces behind it --- split into content and closing decoration.
 ///
-/// Concatenating the fields in declaration order reconstructs the input, so
-/// emission stays byte-lossless.
+/// The attribute block precedes the closing run in VitePress and follows it
+/// in the Pandoc dialect.
 struct AtxTail<'a> {
     content: &'a str,
     /// Whitespace between the content and an mmd `[id]` identifier.
@@ -349,12 +352,11 @@ struct AtxTail<'a> {
     /// Whitespace in front of the closing `#` run.
     closing_gap: &'a str,
     closing_run: &'a str,
-    /// Whitespace between the closing run and the attribute block, or the
-    /// line's trailing whitespace when there is no block.
+    /// Whitespace immediately before the attribute block.
     attr_gap: &'a str,
-    /// Trailing `{...}` attribute block, including the line's trailing
-    /// whitespace.
+    /// The `{...}` attribute block and any padding after it.
     attrs: Option<&'a str>,
+    trailing_gap: &'a str,
 }
 
 impl<'a> AtxTail<'a> {
@@ -367,11 +369,28 @@ impl<'a> AtxTail<'a> {
             closing_run: "",
             attr_gap: "",
             attrs: None,
+            trailing_gap: "",
         }
     }
 
     fn content_ends_the_line(&self) -> bool {
         self.mmd_attrs.is_none() && self.closing_run.is_empty() && self.attrs.is_none()
+    }
+
+    fn split_attributes(&mut self, rest: &'a str, config: &ParserOptions) -> &'a str {
+        if config.extensions.header_attributes
+            && let Some((_attrs, text_before, open_brace)) =
+                try_parse_trailing_attributes_allow_after_bracket(
+                    rest,
+                    config.flavor == Flavor::VitePress,
+                )
+        {
+            self.attrs = Some(&rest[open_brace..]);
+            self.attr_gap = &rest[text_before.len()..open_brace];
+            text_before
+        } else {
+            rest
+        }
     }
 }
 
@@ -392,7 +411,9 @@ fn closing_run_len(text: &str) -> usize {
     bytes.len() - end
 }
 
-/// Split an ATX heading line's tail the way pandoc's `atxClosing` reads it.
+/// Split an ATX heading's decoration in dialect order.
+///
+/// VitePress removes the CommonMark closing run before reading attributes.
 ///
 /// pandoc parses the closing decoration as an optional mmd `[id]`, then a run
 /// of `#`, then an optional `{...}` attribute block, all anchored to the end of
@@ -401,8 +422,8 @@ fn closing_run_len(text: &str) -> usize {
 /// `# foo {#id} #` is `Header 1 (foo-id) [Str "foo", Space, Str "{#id}"]` ---
 /// braces and all, with the id auto-generated from that text.
 ///
-/// The block is only syntax while `header_attributes` is on. Under
-/// `commonmark`, `gfm`, and `markdown_mmd` the braces are content
+/// The block is only syntax while `header_attributes` is on. With the
+/// defaults for `commonmark`, `gfm`, and `markdown_mmd`, the braces are content
 /// (`# foo {#id}` is `[Str "foo", Space, Str "{#id}"]`), which also frees the
 /// formatter from re-emitting a closing run in front of them --- the run is
 /// load-bearing only while the block is live. The mmd `[id]` identifier rides
@@ -418,13 +439,9 @@ fn split_atx_tail<'a>(
     }
     let mut rest = heading_text;
 
-    if config.extensions.header_attributes
-        && let Some((_attrs, text_before, open_brace)) =
-            try_parse_trailing_attributes_with_pos(rest)
-    {
-        tail.attrs = Some(&rest[open_brace..]);
-        tail.attr_gap = &rest[text_before.len()..open_brace];
-        rest = text_before;
+    let vitepress = config.flavor == Flavor::VitePress;
+    if !vitepress {
+        rest = tail.split_attributes(rest, config);
     }
 
     let run_end = trim_end_spaces_tabs(rest).len();
@@ -439,13 +456,19 @@ fn split_atx_tail<'a>(
             || (before_run.is_empty() && spaces_after_marker > 0);
         if preceded_by_ws {
             tail.closing_run = &rest[run_end - hashes..run_end];
-            if tail.attrs.is_none() {
-                tail.attr_gap = &rest[run_end..];
-            }
+            tail.trailing_gap = if tail.attrs.is_none() {
+                &rest[run_end..]
+            } else {
+                ""
+            };
             let content_end = trim_end_spaces_tabs(before_run).len();
             tail.closing_gap = &before_run[content_end..];
             rest = &before_run[..content_end];
         }
+    }
+
+    if vitepress {
+        rest = tail.split_attributes(rest, config);
     }
 
     if tail.attrs.is_none()
@@ -565,17 +588,28 @@ pub(crate) fn emit_atx_heading(
     if let Some(mmd_attrs) = tail.mmd_attrs {
         emit_attribute_node(builder, mmd_attrs);
     }
+    let emit_attributes = |builder: &mut _, gap: &str, attrs: Option<&str>| {
+        if !gap.is_empty() {
+            InlineSink::token(builder, SyntaxKind::WHITESPACE.into(), gap);
+        }
+        if let Some(attrs) = attrs {
+            emit_attribute_node(builder, attrs);
+        }
+    };
+    if config.flavor == Flavor::VitePress {
+        emit_attributes(builder, tail.attr_gap, tail.attrs);
+    }
     if !tail.closing_gap.is_empty() {
         builder.token(SyntaxKind::WHITESPACE.into(), tail.closing_gap);
     }
     if !tail.closing_run.is_empty() {
         builder.token(SyntaxKind::ATX_HEADING_MARKER.into(), tail.closing_run);
     }
-    if !tail.attr_gap.is_empty() {
-        builder.token(SyntaxKind::WHITESPACE.into(), tail.attr_gap);
+    if config.flavor != Flavor::VitePress {
+        emit_attributes(builder, tail.attr_gap, tail.attrs);
     }
-    if let Some(attrs) = tail.attrs {
-        emit_attribute_node(builder, attrs);
+    if !tail.trailing_gap.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), tail.trailing_gap);
     }
 
     if !newline_str.is_empty() {

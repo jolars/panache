@@ -94,11 +94,15 @@ pub(super) fn format_code_block(
     output: &mut String,
 ) {
     if is_unclosed_fenced_code_block(node) {
-        output.push_str(&node.text().to_string());
+        if in_vitepress_container(node) {
+            output.push_str(&text_without_line_prefixes(node));
+        } else {
+            output.push_str(&node.text().to_string());
+        }
         return;
     }
 
-    let (info_node, _, extracted_content) = extract_code_block_parts(node);
+    let (info_node, _, extracted_content) = extract_code_block_parts(node, config.flavor);
     let mut content = extracted_content;
     if let Some(formatted) = formatted_code.get(&usize::from(node.text_range().start())) {
         content = expand_tabs_with_width(formatted, config.tab_width);
@@ -130,7 +134,13 @@ pub(super) fn format_code_block(
         final_content = expand_tabs_with_width(&final_content, config.tab_width);
     }
 
-    let fence_char = '`';
+    // A backtick is valid in a tilde fence's info string, including in
+    // a VitePress tab label, but would invalidate a backtick opener.
+    let fence_char = if config.flavor == Flavor::VitePress && info_string_raw.contains('`') {
+        '~'
+    } else {
+        '`'
+    };
 
     let fence_length = determine_fence_length(&final_content, fence_char);
 
@@ -151,7 +161,11 @@ pub(super) fn format_code_block(
         return;
     }
 
-    let formatted_info = format_info_string(&info_node, &info);
+    let formatted_info = if config.flavor == Flavor::VitePress {
+        info_string_raw
+    } else {
+        format_info_string(&info_node, &info)
+    };
 
     log::trace!("formatted_info = '{}'", formatted_info);
 
@@ -167,6 +181,16 @@ pub(super) fn format_code_block(
         output.push(fence_char);
     }
     output.push('\n');
+}
+
+// An outer colon fence can end a nested code block before its own closer.
+pub(super) fn preserve_vitepress_fence(node: &SyntaxNode) -> bool {
+    is_unclosed_fenced_code_block(node) && in_vitepress_container(node)
+}
+
+fn in_vitepress_container(node: &SyntaxNode) -> bool {
+    node.ancestors()
+        .any(|ancestor| ancestor.kind() == SyntaxKind::VITEPRESS_CONTAINER)
 }
 
 fn is_unclosed_fenced_code_block(node: &SyntaxNode) -> bool {
@@ -277,13 +301,19 @@ fn fenced_in_blockquote(node: &SyntaxNode, has_fence: bool) -> bool {
     has_fence && node.parent().map(|p| p.kind()) == Some(SyntaxKind::BLOCK_QUOTE)
 }
 
-fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<String>, String) {
+fn extract_code_block_parts(
+    node: &SyntaxNode,
+    flavor: Flavor,
+) -> (Option<SyntaxNode>, Option<String>, String) {
     let mut info_node: Option<SyntaxNode> = None;
     let mut language: Option<String> = None;
     let mut content = String::new();
     let mut has_fence = false;
     let mut fence_indent = String::new();
     let mut fence_indent_cols = 0usize;
+    // VitePress emits whole list and quote prefixes as LINE_PREFIX.
+    // Only the code block's own indentation can dedent its payload.
+    let vitepress = flavor == Flavor::VitePress;
     let drop_container_indent = fenced_in_blockquote(
         node,
         node.children()
@@ -293,7 +323,8 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
     for child in node.children_with_tokens() {
         match child {
             NodeOrToken::Token(t) => {
-                if matches!(t.kind(), SyntaxKind::WHITESPACE | SyntaxKind::LINE_PREFIX)
+                if (t.kind() == SyntaxKind::WHITESPACE
+                    || (t.kind() == SyntaxKind::LINE_PREFIX && !vitepress))
                     && !has_fence
                 {
                     fence_indent.push_str(t.text());
@@ -328,6 +359,7 @@ fn extract_code_block_parts(node: &SyntaxNode) -> (Option<SyntaxNode>, Option<St
                     for token in n.children_with_tokens() {
                         match token {
                             NodeOrToken::Token(t) => match t.kind() {
+                                SyntaxKind::LINE_PREFIX if vitepress => {}
                                 SyntaxKind::LINE_PREFIX
                                     if at_line_start && !t.text().trim().is_empty() =>
                                 {
@@ -847,7 +879,7 @@ pub fn collect_code_blocks(
             continue;
         }
 
-        let (info_node, language, content) = extract_code_block_parts(&node);
+        let (info_node, language, content) = extract_code_block_parts(&node, config.flavor);
         if content.is_empty() {
             continue;
         }

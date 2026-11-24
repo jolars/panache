@@ -17,13 +17,15 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use crate::config::Config;
+use crate::config::{Config, Flavor};
 use crate::salsa::SymbolUsageIndex;
 use crate::syntax::{
-    AstNode, AttributeNode, Citation, FootnoteReference, ImageLink, Link, MystTarget, SyntaxKind,
-    SyntaxNode, UnresolvedReference,
+    AstNode, Citation, FootnoteReference, ImageLink, Link, MystTarget, SyntaxKind, SyntaxNode,
+    UnresolvedReference,
 };
-use crate::utils::{implicit_heading_ids, normalize_anchor_label, normalize_label};
+use crate::utils::{
+    heading_has_explicit_id, implicit_heading_ids, normalize_anchor_label, normalize_label,
+};
 
 /// Definition-side labels a document contributes: the targets that references,
 /// footnotes, and cross-references may resolve against.
@@ -130,7 +132,12 @@ pub fn build_from_fs(
             if path == doc_path {
                 continue;
             }
-            let index = crate::salsa::symbol_usage_index_from_tree(&db, &tree, &config.extensions);
+            let index = crate::salsa::symbol_usage_index_from_tree_with_flavor(
+                &db,
+                &tree,
+                &config.extensions,
+                config.flavor,
+            );
             aggregate.fold_document(&tree, &index, config);
         }
     }
@@ -174,15 +181,12 @@ pub fn extend_labels_from_tree(
     if config.extensions.bookdown_references && config.extensions.auto_identifiers {
         labels
             .crossref_labels
-            .extend(collect_implicit_heading_ids(tree, &config.extensions));
+            .extend(collect_implicit_heading_ids(tree, config));
     }
 }
 
-fn collect_implicit_heading_ids(
-    tree: &SyntaxNode,
-    extensions: &crate::config::Extensions,
-) -> HashSet<String> {
-    implicit_heading_ids(tree, extensions)
+fn collect_implicit_heading_ids(tree: &SyntaxNode, config: &Config) -> HashSet<String> {
+    implicit_heading_ids(tree, &config.extensions, config.flavor)
         .into_iter()
         .map(|entry| entry.id)
         .collect()
@@ -212,8 +216,8 @@ pub fn extend_anchors(
     }
 
     if config.extensions.auto_identifiers {
-        for entry in implicit_heading_ids(tree, &config.extensions) {
-            if heading_has_explicit_id(&entry.heading) {
+        for entry in implicit_heading_ids(tree, &config.extensions, config.flavor) {
+            if config.flavor != Flavor::VitePress && heading_has_explicit_id(&entry.heading) {
                 continue;
             }
             if entry.id.is_empty() {
@@ -233,13 +237,6 @@ pub fn extend_anchors(
             }
         }
     }
-}
-
-fn heading_has_explicit_id(heading: &SyntaxNode) -> bool {
-    heading
-        .children()
-        .filter_map(AttributeNode::cast)
-        .any(|attribute| attribute.id().is_some())
 }
 
 /// Collect reference/footnote usage labels from a stream of candidate nodes.

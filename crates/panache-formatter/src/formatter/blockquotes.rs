@@ -3,14 +3,19 @@ use crate::formatter::Formatter;
 use crate::formatter::core::BlockquoteContext;
 use crate::formatter::preserve::{preserve_lines, preserve_lines_unprefixed};
 use crate::formatter::utils::is_block_element;
-use crate::syntax::{AstNode, MystDirective, SyntaxKind, SyntaxNode};
+use crate::syntax::{Alert, AstNode, MystDirective, SyntaxKind, SyntaxNode};
 
 impl Formatter {
     pub(super) fn format_block_quote(&mut self, node: &SyntaxNode, indent: usize) {
         log::trace!("Formatting blockquote");
         let depth = node
             .ancestors()
-            .take_while(|ancestor| ancestor.kind() != SyntaxKind::LIST_ITEM)
+            .take_while(|ancestor| {
+                !matches!(
+                    ancestor.kind(),
+                    SyntaxKind::LIST_ITEM | SyntaxKind::VITEPRESS_CONTAINER
+                )
+            })
             .filter(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_QUOTE)
             .count()
             .max(1);
@@ -70,15 +75,14 @@ impl Formatter {
                     self.guard_definition_marker_start(para_start, 0);
                 }
                 SyntaxKind::ALERT => {
-                    let marker = child
-                        .children_with_tokens()
-                        .filter_map(|item| item.into_token())
-                        .find(|tok| tok.kind() == SyntaxKind::ALERT_MARKER)
-                        .map(|tok| tok.text().to_string())
-                        .unwrap_or_else(|| "[!NOTE]".to_string());
-
+                    let alert = Alert::cast(child.clone()).expect("alert");
+                    let marker = alert.marker().expect("alert marker");
                     self.output.push_str(&content_prefix);
                     self.output.push_str(&marker);
+                    if let Some(title) = alert.title() {
+                        self.output.push(' ');
+                        self.output.push_str(title.text());
+                    }
                     self.output.push('\n');
 
                     for alert_child in child.children() {
@@ -182,14 +186,15 @@ impl Formatter {
                     }
                 }
                 SyntaxKind::CODE_BLOCK => {
-                    let code_block_leading_indent = Self::code_block_leading_indent(child);
+                    let leading_indent = (!super::code_blocks::preserve_vitepress_fence(child))
+                        .then(|| Self::code_block_leading_indent(child));
                     let code_output = self.render_to_buffer(child, indent, 0);
 
                     self.append_blockquote_prefixed_block(
                         &code_output,
                         &content_prefix,
                         &blank_prefix,
-                        Some(&code_block_leading_indent),
+                        leading_indent.as_deref(),
                     );
                     if let Some(ctx) = self.blockquote_context.as_mut() {
                         ctx.in_list_continuation = false;
@@ -218,6 +223,20 @@ impl Formatter {
                     }
                     if !self.output.ends_with('\n') {
                         self.output.push('\n');
+                    }
+                }
+                SyntaxKind::VITEPRESS_CONTAINER
+                | SyntaxKind::VITEPRESS_SNIPPET
+                | SyntaxKind::VITEPRESS_TOC => {
+                    let rendered = self.render_to_buffer(child, 0, content_prefix.len());
+                    self.append_blockquote_prefixed_block(
+                        &rendered,
+                        &content_prefix,
+                        &blank_prefix,
+                        None,
+                    );
+                    if let Some(ctx) = self.blockquote_context.as_mut() {
+                        ctx.in_list_continuation = false;
                     }
                 }
                 SyntaxKind::MYST_DIRECTIVE

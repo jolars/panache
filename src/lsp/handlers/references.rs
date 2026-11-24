@@ -29,7 +29,7 @@ pub(crate) fn references(snap: &StateSnapshot, params: ReferenceParams) -> Optio
 
     let target = {
         let root = ctx.syntax_root();
-        resolve_symbol_target_at_offset(&root, offset)
+        resolve_symbol_target_at_offset(&root, offset, config.flavor)
     };
     let target = target?;
 

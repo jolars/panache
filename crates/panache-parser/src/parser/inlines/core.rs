@@ -320,6 +320,26 @@ fn bare_uri_has_left_boundary(text: &str, pos: usize) -> bool {
     }
 }
 
+fn emit_vitepress_inline_attributes(
+    builder: &mut impl InlineSink,
+    rest: &str,
+    config: &ParserOptions,
+) -> usize {
+    if config.flavor != crate::options::Flavor::VitePress || !rest.starts_with('{') {
+        return 0;
+    }
+    use crate::parser::utils::attributes::{emit_attribute_node, try_parse_trailing_attributes};
+    let Some(end) = rest.find('}') else {
+        return 0;
+    };
+    let attrs = &rest[..=end];
+    if try_parse_trailing_attributes(attrs).is_none() {
+        return 0;
+    }
+    emit_attribute_node(builder, attrs);
+    attrs.len()
+}
+
 fn is_emoji_boundary(text: &str, pos: usize) -> bool {
     if pos > 0 {
         let prev = text.as_bytes()[pos - 1] as char;
@@ -765,6 +785,7 @@ fn parse_inline_range_impl(
                             suppress_footnote_refs,
                         );
                         pos += len;
+                        pos += emit_vitepress_inline_attributes(builder, &text[pos..end], config);
                         text_start = pos;
                         continue;
                     }
@@ -818,6 +839,7 @@ fn parse_inline_range_impl(
                             suppress_footnote_refs,
                         );
                         pos += len;
+                        pos += emit_vitepress_inline_attributes(builder, &text[pos..end], config);
                         text_start = pos;
                         continue;
                     }
@@ -1098,6 +1120,11 @@ fn parse_inline_range_impl(
                     let code_span_len = backtick_count * 2 + content.len();
                     emit_code_span(builder, content, backtick_count, None);
                     pos += code_span_len;
+                    pos += emit_vitepress_inline_attributes(
+                        builder,
+                        text.get(pos..end).unwrap_or_default(),
+                        config,
+                    );
                     text_start = pos;
                     continue;
                 } else {
@@ -1204,6 +1231,7 @@ fn parse_inline_range_impl(
             log::trace!("Matched strikeout at pos {}", pos);
             emit_strikeout(builder, content, config, suppress_footnote_refs);
             pos += len;
+            pos += emit_vitepress_inline_attributes(builder, &text[pos..end], config);
             text_start = pos;
             continue;
         }
@@ -1338,6 +1366,11 @@ fn parse_inline_range_impl(
             log::trace!("Matched autolink at pos {}", pos);
             emit_autolink(builder, &text[pos..pos + len], url);
             pos += len;
+            pos += emit_vitepress_inline_attributes(
+                builder,
+                text.get(pos..end).unwrap_or_default(),
+                config,
+            );
             text_start = pos;
             continue;
         }
@@ -1532,6 +1565,7 @@ fn parse_inline_range_impl(
                     builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
                     builder.finish_node();
                     pos = partner + partner_len;
+                    pos += emit_vitepress_inline_attributes(builder, &text[pos..end], config);
                     text_start = pos;
                     continue;
                 }

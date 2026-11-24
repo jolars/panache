@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use lsp_types::{Location, Range, Uri};
 
 use crate::Config;
-use crate::config::ConfigSource;
+use crate::config::{ConfigSource, Flavor};
 use crate::lsp::uri_ext::UriExt;
 use crate::syntax::{
     AstNode, AttributeNode, Citation, CodeBlock, CodeSpan, Crossref, FootnoteDefinition,
@@ -237,48 +237,6 @@ pub(crate) fn extract_chunk_label_key(node: &SyntaxNode) -> Option<String> {
     chunk_label_entry_at_node(node).map(|entry| entry.value().to_string())
 }
 
-pub(crate) fn extract_attribute_id_key(node: &SyntaxNode) -> Option<String> {
-    if let Some(attribute) = AttributeNode::cast(node.clone())
-        && let Some(id) = attribute.id()
-    {
-        return Some(id);
-    }
-
-    let mut current = node.clone();
-    while let Some(parent) = current.parent() {
-        if let Some(attribute) = AttributeNode::cast(parent.clone())
-            && let Some(id) = attribute.id()
-        {
-            return Some(id);
-        }
-        current = parent;
-    }
-
-    None
-}
-
-pub(crate) fn extract_heading_id_key(node: &SyntaxNode) -> Option<String> {
-    if let Some(attribute) = AttributeNode::cast(node.clone())
-        && let Some(id) = attribute.id()
-        && attribute_has_heading_ancestor(attribute.syntax())
-    {
-        return Some(normalize_anchor_label(&id));
-    }
-
-    let mut current = node.clone();
-    while let Some(parent) = current.parent() {
-        if let Some(attribute) = AttributeNode::cast(parent.clone())
-            && let Some(id) = attribute.id()
-            && attribute_has_heading_ancestor(attribute.syntax())
-        {
-            return Some(normalize_anchor_label(&id));
-        }
-        current = parent;
-    }
-
-    None
-}
-
 pub(crate) fn extract_heading_link_target(node: &SyntaxNode) -> Option<String> {
     if let Some(target) = heading_target_from_node(node) {
         return Some(target);
@@ -394,7 +352,7 @@ fn bookdown_definition_span_at_offset(root: &SyntaxNode, offset: usize) -> Optio
     None
 }
 
-pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> {
+fn extract_symbol_text_range(node: &SyntaxNode, flavor: Flavor) -> Option<TextRange> {
     if let Some(crossref) = Crossref::cast(node.clone()) {
         return crossref.keys().first().map(|key| key.text_range());
     }
@@ -405,9 +363,9 @@ pub(crate) fn extract_symbol_text_range(node: &SyntaxNode) -> Option<TextRange> 
         return Some(entry.value_range());
     }
     if let Some(attribute) = AttributeNode::cast(node.clone())
-        && attribute.id().is_some()
+        && let Some((_, range)) = crate::utils::attribute_anchor_id(&attribute, flavor)
     {
-        return attribute.id_value_range();
+        return range;
     }
     if let Some(link) = Link::cast(node.clone()) {
         if let Some(dest) = link.dest() {
@@ -488,6 +446,7 @@ pub(crate) fn example_label_range_at_offset(root: &SyntaxNode, offset: usize) ->
 pub(crate) fn find_symbol_text_range_at_offset(
     root: &SyntaxNode,
     offset: usize,
+    flavor: Flavor,
 ) -> Option<TextRange> {
     if let Some(range) = bookdown_definition_label_range_at_offset(root, offset) {
         return Some(range);
@@ -496,16 +455,11 @@ pub(crate) fn find_symbol_text_range_at_offset(
     let mut node = find_node_at_offset(root, offset)?;
 
     loop {
-        if let Some(range) = extract_symbol_text_range(&node) {
+        if let Some(range) = extract_symbol_text_range(&node, flavor) {
             return Some(range);
         }
         node = node.parent()?;
     }
-}
-
-fn attribute_has_heading_ancestor(node: &SyntaxNode) -> bool {
-    node.ancestors()
-        .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
 }
 
 fn node_and_ancestors(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> {
@@ -671,7 +625,8 @@ mod tests {
             .find_map(InlineMath::cast)
             .expect("inline math");
 
-        let range = extract_symbol_text_range(node.syntax()).expect("content range");
+        let range =
+            extract_symbol_text_range(node.syntax(), Flavor::Pandoc).expect("content range");
         let start: usize = range.start().into();
         let end: usize = range.end().into();
         assert_eq!(&input[start..end], "x^2");
@@ -686,7 +641,8 @@ mod tests {
             .find_map(CodeSpan::cast)
             .expect("code span");
 
-        let range = extract_symbol_text_range(node.syntax()).expect("content range");
+        let range =
+            extract_symbol_text_range(node.syntax(), Flavor::Pandoc).expect("content range");
         let start: usize = range.start().into();
         let end: usize = range.end().into();
         assert_eq!(&input[start..end], "fmt");
@@ -764,7 +720,8 @@ mod tests {
             .find_map(FootnoteReference::cast)
             .expect("footnote reference");
 
-        let range = extract_symbol_text_range(node.syntax()).expect("id value range");
+        let range =
+            extract_symbol_text_range(node.syntax(), Flavor::Pandoc).expect("id value range");
         let start: usize = range.start().into();
         let end: usize = range.end().into();
         assert_eq!(&input[start..end], "note");

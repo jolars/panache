@@ -47,6 +47,9 @@ pub use pandoc_ast::{
     to_pandoc_ast, to_pandoc_ast_with_options, to_pandoc_json, to_pandoc_json_with_options,
 };
 pub use parser::ParsedDocument;
+pub use parser::blocks::vitepress_containers::{
+    is_vitepress_container_opener, vitepress_container_closing_fence_len,
+};
 pub use parser::inlines::refdef_map::{
     RefdefMap, collect_refdef_labels, collect_refdef_labels_with_options,
     normalize_label as normalize_reference_label,

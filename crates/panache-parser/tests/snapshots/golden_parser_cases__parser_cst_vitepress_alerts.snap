@@ -1,0 +1,190 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..404
+  BLOCK_QUOTE@0..40
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    ALERT@2..40
+      ALERT_MARKER@2..9 "[!INFO]"
+      NEWLINE@9..10 "\n"
+      BLOCK_QUOTE_MARKER@10..11 ">"
+      WHITESPACE@11..12 " "
+      PARAGRAPH@12..40
+        TEXT@12..28 "An informational"
+        NEWLINE@28..29 "\n"
+        LINE_PREFIX@29..30 ">"
+        LINE_PREFIX@30..31 " "
+        TEXT@31..39 "message."
+        NEWLINE@39..40 "\n"
+  BLANK_LINE@40..41
+    BLANK_LINE@40..41 "\n"
+  BLOCK_QUOTE@41..91
+    BLOCK_QUOTE_MARKER@41..42 ">"
+    WHITESPACE@42..43 " "
+    ALERT@43..91
+      ALERT_MARKER@43..49 "[!tip]"
+      WHITESPACE@49..50 " "
+      ALERT_TITLE@50..64 "A custom title"
+      NEWLINE@64..65 "\n"
+      BLOCK_QUOTE_MARKER@65..66 ">"
+      WHITESPACE@66..67 " "
+      PARAGRAPH@67..91
+        TEXT@67..76 "A helpful"
+        NEWLINE@76..77 "\n"
+        LINE_PREFIX@77..78 ">"
+        LINE_PREFIX@78..79 " "
+        TEXT@79..90 "suggestion."
+        NEWLINE@90..91 "\n"
+  BLANK_LINE@91..92
+    BLANK_LINE@91..92 "\n"
+  LIST@92..135
+    LIST_ITEM@92..135
+      LIST_MARKER@92..93 "-"
+      WHITESPACE@93..94 " "
+      BLOCK_QUOTE@94..135
+        BLOCK_QUOTE_MARKER@94..95 ">"
+        WHITESPACE@95..96 " "
+        ALERT@96..135
+          ALERT_MARKER@96..105 "[!DANGER]"
+          WHITESPACE@105..106 " "
+          ALERT_TITLE@106..115 "Attention"
+          NEWLINE@115..116 "\n"
+          WHITESPACE@116..118 "  "
+          BLOCK_QUOTE_MARKER@118..119 ">"
+          WHITESPACE@119..120 " "
+          PARAGRAPH@120..135
+            TEXT@120..134 "Inside a list."
+            NEWLINE@134..135 "\n"
+  BLANK_LINE@135..136
+    BLANK_LINE@135..136 "\n"
+  BLOCK_QUOTE@136..170
+    BLOCK_QUOTE_MARKER@136..137 ">"
+    WHITESPACE@137..138 " "
+    CODE_BLOCK@138..170
+      CODE_CONTENT@138..170
+        WHITESPACE@138..142 "    "
+        TEXT@142..149 "[!INFO]"
+        NEWLINE@149..150 "\n"
+        LINE_PREFIX@150..151 ">"
+        LINE_PREFIX@151..152 " "
+        WHITESPACE@152..156 "    "
+        TEXT@156..169 "Literal code."
+        NEWLINE@169..170 "\n"
+  BLANK_LINE@170..171
+    BLANK_LINE@170..171 "\n"
+  BLOCK_QUOTE@171..215
+    BLOCK_QUOTE_MARKER@171..172 ">"
+    ALERT@172..215
+      WHITESPACE@172..173 "\t"
+      ALERT_MARKER@173..183 "[!WARNING]"
+      WHITESPACE@183..184 " "
+      ALERT_TITLE@184..201 "Tab-padded marker"
+      NEWLINE@201..202 "\n"
+      BLOCK_QUOTE_MARKER@202..203 ">"
+      WHITESPACE@203..204 " "
+      PARAGRAPH@204..215
+        TEXT@204..214 "A warning."
+        NEWLINE@214..215 "\n"
+  BLANK_LINE@215..216
+    BLANK_LINE@215..216 "\n"
+  BLOCK_QUOTE@216..241
+    BLOCK_QUOTE_MARKER@216..217 ">"
+    LIST@217..241
+      LIST_ITEM@217..241
+        LIST_MARKER@217..218 "-"
+        WHITESPACE@218..219 " "
+        PLAIN@219..241
+          TEXT@219..223 "word"
+          NEWLINE@223..224 "\n"
+          LINE_PREFIX@224..225 ">"
+          TEXT@225..240 "[!TIP] My title"
+          NEWLINE@240..241 "\n"
+  BLANK_LINE@241..242
+    BLANK_LINE@241..242 "\n"
+  BLOCK_QUOTE@242..277
+    BLOCK_QUOTE_MARKER@242..243 ">"
+    WHITESPACE@243..244 " "
+    HORIZONTAL_RULE@244..248
+      HORIZONTAL_RULE@244..247 "---"
+      NEWLINE@247..248 "\n"
+    BLOCK_QUOTE_MARKER@248..249 ">"
+    WHITESPACE@249..250 " "
+    ALERT@250..277
+      ALERT_MARKER@250..256 "[!TIP]"
+      WHITESPACE@256..257 " "
+      ALERT_TITLE@257..269 "After a rule"
+      NEWLINE@269..270 "\n"
+      BLOCK_QUOTE_MARKER@270..271 ">"
+      WHITESPACE@271..272 " "
+      PARAGRAPH@272..277
+        TEXT@272..276 "Body"
+        NEWLINE@276..277 "\n"
+  BLANK_LINE@277..278
+    BLANK_LINE@277..278 "\n"
+  BLOCK_QUOTE@278..332
+    BLOCK_QUOTE_MARKER@278..279 ">"
+    WHITESPACE@279..280 " "
+    VITEPRESS_CONTAINER@280..332
+      VITEPRESS_CONTAINER_OPEN@280..289
+        VITEPRESS_CONTAINER_FENCE@280..283 ":::"
+        WHITESPACE@283..284 " "
+        VITEPRESS_CONTAINER_TYPE@284..288 "info"
+        NEWLINE@288..289 "\n"
+      BLOCK_QUOTE_MARKER@289..290 ">"
+      WHITESPACE@290..291 " "
+      ALERT@291..326
+        ALERT_MARKER@291..297 "[!TIP]"
+        WHITESPACE@297..298 " "
+        ALERT_TITLE@298..310 "Nested title"
+        NEWLINE@310..311 "\n"
+        BLOCK_QUOTE_MARKER@311..312 ">"
+        WHITESPACE@312..313 " "
+        PARAGRAPH@313..326
+          TEXT@313..325 "Body   text."
+          NEWLINE@325..326 "\n"
+      VITEPRESS_CONTAINER_CLOSE@326..332
+        LINE_PREFIX@326..327 ">"
+        LINE_PREFIX@327..328 " "
+        VITEPRESS_CONTAINER_FENCE@328..331 ":::"
+        NEWLINE@331..332 "\n"
+  BLANK_LINE@332..333
+    BLANK_LINE@332..333 "\n"
+  BLOCK_QUOTE@333..365
+    BLOCK_QUOTE_MARKER@333..334 ">"
+    WHITESPACE@334..335 " "
+    LIST@335..365
+      LIST_ITEM@335..365
+        LIST_MARKER@335..336 "-"
+        WHITESPACE@336..337 " "
+        ALERT@337..353
+          ALERT_MARKER@337..344 "[!NOTE]"
+          WHITESPACE@344..345 " "
+          ALERT_TITLE@345..352 "Example"
+          NEWLINE@352..353 "\n"
+        PLAIN@353..365
+          LINE_PREFIX@353..354 ">"
+          LINE_PREFIX@354..355 " "
+          TEXT@355..364 "  content"
+          NEWLINE@364..365 "\n"
+  BLANK_LINE@365..366
+    BLANK_LINE@365..366 "\n"
+  BLOCK_QUOTE@366..404
+    BLOCK_QUOTE_MARKER@366..367 ">"
+    WHITESPACE@367..368 " "
+    LIST@368..404
+      LIST_ITEM@368..379
+        LIST_MARKER@368..369 "-"
+        WHITESPACE@369..370 " "
+        PLAIN@370..379
+          TEXT@370..378 "ordinary"
+          NEWLINE@378..379 "\n"
+      BLOCK_QUOTE_MARKER@379..380 ">"
+      WHITESPACE@380..381 " "
+      LIST_ITEM@381..404
+        LIST_MARKER@381..382 "-"
+        WHITESPACE@382..383 " "
+        PLAIN@383..404
+          TEXT@383..403 "[!NOTE] Not an alert"
+          NEWLINE@403..404 "\n"

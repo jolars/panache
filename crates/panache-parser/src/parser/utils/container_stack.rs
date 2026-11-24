@@ -49,7 +49,9 @@ pub(crate) enum OpenDisplayMath {
 /// content containers leave behind — never against the raw line.
 #[derive(Debug, Clone)]
 pub(crate) enum Container {
-    BlockQuote {},
+    BlockQuote {
+        start_line: Option<usize>,
+    },
     Alert {
         blockquote_depth: usize,
     },
@@ -59,6 +61,12 @@ pub(crate) enum Container {
         /// this is not a closer at the top level (pandoc rule); see
         /// `FencedDivCloseParser::detect_prepared`.
         open_indent_cols: usize,
+    },
+    /// A colon container whose body is bounded by the line discovered at its opener.
+    VitePress {
+        parent_line_limit: usize,
+        explicit_close: bool,
+        max_body_fence_len: usize,
     },
     /// MyST directive container. Closed by a fence line matching the opener's
     /// `fence_char` with at least `fence_count` repeats. The fence info is

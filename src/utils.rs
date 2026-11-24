@@ -1,10 +1,11 @@
-use crate::config::Extensions;
+use crate::config::{Extensions, Flavor};
 use crate::linter::code_block_collector::SnippetKind;
 use crate::syntax::{
-    AstNode, CellOptionResolution, CodeBlock, Heading, InlineExecutable, MystDirective, SyntaxKind,
-    SyntaxNode,
+    AstNode, AttributeNode, CellOptionResolution, CodeBlock, Heading, InlineExecutable,
+    MystDirective, SyntaxKind, SyntaxNode,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use unicode_normalization::UnicodeNormalization;
 
 /// A block or inline expression with its location in the document.
 #[derive(Debug, Clone)]
@@ -241,6 +242,37 @@ pub fn normalize_anchor_label(label: &str) -> String {
     label.trim().to_string()
 }
 
+pub(crate) fn attribute_anchor_id(
+    attribute: &AttributeNode,
+    flavor: Flavor,
+) -> Option<(String, Option<rowan::TextRange>)> {
+    if flavor == Flavor::VitePress {
+        let id = attribute.vitepress_id()?;
+        Some((id.value().to_owned(), Some(id.text_range())))
+    } else {
+        Some((attribute.id()?, attribute.id_value_range()))
+    }
+}
+
+pub(crate) fn heading_for_attribute(attribute: &AttributeNode, flavor: Flavor) -> Option<Heading> {
+    if flavor == Flavor::VitePress {
+        attribute
+            .syntax()
+            .parent()
+            .and_then(Heading::cast)
+            .filter(|heading| !heading.vitepress_attributes_attach_inline())
+    } else {
+        attribute.syntax().ancestors().find_map(Heading::cast)
+    }
+}
+
+pub(crate) fn heading_has_explicit_id(heading: &SyntaxNode) -> bool {
+    heading
+        .children()
+        .filter_map(AttributeNode::cast)
+        .any(|attribute| attribute.id().is_some())
+}
+
 pub fn crossref_resolution_labels(label: &str, bookdown_references: bool) -> Vec<String> {
     let normalized = normalize_anchor_label(label);
     let mut labels = vec![normalized.clone()];
@@ -290,36 +322,58 @@ pub struct ImplicitHeadingId {
     pub heading: SyntaxNode,
 }
 
-pub fn implicit_heading_ids(tree: &SyntaxNode, extensions: &Extensions) -> Vec<ImplicitHeadingId> {
+pub fn implicit_heading_ids(
+    tree: &SyntaxNode,
+    extensions: &Extensions,
+    flavor: Flavor,
+) -> Vec<ImplicitHeadingId> {
     if !extensions.auto_identifiers {
         return Vec::new();
     }
 
     let mut out = Vec::new();
     let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut vitepress_ids = HashSet::new();
 
     for heading in tree.descendants().filter_map(Heading::cast) {
-        let raw_text = heading
-            .content()
-            .map(|content| content.text())
-            .unwrap_or_default();
-        let normalized = normalize_label(&raw_text);
-        if normalized.is_empty() {
+        if flavor == Flavor::VitePress
+            && let Some(id) = heading.vitepress_explicit_id()
+        {
+            vitepress_ids.insert(id.value().to_owned());
             continue;
         }
-
-        let base = heading_slugify(&normalized, extensions);
-        if base.is_empty() {
-            continue;
-        }
-
-        let count = seen.entry(base.clone()).or_insert(0);
-        let id = if *count == 0 {
-            base
+        let id = if flavor == Flavor::VitePress && !extensions.gfm_auto_identifiers {
+            let text = heading
+                .content()
+                .map(|content| content.vitepress_anchor_text(extensions.emoji))
+                .unwrap_or_default();
+            let base = vitepress_slugify(&text);
+            let suffix = seen.entry(base.clone()).or_insert(0);
+            loop {
+                let id = if *suffix == 0 {
+                    base.clone()
+                } else {
+                    format!("{base}-{suffix}")
+                };
+                *suffix += 1;
+                if vitepress_ids.insert(id.clone()) {
+                    break id;
+                }
+            }
         } else {
-            format!("{}-{}", base, *count)
+            let base = heading_slugify(&normalize_label(&heading.text()), extensions);
+            if base.is_empty() {
+                continue;
+            }
+            let count = seen.entry(base.clone()).or_insert(0);
+            let id = if *count == 0 {
+                base
+            } else {
+                format!("{base}-{count}")
+            };
+            *count += 1;
+            id
         };
-        *count += 1;
 
         out.push(ImplicitHeadingId {
             id,
@@ -328,6 +382,31 @@ pub fn implicit_heading_ids(tree: &SyntaxNode, extensions: &Extensions) -> Vec<I
     }
 
     out
+}
+
+/// VitePress 1.x uses the mdit-vue slugger for its automatic heading IDs.
+fn vitepress_slugify(text: &str) -> String {
+    const SEPARATORS: &str = "~`!@#$%^&*()-_+=[]{}|\\;:\"'“”‘’<>,.?/";
+    let mut slug = String::new();
+    let mut pending_separator = false;
+    for ch in text.nfkd() {
+        if ch <= '\u{1f}' || ('\u{300}'..='\u{36f}').contains(&ch) {
+            continue;
+        }
+        if ch.is_whitespace() || ch == '\u{feff}' || SEPARATORS.contains(ch) {
+            pending_separator = !slug.is_empty();
+            continue;
+        }
+        if pending_separator {
+            slug.push('-');
+            pending_separator = false;
+        }
+        if slug.is_empty() && ch.is_ascii_digit() {
+            slug.push('_');
+        }
+        slug.push(ch);
+    }
+    slug.to_lowercase()
 }
 
 /// Generate an auto identifier from heading text based on extension settings.
@@ -407,7 +486,7 @@ pub fn pandoc_slugify(text: &str) -> String {
 mod tests {
     #[cfg(feature = "lsp")]
     use super::crossref_symbol_labels;
-    use super::{crossref_resolution_labels, implicit_heading_ids};
+    use super::{Flavor, crossref_resolution_labels, implicit_heading_ids};
 
     #[test]
     fn myst_non_code_directives_are_not_code_snippets() {
@@ -457,10 +536,11 @@ mod tests {
     #[test]
     fn implicit_heading_ids_use_pandoc_duplicate_suffixes() {
         let tree = crate::parse("# Heading\n\n# Heading\n\n# Heading\n", None);
-        let ids = implicit_heading_ids(&tree, &crate::config::Extensions::default())
-            .into_iter()
-            .map(|entry| entry.id)
-            .collect::<Vec<_>>();
+        let ids =
+            implicit_heading_ids(&tree, &crate::config::Extensions::default(), Flavor::Pandoc)
+                .into_iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>();
         assert_eq!(ids, vec!["heading", "heading-1", "heading-2"]);
     }
 
@@ -471,7 +551,7 @@ mod tests {
             gfm_auto_identifiers: true,
             ..crate::config::Extensions::default()
         };
-        let ids = implicit_heading_ids(&tree, &ext)
+        let ids = implicit_heading_ids(&tree, &ext, Flavor::Gfm)
             .into_iter()
             .map(|entry| entry.id)
             .collect::<Vec<_>>();
@@ -485,6 +565,6 @@ mod tests {
             auto_identifiers: false,
             ..crate::config::Extensions::default()
         };
-        assert!(implicit_heading_ids(&tree, &ext).is_empty());
+        assert!(implicit_heading_ids(&tree, &ext, Flavor::CommonMark).is_empty());
     }
 }

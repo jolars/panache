@@ -43,6 +43,7 @@ pub fn write_report(
         Flavor::Mdsvex => "mdsvex",
         Flavor::Myst => "myst",
         Flavor::Hugo => "hugo",
+        Flavor::VitePress => "vitepress",
         Flavor::Jupyter => "jupyter",
     };
     let (source_name, origin) = match source {

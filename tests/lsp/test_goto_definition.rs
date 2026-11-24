@@ -486,6 +486,81 @@ fn test_goto_definition_inline_hash_heading_reference() {
 }
 
 #[test]
+fn test_goto_definition_gfm_skips_implicit_id_for_explicit_heading() {
+    let project = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        project.path().join("panache.toml"),
+        "flavor = 'gfm'\n[extensions]\nheader-attributes = true\n",
+    )
+    .unwrap();
+    let root = Uri::from_file_path(project.path()).unwrap();
+    let document = Uri::from_file_path(project.path().join("guide.md")).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root.as_str());
+    server.open_document(
+        document.as_str(),
+        "# Title {#custom}\n\n[Missing](#title)\n[Existing](#custom)\n",
+        "markdown",
+    );
+
+    assert!(server.goto_definition(document.as_str(), 2, 13).is_none());
+    let Some(GotoDefinitionResponse::Scalar(location)) =
+        server.goto_definition(document.as_str(), 3, 15)
+    else {
+        panic!("Expected a location for the explicit heading ID");
+    };
+    assert_eq!(location.range.start.line, 0);
+}
+
+#[test]
+fn test_goto_definition_vitepress_automatic_heading_anchor() {
+    let project = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        project.path().join("panache.toml"),
+        "flavor = \"vitepress\"\n",
+    )
+    .unwrap();
+    let root = Uri::from_file_path(project.path()).unwrap();
+    let document = Uri::from_file_path(project.path().join("guide.md")).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root.as_str());
+    server.open_document(document.as_str(), "# Café\n\n[Link](#cafe)\n", "markdown");
+
+    let result = server.goto_definition(document.as_str(), 2, 10);
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected a location for the VitePress heading");
+    };
+    assert_eq!(location.uri, document);
+    assert_eq!(location.range.start.line, 0);
+}
+
+#[test]
+fn test_goto_definition_vitepress_named_heading_id() {
+    let project = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        project.path().join("panache.toml"),
+        "flavor = \"vitepress\"\n",
+    )
+    .unwrap();
+    let root = Uri::from_file_path(project.path()).unwrap();
+    let document = Uri::from_file_path(project.path().join("guide.md")).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root.as_str());
+    server.open_document(
+        document.as_str(),
+        "# Setup {id=\"install\"}\n\n[Link](#install)\n",
+        "markdown",
+    );
+
+    let result = server.goto_definition(document.as_str(), 2, 10);
+    let Some(GotoDefinitionResponse::Scalar(location)) = result else {
+        panic!("Expected a location for the VitePress heading");
+    };
+    assert_eq!(location.uri, document);
+    assert_eq!(location.range.start.line, 0);
+}
+
+#[test]
 fn test_goto_definition_shortcut_implicit_heading_reference_with_spaces() {
     let mut server = TestLspServer::new();
 

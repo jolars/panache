@@ -33,6 +33,9 @@ pub mod line_blocks;
 pub mod lists;
 #[path = "blocks/metadata.rs"]
 pub mod metadata;
+#[path = "blocks/vitepress_containers.rs"]
+pub(crate) mod vitepress_containers;
+
 #[path = "blocks/myst_directives.rs"]
 pub mod myst_directives;
 #[path = "blocks/myst_targets.rs"]

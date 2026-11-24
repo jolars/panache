@@ -1,4 +1,5 @@
 use super::*;
+use crate::options::Flavor;
 
 pub(super) struct LazyFold<'l> {
     pub(super) line: &'l str,
@@ -44,11 +45,18 @@ pub(super) struct LazyInterrupts {
     pub(super) div_close: bool,
     pub(super) html: bool,
     pub(super) ends_gobble: bool,
+    pub(super) vitepress_block: bool,
 }
 
 impl LazyInterrupts {
     pub(super) fn any(&self) -> bool {
-        self.hr || self.fence || self.heading || self.div_close || self.html || self.ends_gobble
+        self.hr
+            || self.fence
+            || self.heading
+            || self.div_close
+            || self.html
+            || self.ends_gobble
+            || self.vitepress_block
     }
 }
 
@@ -95,12 +103,118 @@ impl<'a> Parser<'a> {
         self.active_alert_blockquote_depth().is_some()
     }
 
-    pub(super) fn alert_marker_from_content(content: &str) -> Option<&'static str> {
-        let (without_newline, _) = strip_newline(content);
-        let trimmed = without_newline.trim();
+    pub(super) fn vitepress_alert_preamble_quote(&self) -> Option<usize> {
+        let (
+            index,
+            Container::BlockQuote {
+                start_line: Some(start_line),
+            },
+        ) = self
+            .containers
+            .stack
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, container)| {
+                !matches!(
+                    container,
+                    Container::VitePress { .. }
+                        | Container::List { .. }
+                        | Container::ListItem { .. }
+                )
+            })?
+        else {
+            return None;
+        };
+        let depth = self.current_blockquote_depth();
+        let lines = self.lines.get(*start_line..self.pos)?;
+        lines
+            .iter()
+            .all(|line| is_blank_line(strip_n_blockquote_markers(line, depth)))
+            .then_some(index)
+    }
+
+    pub(super) fn skip_vitepress_alert_preamble(&mut self, parser_name: &str, lines: usize) {
+        // These blocks emit no inline content. VitePress still checks the
+        // first inline block after them for an alert marker.
+        if self.config.flavor == Flavor::VitePress
+            && matches!(
+                parser_name,
+                "horizontal_rule"
+                    | "fenced_code_block"
+                    | "indented_code_block"
+                    | "html_block"
+                    | "reference_definition"
+                    | "vitepress_snippet"
+                    | "vitepress_toc"
+            )
+        {
+            self.advance_vitepress_alert_preamble(lines);
+        }
+    }
+
+    pub(super) fn advance_vitepress_alert_preamble(&mut self, lines: usize) {
+        if let Some(index) = self.vitepress_alert_preamble_quote()
+            && let Container::BlockQuote { start_line } = &mut self.containers.stack[index]
+        {
+            *start_line = Some(self.pos + lines);
+        }
+    }
+
+    pub(super) fn alert_marker_from_content(&self, line: &str, content: &str) -> Option<usize> {
+        if self.config.flavor != Flavor::VitePress {
+            return GITHUB_ALERT_MARKERS
+                .into_iter()
+                .find(|marker| *marker == content.trim_end())
+                .map(str::len);
+        }
+
+        let rest = content.strip_prefix("[!")?;
+        let prefix = self.lines[self.pos].strip_suffix(line).unwrap_or_default();
+        if vitepress_containers::frame_indent(line, prefix).0 >= 4 {
+            return None;
+        }
+        let (name, _) = rest.split_once(']')?;
         GITHUB_ALERT_MARKERS
             .into_iter()
-            .find(|marker| *marker == trimmed)
+            .chain(["[!INFO]", "[!DANGER]"])
+            .any(|marker| marker[2..marker.len() - 1].eq_ignore_ascii_case(name))
+            .then_some(name.len() + 3)
+    }
+
+    pub(super) fn emit_alert_header(
+        builder: &mut GreenNodeBuilder<'static>,
+        line: &str,
+        newline: &str,
+        indent: &str,
+        marker_len: usize,
+    ) {
+        builder.start_node(SyntaxKind::ALERT.into());
+        let header = line.trim_start();
+        let leading = &line[..line.len() - header.len()];
+        for whitespace in [indent, leading] {
+            if !whitespace.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), whitespace);
+            }
+        }
+        let (marker, remainder) = header.split_at(marker_len);
+        builder.token(SyntaxKind::ALERT_MARKER.into(), marker);
+        let title_and_padding = remainder.trim_start();
+        let gap = &remainder[..remainder.len() - title_and_padding.len()];
+        let title = title_and_padding.trim_end();
+        if !gap.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), gap);
+        }
+        if !title.is_empty() {
+            builder.token(SyntaxKind::ALERT_TITLE.into(), title);
+        }
+        let trailing = &title_and_padding[title.len()..];
+        if !trailing.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), trailing);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
     }
 
     pub(super) fn blockquote_marker_info(
@@ -458,6 +572,12 @@ impl<'a> Parser<'a> {
                     && self.quoted_div_closes_at(count_blockquote_markers(line).0)));
         let html = self.lazy_html_block_interrupts(inner_content);
         let ends_gobble = !is_commonmark && self.blockquote_gobble_ends_at(line, inner_content);
+        let prefix = line.strip_suffix(inner_content).unwrap_or_default();
+        let vitepress_block = (self.config.extensions.vitepress_containers
+            && vitepress_containers::OpenContainer::parse_in_frame(inner_content, prefix)
+                .is_some())
+            || (self.config.flavor == Flavor::VitePress
+                && vitepress_containers::toc_marker_offset(inner_content, prefix).is_some());
         LazyInterrupts {
             hr,
             fence,
@@ -465,6 +585,7 @@ impl<'a> Parser<'a> {
             div_close,
             html,
             ends_gobble,
+            vitepress_block,
         }
     }
 

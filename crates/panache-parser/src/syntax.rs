@@ -30,6 +30,7 @@ pub mod raw_tex;
 pub mod references;
 pub mod shortcodes;
 pub mod tables;
+pub mod vitepress;
 pub mod yaml;
 pub mod yaml_ast;
 
@@ -59,6 +60,7 @@ pub use raw_tex::*;
 pub use references::*;
 pub use shortcodes::*;
 pub use tables::*;
+pub use vitepress::*;
 pub use yaml::*;
 pub use yaml_ast::*;
 

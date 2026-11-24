@@ -91,6 +91,9 @@ Reference images
 Footnote references
 :   `[^id]` → `[^id]: content`
 
+VitePress heading links
+:   `[text](#cafe)` → `# Café` using the automatically generated heading ID
+
 Quarto crossrefs
 :   `@fig-label` → `#| label: fig-label` (or other crossref label definitions)
 

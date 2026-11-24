@@ -17,6 +17,35 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[test]
+fn vitepress_container_extension_is_opt_in() {
+    use panache_parser::syntax::{AstNode, VitePressContainer};
+
+    let input = "::: info Note\nBody.\n:::\n";
+    for flavor in [Flavor::CommonMark, Flavor::Pandoc] {
+        let tree = parse(input, Some(ParserOptions::for_flavor(flavor)));
+        assert!(
+            tree.descendants()
+                .find_map(VitePressContainer::cast)
+                .is_none()
+        );
+    }
+
+    let mut options = ParserOptions::for_flavor(Flavor::VitePress);
+    let tree = parse(input, Some(options.clone()));
+    let container = tree.children().find_map(VitePressContainer::cast).unwrap();
+    assert_eq!(container.container_type().unwrap().text(), "info");
+    assert_eq!(container.title().unwrap().text(), "Note");
+
+    options.extensions.vitepress_containers = false;
+    let tree = parse(input, Some(options));
+    assert!(
+        tree.descendants()
+            .find_map(VitePressContainer::cast)
+            .is_none()
+    );
+}
+
 fn find_file_with_extension(dir: &Path, base: &str) -> Option<PathBuf> {
     for ext in &["md", "qmd", "Rmd", "svx"] {
         let path = dir.join(format!("{}.{}", base, ext));
@@ -50,6 +79,7 @@ fn load_test_parser_options(dir: &Path) -> Option<ParserOptions> {
             "mdsvex" => Flavor::Mdsvex,
             "myst" => Flavor::Myst,
             "hugo" => Flavor::Hugo,
+            "vitepress" => Flavor::VitePress,
             _ => Flavor::default(),
         };
         options.flavor = flavor;
@@ -1342,6 +1372,15 @@ golden_test_cases!(
     math_left_right,
     math_optional_arguments,
     math_scripts,
+    vitepress_containers,
+    vitepress_container_nesting,
+    vitepress_container_boundaries,
+    vitepress_alerts,
+    vitepress_quoted_fences,
+    vitepress_container_regressions,
+    vitepress_heading_regressions,
+    vitepress_snippets,
+    vitepress_toc,
     myst_directive_basic,
     myst_directive_arg_options,
     myst_directive_options_no_blank,

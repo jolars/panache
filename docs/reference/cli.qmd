@@ -30,6 +30,7 @@ Panache is a language server, formatter, and linter for Quarto and other Markdow
     - `mdsvex`: mdsvex (Svelte-flavored Markdown: CommonMark + Svelte template syntax)
     - `myst`: MyST (CommonMark + Sphinx/MyST directives, roles, and targets)
     - `hugo`: Hugo Markdown (Goldmark defaults, front matter, and shortcodes)
+    - `vitepress`: VitePress 1.x Markdown (CommonMark with colon containers)
 
 `--color <WHEN>`
 :   Control when colored output is used

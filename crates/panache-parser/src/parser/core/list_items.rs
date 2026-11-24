@@ -124,9 +124,64 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// The list item buffers its marker-line content before ordinary block dispatch.
+    pub(super) fn maybe_open_custom_block_in_new_list_item(&mut self) -> Option<usize> {
+        if self.config.extensions.vitepress_containers
+            && self.maybe_open_vitepress_in_new_list_item().is_some()
+        {
+            return Some(0);
+        }
+        if self.config.flavor == crate::options::Flavor::VitePress
+            && self.config.extensions.alerts
+            && !self.in_active_alert()
+            && self.vitepress_alert_preamble_quote().is_some()
+            && let Some(Container::ListItem { buffer, .. }) = self.containers.last()
+            && let Some(first) = buffer.sole_text_segment()
+            && let (line, newline) = strip_newline(first)
+            && let Some(marker_len) = self.alert_marker_from_content(first, line.trim_start())
+        {
+            // Retain the list item as the owner of the following body lines.
+            Self::emit_alert_header(&mut self.builder, line, newline, "", marker_len);
+            self.builder.finish_node();
+            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                buffer.clear();
+            }
+            return Some(0);
+        }
+        if self.config.flavor == crate::options::Flavor::VitePress
+            && let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut()
+            && let Some(first) = buffer.sole_text_segment()
+        {
+            use super::vitepress_containers as vitepress;
+            if let Some(marker) = vitepress::snippet_marker_offset(first, "") {
+                vitepress::emit_snippet(&mut self.builder, first, 0, marker);
+            } else if let Some(marker) = vitepress::toc_marker_offset(first, "") {
+                vitepress::emit_toc(&mut self.builder, first, 0, marker);
+            } else {
+                return self.maybe_open_hugo_in_new_list_item();
+            }
+            buffer.clear();
+            return Some(0);
+        }
+        self.maybe_open_hugo_in_new_list_item()
+    }
+
+    fn maybe_open_vitepress_in_new_list_item(&mut self) -> Option<()> {
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config);
+        let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() else {
+            return None;
+        };
+        let first = buffer.sole_text_segment()?;
+        let open = super::OpenContainer::parse(first)?;
+        open.emit(&mut self.builder, first, self.config.flavor);
+        buffer.clear();
+        self.push_vitepress_container(&open, &prefix);
+        Some(())
+    }
+
     /// The marker line bypasses block dispatch, so claim shortcode regions
     /// before their continuation lines can open Markdown blocks.
-    pub(super) fn maybe_open_hugo_in_new_list_item(&mut self) -> Option<usize> {
+    fn maybe_open_hugo_in_new_list_item(&mut self) -> Option<usize> {
         if !self.config.extensions.hugo_shortcodes {
             return None;
         }
@@ -195,6 +250,16 @@ impl<'a> Parser<'a> {
         &mut self,
         result: crate::parser::blocks::lists::ListItemFinish,
     ) -> usize {
+        if self.config.flavor == crate::options::Flavor::VitePress {
+            for container in self.containers.stack.iter_mut().rev() {
+                if let Container::BlockQuote { start_line } = container {
+                    if start_line.is_some() {
+                        break;
+                    }
+                    *start_line = Some(self.pos);
+                }
+            }
+        }
         let crate::parser::blocks::lists::ListItemFinish::BqDispatch { content } = result else {
             return 0;
         };
@@ -852,6 +917,41 @@ impl<'a> Parser<'a> {
         self.builder.finish_node();
     }
 
+    pub(super) fn fold_vitepress_setext_heading(&mut self, prefix: &ContainerPrefix) {
+        let (mut buffer, checkpoint) = match self.containers.last() {
+            Some(Container::Paragraph {
+                buffer,
+                start_checkpoint,
+                ..
+            }) => (buffer.clone(), Some(*start_checkpoint)),
+            Some(Container::ListItem { buffer, .. }) => (
+                buffer.to_paragraph_buffer(&self.containers.gobble_chain()),
+                None,
+            ),
+            _ => unreachable!("setext folding requires buffered inline content"),
+        };
+        let lines = StrippedLines::new(&self.lines, self.pos, prefix);
+        let text = lines.first_unconditional();
+        if let Some(indent) = lines.first().strip_suffix(text) {
+            buffer.push_indent(indent);
+        }
+        buffer.push_text(text);
+        if let Some(checkpoint) = checkpoint {
+            self.containers.stack.pop();
+            self.builder
+                .start_node_at(checkpoint, SyntaxKind::HEADING.into());
+        } else {
+            if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
+                buffer.clear();
+            }
+            self.builder.start_node(SyntaxKind::HEADING.into());
+        }
+        buffer.emit_setext_heading_text(&mut self.builder, self.config);
+        let underline = lines.emit_prefix_at(&mut self.builder, self.pos + 1);
+        emit_setext_underline(&mut self.builder, underline);
+        self.builder.finish_node();
+    }
+
     /// Try to fold a list item's buffered first-line text and the current line
     /// into a setext HEADING node, returning true on success.
     ///
@@ -1280,7 +1380,7 @@ impl<'a> Parser<'a> {
                             self.config,
                         )
                     };
-                    if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+                    if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
                         return extras;
                     }
                     if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
@@ -1318,7 +1418,7 @@ impl<'a> Parser<'a> {
                 indent_to_emit,
                 self.config,
             );
-            if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+            if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
                 return extras;
             }
             if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
@@ -1375,7 +1475,7 @@ impl<'a> Parser<'a> {
                     self.config,
                 )
             };
-            if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+            if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
                 return extras;
             }
             if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {
@@ -1442,7 +1542,7 @@ impl<'a> Parser<'a> {
                 self.config,
             )
         };
-        if let Some(extras) = self.maybe_open_hugo_in_new_list_item() {
+        if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
             return extras;
         }
         if let Some(extras) = self.maybe_open_html_block_in_new_list_item() {

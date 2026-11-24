@@ -463,6 +463,7 @@ pub(crate) fn code_action(
             &tree,
             &text,
             &config.extensions,
+            config.flavor,
         );
         if !edits.is_empty() {
             let mut changes = HashMap::new();

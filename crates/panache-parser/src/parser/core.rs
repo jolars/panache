@@ -1,4 +1,4 @@
-use crate::options::ParserOptions;
+use crate::options::{Flavor, ParserOptions};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 use rowan::GreenNodeBuilder;
 
@@ -27,6 +27,7 @@ use super::blocks::paragraphs;
 use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
 use super::blocks::tables;
 use super::blocks::tables::LineView;
+use super::blocks::vitepress_containers::{self, Boundary, OpenContainer};
 use super::diagnostics::{Diagnostics, SyntaxError};
 use super::utils::container_stack;
 use super::utils::helpers::{
@@ -90,8 +91,29 @@ impl LineDispatch {
     }
 }
 
+/// The active block window. VitePress establishes a container's end before
+/// parsing its children, so even multiline scanners see a virtual EOF there.
+struct BlockLines<'a> {
+    all: Vec<&'a str>,
+    limit: usize,
+}
+
+impl<'a> std::ops::Deref for BlockLines<'a> {
+    type Target = [&'a str];
+
+    fn deref(&self) -> &Self::Target {
+        &self.all[..self.limit]
+    }
+}
+
+impl std::ops::DerefMut for BlockLines<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.all[..self.limit]
+    }
+}
+
 pub struct Parser<'a> {
-    lines: Vec<&'a str>,
+    lines: BlockLines<'a>,
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     containers: ContainerStack,
@@ -129,7 +151,10 @@ impl<'a> Parser<'a> {
     fn with_origin(input: &'a str, config: &'a ParserOptions, origin: ParseOrigin) -> Self {
         let lines = split_lines_inclusive(input);
         Self {
-            lines,
+            lines: BlockLines {
+                limit: lines.len(),
+                all: lines,
+            },
             pos: 0,
             builder: GreenNodeBuilder::new(),
             containers: ContainerStack::new(),
@@ -308,6 +333,13 @@ impl<'a> Parser<'a> {
                     self.containers.stack.pop();
                     self.builder.finish_node();
                 }
+                Some(Container::VitePress {
+                    parent_line_limit, ..
+                }) => {
+                    self.lines.limit = *parent_line_limit;
+                    self.containers.stack.pop();
+                    self.builder.finish_node();
+                }
                 _ => {
                     self.containers.stack.pop();
                     self.builder.finish_node();
@@ -461,7 +493,7 @@ impl<'a> Parser<'a> {
 
         if self.config.extensions.definition_lists
             && let Some(blank_count) = first_content_line_term_lookahead(
-                self.lines.as_slice(),
+                &*self.lines,
                 self.pos,
                 content_col,
                 self.config.extensions.table_captions,
@@ -682,7 +714,9 @@ impl<'a> Parser<'a> {
                     info.has_trailing_space,
                 );
             }
-            self.containers.push(Container::BlockQuote {});
+            self.containers.push(Container::BlockQuote {
+                start_line: Some(self.pos),
+            });
         }
 
         paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
@@ -721,7 +755,11 @@ impl<'a> Parser<'a> {
 
         log::trace!("Starting document parse");
 
-        while self.pos < self.lines.len() {
+        while self.pos < self.lines.all.len() {
+            if self.pos == self.lines.limit {
+                self.finish_vitepress_container();
+                continue;
+            }
             let line = self.lines[self.pos];
 
             log::trace!("Parsing line {}: {}", self.pos + 1, line);
@@ -889,7 +927,9 @@ impl<'a> Parser<'a> {
                 self.close_lists_before_blockquote(line, current_bq_depth);
                 for _ in current_bq_depth..bq_depth {
                     self.builder.start_node(SyntaxKind::BLOCK_QUOTE.into());
-                    self.containers.push(Container::BlockQuote {});
+                    self.containers.push(Container::BlockQuote {
+                        start_line: Some(self.pos),
+                    });
                 }
             } else if bq_depth < current_bq_depth {
                 self.close_blockquotes_to_depth(bq_depth);
@@ -1135,7 +1175,9 @@ impl<'a> Parser<'a> {
                     &stripped,
                 );
                 for _ in 0..bq_depth {
-                    self.containers.push(Container::BlockQuote {});
+                    self.containers.push(Container::BlockQuote {
+                        start_line: Some(self.pos),
+                    });
                 }
             } else {
                 for level in 0..current_bq_depth {
@@ -1159,7 +1201,9 @@ impl<'a> Parser<'a> {
                         );
                     }
 
-                    self.containers.push(Container::BlockQuote {});
+                    self.containers.push(Container::BlockQuote {
+                        start_line: Some(self.pos),
+                    });
                 }
             }
 
@@ -1525,7 +1569,7 @@ impl<'a> Parser<'a> {
                         self.config,
                     );
                     let extras = if let Some(extras) = self
-                        .maybe_open_hugo_in_new_list_item()
+                        .maybe_open_custom_block_in_new_list_item()
                         .or_else(|| self.maybe_open_html_block_in_new_list_item())
                     {
                         extras
@@ -1868,14 +1912,19 @@ impl<'a> Parser<'a> {
             && self.current_blockquote_depth() > 0
             && !self.in_active_alert()
             && !self.is_paragraph_open()
-            && let Some(marker) = Self::alert_marker_from_content(stripped_content)
+            && let (line, newline) = strip_newline(stripped_content)
+            && let header = line.trim_start()
+            && let Some(marker_len) = self.alert_marker_from_content(stripped_content, header)
+            && (self.config.flavor != Flavor::VitePress
+                || self.vitepress_alert_preamble_quote().is_some())
         {
-            let (_, newline_str) = strip_newline(stripped_content);
-            self.builder.start_node(SyntaxKind::ALERT.into());
-            self.builder.token(SyntaxKind::ALERT_MARKER.into(), marker);
-            if !newline_str.is_empty() {
-                self.builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-            }
+            Self::emit_alert_header(
+                &mut self.builder,
+                line,
+                newline,
+                indent_to_emit.unwrap_or_default(),
+                marker_len,
+            );
             self.containers.push(Container::Alert {
                 blockquote_depth: self.current_blockquote_depth(),
             });
@@ -2050,7 +2099,9 @@ impl<'a> Parser<'a> {
                                     );
                                 }
 
-                                self.containers.push(Container::BlockQuote {});
+                                self.containers.push(Container::BlockQuote {
+                                    start_line: Some(self.pos),
+                                });
                             }
                         } else {
                             self.emit_blockquote_markers(&marker_info, bq_depth);
@@ -2368,8 +2419,10 @@ impl<'a> Parser<'a> {
                     )
                 };
 
+                let parser_name = self.block_registry.parser_name(block_match);
+                self.skip_vitepress_alert_preamble(parser_name, lines_consumed);
                 if matches!(
-                    self.block_registry.parser_name(block_match),
+                    parser_name,
                     "yaml_metadata" | "toml_metadata" | "pandoc_title_block" | "mmd_title_block"
                 ) {
                     self.after_metadata_block = true;
@@ -2387,6 +2440,10 @@ impl<'a> Parser<'a> {
                     }
                     BlockEffect::OpenMystDirective => {
                         self.push_myst_directive_container(block_match);
+                        0
+                    }
+                    BlockEffect::OpenVitePressContainer => {
+                        self.push_prepared_vitepress_container(block_match, &dispatcher_prefix);
                         0
                     }
                     BlockEffect::CloseMystDirective => {
@@ -2536,6 +2593,14 @@ impl<'a> Parser<'a> {
                 }
                 BlockDetectionResult::Yes => {
                     if parser_name == "setext_heading"
+                        && self.config.flavor == Flavor::VitePress
+                        && (self.is_paragraph_open() || self.is_list_item_content_open())
+                    {
+                        self.fold_vitepress_setext_heading(&dispatcher_prefix);
+                        return LineDispatch::consumed(2);
+                    }
+
+                    if parser_name == "setext_heading"
                         && self.is_paragraph_open()
                         && self.config.dialect == crate::options::Dialect::CommonMark
                     {
@@ -2605,6 +2670,7 @@ impl<'a> Parser<'a> {
                         &stripped,
                     )
                 };
+                self.skip_vitepress_alert_preamble(parser_name, lines_consumed);
 
                 let extras = match block_match.effect {
                     BlockEffect::None => 0,
@@ -2618,6 +2684,10 @@ impl<'a> Parser<'a> {
                     }
                     BlockEffect::OpenMystDirective => {
                         self.push_myst_directive_container(block_match);
+                        0
+                    }
+                    BlockEffect::OpenVitePressContainer => {
+                        self.push_prepared_vitepress_container(block_match, &dispatcher_prefix);
                         0
                     }
                     BlockEffect::CloseMystDirective => {
@@ -2835,6 +2905,91 @@ impl<'a> Parser<'a> {
             Container::FencedDiv { open_indent_cols } => Some(*open_indent_cols),
             _ => None,
         })
+    }
+
+    fn push_prepared_vitepress_container(
+        &mut self,
+        block_match: &PreparedBlockMatch,
+        prefix: &ContainerPrefix,
+    ) {
+        let open = block_match
+            .payload
+            .as_ref()
+            .and_then(|payload| payload.downcast_ref::<OpenContainer>())
+            .expect("VitePress container opener was prepared");
+        self.push_vitepress_container(open, prefix);
+    }
+
+    fn push_vitepress_container(&mut self, open: &OpenContainer, prefix: &ContainerPrefix) {
+        if self.config.flavor == Flavor::VitePress {
+            self.advance_vitepress_alert_preamble(1);
+        }
+        let lines = StrippedLines::new(&self.lines, self.pos, prefix);
+        // Reuse the enclosing scan when it already ruled out a closer of
+        // this length in the same frame. Runs of unclosed, same-length
+        // containers otherwise each scan the entire remaining body.
+        let inherited_max =
+            self.containers
+                .stack
+                .iter()
+                .enumerate()
+                .rev()
+                .find_map(|(index, container)| match container {
+                    Container::VitePress {
+                        max_body_fence_len, ..
+                    } => Some((index, *max_body_fence_len)),
+                    _ => None,
+                });
+        let boundary = if let Some((index, max_body_fence_len)) = inherited_max
+            && max_body_fence_len < open.fence_len
+            && ContainerPrefix::from_stack(&self.containers.stack[..index], false, self.config)
+                .ops()
+                == prefix.ops()
+        {
+            Boundary {
+                line: self.lines.limit,
+                explicit_close: false,
+                max_body_fence_len,
+            }
+        } else {
+            open.boundary(&lines)
+        };
+        self.containers.push(Container::VitePress {
+            parent_line_limit: self.lines.limit,
+            explicit_close: boundary.explicit_close,
+            max_body_fence_len: boundary.max_body_fence_len,
+        });
+        self.lines.limit = boundary.line;
+    }
+
+    fn finish_vitepress_container(&mut self) {
+        let (owner, explicit_close) = self
+            .containers
+            .stack
+            .iter()
+            .enumerate()
+            .rev()
+            .find_map(|(index, container)| match container {
+                Container::VitePress { explicit_close, .. } => Some((index, *explicit_close)),
+                _ => None,
+            })
+            .expect("a VitePress container owns the active line limit");
+        self.close_containers_to(owner + 1);
+        if explicit_close {
+            let prefix =
+                ContainerPrefix::from_stack(&self.containers.stack[..owner], false, self.config);
+            let lines = StrippedLines::new(&self.lines.all, self.pos, &prefix);
+            self.builder
+                .start_node(SyntaxKind::VITEPRESS_CONTAINER_CLOSE.into());
+            let tail = lines.emit_prefix_at(&mut self.builder, self.pos);
+            vitepress_containers::emit_close(&mut self.builder, tail);
+            self.builder.finish_node();
+            if self.config.flavor == Flavor::VitePress {
+                self.advance_vitepress_alert_preamble(1);
+            }
+            self.pos += 1;
+        }
+        self.close_containers_to(owner);
     }
 
     fn myst_directive_container_index(&self) -> Option<usize> {

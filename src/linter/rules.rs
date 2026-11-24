@@ -292,10 +292,11 @@ impl LintContext<'_> {
             Some(symbols) => std::borrow::Cow::Borrowed(symbols),
             None => {
                 let db = crate::salsa::SalsaDb::default();
-                std::borrow::Cow::Owned(crate::salsa::symbol_usage_index_from_tree(
+                std::borrow::Cow::Owned(crate::salsa::symbol_usage_index_from_tree_with_flavor(
                     &db,
                     self.tree,
                     &self.config.extensions,
+                    self.config.flavor,
                 ))
             }
         }

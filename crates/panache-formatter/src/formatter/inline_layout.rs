@@ -507,6 +507,7 @@ struct StreamingCoreSink<'a> {
     avoid_heading_line_start: bool,
     avoid_tilde_fence_line_start: bool,
     avoid_hugo_shortcode_line_start: bool,
+    avoid_vitepress_fence_line_start: bool,
     escape_fancy_list_line_start: bool,
 }
 
@@ -541,6 +542,7 @@ impl<'a> StreamingCoreSink<'a> {
             avoid_heading_line_start,
             avoid_tilde_fence_line_start,
             avoid_hugo_shortcode_line_start: false,
+            avoid_vitepress_fence_line_start: false,
             escape_fancy_list_line_start: false,
         }
     }
@@ -552,6 +554,7 @@ impl<'a> StreamingCoreSink<'a> {
             || (self.avoid_heading_line_start
                 && (is_atx_heading_marker_piece(text) || is_setext_or_thematic_marker_piece(text)))
             || (self.avoid_tilde_fence_line_start && is_tilde_fence_piece(text))
+            || (self.avoid_vitepress_fence_line_start && text.starts_with(":::"))
             || (self.avoid_hugo_shortcode_line_start
                 && (text.starts_with("{{<") || text.starts_with("{{%")))
     }
@@ -572,9 +575,15 @@ impl<'a> StreamingCoreSink<'a> {
             let spacer_width = usize::from(self.line_has_piece && self.prev_ws_after);
             let would_start_line_with_unsafe_piece =
                 self.prev_ws_after && self.piece_would_start_unsafe_line(segment.text.as_str());
+            // A literal colon run at the start of a paragraph must also stay
+            // with its next word so it cannot become a standalone closer.
+            let would_end_with_vitepress_fence = self.avoid_vitepress_fence_line_start
+                && self.line.starts_with(":::")
+                && self.line.bytes().all(|byte| byte == b':');
             if self.line_has_piece
                 && self.line_width + spacer_width + piece_width > width_limit
                 && !would_start_line_with_unsafe_piece
+                && !would_end_with_vitepress_fence
             {
                 self.out.push(std::mem::take(&mut self.line));
                 self.line_width = 0;
@@ -1663,6 +1672,7 @@ pub(super) fn wrapped_lines_for_node(
     );
     // A shortcode on its own physical line interrupts Markdown inlines.
     builder.sink.avoid_hugo_shortcode_line_start = config.parser_extensions.hugo_shortcodes;
+    builder.sink.avoid_vitepress_fence_line_start = config.parser_extensions.vitepress_containers;
     builder.sink.escape_fancy_list_line_start = options.preserve_newlines
         && config.parser_extensions.fancy_lists
         && node
@@ -1677,7 +1687,18 @@ pub(super) fn wrapped_lines_for_node(
         options.atomic_links_root,
         false,
     );
-    builder.finish()
+    let mut lines = builder.finish();
+    if config.parser_extensions.vitepress_containers
+        && matches!(node.kind(), SyntaxKind::PARAGRAPH | SyntaxKind::PLAIN)
+    {
+        for line in &mut lines {
+            if panache_parser::is_vitepress_container_opener(line) {
+                let fence = line.find(':').expect("VitePress container opener");
+                line.insert(fence, '\\');
+            }
+        }
+    }
+    lines
 }
 
 fn is_fence_like_triplet_paragraph(node: &SyntaxNode) -> bool {

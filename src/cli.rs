@@ -607,4 +607,7 @@ pub enum CliFlavor {
     Myst,
     /// Hugo Markdown (Goldmark defaults, front matter, and shortcodes)
     Hugo,
+    /// VitePress 1.x Markdown (CommonMark with colon containers)
+    #[value(name = "vitepress")]
+    VitePress,
 }

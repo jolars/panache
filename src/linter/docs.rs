@@ -296,6 +296,7 @@ fn flavor_name(flavor: Flavor) -> &'static str {
         Flavor::Mdsvex => "mdsvex",
         Flavor::Myst => "MyST",
         Flavor::Hugo => "Hugo",
+        Flavor::VitePress => "VitePress",
         Flavor::Jupyter => "Jupyter",
     }
 }

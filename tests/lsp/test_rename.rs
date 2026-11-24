@@ -507,6 +507,49 @@ foobar
 }
 
 #[test]
+fn vitepress_renames_named_heading_id_from_the_declaration() {
+    let project = tempfile::TempDir::new().unwrap();
+    fs::write(
+        project.path().join("panache.toml"),
+        "flavor = 'vitepress'\n",
+    )
+    .unwrap();
+    let root = Uri::from_file_path(project.path()).unwrap();
+    let doc = Uri::from_file_path(project.path().join("guide.md")).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root.as_str());
+    server.open_document(
+        doc.as_str(),
+        "# Setup {id=\"install\"}\n\n[Link](#install)\n",
+        "markdown",
+    );
+
+    let declaration = Range::new(Position::new(0, 13), Position::new(0, 20));
+    let prepared = server.prepare_rename(doc.as_str(), 0, 15).unwrap();
+    assert_eq!(
+        prepared,
+        lsp_types::PrepareRenameResponse::RangeWithPlaceholder {
+            range: declaration,
+            placeholder: "install".to_owned(),
+        }
+    );
+    let edit = server.rename(doc.as_str(), 0, 15, "configure").unwrap();
+    let changes = edit.changes.unwrap();
+    let mut edits = changes[&doc].clone();
+    edits.sort_by_key(|edit| edit.range.start);
+    assert_eq!(
+        edits,
+        [
+            TextEdit::new(declaration, "configure".to_owned()),
+            TextEdit::new(
+                Range::new(Position::new(2, 8), Position::new(2, 15)),
+                "configure".to_owned(),
+            ),
+        ]
+    );
+}
+
+#[test]
 fn test_rename_heading_id_is_case_sensitive() {
     let mut server = TestLspServer::new();
     let content = r#"# Heading {#em}

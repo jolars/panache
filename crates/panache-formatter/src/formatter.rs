@@ -30,6 +30,7 @@ mod smart;
 pub mod table_conversion;
 mod tables;
 mod utils;
+mod vitepress;
 #[allow(dead_code)]
 pub mod yaml;
 

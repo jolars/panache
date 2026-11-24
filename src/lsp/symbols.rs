@@ -1,9 +1,12 @@
 use rowan::TextRange;
 
+use crate::config::Flavor;
 use crate::lsp::context::OpenDocumentContext;
 use crate::lsp::global_state::StateSnapshot;
-use crate::syntax::{AstNode, ImageLink, Link, ReferenceDefinition, SyntaxNode};
-use crate::utils::{normalize_anchor_label, normalize_label};
+use crate::syntax::{AstNode, AttributeNode, ImageLink, Link, ReferenceDefinition, SyntaxNode};
+use crate::utils::{
+    attribute_anchor_id, heading_for_attribute, normalize_anchor_label, normalize_label,
+};
 
 use super::helpers;
 
@@ -21,6 +24,7 @@ pub(crate) enum SymbolTarget {
 pub(crate) fn resolve_symbol_target_at_offset(
     root: &SyntaxNode,
     offset: usize,
+    flavor: Flavor,
 ) -> Option<SymbolTarget> {
     if let Some((label, is_footnote)) = helpers::extract_definition_target_at_offset(root, offset) {
         return Some(SymbolTarget::Reference { label, is_footnote });
@@ -49,12 +53,19 @@ pub(crate) fn resolve_symbol_target_at_offset(
             return Some(SymbolTarget::ChunkLabel(key));
         }
 
-        if let Some(key) = helpers::extract_heading_id_key(&node) {
-            return Some(SymbolTarget::HeadingId(key));
-        }
-
-        if let Some(key) = helpers::extract_attribute_id_key(&node) {
-            return Some(SymbolTarget::Crossref(key));
+        if let Some((attribute, key)) =
+            node.ancestors()
+                .filter_map(AttributeNode::cast)
+                .find_map(|attribute| {
+                    let (key, _) = attribute_anchor_id(&attribute, flavor)?;
+                    Some((attribute, key))
+                })
+        {
+            return Some(if heading_for_attribute(&attribute, flavor).is_some() {
+                SymbolTarget::HeadingId(normalize_anchor_label(&key))
+            } else {
+                SymbolTarget::Crossref(key)
+            });
         }
 
         if let Some(key) = helpers::extract_heading_link_target(&node) {
@@ -182,14 +193,14 @@ fn collect_reference_link_ranges(root: &SyntaxNode, label: &str) -> Vec<TextRang
 
 #[cfg(test)]
 mod tests {
-    use super::{SymbolTarget, resolve_symbol_target_at_offset};
+    use super::{Flavor, SymbolTarget, resolve_symbol_target_at_offset};
 
     #[test]
     fn resolves_citation_target() {
         let input = "See @doe2020.";
         let root = crate::parse(input, None);
         let offset = input.find("doe2020").unwrap();
-        let target = resolve_symbol_target_at_offset(&root, offset);
+        let target = resolve_symbol_target_at_offset(&root, offset, Flavor::Pandoc);
         assert_eq!(target, Some(SymbolTarget::Citation("doe2020".to_string())));
     }
 
@@ -204,7 +215,7 @@ mod tests {
         config.extensions.bookdown_references = true;
         let root = crate::parse(input, Some(config));
         let offset = input.find("heading-2").unwrap();
-        let target = resolve_symbol_target_at_offset(&root, offset);
+        let target = resolve_symbol_target_at_offset(&root, offset, Flavor::Pandoc);
         assert_eq!(
             target,
             Some(SymbolTarget::Crossref("heading-2".to_string()))
@@ -216,7 +227,7 @@ mod tests {
         let input = "# Heading {#heading}\n\nSee [text](#heading).\n";
         let root = crate::parse(input, None);
         let offset = input.rfind("#heading").unwrap() + 1;
-        let target = resolve_symbol_target_at_offset(&root, offset);
+        let target = resolve_symbol_target_at_offset(&root, offset, Flavor::Pandoc);
         assert_eq!(
             target,
             Some(SymbolTarget::HeadingLink("heading".to_string()))
@@ -233,7 +244,7 @@ mod tests {
         };
         let root = crate::parse(input, Some(config));
         let offset = input.find("fig-plot").unwrap();
-        let target = resolve_symbol_target_at_offset(&root, offset);
+        let target = resolve_symbol_target_at_offset(&root, offset, Flavor::Pandoc);
         assert_eq!(
             target,
             Some(SymbolTarget::ChunkLabel("fig-plot".to_string()))
@@ -250,7 +261,7 @@ mod tests {
         let input = "(@good) First example.\n\nAs (@good) shows.\n";
         let root = crate::parse(input, Some(config));
         let offset = input.rfind("good").unwrap();
-        let target = resolve_symbol_target_at_offset(&root, offset);
+        let target = resolve_symbol_target_at_offset(&root, offset, Flavor::Pandoc);
         assert_eq!(target, Some(SymbolTarget::ExampleLabel("good".to_string())));
     }
 }

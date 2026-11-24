@@ -245,3 +245,25 @@ fn full_parse_definition_list_from_trailing_colon_after_lazy_list_item() {
         "pandoc reads this as a bullet list plus a paragraph, with no definition list"
     );
 }
+
+#[test]
+fn vitepress_edit_changes_the_closing_fence() {
+    use panache_parser::{Flavor, ParserOptions};
+
+    let before = "Earlier paragraph.\n\n:::: info Note\n::: tip Inner\nBody.\n::::\nOutside.\n";
+    let options = Some(ParserOptions::for_flavor(Flavor::VitePress));
+    let (old_tree, old_errors) = parse_with_errors(before, options.clone());
+    let closing = before.find("\n::::\n").unwrap() + 1;
+    let updated = apply_edit(before, (closing, closing + 1), "");
+    let spliced = reparse_or_full(
+        &updated,
+        options.clone(),
+        &old_tree,
+        &old_errors,
+        (closing, closing + 1),
+        (closing, closing),
+    );
+    let (full, errors) = parse_with_errors(&updated, options);
+    assert_eq!(spliced.tree.green(), full.green());
+    assert_eq!(spliced.errors, errors);
+}

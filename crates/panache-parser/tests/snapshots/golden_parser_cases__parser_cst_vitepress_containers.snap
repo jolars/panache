@@ -1,0 +1,100 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..517
+  PARAGRAPH@0..22
+    TEXT@0..21 "Before the container."
+    NEWLINE@21..22 "\n"
+  VITEPRESS_CONTAINER@22..308
+    VITEPRESS_CONTAINER_OPEN@22..36
+      VITEPRESS_CONTAINER_FENCE@22..25 ":::"
+      WHITESPACE@25..26 " "
+      VITEPRESS_CONTAINER_TYPE@26..30 "info"
+      WHITESPACE@30..31 " "
+      VITEPRESS_CONTAINER_TITLE@31..35 "Note"
+      NEWLINE@35..36 "\n"
+    PARAGRAPH@36..304
+      TEXT@36..115 "These choices are sta ..."
+      NEWLINE@115..116 "\n"
+      TEXT@116..193 "starting point, and a ..."
+      NEWLINE@193..194 "\n"
+      TEXT@194..267 "find the global minim ..."
+      NEWLINE@267..268 "\n"
+      TEXT@268..303 "returned point on you ..."
+      NEWLINE@303..304 "\n"
+    VITEPRESS_CONTAINER_CLOSE@304..308
+      VITEPRESS_CONTAINER_FENCE@304..307 ":::"
+      NEWLINE@307..308 "\n"
+  BLANK_LINE@308..309
+    BLANK_LINE@308..309 "\n"
+  VITEPRESS_CONTAINER@309..370
+    VITEPRESS_CONTAINER_OPEN@309..342
+      VITEPRESS_CONTAINER_FENCE@309..312 ":::"
+      WHITESPACE@312..313 " "
+      VITEPRESS_CONTAINER_TYPE@313..320 "details"
+      WHITESPACE@320..321 " "
+      VITEPRESS_CONTAINER_TITLE@321..341 "Read **more** {open}"
+      NEWLINE@341..342 "\n"
+    PARAGRAPH@342..365
+      TEXT@342..350 "Read the"
+      NEWLINE@350..351 "\n"
+      TEXT@351..364 "details here."
+      NEWLINE@364..365 "\n"
+    VITEPRESS_CONTAINER_CLOSE@365..370
+      VITEPRESS_CONTAINER_FENCE@365..369 "::::"
+      NEWLINE@369..370 "\n"
+  BLANK_LINE@370..371
+    BLANK_LINE@370..371 "\n"
+  VITEPRESS_CONTAINER@371..517
+    VITEPRESS_CONTAINER_OPEN@371..386
+      VITEPRESS_CONTAINER_FENCE@371..374 ":::"
+      WHITESPACE@374..375 " "
+      VITEPRESS_CONTAINER_TYPE@375..385 "code-group"
+      NEWLINE@385..386 "\n"
+    CODE_BLOCK@386..431
+      CODE_FENCE_OPEN@386..409
+        CODE_FENCE_MARKER@386..389 "```"
+        CODE_INFO@389..408
+          CODE_LANGUAGE@389..396 "js{1,3}"
+          TEXT@396..408 " [config.js]"
+        NEWLINE@408..409 "\n"
+      CODE_CONTENT@409..427
+        TEXT@409..426 "const config = {}"
+        NEWLINE@426..427 "\n"
+      CODE_FENCE_CLOSE@427..431
+        CODE_FENCE_MARKER@427..430 "```"
+        NEWLINE@430..431 "\n"
+    BLANK_LINE@431..432
+      BLANK_LINE@431..432 "\n"
+    CODE_BLOCK@432..479
+      CODE_FENCE_OPEN@432..450
+        CODE_FENCE_MARKER@432..435 "```"
+        CODE_INFO@435..449
+          CODE_LANGUAGE@435..437 "ts"
+          TEXT@437..449 " [config.ts]"
+        NEWLINE@449..450 "\n"
+      CODE_CONTENT@450..475
+        TEXT@450..474 "export const config = {}"
+        NEWLINE@474..475 "\n"
+      CODE_FENCE_CLOSE@475..479
+        CODE_FENCE_MARKER@475..478 "```"
+        NEWLINE@478..479 "\n"
+    BLANK_LINE@479..480
+      BLANK_LINE@479..480 "\n"
+    CODE_BLOCK@480..513
+      CODE_FENCE_OPEN@480..496
+        CODE_FENCE_MARKER@480..483 "~~~"
+        CODE_INFO@483..495
+          CODE_LANGUAGE@483..485 "sh"
+          TEXT@485..495 " [`shell`]"
+        NEWLINE@495..496 "\n"
+      CODE_CONTENT@496..509
+        TEXT@496..508 "echo example"
+        NEWLINE@508..509 "\n"
+      CODE_FENCE_CLOSE@509..513
+        CODE_FENCE_MARKER@509..512 "~~~"
+        NEWLINE@512..513 "\n"
+    VITEPRESS_CONTAINER_CLOSE@513..517
+      VITEPRESS_CONTAINER_FENCE@513..516 ":::"
+      NEWLINE@516..517 "\n"

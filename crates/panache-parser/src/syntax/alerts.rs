@@ -1,7 +1,9 @@
 //! Alert block AST node wrappers.
 
 use super::ast::support;
-use super::{AstChildren, AstNode, PanacheLanguage, Paragraph, SyntaxKind, SyntaxNode};
+use super::{
+    AstChildren, AstNode, PanacheLanguage, Paragraph, SyntaxKind, SyntaxNode, SyntaxToken,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertKind {
@@ -10,6 +12,8 @@ pub enum AlertKind {
     Important,
     Warning,
     Caution,
+    Info,
+    Danger,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -33,11 +37,19 @@ impl AstNode for Alert {
 
 impl Alert {
     pub fn marker(&self) -> Option<String> {
+        self.header_token(SyntaxKind::ALERT_MARKER)
+            .map(|token| token.text().to_string())
+    }
+
+    pub fn title(&self) -> Option<SyntaxToken> {
+        self.header_token(SyntaxKind::ALERT_TITLE)
+    }
+
+    fn header_token(&self, kind: SyntaxKind) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
             .filter_map(|child| child.into_token())
-            .find(|token| token.kind() == SyntaxKind::ALERT_MARKER)
-            .map(|token| token.text().to_string())
+            .find(|token| token.kind() == kind)
     }
 
     pub fn paragraphs(&self) -> AstChildren<Paragraph> {
@@ -49,12 +61,16 @@ impl Alert {
             .marker()?
             .trim_matches(['[', ']'])
             .trim_start_matches('!')
+            .to_ascii_uppercase()
+            .as_str()
         {
             "NOTE" => Some(AlertKind::Note),
             "TIP" => Some(AlertKind::Tip),
             "IMPORTANT" => Some(AlertKind::Important),
             "WARNING" => Some(AlertKind::Warning),
             "CAUTION" => Some(AlertKind::Caution),
+            "INFO" => Some(AlertKind::Info),
+            "DANGER" => Some(AlertKind::Danger),
             _ => None,
         }
     }

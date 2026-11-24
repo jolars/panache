@@ -6,7 +6,7 @@ use super::core::normalize_attribute_text;
 use super::inline::{collapse_spaces, format_inline_node_with_spacing};
 use super::smart::smart_token_text;
 use crate::config::Flavor;
-use crate::syntax::{SyntaxKind, SyntaxNode};
+use crate::syntax::{AstNode, Heading, SyntaxKind, SyntaxNode, text_without_line_prefixes};
 
 /// Render a single heading line (`### content {attrs}`), formatting inline
 /// elements and normalizing attributes. Surrounding blank lines and the
@@ -18,6 +18,22 @@ use crate::syntax::{SyntaxKind, SyntaxNode};
 /// identically regardless of where the heading appears. The `#` prefix means
 /// the rendered line can never collide with a thematic break.
 pub(super) fn format_heading(node: &SyntaxNode, config: &FormatContext) -> String {
+    let vitepress_heading =
+        (config.flavor == Flavor::VitePress).then(|| Heading::cast(node.clone()).expect("heading"));
+    if let Some(heading) = &vitepress_heading
+        && node
+            .children()
+            .any(|child| child.kind() == SyntaxKind::SETEXT_HEADING_UNDERLINE)
+        && heading
+            .content()
+            .is_some_and(|content| content.syntax().text().contains_char('\n'))
+    {
+        // VitePress omits soft breaks from the anchor text and uses hard
+        // breaks in the rendered title. Preserve the original line structure.
+        return text_without_line_prefixes(node)
+            .trim_end_matches(['\r', '\n'])
+            .to_string();
+    }
     // These flavors derive anchors from each source space, so collapsing them can break links.
     let collapse_ws = !matches!(config.flavor, Flavor::Gfm | Flavor::Hugo | Flavor::Jupyter);
     let mut level = 1;
@@ -62,6 +78,9 @@ pub(super) fn format_heading(node: &SyntaxNode, config: &FormatContext) -> Strin
                     }
                 }
             }
+            SyntaxKind::ATTRIBUTE if vitepress_heading.is_some() => {
+                attributes = child.text().to_string();
+            }
             SyntaxKind::ATTRIBUTE => {
                 attributes = normalize_attribute_text(
                     &child.text().to_string(),
@@ -82,11 +101,15 @@ pub(super) fn format_heading(node: &SyntaxNode, config: &FormatContext) -> Strin
         out.push(' ');
         out.push_str(content);
     }
-    if content_reads_as_decoration(content, &config.parser_options()) {
+    if !(vitepress_heading.is_some() && !attributes.is_empty())
+        && content_reads_as_decoration(content, &config.parser_options())
+    {
         out.push_str(" #");
     }
     if !attributes.is_empty() {
-        out.push(' ');
+        if !vitepress_heading.is_some_and(|heading| heading.vitepress_attributes_attach_inline()) {
+            out.push(' ');
+        }
         out.push_str(&attributes);
     }
     out

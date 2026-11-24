@@ -405,10 +405,15 @@ fn from_stack_content_indent_ops_sum_to_the_stack_accessor() {
             definition(4),
             list(),
             list_item(2),
-            Container::BlockQuote {},
+            Container::BlockQuote { start_line: None },
         ],
         vec![admonition(4), footnote(4)],
-        vec![Container::BlockQuote {}, footnote(4), list(), list_item(6)],
+        vec![
+            Container::BlockQuote { start_line: None },
+            footnote(4),
+            list(),
+            list_item(6),
+        ],
     ];
     for stack in &stacks {
         let p = ContainerPrefix::from_stack(stack, false, &opts(Dialect::CommonMark));
@@ -442,7 +447,7 @@ fn current_content_col_puts_a_footnote_width_in_the_list_slot() {
 /// verdict walk must preserve this interplay.
 #[test]
 fn lazy_blockquote_gobble_is_dialect_gated() {
-    let stack = vec![Container::BlockQuote {}];
+    let stack = vec![Container::BlockQuote { start_line: None }];
     let pandoc = ContainerPrefix::from_stack(&stack, false, &opts(Dialect::Pandoc));
     let commonmark = ContainerPrefix::from_stack(&stack, false, &opts(Dialect::CommonMark));
     assert_eq!(pandoc.strip("    deep"), "deep");
@@ -633,7 +638,10 @@ fn div_closer_ends_lines_needs_a_div_on_the_stack() {
         ContainerPrefix::from_stack(stack, false, &opts(Dialect::Pandoc)).div_closer_ends_lines()
     };
     assert!(p(&[fenced_div(0), definition(4)]));
-    assert!(p(&[fenced_div(0), Container::BlockQuote {}]));
+    assert!(p(&[
+        fenced_div(0),
+        Container::BlockQuote { start_line: None }
+    ]));
     assert!(p(&[fenced_div(0), list(), list_item(2)]));
     assert!(p(&[definition(4), fenced_div(0)]));
     assert!(p(&[fenced_div(0)]));
@@ -656,8 +664,14 @@ fn note_marker_bound_needs_a_footnote_on_the_stack() {
         ContainerPrefix::from_stack(stack, false, &opts(Dialect::Pandoc)).note_marker_op_bound()
     };
     assert_eq!(p(&[footnote(4)]), Some(0));
-    assert_eq!(p(&[Container::BlockQuote {}, footnote(4)]), Some(1));
-    assert_eq!(p(&[footnote(4), Container::BlockQuote {}]), Some(0));
+    assert_eq!(
+        p(&[Container::BlockQuote { start_line: None }, footnote(4)]),
+        Some(1)
+    );
+    assert_eq!(
+        p(&[footnote(4), Container::BlockQuote { start_line: None }]),
+        Some(0)
+    );
     assert_eq!(p(&[list(), list_item(2), footnote(4)]), Some(1));
     assert_eq!(p(&[footnote(4), list(), list_item(4)]), Some(0));
     assert_eq!(p(&[list(), list_item(2)]), None);
@@ -677,7 +691,7 @@ fn note_marker_ends_container_lines_on_the_stripped_tail() {
     use crate::parser::blocks::tables::LineView;
 
     let quoted_note = ContainerPrefix::from_stack(
-        &[Container::BlockQuote {}, footnote(4)],
+        &[Container::BlockQuote { start_line: None }, footnote(4)],
         false,
         &opts(Dialect::Pandoc),
     );
@@ -746,7 +760,11 @@ fn list_start_detect_needs_a_list_item_on_the_stack() {
             .is_some()
     };
     assert!(p(&[list(), list_item(2)]));
-    assert!(p(&[Container::BlockQuote {}, list(), list_item(2)]));
+    assert!(p(&[
+        Container::BlockQuote { start_line: None },
+        list(),
+        list_item(2)
+    ]));
     assert!(p(&[footnote(4), list(), list_item(4)]));
     assert!(!p(&[]));
     assert!(!p(&[footnote(4)]));
@@ -895,7 +913,7 @@ fn html_closer_tag_needs_a_container_above_the_tag_holding_item() {
         p(&[
             list(),
             list_item_with_open_tag(2, "<div>"),
-            Container::BlockQuote {}
+            Container::BlockQuote { start_line: None }
         ]),
         armed
     );
@@ -906,13 +924,20 @@ fn html_closer_tag_needs_a_container_above_the_tag_holding_item() {
     assert_eq!(p(&[list(), list_item_with_open_tag(2, "<div>")]), None);
     assert_eq!(
         p(&[
-            Container::BlockQuote {},
+            Container::BlockQuote { start_line: None },
             list(),
             list_item_with_open_tag(2, "<div>")
         ]),
         None
     );
-    assert_eq!(p(&[list(), list_item(2), Container::BlockQuote {}]), None);
+    assert_eq!(
+        p(&[
+            list(),
+            list_item(2),
+            Container::BlockQuote { start_line: None }
+        ]),
+        None
+    );
     assert_eq!(p(&[]), None);
 }
 
@@ -932,7 +957,11 @@ fn html_closer_tag_survives_the_mid_item_flush() {
     flushed.push_text("<div>\n", &config);
     flushed.clear();
     let prefix = ContainerPrefix::from_stack(
-        &[list(), item(flushed), Container::BlockQuote {}],
+        &[
+            list(),
+            item(flushed),
+            Container::BlockQuote { start_line: None },
+        ],
         false,
         &config,
     );
@@ -944,7 +973,11 @@ fn html_closer_tag_survives_the_mid_item_flush() {
     closed.push_text("</div>\n", &config);
     closed.clear();
     let prefix = ContainerPrefix::from_stack(
-        &[list(), item(closed), Container::BlockQuote {}],
+        &[
+            list(),
+            item(closed),
+            Container::BlockQuote { start_line: None },
+        ],
         false,
         &config,
     );
@@ -964,7 +997,7 @@ fn html_closer_ends_container_lines_at_the_items_frame_position() {
         &[
             list(),
             list_item_with_open_tag(2, "<div>"),
-            Container::BlockQuote {},
+            Container::BlockQuote { start_line: None },
         ],
         false,
         &opts(Dialect::Pandoc),
@@ -1021,8 +1054,11 @@ fn html_closer_fence_is_pandoc_only() {
             marker_only: false,
             virtual_marker_space: false,
         };
-        let prefix =
-            ContainerPrefix::from_stack(&[list(), item, Container::BlockQuote {}], false, &config);
+        let prefix = ContainerPrefix::from_stack(
+            &[list(), item, Container::BlockQuote { start_line: None }],
+            false,
+            &config,
+        );
         assert_eq!(
             prefix.html_closer_tag().is_some(),
             armed,

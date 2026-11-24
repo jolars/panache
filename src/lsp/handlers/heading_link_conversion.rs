@@ -1,6 +1,6 @@
 //! Heading link conversion utilities for code actions.
 
-use crate::config::Extensions;
+use crate::config::{Extensions, Flavor};
 use crate::syntax::{AstNode, Heading, Link, SyntaxNode, UnresolvedReference};
 use crate::utils::{implicit_heading_ids, normalize_label};
 use lsp_types::{Range, TextEdit};
@@ -48,12 +48,13 @@ pub fn convert_to_explicit_heading_link(
     tree: &SyntaxNode,
     text: &str,
     extensions: &Extensions,
+    flavor: Flavor,
 ) -> Vec<TextEdit> {
     let Some(normalized_label) = shortcut_label(link_node) else {
         return vec![];
     };
 
-    let Some(entry) = implicit_heading_ids(tree, extensions)
+    let Some(entry) = implicit_heading_ids(tree, extensions, flavor)
         .into_iter()
         .find(|entry| {
             Heading::cast(entry.heading.clone())
@@ -104,6 +105,7 @@ mod tests {
             &tree,
             input,
             &crate::config::Extensions::default(),
+            Flavor::Pandoc,
         );
         assert_eq!(edits.len(), 1);
         assert_eq!(edits[0].new_text, "[unordered lists](#unordered-lists)");
@@ -120,6 +122,7 @@ mod tests {
             &tree,
             input,
             &crate::config::Extensions::default(),
+            Flavor::Pandoc,
         );
         assert_eq!(edits.len(), 1);
         assert_eq!(edits[0].new_text, "[*Title*](#title)");
@@ -137,6 +140,7 @@ mod tests {
                 &tree,
                 input,
                 &crate::config::Extensions::default(),
+                Flavor::Pandoc,
             )
             .is_empty()
         );

@@ -49,7 +49,11 @@ pub(crate) fn hover(snap: &StateSnapshot, params: HoverParams) -> Option<Hover> 
 
     let (target, reference_label) = {
         let root = ctx.syntax_root();
-        let target = resolve_symbol_target_at_offset(&root, offset);
+        let target = resolve_symbol_target_at_offset(
+            &root,
+            offset,
+            ctx.salsa_config.config(snap.db()).flavor,
+        );
         // Symbols inside link text retain their own hover previews.
         let reference_label = match &target {
             None

@@ -1057,16 +1057,29 @@ pub(crate) fn parse_fenced_code_block(
 
     builder.start_node(SyntaxKind::CODE_BLOCK.into());
 
-    let (first_trimmed, _first_inner) = prepare_fence_open_line(
-        builder,
-        lines[start_pos],
-        first_line_override,
-        bq_depth,
-        list_content_col,
-        list_marker_consumed_on_line_0,
-        bq_outer,
-        content_indent,
-    );
+    let first_trimmed = if flavor == Flavor::VitePress && first_line_override.is_none() {
+        let line = window.emit_or_dispatch_tail(builder, start_pos);
+        let trimmed = strip_leading_spaces(line);
+        if line.len() > trimmed.len() {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &line[..line.len() - trimmed.len()],
+            );
+        }
+        trimmed
+    } else {
+        prepare_fence_open_line(
+            builder,
+            lines[start_pos],
+            first_line_override,
+            bq_depth,
+            list_content_col,
+            list_marker_consumed_on_line_0,
+            bq_outer,
+            content_indent,
+        )
+        .0
+    };
 
     builder.start_node(SyntaxKind::CODE_FENCE_OPEN.into());
     builder.token(

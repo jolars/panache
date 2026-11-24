@@ -20,6 +20,9 @@ pub fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::PIPE_TABLE
             | SyntaxKind::LINE_BLOCK
             | SyntaxKind::HUGO_SHORTCODE_BLOCK
+            | SyntaxKind::VITEPRESS_CONTAINER
+            | SyntaxKind::VITEPRESS_SNIPPET
+            | SyntaxKind::VITEPRESS_TOC
     )
 }
 
@@ -45,6 +48,9 @@ pub fn is_structural_block(kind: SyntaxKind) -> bool {
             | SyntaxKind::FENCED_DIV
             | SyntaxKind::HORIZONTAL_RULE
             | SyntaxKind::HUGO_SHORTCODE_BLOCK
+            | SyntaxKind::VITEPRESS_CONTAINER
+            | SyntaxKind::VITEPRESS_SNIPPET
+            | SyntaxKind::VITEPRESS_TOC
             | SyntaxKind::TOML_METADATA
             | SyntaxKind::YAML_METADATA
             | SyntaxKind::PANDOC_TITLE_BLOCK

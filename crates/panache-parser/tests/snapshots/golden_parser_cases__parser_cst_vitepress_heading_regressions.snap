@@ -1,0 +1,224 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..353
+  HEADING@0..12
+    HEADING_CONTENT@0..7
+      TEXT@0..3 "Foo"
+      NEWLINE@3..4 "\n"
+      TEXT@4..7 "Bar"
+    NEWLINE@7..8 "\n"
+    SETEXT_HEADING_UNDERLINE@8..11
+      SETEXT_HEADING_UNDERLINE@8..11 "==="
+    NEWLINE@11..12 "\n"
+  BLANK_LINE@12..13
+    BLANK_LINE@12..13 "\n"
+  PARAGRAPH@13..29
+    LINK@13..28
+      LINK_START@13..14
+        LINK_START@13..14 "["
+      LINK_TEXT@14..18
+        TEXT@14..18 "Link"
+      LINK_TEXT_END@18..19 "]"
+      LINK_DEST_START@19..20 "("
+      LINK_DEST@20..27
+        LINK_DEST_URL@20..27
+          TEXT@20..27 "#foobar"
+      LINK_DEST_END@27..28 ")"
+    NEWLINE@28..29 "\n"
+  BLANK_LINE@29..30
+    BLANK_LINE@29..30 "\n"
+  HEADING@30..54
+    HEADING_CONTENT@30..49
+      TEXT@30..40 "Hard break"
+      HARD_LINE_BREAK@40..42 "\\\n"
+      TEXT@42..49 "Heading"
+    NEWLINE@49..50 "\n"
+    SETEXT_HEADING_UNDERLINE@50..53
+      SETEXT_HEADING_UNDERLINE@50..53 "---"
+    NEWLINE@53..54 "\n"
+  BLANK_LINE@54..55
+    BLANK_LINE@54..55 "\n"
+  BLOCK_QUOTE@55..80
+    BLOCK_QUOTE_MARKER@55..56 ">"
+    WHITESPACE@56..57 " "
+    HEADING@57..80
+      HEADING_CONTENT@57..73
+        TEXT@57..63 "Quoted"
+        NEWLINE@63..64 "\n"
+        LINE_PREFIX@64..65 ">"
+        LINE_PREFIX@65..66 " "
+        TEXT@66..73 "Heading"
+      NEWLINE@73..74 "\n"
+      LINE_PREFIX@74..75 ">"
+      LINE_PREFIX@75..76 " "
+      SETEXT_HEADING_UNDERLINE@76..79
+        SETEXT_HEADING_UNDERLINE@76..79 "==="
+      NEWLINE@79..80 "\n"
+  BLANK_LINE@80..81
+    BLANK_LINE@80..81 "\n"
+  LIST@81..106
+    LIST_ITEM@81..106
+      LIST_MARKER@81..82 "-"
+      WHITESPACE@82..83 " "
+      HEADING@83..106
+        HEADING_CONTENT@83..99
+          TEXT@83..89 "Listed"
+          NEWLINE@89..90 "\n"
+          LINE_PREFIX@90..92 "  "
+          TEXT@92..99 "Heading"
+        NEWLINE@99..100 "\n"
+        LINE_PREFIX@100..102 "  "
+        SETEXT_HEADING_UNDERLINE@102..105
+          SETEXT_HEADING_UNDERLINE@102..105 "==="
+        NEWLINE@105..106 "\n"
+  BLANK_LINE@106..107
+    BLANK_LINE@106..107 "\n"
+  HEADING@107..130
+    ATX_HEADING_MARKER@107..108
+      ATX_HEADING_MARKER@107..108 "#"
+    WHITESPACE@108..109 " "
+    HEADING_CONTENT@109..122
+      LINK@109..122
+        LINK_START@109..110
+          LINK_START@109..110 "["
+        LINK_TEXT@110..113
+          TEXT@110..113 "Foo"
+        LINK_TEXT_END@113..114 "]"
+        LINK_DEST_START@114..115 "("
+        LINK_DEST@115..121
+          LINK_DEST_URL@115..121
+            TEXT@115..121 "foo.md"
+        LINK_DEST_END@121..122 ")"
+    ATTRIBUTE@122..129
+      TEXT@122..123 "{"
+      ATTR_ID@123..128 "#link"
+      TEXT@128..129 "}"
+    NEWLINE@129..130 "\n"
+  BLANK_LINE@130..131
+    BLANK_LINE@130..131 "\n"
+  HEADING@131..154
+    ATX_HEADING_MARKER@131..132
+      ATX_HEADING_MARKER@131..132 "#"
+    WHITESPACE@132..133 " "
+    HEADING_CONTENT@133..138
+      TEXT@133..138 "Setup"
+    WHITESPACE@138..139 " "
+    ATTRIBUTE@139..153
+      TEXT@139..140 "{"
+      ATTR_KEY_VALUE@140..152
+        ATTR_KEY@140..142 "id"
+        TEXT@142..143 "="
+        ATTR_VALUE@143..152 "\"install\""
+      TEXT@152..153 "}"
+    NEWLINE@153..154 "\n"
+  BLANK_LINE@154..155
+    BLANK_LINE@154..155 "\n"
+  HEADING@155..191
+    ATX_HEADING_MARKER@155..156
+      ATX_HEADING_MARKER@155..156 "#"
+    WHITESPACE@156..157 " "
+    HEADING_CONTENT@157..173
+      LINK@157..173
+        LINK_START@157..158
+          LINK_START@157..158 "["
+        LINK_TEXT@158..167
+          TEXT@158..167 "Reference"
+        TEXT@167..168 "]"
+        TEXT@168..169 "["
+        LINK_REF@169..172
+          TEXT@169..172 "ref"
+        TEXT@172..173 "]"
+    ATTRIBUTE@173..190
+      TEXT@173..174 "{"
+      ATTR_ID@174..189 "#reference-link"
+      TEXT@189..190 "}"
+    NEWLINE@190..191 "\n"
+  BLANK_LINE@191..192
+    BLANK_LINE@191..192 "\n"
+  REFERENCE_DEFINITION@192..205
+    LINK@192..197
+      LINK_START@192..193
+        LINK_START@192..193 "["
+      LINK_TEXT@193..196
+        TEXT@193..196 "ref"
+      TEXT@196..197 "]"
+    TEXT@197..198 ":"
+    WHITESPACE@198..199 " "
+    REFERENCE_URL@199..204
+      TEXT@199..204 "/path"
+    NEWLINE@204..205 "\n"
+  BLANK_LINE@205..206
+    BLANK_LINE@205..206 "\n"
+  HEADING@206..228
+    ATX_HEADING_MARKER@206..207
+      ATX_HEADING_MARKER@206..207 "#"
+    WHITESPACE@207..208 " "
+    HEADING_CONTENT@208..215
+      TEXT@208..215 "Install"
+    WHITESPACE@215..216 " "
+    ATTRIBUTE@216..224
+      TEXT@216..217 "{"
+      ATTR_ID@217..223 "#setup"
+      TEXT@223..224 "}"
+    WHITESPACE@224..225 " "
+    ATX_HEADING_MARKER@225..227 "##"
+    NEWLINE@227..228 "\n"
+  BLANK_LINE@228..229
+    BLANK_LINE@228..229 "\n"
+  HEADING@229..260
+    ATX_HEADING_MARKER@229..230
+      ATX_HEADING_MARKER@229..230 "#"
+    WHITESPACE@230..231 " "
+    HEADING_CONTENT@231..241
+      TEXT@231..241 "Install ##"
+    WHITESPACE@241..242 " "
+    ATTRIBUTE@242..259
+      TEXT@242..243 "{"
+      ATTR_ID@243..258 "#literal-hashes"
+      TEXT@258..259 "}"
+    NEWLINE@259..260 "\n"
+  BLANK_LINE@260..261
+    BLANK_LINE@260..261 "\n"
+  HEADING@261..285
+    ATX_HEADING_MARKER@261..262
+      ATX_HEADING_MARKER@261..262 "#"
+    WHITESPACE@262..263 " "
+    HEADING_CONTENT@263..284
+      STRONG@263..271
+        STRONG_MARKER@263..265 "**"
+        TEXT@265..269 "Bold"
+        STRONG_MARKER@269..271 "**"
+      ATTRIBUTE@271..278
+        TEXT@271..272 "{"
+        ATTR_ID@272..277 "#part"
+        TEXT@277..278 "}"
+      TEXT@278..284 " after"
+    NEWLINE@284..285 "\n"
+  BLANK_LINE@285..286
+    BLANK_LINE@285..286 "\n"
+  HEADING@286..315
+    ATX_HEADING_MARKER@286..287
+      ATX_HEADING_MARKER@286..287 "#"
+    WHITESPACE@287..288 " "
+    HEADING_CONTENT@288..307
+      TEXT@288..307 "https://example.com"
+    ATTRIBUTE@307..314
+      TEXT@307..308 "{"
+      ATTR_ID@308..313 "#site"
+      TEXT@313..314 "}"
+    NEWLINE@314..315 "\n"
+  BLANK_LINE@315..316
+    BLANK_LINE@315..316 "\n"
+  HEADING@316..353
+    ATX_HEADING_MARKER@316..317
+      ATX_HEADING_MARKER@316..317 "#"
+    WHITESPACE@317..318 " "
+    HEADING_CONTENT@318..338
+      TEXT@318..338 "https://example.org."
+    ATTRIBUTE@338..352
+      TEXT@338..339 "{"
+      ATTR_ID@339..351 "#punctuation"
+      TEXT@351..352 "}"
+    NEWLINE@352..353 "\n"

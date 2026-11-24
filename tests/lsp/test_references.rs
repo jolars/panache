@@ -359,6 +359,30 @@ fn test_references_returns_none_inside_yaml_frontmatter() {
 }
 
 #[test]
+fn test_references_vitepress_named_heading_id_from_the_declaration() {
+    let project = tempfile::TempDir::new().unwrap();
+    std::fs::write(
+        project.path().join("panache.toml"),
+        "flavor = 'vitepress'\n",
+    )
+    .unwrap();
+    let root = Uri::from_file_path(project.path()).unwrap();
+    let doc = Uri::from_file_path(project.path().join("guide.md")).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root.as_str());
+    server.open_document(
+        doc.as_str(),
+        "# Setup {id=\"install\"}\n\n[Link](#install)\n",
+        "markdown",
+    );
+
+    let from_id = server.references(doc.as_str(), 0, 15, true).unwrap();
+    let from_link = server.references(doc.as_str(), 2, 10, true).unwrap();
+    assert_eq!(from_id, from_link);
+    assert!(from_id.iter().any(|loc| loc.range.start.line == 2));
+}
+
+#[test]
 fn test_references_heading_hash_link_and_id_are_consistent() {
     let mut server = TestLspServer::new();
     let content = "# Heading {#heading}\n\nSee [label](#heading).\n";

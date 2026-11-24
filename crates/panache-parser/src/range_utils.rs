@@ -12,6 +12,9 @@ fn is_block_element(kind: SyntaxKind) -> bool {
             | SyntaxKind::CODE_BLOCK
             | SyntaxKind::TOML_METADATA
             | SyntaxKind::HUGO_SHORTCODE_BLOCK
+            | SyntaxKind::VITEPRESS_CONTAINER
+            | SyntaxKind::VITEPRESS_SNIPPET
+            | SyntaxKind::VITEPRESS_TOC
             | SyntaxKind::SIMPLE_TABLE
             | SyntaxKind::MULTILINE_TABLE
             | SyntaxKind::PIPE_TABLE
@@ -81,6 +84,14 @@ fn find_expandable_container(node: &SyntaxNode) -> Option<SyntaxNode> {
             SyntaxKind::DEFINITION_ITEM => 3,
             SyntaxKind::LINE_BLOCK => 2,
             SyntaxKind::BLOCK_QUOTE | SyntaxKind::FENCED_DIV => 4,
+            // Range formatting renders the whole top-level block containing
+            // a VitePress fence, including any surrounding list or quote.
+            SyntaxKind::VITEPRESS_CONTAINER => {
+                return current
+                    .ancestors()
+                    .take_while(|ancestor| ancestor.kind() != SyntaxKind::DOCUMENT)
+                    .last();
+            }
             _ => 0,
         };
         if priority >= best_priority && priority > 0 {

@@ -33,6 +33,9 @@ pub enum Flavor {
     Myst,
     /// Hugo Markdown (CommonMark + Goldmark defaults and Hugo syntax).
     Hugo,
+    /// VitePress 1.x Markdown (CommonMark with colon containers).
+    #[cfg_attr(feature = "serde", serde(rename = "vitepress"))]
+    VitePress,
 }
 
 /// Markdown extensions configuration.
@@ -162,6 +165,8 @@ pub struct Extensions {
     pub toml_metadata_block: bool,
     /// Hugo shortcode calls and paired bodies, preserved verbatim.
     pub hugo_shortcodes: bool,
+    /// VitePress colon-fenced containers.
+    pub vitepress_containers: bool,
     /// Pandoc title block (Title/Author/Date)
     pub pandoc_title_block: bool,
     /// [NON-DEFAULT] MultiMarkdown metadata/title block (Key: Value ...)
@@ -341,6 +346,7 @@ impl Extensions {
             yaml_metadata_block: false,
             toml_metadata_block: false,
             hugo_shortcodes: false,
+            vitepress_containers: false,
         }
     }
 
@@ -357,6 +363,7 @@ impl Extensions {
             Flavor::Mdsvex => Self::mdsvex_defaults(),
             Flavor::Myst => Self::myst_defaults(),
             Flavor::Hugo => Self::hugo_defaults(),
+            Flavor::VitePress => Self::vitepress_defaults(),
         }
     }
 
@@ -428,6 +435,7 @@ impl Extensions {
             yaml_metadata_block: true,
             toml_metadata_block: false,
             hugo_shortcodes: false,
+            vitepress_containers: false,
 
             markdown_in_html_blocks: false,
             raw_attribute: true,
@@ -613,6 +621,19 @@ impl Extensions {
         ext
     }
 
+    fn vitepress_defaults() -> Self {
+        let mut ext = Self::commonmark_defaults();
+        ext.alerts = true;
+        ext.auto_identifiers = true;
+        ext.emoji = true;
+        ext.header_attributes = true;
+        ext.pipe_tables = true;
+        ext.strikeout = true;
+        ext.yaml_metadata_block = true;
+        ext.vitepress_containers = true;
+        ext
+    }
+
     fn myst_defaults() -> Self {
         let mut ext = Self::commonmark_defaults();
 
@@ -755,6 +776,7 @@ known_extensions! {
     "yaml-metadata-block" => yaml_metadata_block,
     "toml-metadata-block" => toml_metadata_block,
     "hugo-shortcodes" => hugo_shortcodes,
+    "vitepress-containers" => vitepress_containers,
     "pandoc-title-block" => pandoc_title_block,
     "mmd-title-block" => mmd_title_block,
     "raw-html" => raw_html,
@@ -1094,7 +1116,8 @@ impl Dialect {
             | Flavor::Gfm
             | Flavor::Mdsvex
             | Flavor::Myst
-            | Flavor::Hugo => Dialect::CommonMark,
+            | Flavor::Hugo
+            | Flavor::VitePress => Dialect::CommonMark,
             Flavor::Pandoc | Flavor::Quarto | Flavor::RMarkdown | Flavor::MultiMarkdown => {
                 Dialect::Pandoc
             }
@@ -1193,7 +1216,8 @@ impl schemars::JsonSchema for Flavor {
                 "multimarkdown",
                 "mdsvex",
                 "myst",
-                "hugo"
+                "hugo",
+                "vitepress"
             ]
         })
     }

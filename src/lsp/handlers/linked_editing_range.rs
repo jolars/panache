@@ -42,7 +42,7 @@ pub(crate) fn linked_editing_range(
     }
 
     let root = ctx.syntax_root();
-    let target = resolve_symbol_target_at_offset(&root, offset)?;
+    let target = resolve_symbol_target_at_offset(&root, offset, config.flavor)?;
 
     let mut ranges = collect_symbol_ranges(snap, &ctx, &config, &root, &target);
 

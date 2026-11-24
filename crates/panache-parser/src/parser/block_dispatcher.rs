@@ -42,7 +42,10 @@ use super::blocks::html_blocks::{
     pandoc_html_block_start_is_valid, pandoc_html_open_tag_closes, parse_html_block_with_wrapper,
     probe_open_tag_line_has_close_gt, try_parse_html_block_start,
 };
-use super::blocks::indented_code::{is_indented_code_line, parse_indented_code_block};
+use super::blocks::indented_code::{
+    is_indented_code_line, parse_indented_code_block, parse_vitepress_indented_code,
+    vitepress_indented_code_start,
+};
 use super::blocks::latex_envs::LatexEnvInfo;
 use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
 use super::blocks::lists::{
@@ -256,6 +259,7 @@ pub(crate) enum BlockEffect {
     OpenFencedDiv,
     CloseFencedDiv,
     OpenMystDirective,
+    OpenVitePressContainer,
     CloseMystDirective,
     OpenAdmonition,
     OpenFootnoteDefinition,
@@ -1595,8 +1599,9 @@ impl BlockParser for FencedCodeBlockParser {
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         let content = lines.first();
         let line_pos = lines.pos();
-        let lines = lines.raw();
-        let content_to_check = if let Some(list_info) = ctx.list_indent_info {
+        let content_to_check = if ctx.config.flavor == crate::options::Flavor::VitePress {
+            lines.first_unconditional()
+        } else if let Some(list_info) = ctx.list_indent_info {
             if list_info.content_col > 0 && !content.is_empty() {
                 let idx = byte_index_at_column(content, list_info.content_col);
                 &content[idx..]
@@ -1606,6 +1611,7 @@ impl BlockParser for FencedCodeBlockParser {
         } else {
             content
         };
+        let lines = lines.raw();
 
         let fence = try_parse_fence_open(content_to_check, ctx.config.dialect)?;
         if (fence.fence_char == '`' && !ctx.config.extensions.backtick_code_blocks)
@@ -3070,6 +3076,8 @@ impl BlockParser for IndentedCodeBlockParser {
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
         let content = lines.first();
         let line_pos = lines.pos();
+        let in_vitepress_frame = ctx.config.flavor == crate::options::Flavor::VitePress;
+        let vitepress_indented = in_vitepress_frame && vitepress_indented_code_start(lines);
         let lines = lines.raw();
         let allow_marker_only = ctx.in_marker_only_list_item;
         let allow = if allow_marker_only {
@@ -3096,20 +3104,13 @@ impl BlockParser for IndentedCodeBlockParser {
             return None;
         }
 
-        let list_content_col = ctx
-            .list_indent_info
-            .map(|list_info| list_info.content_col)
-            .unwrap_or(0);
-        let required_indent = list_content_col + 4;
-
-        let (indent_cols, _) = leading_indent(content);
-        if indent_cols < required_indent
-            && try_parse_list_marker(content, ctx.config, ctx.open_alpha_hint).is_some()
-        {
-            return None;
-        }
-
-        if indent_cols < required_indent || !is_indented_code_line(content) {
+        let indented = if in_vitepress_frame {
+            vitepress_indented
+        } else {
+            let list_content_col = ctx.list_indent_info.map_or(0, |list| list.content_col);
+            leading_indent(content).0 >= list_content_col + 4 && is_indented_code_line(content)
+        };
+        if !indented {
             return None;
         }
 
@@ -3128,6 +3129,9 @@ impl BlockParser for IndentedCodeBlockParser {
         lines: &StrippedLines<'_, '_>,
         _payload: Option<&dyn Any>,
     ) -> usize {
+        if ctx.config.flavor == crate::options::Flavor::VitePress {
+            return parse_vitepress_indented_code(builder, lines);
+        }
         let line_pos = lines.pos();
         let lines = lines.raw();
         let base_indent = ctx.content_indent
@@ -3380,6 +3384,10 @@ impl BlockParserRegistry {
             Box::new(MmdTitleBlockParser),
             Box::new(MystDirectiveCloseParser),
             Box::new(MystDirectiveOpenParser),
+            // VitePress container openers can interrupt paragraphs, like fenced code.
+            Box::new(super::blocks::vitepress_containers::VitePressContainerParser),
+            // VitePress recognizes standalone imports before ordinary fenced code.
+            Box::new(super::blocks::vitepress_containers::VitePressSnippetParser),
             Box::new(FencedCodeBlockParser),
             Box::new(YamlMetadataParser),
             // Front matter wins over MyST block breaks only at document start.
@@ -3390,6 +3398,8 @@ impl BlockParserRegistry {
             Box::new(FencedDivOpenParser),
             Box::new(MystTargetParser),
             Box::new(MystCommentParser),
+            // VitePress's table of contents rule precedes heading recognition.
+            Box::new(super::blocks::vitepress_containers::VitePressTocParser),
             Box::new(SetextHeadingParser),
             Box::new(AtxHeadingParser),
             Box::new(HtmlBlockParser),

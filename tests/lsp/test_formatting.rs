@@ -27,6 +27,33 @@ fn hugo_workspace_formatting_preserves_opaque_syntax() {
 }
 
 #[test]
+fn vitepress_range_formatting_replaces_the_enclosing_container() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("panache.toml"), "flavor = 'vitepress'\n").unwrap();
+    let file = dir.path().join("guide.md");
+    let content = "Before.\n\n::: info\nSome   text.\n:::\n\nAfter.\n";
+    let root_uri = Uri::from_file_path(dir.path()).unwrap();
+    let doc_uri = Uri::from_file_path(&file).unwrap();
+    let mut server = TestLspServer::new();
+    server.initialize(root_uri.as_str());
+    server.open_document(doc_uri.as_str(), content, "markdown");
+
+    let edits = server.format_range(doc_uri.as_str(), 3, 0, 3, 6).unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].range.start, lsp_types::Position::new(2, 0));
+    assert_eq!(edits[0].range.end, lsp_types::Position::new(5, 0));
+    assert_eq!(edits[0].new_text, "::: info\nSome text.\n:::\n");
+
+    let nested = "Before.\n\n- > ::: info\n  > Some   text.\n  > :::\n\nAfter.\n";
+    server.open_document(doc_uri.as_str(), nested, "markdown");
+    let edits = server.format_range(doc_uri.as_str(), 3, 4, 3, 10).unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].range.start, lsp_types::Position::new(2, 0));
+    assert_eq!(edits[0].range.end, lsp_types::Position::new(5, 0));
+    assert_eq!(edits[0].new_text, "- > ::: info\n  > Some text.\n  > :::\n");
+}
+
+#[test]
 fn hugo_range_formatting_replaces_complete_opaque_blocks() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("panache.toml"), "flavor = 'hugo'\n").unwrap();

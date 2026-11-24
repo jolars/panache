@@ -32,6 +32,13 @@ pub fn try_parse_trailing_attributes(text: &str) -> Option<(AttributeBlock, &str
 /// Try to parse an attribute block from the end of a string.
 /// Returns: (attribute_block, text_before_attributes, open_brace_position_in_trimmed_text)
 pub fn try_parse_trailing_attributes_with_pos(text: &str) -> Option<(AttributeBlock, &str, usize)> {
+    try_parse_trailing_attributes_allow_after_bracket(text, false)
+}
+
+pub(crate) fn try_parse_trailing_attributes_allow_after_bracket(
+    text: &str,
+    allow_after_bracket: bool,
+) -> Option<(AttributeBlock, &str, usize)> {
     let trimmed = text.trim_end();
 
     if !trimmed.ends_with('}') {
@@ -45,7 +52,7 @@ pub fn try_parse_trailing_attributes_with_pos(text: &str) -> Option<(AttributeBl
     }
 
     let before_brace = &trimmed[..open_brace];
-    if before_brace.trim_end().ends_with(']') {
+    if !allow_after_bracket && before_brace.trim_end().ends_with(']') {
         log::trace!("Skipping attribute parsing for bracketed span: {}", text);
         return None;
     }

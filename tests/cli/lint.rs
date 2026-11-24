@@ -10,6 +10,115 @@ use std::time::Duration;
 use tempfile::TempDir;
 
 #[test]
+fn vitepress_resolves_automatic_heading_anchors() {
+    cargo_bin_cmd!("panache")
+        .args(["lint", "--isolated", "--no-cache", "--flavor", "vitepress"])
+        .write_stdin(
+            "# Hello world\n\n# 2. Café & crème\n\n# Hello world\n\n\
+             # [Food](/food) :tada:\n\n\
+             [Home](#hello-world), [Menu](#_2-cafe-creme), [Again](#hello-world-1), and [Food](#food).\n",
+        )
+        .assert()
+        .success();
+}
+
+#[test]
+fn vitepress_resolves_heading_anchors_after_rendering_inline_markup() {
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--isolated",
+            "--no-cache",
+            "--flavor",
+            "vitepress",
+            "--select",
+            "undefined-anchor",
+        ])
+        .write_stdin(concat!(
+            "# Install {#setup} ##\n\n",
+            "Foo\n Bar\n---\n\n",
+            "# Fast :P setup\n\n",
+            "# Ship:rocket:Now\n\n",
+            "# **Bold**{#part} after\n\n",
+            "# &copy;\n\n",
+            "# A &copy;\n\n",
+            "[Setup](#setup) [Setext](#foobar) [Shortcut](#fast-setup) ",
+            "[Alias](#shipnow) [Bold](#bold-after) [Inline ID](#part) ",
+            "[Entity](#©) [Joined entity](#a-copy)\n",
+        ))
+        .assert()
+        .success();
+}
+
+#[test]
+fn vitepress_resolves_link_attributes_and_heading_anchors() {
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--isolated",
+            "--no-cache",
+            "--flavor",
+            "vitepress",
+            "--select",
+            "undefined-anchor",
+        ])
+        .write_stdin(concat!(
+            "# Setup {id=\"install\"}\n\n",
+            "# [Foo](foo.md){#inline}\n\n",
+            "# A \\& B\n\n",
+            "A `bold\ntext` B\n===\n\n",
+            "# A` b `C\n\n",
+            "# [Reference][ref]{#reference-link}\n\n[ref]: /path\n\n",
+            "# Hey :invalidnotemoji: :tada:\n\n",
+            "[Setup](#install) [Foo](#foo) [Inline](#inline) [Ampersand](#a-amp-b) ",
+            "[Code](#a-bold-text-b) [Padded code](#abc) [Emoji](#hey-invalidnotemoji) ",
+            "[Reference](#reference) [Reference link](#reference-link)\n",
+        ))
+        .assert()
+        .success();
+}
+
+#[test]
+fn vitepress_resolves_bare_url_heading_and_container_anchors() {
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--isolated",
+            "--no-cache",
+            "--flavor",
+            "vitepress",
+            "--select",
+            "undefined-anchor",
+        ])
+        .write_stdin(concat!(
+            "# https://example.com{#site}\n\n",
+            "::: tip Useful {#useful}\nBody\n:::\n\n",
+            "[Heading](#https-example-com) [Link](#site) [Container](#useful)\n",
+        ))
+        .assert()
+        .success();
+}
+
+#[test]
+fn vitepress_reserves_explicit_heading_ids_before_slugging() {
+    cargo_bin_cmd!("panache")
+        .args([
+            "lint",
+            "--isolated",
+            "--no-cache",
+            "--flavor",
+            "vitepress",
+            "--select",
+            "undefined-anchor",
+        ])
+        .write_stdin(
+            "# Setup {id=\"install\"}\n\n# Install\n\n[Setup](#install) [Next](#install-1)\n",
+        )
+        .assert()
+        .success();
+}
+
+#[test]
 fn myst_targets_resolve_as_anchors() {
     let dir = TempDir::new().unwrap();
     fs::write(dir.path().join("panache.toml"), "flavor = \"myst\"\n").unwrap();

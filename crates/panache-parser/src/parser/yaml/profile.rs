@@ -182,7 +182,8 @@ fn frontmatter_consumers(flavor: Flavor) -> ConsumerSet {
         | Flavor::MultiMarkdown
         | Flavor::Mdsvex
         | Flavor::Myst
-        | Flavor::Hugo => ConsumerSet::empty(),
+        | Flavor::Hugo
+        | Flavor::VitePress => ConsumerSet::empty(),
     }
 }
 
@@ -197,7 +198,8 @@ fn hashpipe_consumers(flavor: Flavor) -> ConsumerSet {
         | Flavor::MultiMarkdown
         | Flavor::Mdsvex
         | Flavor::Myst
-        | Flavor::Hugo => ConsumerSet::empty(),
+        | Flavor::Hugo
+        | Flavor::VitePress => ConsumerSet::empty(),
     }
 }
 

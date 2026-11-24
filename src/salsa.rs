@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use crate::config::Config;
+use crate::config::{Config, Flavor};
 use crate::incremental::{PrevParse, ReparseAdmission, ReparseCache};
 use crate::linter::diagnostics::Diagnostic;
 use crate::metadata::DocumentMetadata;
@@ -1008,7 +1008,7 @@ impl SymbolUsageIndex {
 
     pub fn heading_implicit_definition_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
         self.heading_implicit_definition_ranges
-            .get(&normalize_label(key))
+            .get(&normalize_anchor_label(key))
     }
 
     pub fn heading_label_ranges(&self, key: &str) -> Option<&Vec<rowan::TextRange>> {
@@ -1072,6 +1072,7 @@ pub fn symbol_usage_index_block(
         db,
         &tree,
         &config.config(db).extensions,
+        config.config(db).flavor,
         &mut index,
         &mut attribute_context,
     );
@@ -1114,7 +1115,8 @@ pub fn symbol_usage_index(db: &dyn Db, file: FileText, config: FileConfig) -> Sy
     // be computed per block. Run that one cross-block pass over the full tree;
     // its ranges are already absolute.
     let tree = parsed_tree_root(db, file, config);
-    collect_implicit_heading_symbols(db, &tree, &config.config(db).extensions, &mut index);
+    let config = config.config(db);
+    collect_implicit_heading_symbols(db, &tree, &config.extensions, config.flavor, &mut index);
     index
 }
 
@@ -1278,15 +1280,25 @@ pub fn symbol_usage_index_from_tree(
     tree: &SyntaxNode,
     extensions: &crate::config::Extensions,
 ) -> SymbolUsageIndex {
+    symbol_usage_index_from_tree_with_flavor(db, tree, extensions, crate::config::Flavor::default())
+}
+
+pub(crate) fn symbol_usage_index_from_tree_with_flavor(
+    db: &dyn Db,
+    tree: &SyntaxNode,
+    extensions: &crate::config::Extensions,
+    flavor: crate::config::Flavor,
+) -> SymbolUsageIndex {
     let mut index = SymbolUsageIndex::default();
     collect_block_local_symbols(
         db,
         tree,
         extensions,
+        flavor,
         &mut index,
         &mut AttributeDeclarationContext::default(),
     );
-    collect_implicit_heading_symbols(db, tree, extensions, &mut index);
+    collect_implicit_heading_symbols(db, tree, extensions, flavor, &mut index);
     index
 }
 
@@ -1389,6 +1401,7 @@ fn collect_block_local_symbols(
     db: &dyn Db,
     tree: &SyntaxNode,
     extensions: &crate::config::Extensions,
+    flavor: Flavor,
     index: &mut SymbolUsageIndex,
     attribute_context: &mut AttributeDeclarationContext,
 ) {
@@ -1649,40 +1662,32 @@ fn collect_block_local_symbols(
 
     for attribute in attribute_nodes {
         db.unwind_if_revision_cancelled();
-        if let Some(id) = attribute.id() {
+        let Some((id, value_range)) = crate::utils::attribute_anchor_id(&attribute, flavor) else {
+            continue;
+        };
+        let id = normalize_anchor_label(&id);
+        index
+            .crossref_declarations
+            .entry(id.clone())
+            .or_default()
+            .push(attribute.syntax().text_range());
+        if let Some(value_range) = value_range {
             index
-                .crossref_declarations
-                .entry(normalize_anchor_label(&id))
+                .crossref_declaration_value_ranges
+                .entry(id.clone())
                 .or_default()
-                .push(attribute.syntax().text_range());
-            if let Some(id_range) = attribute.id_value_range() {
+                .push(value_range);
+            if let Some(heading) = crate::utils::heading_for_attribute(&attribute, flavor) {
                 index
-                    .crossref_declaration_value_ranges
-                    .entry(normalize_anchor_label(&id))
+                    .heading_id_value_ranges
+                    .entry(id.clone())
                     .or_default()
-                    .push(id_range);
-                if attribute
-                    .syntax()
-                    .ancestors()
-                    .any(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
-                {
-                    index
-                        .heading_id_value_ranges
-                        .entry(normalize_anchor_label(&id))
-                        .or_default()
-                        .push(id_range);
-                    if let Some(heading) = attribute
-                        .syntax()
-                        .ancestors()
-                        .find(|ancestor| ancestor.kind() == SyntaxKind::HEADING)
-                    {
-                        index
-                            .heading_explicit_definition_ranges
-                            .entry(normalize_anchor_label(&id))
-                            .or_default()
-                            .push(heading.text_range());
-                    }
-                }
+                    .push(value_range);
+                index
+                    .heading_explicit_definition_ranges
+                    .entry(id)
+                    .or_default()
+                    .push(heading.text_range());
             }
         }
     }
@@ -1754,19 +1759,20 @@ fn collect_implicit_heading_symbols(
     db: &dyn Db,
     tree: &SyntaxNode,
     extensions: &crate::config::Extensions,
+    flavor: crate::config::Flavor,
     index: &mut SymbolUsageIndex,
 ) {
-    for entry in implicit_heading_ids(tree, extensions) {
+    for entry in implicit_heading_ids(tree, extensions, flavor) {
         db.unwind_if_revision_cancelled();
+        if flavor != Flavor::VitePress && crate::utils::heading_has_explicit_id(&entry.heading) {
+            continue;
+        }
         index
             .heading_implicit_definition_ranges
-            .entry(normalize_label(&entry.id))
+            .entry(normalize_anchor_label(&entry.id))
             .or_default()
             .push(entry.heading.text_range());
 
-        if heading_has_explicit_id(&entry.heading) {
-            continue;
-        }
         let Some(heading) = Heading::cast(entry.heading.clone()) else {
             continue;
         };
@@ -1781,13 +1787,6 @@ fn collect_implicit_heading_symbols(
             .or_default()
             .push(range);
     }
-}
-
-fn heading_has_explicit_id(heading: &SyntaxNode) -> bool {
-    heading
-        .children()
-        .filter_map(AttributeNode::cast)
-        .any(|attribute| attribute.id().is_some())
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

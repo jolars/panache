@@ -38,6 +38,7 @@ impl From<CliFlavor> for Flavor {
             CliFlavor::Mdsvex => Flavor::Mdsvex,
             CliFlavor::Myst => Flavor::Myst,
             CliFlavor::Hugo => Flavor::Hugo,
+            CliFlavor::VitePress => Flavor::VitePress,
         }
     }
 }

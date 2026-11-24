@@ -116,6 +116,16 @@ impl AttributeNode {
             .filter(|id| !id.is_empty())
     }
 
+    /// markdown-it-attrs accepts either shorthand or a named id. The first
+    /// declaration wins, matching the rendered element's attribute order.
+    pub fn vitepress_id(&self) -> Option<AttributeValue> {
+        self.entries().into_iter().find_map(|entry| match entry {
+            AttributeEntry::Identifier(value) => Some(value),
+            AttributeEntry::KeyValue { key, value } if key.value() == "id" => Some(value),
+            _ => None,
+        })
+    }
+
     /// Source-ordered attributes with cooked values and payload ranges.
     pub fn entries(&self) -> Vec<AttributeEntry> {
         if !self.has_structured_children() {

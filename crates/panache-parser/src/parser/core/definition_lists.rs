@@ -320,7 +320,9 @@ impl<'a> Parser<'a> {
                                     info.has_trailing_space,
                                 );
                             }
-                            self.containers.push(Container::BlockQuote {});
+                            self.containers.push(Container::BlockQuote {
+                                start_line: Some(self.pos),
+                            });
                         }
 
                         if !inner_blockquote_content.trim().is_empty() {

@@ -1938,7 +1938,7 @@ mod tests {
     #[test]
     fn with_extra_blockquotes_matches_a_deeper_stack() {
         let base = ContainerPrefix::from_stack(
-            &[Container::BlockQuote {}],
+            &[Container::BlockQuote { start_line: None }],
             false,
             &opts(Dialect::CommonMark),
         );
@@ -1948,7 +1948,10 @@ mod tests {
         assert_eq!(base.strip_line_0_for_emission("> > a"), "> a");
         assert_eq!(deeper.strip_line_0_for_emission("> > a"), "a");
         let from_stack = ContainerPrefix::from_stack(
-            &[Container::BlockQuote {}, Container::BlockQuote {}],
+            &[
+                Container::BlockQuote { start_line: None },
+                Container::BlockQuote { start_line: None },
+            ],
             false,
             &opts(Dialect::CommonMark),
         );
