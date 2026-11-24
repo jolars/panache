@@ -1,105 +1,34 @@
----
-name: perf-investigation
-description: Profile-driven performance work on the panache parser or
-  formatter. Measure first with perf + the right harness; classify
-  hotspots into one of a small set of buckets; apply the matching
-  cheap fix; verify median wall-time moved before committing.
----
+# Panache performance measurements
 
-Use this skill when asked to "speed up parsing", "speed up formatting",
-"look at the parser/formatter hotspots", "fix the regression after
-<feature> landed", or anything else where the task is *measure
-parser/formatter cost on a real input and recover wall-time*.
+For parser work, use the `panache-parser` crate's `profile_parse` example
+with `pandoc/MANUAL.txt` or a file that reproduces the reported behavior.
+For formatter internals, select the input with `PANACHE_BENCH_DOC` and the
+repeat count with `PANACHE_BENCH_ITERATIONS`. Use
+`benches/documents/download.sh` if you need the pinned corpus.
 
-The buckets, workflow, and verification steps are shared across parser
-and formatter; only the harness invocation and the hot-file map
-differ. The "Harness" sections below have both — pick the one that
-matches the target.
-
-## Scope boundaries
-
-- Verification is end-to-end test green + `commonmark_allowlist` green
-  + clippy/fmt clean. Performance gains do not justify a snapshot diff
-  or a regression in any test.
-- The thread-local pool / scratch-bundle pattern in
-  `inline_ir.rs::ScratchEvents` is the established shape for
-  amortizing per-call allocations. Don't invent a new pattern; extend
-  that one.
-- Formatting must remain idempotent (`format(format(x)) == format(x)`).
-  Any formatter perf change that touches emitter shape needs the
-  golden-cases suite green.
-- Parsing must remain CST-lossless. Any parser perf change that
-  touches `builder.token()` / `builder.start_node()` shape needs the
-  parser golden snapshots and the conformance allowlist green.
-
-Follow the parser, formatter, and integration-test invariants in the
-repository's root `AGENTS.md`.
-
-## Harness — parser
-
-Stress doc: `pandoc/MANUAL.txt` (~300 KB). Small docs hide per-line
-dispatcher cost behind allocator noise.
-
-```
+```sh
 CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release \
-    --example profile_parse -p panache-parser
-for i in $(seq 1 12); do
-  taskset -c 0 ./target/release/examples/profile_parse \
-      pandoc/MANUAL.txt 200 2>&1 | tail -1
-done
-```
-
-`taskset -c 0` pins to one core — without it, scheduling jitter on a
-hybrid-core CPU swamps small wins. Discard the first 2-3 warmup runs;
-take median of the remaining ~9-10. Per-run variance on a warm machine
-is ~3-5%; demand at least that big a delta before declaring a fix
-worked.
-
-## Harness — formatter
-
-The repo's formatting bench is `cargo bench --bench formatting`. For
-focused hotspot work, set `PANACHE_BENCH_DOC` to the doc you're
-investigating and a low `PANACHE_BENCH_ITERATIONS`:
-
-```
-cd benches/documents && ./download.sh && cd ../..   # first time only
+  --example profile_parse -p panache-parser
+./target/release/examples/profile_parse pandoc/MANUAL.txt 200
 PANACHE_BENCH_DOC=pandoc_manual.md PANACHE_BENCH_ITERATIONS=3 \
-    cargo bench --bench formatting
-
-# Or end-to-end on a single doc via the CLI binary, with hyperfine if
-# available (more honest than ad-hoc shell loops):
-CARGO_PROFILE_RELEASE_DEBUG=true cargo build --release
-hyperfine --warmup 3 \
-    'taskset -c 0 ./target/release/panache format \
-         < pandoc/MANUAL.txt > /dev/null'
+  cargo bench --bench formatting
 ```
 
-Same warmup-discard rule applies.
+For end-to-end formatting, build the release CLI and run it with the relevant
+file and configuration. The devenv shell provides Hyperfine. Supply a shell
+when timing a command with redirection, for example:
 
-## Capture a perf profile
-
-```
-perf record --call-graph=dwarf -F 999 -o /tmp/panache_perf.data -- \
-    ./target/release/examples/profile_parse pandoc/MANUAL.txt 400
-perf report --stdio -i /tmp/panache_perf.data \
-    --no-children -g none --percent-limit 1.0 | head -40
+```sh
+hyperfine --shell=default --warmup 3 \
+  './target/release/panache format < pandoc/MANUAL.txt > /dev/null'
 ```
 
-Always read **`cpu_core` samples**, not `cpu_atom` — on a hybrid-core
-CPU `cpu_atom` typically captures only a handful of samples and
-percentages there are essentially noise. Use `--no-children` for the
-flat self-time view; use `-g graph,caller,…` (or `,callee,…`) when
-you need to find who calls a hot leaf. For inline-frame visibility
-add `--inline`.
+## Historical hotspot notes
 
-For flame graphs, the repo already integrates `cargo flamegraph`:
+These results describe prior inputs and builds. Re-measure on the current
+revision before applying the same changes.
 
-```
-PANACHE_BENCH_DOC=pandoc_manual.md PANACHE_BENCH_ITERATIONS=3 \
-    cargo flamegraph --bench formatting
-```
-
-## Classify each hotspot
+### Parser and formatter examples
 
 Every parser/formatter hotspot recovered so far falls into one of
 these buckets. Identify which one BEFORE editing:
@@ -170,61 +99,6 @@ these buckets. Identify which one BEFORE editing:
   nodes (memory leak) and warming it across benchmark iterations
   creates a misleading result.
 
-## Apply the smallest matching fix
-
-Rules that have paid off:
-
-- **Don't theorize before measuring.** Multiple "should-have-helped"
-  changes (pre-sizing line-split vecs via an LF count; byte-gate on
-  `BlockQuoteParser::detect_prepared`) regressed wall time and were
-  reverted. The intuition wasn't wrong; the cost model was. Always
-  measure.
-- **Verify with measurement, not perf-only.** A change can drop a
-  symbol from the perf top-25 without moving median wall time
-  (sample relocation, not work elimination). The wall-time median is
-  the truth.
-- **One change per commit.** Prevents one regression from masking the
-  win of another. Re-run the test suite + clippy + fmt + a fresh
-  `taskset -c 0` measurement cycle for each.
-- **Revert promptly.** If 12 runs after the change don't show a
-  median shift larger than the baseline noise (~3-5%), the fix
-  doesn't pay; revert and pick a different lever. Don't ship
-  pretty-but-flat refactors as perf.
-
-## Verify and commit
-
-For every commit:
-
-```
-cargo test --workspace --no-fail-fast
-cargo test -p panache-parser --test commonmark commonmark_allowlist
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo fmt -- --check
-```
-
-For formatter changes also verify the golden-cases suite explicitly:
-
-```
-cargo test --test golden_cases
-```
-
-Then a fresh measurement (taskset, 12 runs, median). The commit
-message should name the bucket and quote the median delta:
-
-```
-perf(parser|formatter): <bucket> on <call site>
-
-<one-paragraph rationale: profile pointed here, what specifically>
-<was wasteful, what the fix replaces it with>
-
-Median wall time on `<harness command>` (12 runs):
-~X ms → ~Y ms (~Z%).
-```
-
-Cite the wall-time number even when it's "in the noise" — that's the
-honest record, and a reviewer can decide whether to ship a noise-floor
-change at all.
-
 ## Key files — parser
 
 - `crates/panache-parser/examples/profile_parse.rs` — the harness.
@@ -283,15 +157,3 @@ change at all.
   gate.** `ReferenceDefinitionParser` was the canonical example —
   the multi-line `String::new() + push_str` ran on every line; the
   byte gate is what unlocked the 15% wall-time jump.
-
-## Report-back format
-
-When done, report:
-
-1. Hotspot (function + approximate %) addressed.
-2. Bucket (from §Classify each hotspot).
-3. Median wall-time delta on the relevant harness (12 runs,
-   `taskset -c 0`).
-4. Test / clippy / fmt status (all green or specific exception).
-5. What was tried but reverted (with reason).
-6. Suggested next hotspot, ranked by likely shared root cause.

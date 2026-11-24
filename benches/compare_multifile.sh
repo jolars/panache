@@ -153,7 +153,7 @@ for tool in "${TOOLS[@]}"; do
     cmd="${TOOL_CMD[$tool]}"
     log "  benchmarking $tool ..."
     tmp=$(mktemp)
-    hyperfine --warmup 1 --min-runs "$HYPERFINE_MIN_RUNS" \
+    hyperfine --shell=default --warmup 1 --min-runs "$HYPERFINE_MIN_RUNS" \
         --prepare "bash '$PREPARE_SCRIPT'" \
         --export-json "$tmp" --style=none \
         "$cmd" >/dev/null 2>&1 || {
@@ -162,12 +162,12 @@ for tool in "${TOOLS[@]}"; do
             rm -f "$tmp"
             continue
         }
-    mean=$(jq -r '.results[0].mean'   "$tmp")
-    stddev=$(jq -r '.results[0].stddev' "$tmp")
-    min=$(jq -r '.results[0].min'     "$tmp")
-    max=$(jq -r '.results[0].max'     "$tmp")
-    runs=$(jq -r '.results[0].times | length' "$tmp")
+    stats=$(jq -er -f "$REPO_ROOT/benches/hyperfine-stats.jq" "$tmp") || {
+        rm -f "$tmp"
+        exit 1
+    }
     rm -f "$tmp"
+    read -r mean stddev min max runs <<< "$stats"
     read -r mean_ms stddev_ms min_ms max_ms < <(awk -v m="$mean" -v s="$stddev" -v lo="$min" -v hi="$max" \
         'BEGIN { printf "%.4f %.4f %.4f %.4f\n", m*1000, s*1000, lo*1000, hi*1000 }')
     RESULTS_JSON+=("$(printf '{"tool":"%s","mean_ms":%s,"stddev_ms":%s,"min_ms":%s,"max_ms":%s,"runs":%d,"failed":false}' \

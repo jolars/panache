@@ -151,17 +151,17 @@ run_one_json() {
         tmp=$(mktemp)
         # --style=none silences the progress UI. Hyperfine hides command
         # stdout/stderr by default; `--show-output` is an opt-in flag.
-        hyperfine --warmup 1 \
+        hyperfine --shell=default --warmup 1 \
             --min-runs "$HYPERFINE_MIN_RUNS" \
             --export-json "$tmp" --style=none \
             "$cmd" >/dev/null 2>&1
-        local mean stddev min max runs
-        mean=$(jq -r '.results[0].mean' "$tmp")
-        stddev=$(jq -r '.results[0].stddev' "$tmp")
-        min=$(jq -r '.results[0].min' "$tmp")
-        max=$(jq -r '.results[0].max' "$tmp")
-        runs=$(jq -r '.results[0].times | length' "$tmp")
+        local stats mean stddev min max runs
+        stats=$(jq -er -f "benches/hyperfine-stats.jq" "$tmp") || {
+            rm -f "$tmp"
+            return 1
+        }
         rm -f "$tmp"
+        read -r mean stddev min max runs <<< "$stats"
         awk -v m="$mean" -v s="$stddev" -v lo="$min" -v hi="$max" -v r="$runs" \
             'BEGIN { printf "%.4f %.4f %.4f %.4f %d\n", m*1000, s*1000, lo*1000, hi*1000, r }'
     else

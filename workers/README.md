@@ -24,8 +24,8 @@ From the repository's development environment:
 
 ```sh
 npm ci --prefix workers
-compute run -- task docs:build
-compute run -- task docs:check
+task docs:build
+task docs:check
 task docs:worker
 ```
 

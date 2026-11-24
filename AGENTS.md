@@ -37,6 +37,14 @@ cargo test -p panache-parser --test golden_parser_cases <case_name>
 cargo run -- debug format --checks all document.qmd
 ```
 
+### Performance investigations
+
+Use the [performance guide](benches/PERFORMANCE.md) to select the parser or
+formatter harness. Time the release CLI for end-to-end changes and a persistent
+language server for editor latency. Preserve CST losslessness and formatter
+bytes, and run the corresponding golden cases, parser snapshots, and CommonMark
+conformance checks.
+
 ### Tests and fixtures
 
 - Assert one user-visible behavior at a time with minimal brittleness.
