@@ -112,7 +112,21 @@ fn run_linter_in_document(
         cmd.output()
             .map_err(|e| LinterError::SpawnFailed(format!("{}: {}", linter_info.command, e)))
     };
-    let output = if linter_name == "jarl"
+    let output = if linter_name == "arity"
+        && linter_info.command.as_ref() == "arity"
+        && let Some(document_path) = document_path
+    {
+        // Arity discovers config from a file argument's directory. Feed the
+        // extracted code through stdin so discovery starts in the document's
+        // directory instead of the temporary directory.
+        let mut r_path = std::path::absolute(document_path)?.into_os_string();
+        r_path.push(".R");
+        run(make_command()
+            .arg("--stdin-filename")
+            .arg(r_path)
+            .arg("-")
+            .stdin(std::fs::File::open(&temp_path)?))?
+    } else if linter_name == "jarl"
         && let Some(document_path) = document_path
     {
         // Jarl discovers configuration from the input path. Give stdin a
