@@ -24,7 +24,7 @@ use super::super::utils::container_stack::{byte_index_at_column, leading_indent}
 use super::super::utils::helpers::is_blank_line;
 use super::super::utils::marker_utils::try_parse_blockquote_marker;
 use super::super::utils::text_buffer::ParagraphBuffer;
-use super::{emit_blank, fence_enabled, is_quote_prose};
+use super::{emit_blank, emit_buffered_paragraph, fence_enabled, is_quote_prose};
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind as K;
 
@@ -120,6 +120,18 @@ fn marker(line: &str, options: &ParserOptions) -> Option<ListMarkerMatch> {
     (leading_indent(line).0 < 4)
         .then(|| try_parse_list_marker(line, options, OpenListHint::None))
         .flatten()
+}
+
+fn list_interrupts_quote_paragraph(
+    marker: &ListMarkerMatch,
+    tail: &str,
+    options: &ParserOptions,
+) -> bool {
+    if options.dialect == Dialect::CommonMark {
+        marker_start_number(&marker.marker).is_none_or(|start| start == 1) && !is_blank_line(tail)
+    } else {
+        options.extensions.lists_without_preceding_blankline
+    }
 }
 
 pub(super) fn plan<'a>(
@@ -258,7 +270,13 @@ pub(super) fn plan<'a>(
             if !planner.paragraph.is_empty()
                 && !is_blank_line(remaining)
                 && (is_quote_prose(remaining, options)
-                    || (commonmark && leading_indent(remaining).0 >= 4))
+                    || (commonmark && leading_indent(remaining).0 >= 4)
+                    || (matches!(planner.frames.get(matched), Some(Frame::Quote))
+                        && marker(remaining, options).is_some_and(|next| {
+                            let (_, indent) = leading_indent(remaining);
+                            let tail = &remaining[indent + next.marker_len..];
+                            !list_interrupts_quote_paragraph(&next, tail, options)
+                        })))
             {
                 // Missing quote markers do not erase the indent of an
                 // enclosing list item on the same lazy continuation.
@@ -295,6 +313,10 @@ pub(super) fn plan<'a>(
         let mut opener_as_text = false;
         loop {
             if let Some((prefix, tail)) = quote_prefix(remaining) {
+                if options.extensions.blank_before_blockquote && !planner.paragraph.is_empty() {
+                    opener_as_text = true;
+                    break;
+                }
                 planner.flush();
                 planner.events.push(Event::Open(K::BLOCK_QUOTE));
                 planner.structural_prefixes(std::mem::take(&mut prefixes));
@@ -310,16 +332,10 @@ pub(super) fn plan<'a>(
                 if next.virtual_marker_space {
                     return Err((remaining, "list marker with virtual padding"));
                 }
-                let paragraph = !planner.paragraph.is_empty();
-                let cannot_interrupt = paragraph
-                    && if commonmark {
-                        marker_start_number(&next.marker).is_some_and(|start| start != 1)
-                            || is_blank_line(tail)
-                    } else {
-                        matches!(planner.frames.last(), Some(Frame::Quote))
-                            && !options.extensions.lists_without_preceding_blankline
-                    };
-                if cannot_interrupt {
+                if !planner.paragraph.is_empty()
+                    && (commonmark || matches!(planner.frames.last(), Some(Frame::Quote)))
+                    && !list_interrupts_quote_paragraph(&next, tail, options)
+                {
                     opener_as_text = true;
                     break;
                 }
@@ -418,6 +434,11 @@ pub(super) fn plan<'a>(
             && fence_enabled(&fence, options)
             && !(options.extensions.tex_math_gfm && is_gfm_math_fence(&fence))
         {
+            if !commonmark && fence.fence_char == '~' && !planner.paragraph.is_empty() {
+                planner.push_text(remaining, prefixes);
+                pos += 1;
+                continue;
+            }
             let quote_depth = planner
                 .frames
                 .iter()
@@ -494,8 +515,20 @@ pub(super) fn plan<'a>(
             if !planner.paragraph.is_empty() && options.extensions.blank_before_header {
                 planner.push_text(remaining, prefixes);
             } else {
-                planner.flush();
-                planner.structural_prefixes(prefixes);
+                // An interrupting heading leaves the quote prefixes in the
+                // paragraph whose last line they follow in the source.
+                if commonmark
+                    && !planner.paragraph.is_empty()
+                    && prefixes
+                        .iter()
+                        .all(|prefix| matches!(prefix, Prefix::Quote(..)))
+                {
+                    planner.push_text("", prefixes);
+                    planner.flush();
+                } else {
+                    planner.flush();
+                    planner.structural_prefixes(prefixes);
+                }
                 planner.events.push(Event::Atx(remaining, level));
             }
         } else if commonmark
@@ -567,9 +600,7 @@ pub(super) fn emit(
                 );
             }
             Event::Paragraph(kind, buffer) => {
-                builder.start_node(kind.into());
-                buffer.emit_with_inlines(builder, options, false);
-                builder.finish_node();
+                emit_buffered_paragraph(builder, kind, &buffer, options);
             }
             Event::Blank(line) => emit_blank(builder, line),
             Event::Whitespace(indent) => builder.token(K::WHITESPACE.into(), indent),

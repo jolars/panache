@@ -324,3 +324,75 @@ fn four_space_rule_uses_configured_list_content_column() {
     check("- first\n    - child\n", &options);
     assert!(experimental_block::try_parse_with_errors("- first\n  - second\n", &options).is_err());
 }
+
+#[test]
+fn commonmark_html_keeps_unicode_whitespace_and_following_text() {
+    check(
+        "<div>\n\u{a0}\nvisible\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
+fn quarto_pipe_table_accepts_lowercase_caption() {
+    check(
+        "table: Measurements\n\nA | B\n--|--\n1 | 2\n",
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
+}
+
+#[test]
+fn quarto_container_openers_respect_blank_before_rules() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("> first\n> > nested\n", &options);
+    check("> text\n> ~~~\n> code\n> ~~~\n", &options);
+    check("> text\n>\n> ~~~\n> code\n> ~~~\n", &options);
+}
+
+#[test]
+fn quarto_promotes_standalone_container_images() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "> ![Caption](image.png)\n",
+        "- ![Caption](image.png)\n",
+        "> - ![Caption](image.png)\n",
+        "> ![Caption](image.png)\n> continued\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn lazy_quote_continuations_respect_dialect() {
+    check(
+        "> quoted\n: ordinary text\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+    check(
+        "> quoted\n- list\n",
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
+}
+
+#[test]
+fn declines_reference_definitions_with_optional_indent_inside_quotes() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    for input in ["> [id]: /url\n", ">  [id]: /url\n", ">    [id]: /url\n"] {
+        assert!(experimental_block::try_parse_with_errors(input, &options).is_err());
+    }
+}
+
+#[test]
+fn list_code_span_keeps_tab_straddling_content_column() {
+    for flavor in [Flavor::CommonMark, Flavor::Quarto] {
+        check("- ``foo\n\tbar``\n", &ParserOptions::for_flavor(flavor));
+    }
+}
+
+#[test]
+fn commonmark_quoted_heading_preserves_paragraph_prefix() {
+    check(
+        "> note\n> # title\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}

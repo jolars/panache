@@ -473,7 +473,7 @@ fn try_parse_caption_prefix(line: &str) -> Option<(usize, &str)> {
     }
 }
 
-fn is_table_caption_start(line: &str) -> bool {
+pub(in crate::parser) fn is_table_caption_start(line: &str) -> bool {
     try_parse_caption_prefix(line).is_some()
 }
 

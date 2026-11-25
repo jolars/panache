@@ -42,10 +42,12 @@ use super::blocks::metadata::{
     is_metadata_open_delim, prepare_yaml_content,
 };
 use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
-use super::blocks::tables::{PreparedPipeTable, prepare_pipe_table, try_parse_grid_separator};
+use super::blocks::tables::{
+    PreparedPipeTable, is_table_caption_start, prepare_pipe_table, try_parse_grid_separator,
+};
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
-use super::utils::container_stack::{byte_index_at_column, leading_indent};
+use super::utils::container_stack::{gobbled_indent_prefix_len, leading_indent};
 use super::utils::helpers::{is_blank_line, split_lines_inclusive};
 use super::utils::inline_emission::emit_inlines;
 use super::utils::text_buffer::ParagraphBuffer;
@@ -95,10 +97,13 @@ fn plain_container_text(text: &str) -> bool {
 }
 
 fn is_quote_prose(text: &str, options: &ParserOptions) -> bool {
-    leading_indent(text).0 < 4
-        && plain_container_text(text)
+    let (columns, indent) = leading_indent(text);
+    let content = &text[indent..];
+    columns < 4
+        && (plain_container_text(content)
+            || (options.dialect == Dialect::CommonMark && content.starts_with(':')))
         && try_parse_list_marker(text, options, OpenListHint::None).is_none()
-        && !(text.starts_with('[') && text.contains("]:"))
+        && !(content.starts_with('[') && content.contains("]:"))
 }
 
 fn list_marker_at(line: &str, indent: usize, options: &ParserOptions) -> Option<ListMarkerMatch> {
@@ -335,7 +340,7 @@ fn plan<'a>(
         } else if fresh
             && indent < 4
             && options.extensions.pipe_tables
-            && (content.contains('|') || content.starts_with(':') || content.starts_with("Table:"))
+            && (content.contains('|') || is_table_caption_start(line))
             && let Some(table) = prepare_pipe_table(
                 &StrippedLines::new(lines, pos, &prefix),
                 options,
@@ -396,7 +401,7 @@ fn plan<'a>(
             let mut end = pos + 1;
             if !is_closing_marker(line, &kind) {
                 while let Some(line) = lines.get(end) {
-                    if ends_at_blank_line(&kind) && is_blank_line(line) {
+                    if ends_at_blank_line(&kind) && line.trim().is_empty() {
                         break;
                     }
                     end += 1;
@@ -596,6 +601,24 @@ fn emit_blank(builder: &mut GreenNodeBuilder<'static>, line: &str) {
     builder.finish_node();
 }
 
+fn emit_buffered_paragraph(
+    builder: &mut GreenNodeBuilder<'static>,
+    kind: K,
+    paragraph: &ParagraphBuffer,
+    options: &ParserOptions,
+) {
+    let kind = if options.extensions.implicit_figures
+        && paragraph_is_standalone_image(&paragraph.get_text_for_parsing(), options)
+    {
+        K::FIGURE
+    } else {
+        kind
+    };
+    builder.start_node(kind.into());
+    paragraph.emit_with_inlines(builder, options, false);
+    builder.finish_node();
+}
+
 fn emit_list(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
@@ -619,7 +642,6 @@ fn emit_list(
         builder.token(K::LIST_MARKER.into(), &line[indent..marker_end]);
         let content_start = marker_end + marker.spaces_after_bytes;
         builder.token(K::WHITESPACE.into(), &line[marker_end..content_start]);
-        builder.start_node(K::PLAIN.into());
         let content_col =
             list_item_content_col(indent, marker.marker_len, marker.spaces_after_cols, options);
         let paragraph_end = item
@@ -628,18 +650,25 @@ fn emit_list(
             .copied()
             .unwrap_or(item.lines.end);
         if paragraph_end == item.lines.start + 1 {
-            emit_inlines(builder, &line[content_start..], options, false);
+            let text = &line[content_start..];
+            let kind = if paragraph_is_standalone_image(text, options) {
+                K::FIGURE
+            } else {
+                K::PLAIN
+            };
+            builder.start_node(kind.into());
+            emit_inlines(builder, text, options, false);
+            builder.finish_node();
         } else {
             let mut paragraph = ParagraphBuffer::new();
             paragraph.push_text(&line[content_start..]);
             for line in &lines[item.lines.start + 1..paragraph_end] {
-                let indent = byte_index_at_column(line, content_col);
+                let indent = gobbled_indent_prefix_len(line, content_col);
                 paragraph.push_indent(&line[..indent]);
                 paragraph.push_text(&line[indent..]);
             }
-            paragraph.emit_with_inlines(builder, options, false);
+            emit_buffered_paragraph(builder, K::PLAIN, &paragraph, options);
         }
-        builder.finish_node();
         for pos in item.restricted_markers {
             builder.start_node(K::PLAIN.into());
             emit_inlines(builder, lines[pos], options, false);
