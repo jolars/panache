@@ -833,25 +833,6 @@ impl LspTester {
         }
     }
 
-    /// Push a `textDocument/formatting` request through the real dispatcher
-    /// so it spawns onto the format pool. Returns the id for use with
-    /// [`Self::send_cancel`].
-    pub fn send_format_request_raw(&mut self, id: i32, uri: &str) -> lsp_server::RequestId {
-        let req_id = lsp_server::RequestId::from(id);
-        let params = DocumentFormattingParams {
-            text_document: text_doc(uri),
-            options: fmt_options(),
-            work_done_progress_params: WorkDoneProgressParams::default(),
-        };
-        let req = lsp_server::Request::new(
-            req_id.clone(),
-            request::Formatting::METHOD.to_owned(),
-            params,
-        );
-        self.gs.on_request(req);
-        req_id
-    }
-
     /// Push a `textDocument/diagnostic` request through the real dispatcher so it
     /// spawns onto the worker pool (rather than answering inline). Returns the id
     /// for use with [`Self::send_cancel`]; the response arrives via [`Self::pump`].
