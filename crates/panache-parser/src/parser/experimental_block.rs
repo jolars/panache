@@ -34,7 +34,8 @@ use super::blocks::html_blocks::{
 use super::blocks::indented_code::parse_indented_code_block;
 use super::blocks::line_blocks::try_parse_line_block_start;
 use super::blocks::lists::{
-    ListMarkerMatch, OpenListHint, marker_start_number, markers_match, try_parse_list_marker,
+    ListMarkerMatch, OpenListHint, is_task_checkbox, list_item_content_col, marker_start_number,
+    markers_match, try_parse_list_marker,
 };
 use super::blocks::metadata::{
     YamlContentOutcome, collect_yaml_content, emit_yaml_block, find_yaml_block_closing_pos,
@@ -122,9 +123,15 @@ fn plan_list(
     let mut marker = first;
     loop {
         let content_start = indent + marker.marker_len + marker.spaces_after_bytes;
-        let content_col = indent + marker.marker_len + marker.spaces_after_cols;
+        let content_col =
+            list_item_content_col(indent, marker.marker_len, marker.spaces_after_cols, options);
         let tail = &lines[*pos][content_start..];
-        if marker.virtual_marker_space || is_blank_line(tail) || !plain_container_text(tail) {
+        if marker.virtual_marker_space
+            || is_blank_line(tail)
+            || is_task_checkbox(tail)
+            || leading_indent(tail).0 >= 4
+            || !plain_container_text(tail)
+        {
             return None;
         }
         let item_start = *pos;
@@ -142,6 +149,12 @@ fn plan_list(
                     && marker_start_number(&marker.marker).is_some_and(|start| start != 1)
                 {
                     restricted_markers.push(*pos);
+                    *pos += 1;
+                    continue;
+                }
+                if options.dialect == Dialect::CommonMark
+                    && marker_start_number(&marker.marker).is_some_and(|start| start != 1)
+                {
                     *pos += 1;
                     continue;
                 }
@@ -263,7 +276,8 @@ fn plan<'a>(
         {
             divs.pop();
             blocks.push(Block::CloseDiv(Some(pos)));
-        } else if options.extensions.fenced_divs
+        } else if fresh
+            && options.extensions.fenced_divs
             && indent < 4
             && marker == Some(b':')
             && let Some(fence) = try_parse_div_fence_open(line)
@@ -332,11 +346,11 @@ fn plan<'a>(
             blocks.push(Block::PipeTable(pos, table));
             pos += consumed;
             continue;
-        } else if indent >= 4 && fresh {
+        } else if indent >= 4 && fresh && !line.trim().is_empty() {
             let mut end = pos + 1;
             let mut cursor = end;
             while let Some(line) = lines.get(cursor) {
-                if !is_blank_line(line) {
+                if !line.trim().is_empty() {
                     if leading_indent(line).0 < 4 {
                         break;
                     }
@@ -606,7 +620,8 @@ fn emit_list(
         let content_start = marker_end + marker.spaces_after_bytes;
         builder.token(K::WHITESPACE.into(), &line[marker_end..content_start]);
         builder.start_node(K::PLAIN.into());
-        let content_col = marker_end + marker.spaces_after_cols;
+        let content_col =
+            list_item_content_col(indent, marker.marker_len, marker.spaces_after_cols, options);
         let paragraph_end = item
             .restricted_markers
             .first()

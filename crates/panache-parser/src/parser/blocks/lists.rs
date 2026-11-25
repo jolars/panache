@@ -866,7 +866,7 @@ pub(in crate::parser) fn emit_list_item(
 /// bracket-shape pattern `[x]`, not a checkbox, and `- [x]\n  foo` yields a
 /// `SoftBreak` rather than a `Space`, so it isn't one either. (GFM's spec is
 /// laxer about the continuation-line form; we follow pandoc.)
-fn is_task_checkbox(rest: &str) -> bool {
+pub(in crate::parser) fn is_task_checkbox(rest: &str) -> bool {
     if !(rest.starts_with("[ ]") || rest.starts_with("[x]") || rest.starts_with("[X]")) {
         return false;
     }

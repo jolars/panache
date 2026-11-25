@@ -9,12 +9,15 @@ use super::super::blocks::code_blocks::{
     FenceInfo, is_closing_fence, is_gfm_math_fence, parse_fenced_code_block, try_parse_fence_open,
 };
 use super::super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
-use super::super::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
+use super::super::blocks::headings::{
+    emit_atx_heading, try_parse_atx_heading, try_parse_setext_heading,
+};
 use super::super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::super::blocks::indented_code::parse_indented_code_block;
 use super::super::blocks::lists::{
     ListItemEmissionInput, ListMarker, ListMarkerMatch, OpenListHint, emit_list_item,
-    list_item_content_col, marker_start_number, markers_match, try_parse_list_marker,
+    is_task_checkbox, list_item_content_col, marker_start_number, markers_match,
+    try_parse_list_marker,
 };
 use super::super::diagnostics::Diagnostics;
 use super::super::utils::container_stack::{byte_index_at_column, leading_indent};
@@ -168,6 +171,12 @@ pub(super) fn plan<'a>(
                     }
                     let bytes = byte_index_at_column(remaining, *column);
                     let (indent, tail) = remaining.split_at(bytes);
+                    // Block detection on the suffix would expand these tabs
+                    // from column zero instead of the list content column.
+                    let (_, tail_indent_bytes) = leading_indent(tail);
+                    if tail[..tail_indent_bytes].contains('\t') {
+                        return Err((remaining, "tabbed list continuation"));
+                    }
                     prefixes.push(Prefix::Indent(indent));
                     remaining = tail;
                 }
@@ -283,7 +292,7 @@ pub(super) fn plan<'a>(
         }
 
         let mut opened_item = false;
-        let mut ordered_marker_as_text = false;
+        let mut opener_as_text = false;
         loop {
             if let Some((prefix, tail)) = quote_prefix(remaining) {
                 planner.flush();
@@ -301,10 +310,20 @@ pub(super) fn plan<'a>(
                 if next.virtual_marker_space {
                     return Err((remaining, "list marker with virtual padding"));
                 }
-                if ["[x]", "[X]", "[ ]"]
-                    .iter()
-                    .any(|task| tail.starts_with(task))
-                {
+                let paragraph = !planner.paragraph.is_empty();
+                let cannot_interrupt = paragraph
+                    && if commonmark {
+                        marker_start_number(&next.marker).is_some_and(|start| start != 1)
+                            || is_blank_line(tail)
+                    } else {
+                        matches!(planner.frames.last(), Some(Frame::Quote))
+                            && !options.extensions.lists_without_preceding_blankline
+                    };
+                if cannot_interrupt {
+                    opener_as_text = true;
+                    break;
+                }
+                if is_task_checkbox(tail) {
                     return Err((remaining, "nested task list"));
                 }
                 let nested_start_restricted = planner.frames.last().is_some_and(|f| {
@@ -313,16 +332,13 @@ pub(super) fn plan<'a>(
                         && options.pandoc_compat.restricts_ordered_sublist_start()
                         && marker_start_number(&next.marker).is_some_and(|start| start != 1)
                 });
-                let commonmark_lazy_ordered = commonmark
-                    && !planner.paragraph.is_empty()
-                    && matches!(planner.frames.last(), Some(Frame::Item { .. }))
-                    && marker_start_number(&next.marker).is_some_and(|start| start != 1);
-                if nested_start_restricted || commonmark_lazy_ordered {
-                    ordered_marker_as_text = true;
-                    if nested_start_restricted {
-                        planner.flush();
-                    }
+                if nested_start_restricted {
+                    opener_as_text = true;
+                    planner.flush();
                     break;
+                }
+                if leading_indent(tail).0 >= 4 && !is_blank_line(tail) {
+                    return Err((remaining, "list item opening with indented code"));
                 }
                 planner.flush();
                 let mut item_line = remaining;
@@ -381,12 +397,13 @@ pub(super) fn plan<'a>(
             }
         } else if planner.paragraph.is_empty()
             && !opened_item
-            && leading_indent(remaining).0 >= 4
+            && !remaining.trim().is_empty()
             && let [Frame::List { .. }, Frame::Item { column }] = planner.frames.as_slice()
+            && leading_indent(line).0 >= *column + 4
         {
             let mut end = pos + 1;
             for (index, raw) in lines.iter().enumerate().skip(end) {
-                if !is_blank_line(raw) {
+                if !raw.trim().is_empty() {
                     if leading_indent(raw).0 < *column + 4 {
                         break;
                     }
@@ -474,14 +491,23 @@ pub(super) fn plan<'a>(
             pos = end;
             continue;
         } else if let Some(level) = try_parse_atx_heading(remaining) {
-            planner.flush();
-            planner.structural_prefixes(prefixes);
-            planner.events.push(Event::Atx(remaining, level));
+            if !planner.paragraph.is_empty() && options.extensions.blank_before_header {
+                planner.push_text(remaining, prefixes);
+            } else {
+                planner.flush();
+                planner.structural_prefixes(prefixes);
+                planner.events.push(Event::Atx(remaining, level));
+            }
+        } else if commonmark
+            && !planner.paragraph.is_empty()
+            && try_parse_setext_heading(&["text\n", remaining], 0).is_some()
+        {
+            return Err((remaining, "nested Setext heading"));
         } else if try_parse_horizontal_rule(remaining).is_some() {
             planner.flush();
             planner.structural_prefixes(prefixes);
             planner.events.push(Event::Rule(remaining));
-        } else if ordered_marker_as_text || is_quote_prose(remaining, options) {
+        } else if opener_as_text || is_quote_prose(remaining, options) {
             // Within a quoted list the incumbent retains list indentation in
             // the text after the quote marker.
             if matches!(planner.frames.last(), Some(Frame::Item { .. }))

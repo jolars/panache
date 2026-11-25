@@ -278,3 +278,49 @@ fn quoted_list_preserves_empty_items_and_blank_lines() {
     check("> -\n>\n> - next\n", &options);
     check("> - a\n>\tcontinued\n", &options);
 }
+
+#[test]
+fn quarto_block_openers_respect_open_paragraphs() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "Prose\n::: note\nText\n:::\n",
+        "> First\n> # Next\n",
+        "> A\n> - B\n",
+        "    first\n    \u{a0}\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn commonmark_non_initial_ordered_markers_continue_paragraphs() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    for input in ["> A\n> 2. B\n", "- parent\n  2. child\n"] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn experimental_parser_declines_unimplemented_container_forms() {
+    for (flavor, input) in [
+        (Flavor::CommonMark, "> A\n> ---\n"),
+        (Flavor::CommonMark, "-     code\n"),
+        (Flavor::Quarto, "- [x] done\n"),
+        (Flavor::Quarto, "- > foo\n  \tcode\n"),
+        (Flavor::CommonMark, "- > foo\n- > - bar\n \n  \t- nested\n"),
+    ] {
+        let options = ParserOptions::for_flavor(flavor);
+        assert!(
+            experimental_block::try_parse_with_errors(input, &options).is_err(),
+            "{input:?}"
+        );
+    }
+}
+
+#[test]
+fn four_space_rule_uses_configured_list_content_column() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.four_space_rule = true;
+    check("- first\n    - child\n", &options);
+    assert!(experimental_block::try_parse_with_errors("- first\n  - second\n", &options).is_err());
+}

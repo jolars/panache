@@ -124,9 +124,14 @@ struct EditStep {
 
 fn check_edits(input: &str, options: &ParserOptions) -> Option<Vec<EditStep>> {
     let Some(offset) = input
-        .match_indices("\n\n")
+        .split_inclusive('\n')
+        .scan(0, |offset, line| {
+            *offset += line.len();
+            Some((*offset, line))
+        })
+        .filter(|(_, line)| matches!(*line, "\n" | "\r\n"))
         .nth(1)
-        .map(|(offset, _)| offset + 2)
+        .map(|(offset, _)| offset)
     else {
         return Some(Vec::new());
     };
@@ -437,6 +442,18 @@ executable-code = false
                     count
                 );
             }
+        }
+    }
+
+    #[test]
+    fn edit_workload_uses_the_third_paragraph_with_either_line_ending() {
+        let options = ParserOptions::for_flavor(Flavor::CommonMark);
+        for newline in ["\n", "\r\n"] {
+            let before = format!("First.{newline}{newline}Second.{newline}{newline}");
+            let input = format!("{before}Third.{newline}");
+            let steps = check_edits(&input, &options).unwrap();
+            assert_eq!(steps.len(), 3);
+            assert_eq!(steps[0].edit.range, before.len()..before.len());
         }
     }
 }
