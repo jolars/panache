@@ -438,6 +438,7 @@ golden_test_cases!(
     simple_table_closer_kept_before_sibling_marker,
     pipe_table_in_footnote_stops_at_note_marker,
     pipe_table_in_list_item_stops_at_sibling_marker,
+    list_item_wrap_example_marker_at_line_start,
     pipe_table_marker_line_in_blockquote,
     simple_table_in_div_stops_at_closer,
     simple_table_closer_before_div_closer,

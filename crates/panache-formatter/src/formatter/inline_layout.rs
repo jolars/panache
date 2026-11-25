@@ -337,7 +337,15 @@ fn is_unsafe_block_line_start_piece(piece: &str) -> bool {
 }
 
 fn is_example_list_marker_piece(piece: &str) -> bool {
-    ExampleListMarker::parse(piece).is_some()
+    if ExampleListMarker::parse(piece).is_some() {
+        return true;
+    }
+    // Pandoc also reads `@label.` and `@label)` (as in `@fig-x.` ending a
+    // sentence) as example markers at a line start.
+    piece
+        .strip_suffix(['.', ')'])
+        .filter(|body| body.starts_with('@'))
+        .is_some_and(|body| ExampleListMarker::parse(&format!("({body})")).is_some())
 }
 
 fn is_decimal_ordered_list_marker_piece(piece: &str) -> bool {
@@ -1769,6 +1777,11 @@ mod tests {
         assert!(is_example_list_marker_piece("(@foo-bar-123)"));
         assert!(is_example_list_marker_piece("(1@foo-bar-123)"));
         assert!(is_example_list_marker_piece("(0@)"));
+        assert!(is_example_list_marker_piece("@fig-scatter."));
+        assert!(is_example_list_marker_piece("@user)"));
+        assert!(is_example_list_marker_piece("@."));
+        assert!(!is_example_list_marker_piece("@fig-scatter"));
+        assert!(!is_example_list_marker_piece("@fig-scatter,"));
         assert!(is_unsafe_list_line_start_piece("(@foo-bar-123)"));
         assert!(is_decimal_ordered_list_marker_piece("2018."));
         assert!(is_decimal_ordered_list_marker_piece("2)"));
