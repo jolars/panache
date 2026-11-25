@@ -12,7 +12,7 @@ This document tracks implementation status for Panache's features.
 - [x] Move shared include-walk state into traversal structs for
   `lint_loaded_document_with_includes` and the execution planner's
   `collect`.
-- [ ] Pass the existing `BracketResolution` to `commit_resolution` so callers
+- [x] Pass the existing `BracketResolution` to `commit_resolution` so callers
   name the link text and suffix offsets.
 
 The WASM formatter's positional signature is used by the playground. Treat

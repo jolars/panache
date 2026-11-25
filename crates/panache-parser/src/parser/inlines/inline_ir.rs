@@ -1742,12 +1742,14 @@ pub fn process_brackets(
             commit_resolution(
                 events,
                 o,
-                i,
-                text_start,
-                text_end,
-                after_close,
-                suffix_end,
-                LinkKind::Inline { dest, title },
+                BracketResolution {
+                    close_event: i as u32,
+                    text_start,
+                    text_end,
+                    suffix_start: after_close,
+                    suffix_end,
+                    kind: LinkKind::Inline { dest, title },
+                },
             );
             mark_opener_resolved(events, o);
             i += 1;
@@ -1764,13 +1766,15 @@ pub fn process_brackets(
                 commit_resolution(
                     events,
                     o,
-                    i,
-                    text_start,
-                    text_end,
-                    after_close,
-                    *suffix_end,
-                    LinkKind::FullReference {
-                        label: label_raw.clone(),
+                    BracketResolution {
+                        close_event: i as u32,
+                        text_start,
+                        text_end,
+                        suffix_start: after_close,
+                        suffix_end: *suffix_end,
+                        kind: LinkKind::FullReference {
+                            label: label_raw.clone(),
+                        },
                     },
                 );
                 mark_opener_resolved(events, o);
@@ -1792,12 +1796,14 @@ pub fn process_brackets(
             commit_resolution(
                 events,
                 o,
-                i,
-                text_start,
-                text_end,
-                after_close,
-                collapsed_suffix_end,
-                LinkKind::CollapsedReference,
+                BracketResolution {
+                    close_event: i as u32,
+                    text_start,
+                    text_end,
+                    suffix_start: after_close,
+                    suffix_end: collapsed_suffix_end,
+                    kind: LinkKind::CollapsedReference,
+                },
             );
             mark_opener_resolved(events, o);
             i += 1;
@@ -1812,12 +1818,14 @@ pub fn process_brackets(
             commit_resolution(
                 events,
                 o,
-                i,
-                text_start,
-                text_end,
-                after_close,
-                after_close,
-                LinkKind::ShortcutReference,
+                BracketResolution {
+                    close_event: i as u32,
+                    text_start,
+                    text_end,
+                    suffix_start: after_close,
+                    suffix_end: after_close,
+                    kind: LinkKind::ShortcutReference,
+                },
             );
             mark_opener_resolved(events, o);
             i += 1;
@@ -1897,26 +1905,10 @@ fn mark_opener_resolved(events: &mut [IrEvent], open_idx: usize) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn commit_resolution(
-    events: &mut [IrEvent],
-    open_idx: usize,
-    close_idx: usize,
-    text_start: usize,
-    text_end: usize,
-    suffix_start: usize,
-    suffix_end: usize,
-    kind: LinkKind,
-) {
+fn commit_resolution(events: &mut [IrEvent], open_idx: usize, resolved: BracketResolution) {
+    let close_idx = resolved.close_event as usize;
     if let IrEvent::OpenBracket { resolution, .. } = &mut events[open_idx] {
-        *resolution = Some(BracketResolution {
-            close_event: close_idx as u32,
-            text_start,
-            text_end,
-            suffix_start,
-            suffix_end,
-            kind,
-        });
+        *resolution = Some(resolved);
     }
     if let IrEvent::CloseBracket { matched, .. } = &mut events[close_idx] {
         *matched = true;
