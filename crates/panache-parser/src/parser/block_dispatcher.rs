@@ -1588,6 +1588,34 @@ pub(super) fn emit_reference_definition_lines(
     emit_text_lines(builder, &s[last_end..]);
 }
 
+pub(super) fn fence_enabled(fence: &FenceInfo, options: &ParserOptions) -> bool {
+    let extensions = &options.extensions;
+    if (fence.fence_char == '`' && !extensions.backtick_code_blocks)
+        || (fence.fence_char == '~' && !extensions.fenced_code_blocks)
+    {
+        return false;
+    }
+    if options.dialect != crate::Dialect::Pandoc {
+        return true;
+    }
+    let info = fence.info_string.trim();
+    if info.starts_with('{') && info.ends_with('}') {
+        let enabled = if info.starts_with("{=") {
+            extensions.raw_attribute
+        } else {
+            extensions.fenced_code_attributes
+        };
+        if !enabled {
+            return false;
+        }
+    }
+    extensions.executable_code
+        || !matches!(
+            InfoString::parse(&fence.info_string).block_type,
+            CodeBlockType::Executable { .. }
+        )
+}
+
 /// Fenced code block parser (``` or ~~~)
 pub(crate) struct FencedCodeBlockParser;
 
@@ -1614,9 +1642,7 @@ impl BlockParser for FencedCodeBlockParser {
         let lines = lines.raw();
 
         let fence = try_parse_fence_open(content_to_check, ctx.config.dialect)?;
-        if (fence.fence_char == '`' && !ctx.config.extensions.backtick_code_blocks)
-            || (fence.fence_char == '~' && !ctx.config.extensions.fenced_code_blocks)
-        {
+        if !fence_enabled(&fence, ctx.config) {
             return None;
         }
 
@@ -1626,26 +1652,6 @@ impl BlockParser for FencedCodeBlockParser {
             && content_to_check.starts_with([' ', '\t'])
         {
             return None;
-        }
-
-        if ctx.config.dialect == crate::options::Dialect::Pandoc {
-            let trimmed_info = fence.info_string.trim();
-            if trimmed_info.starts_with('{') && trimmed_info.ends_with('}') {
-                if trimmed_info.starts_with("{=") {
-                    if !ctx.config.extensions.raw_attribute {
-                        return None;
-                    }
-                } else if !ctx.config.extensions.fenced_code_attributes {
-                    return None;
-                }
-            }
-
-            let info = InfoString::parse(&fence.info_string);
-
-            let is_executable = matches!(info.block_type, CodeBlockType::Executable { .. });
-            if is_executable && !ctx.config.extensions.executable_code {
-                return None;
-            }
         }
 
         let has_info = !fence.info_string.trim().is_empty();

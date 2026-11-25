@@ -1,7 +1,7 @@
 //! Experimental block planning followed by lossless CST emission.
 //!
-//! The implementation covers a subset of the default CommonMark and Quarto
-//! flavors. Compare the result with the incumbent parser before using a
+//! The implementation covers a subset of the CommonMark and Quarto flavors
+//! with resolved extension settings. Compare the result with the incumbent parser before using a
 //! document as a benchmark workload.
 
 use std::{cell::OnceCell, ops::Range, sync::Arc};
@@ -12,13 +12,14 @@ use crate::options::{Dialect, Flavor, ParserOptions};
 use crate::syntax::{SyntaxKind as K, SyntaxNode};
 
 use super::block_dispatcher::{
-    emit_div_fence_close, emit_div_fence_open, emit_reference_definition_lines,
+    emit_div_fence_close, emit_div_fence_open, emit_reference_definition_lines, fence_enabled,
 };
 use super::blocks::blockquotes::emit_one_blockquote_marker;
 use super::blocks::code_blocks::{
-    FenceInfo, is_closing_fence, parse_fenced_code_block, try_parse_fence_open,
+    FenceInfo, is_closing_fence, is_gfm_math_fence, parse_fenced_code_block, try_parse_fence_open,
 };
 use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
+use super::blocks::definition_lists::try_parse_definition_marker;
 use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
 use super::blocks::figures::paragraph_is_standalone_image;
 use super::blocks::headings::{
@@ -30,13 +31,16 @@ use super::blocks::html_blocks::{
     parse_html_block_with_wrapper, try_parse_html_block_start,
 };
 use super::blocks::indented_code::parse_indented_code_block;
-use super::blocks::lists::{ListMarkerMatch, OpenListHint, markers_match, try_parse_list_marker};
+use super::blocks::line_blocks::try_parse_line_block_start;
+use super::blocks::lists::{
+    ListMarkerMatch, OpenListHint, marker_start_number, markers_match, try_parse_list_marker,
+};
 use super::blocks::metadata::{
     YamlContentOutcome, collect_yaml_content, emit_yaml_block, find_yaml_block_closing_pos,
     is_metadata_open_delim, prepare_yaml_content,
 };
 use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
-use super::blocks::tables::{PreparedPipeTable, prepare_pipe_table};
+use super::blocks::tables::{PreparedPipeTable, prepare_pipe_table, try_parse_grid_separator};
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
 use super::utils::container_stack::{byte_index_at_column, leading_indent};
@@ -77,6 +81,7 @@ struct ListItem {
     lines: Range<usize>,
     marker: ListMarkerMatch,
     nested: Vec<ListItem>,
+    restricted_markers: Vec<usize>,
 }
 
 fn plain_container_text(text: &str) -> bool {
@@ -125,14 +130,26 @@ fn plan_list(
         let item_start = *pos;
         *pos += 1;
         let mut nested = Vec::new();
+        let mut restricted_markers = Vec::new();
         while let Some(&line) = lines.get(*pos) {
             let (columns, _) = leading_indent(line);
             if is_blank_line(line) || columns < content_col {
                 break;
             }
             if let Some(marker) = list_marker_at(line, content_col, options) {
+                if options.dialect == Dialect::Pandoc
+                    && options.pandoc_compat.restricts_ordered_sublist_start()
+                    && marker_start_number(&marker.marker).is_some_and(|start| start != 1)
+                {
+                    restricted_markers.push(*pos);
+                    *pos += 1;
+                    continue;
+                }
                 nested = plan_list(lines, pos, marker, content_col, depth + 1, options)?;
                 break;
+            }
+            if !restricted_markers.is_empty() {
+                return None;
             }
             if columns >= content_col + 4 || !plain_container_text(line) {
                 return None;
@@ -154,6 +171,7 @@ fn plan_list(
             lines: item_start..paragraph_end,
             marker,
             nested,
+            restricted_markers,
         });
         if let Some(next) = next {
             *pos = next_pos;
@@ -222,7 +240,12 @@ fn plan<'a>(
         } else if indent < 4
             && matches!(marker, Some(b'`' | b'~'))
             && let Some(fence) = try_parse_fence_open(line, options.dialect)
+            && fence_enabled(&fence, options)
+            && (commonmark || fresh || (fence.fence_char != '~' && indent == 0))
         {
+            if options.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
+                return Err(unsupported("fenced math"));
+            }
             let close = lines[pos + 1..]
                 .iter()
                 .position(|line| is_closing_fence(line, &fence));
@@ -256,7 +279,7 @@ fn plan<'a>(
             *blocks.last_mut().unwrap() = Block::Setext(range, pos);
         } else if indent < 4
             && marker == Some(b'#')
-            && (commonmark || fresh || !options.extensions.blank_before_header)
+            && (fresh || !options.extensions.blank_before_header)
             && let Some(level) = try_parse_atx_heading(line)
         {
             blocks.push(Block::Atx(pos, level));
@@ -360,6 +383,7 @@ fn plan<'a>(
             blocks.push(Block::List(indent, items));
             continue;
         } else if commonmark
+            && options.extensions.raw_html
             && marker == Some(b'<')
             && indent < 4
             && let Some(kind) = try_parse_html_block_start(line, true)
@@ -380,20 +404,33 @@ fn plan<'a>(
             blocks.push(Block::Html(pos..end, kind));
             pos = end;
             continue;
-        } else if !commonmark && marker == Some(b'<') {
+        } else if !commonmark && options.extensions.raw_html && marker == Some(b'<') {
             return Err(unsupported("Pandoc HTML block"));
         } else if !commonmark
+            && options.extensions.footnotes
             && marker == Some(b'[')
             && content.starts_with("[^")
             && content.contains("]:")
         {
             return Err(unsupported("footnote definition"));
+        } else if options.extensions.grid_tables
+            && marker == Some(b'+')
+            && try_parse_grid_separator(line).is_some()
+        {
+            return Err(unsupported("grid table"));
+        } else if options.extensions.line_blocks
+            && fresh
+            && marker == Some(b'|')
+            && try_parse_line_block_start(line).is_some()
+        {
+            return Err(unsupported("line block"));
         } else if !commonmark
-            && (matches!(marker, Some(b':' | b'|' | b'%' | b'\\'))
-                || content.starts_with("$$")
-                || lines
-                    .get(pos + 1)
-                    .is_some_and(|next| content.contains('|') && next.contains('|')))
+            && ((options.extensions.definition_lists
+                && matches!(marker, Some(b':' | b'~'))
+                && try_parse_definition_marker(line).is_some())
+                || (options.extensions.pandoc_title_block && marker == Some(b'%'))
+                || (options.extensions.raw_tex && marker == Some(b'\\'))
+                || (options.extensions.tex_math_dollars && content.starts_with("$$")))
         {
             return Err(unsupported("extended Pandoc block"));
         } else {
@@ -422,7 +459,6 @@ fn parse_at(
 ) -> Result<(SyntaxNode, Vec<SyntaxError>), Unsupported> {
     if !matches!(options.flavor, Flavor::CommonMark | Flavor::Quarto)
         || options.dialect != Dialect::for_flavor(options.flavor)
-        || options.extensions != crate::Extensions::for_flavor(options.flavor)
     {
         return Err(Unsupported {
             offset: 0,
@@ -560,12 +596,17 @@ fn emit_list(
         builder.token(K::WHITESPACE.into(), &line[marker_end..content_start]);
         builder.start_node(K::PLAIN.into());
         let content_col = marker_end + marker.spaces_after_cols;
-        if item.lines.len() == 1 {
+        let paragraph_end = item
+            .restricted_markers
+            .first()
+            .copied()
+            .unwrap_or(item.lines.end);
+        if paragraph_end == item.lines.start + 1 {
             emit_inlines(builder, &line[content_start..], options, false);
         } else {
             let mut paragraph = ParagraphBuffer::new();
             paragraph.push_text(&line[content_start..]);
-            for line in &lines[item.lines.start + 1..item.lines.end] {
+            for line in &lines[item.lines.start + 1..paragraph_end] {
                 let indent = byte_index_at_column(line, content_col);
                 paragraph.push_indent(&line[..indent]);
                 paragraph.push_text(&line[indent..]);
@@ -573,6 +614,11 @@ fn emit_list(
             paragraph.emit_with_inlines(builder, options, false);
         }
         builder.finish_node();
+        for pos in item.restricted_markers {
+            builder.start_node(K::PLAIN.into());
+            emit_inlines(builder, lines[pos], options, false);
+            builder.finish_node();
+        }
         end = item.lines.end;
         if !item.nested.is_empty() {
             end = emit_list(builder, lines, item.nested, content_col, options);

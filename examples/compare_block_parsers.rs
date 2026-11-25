@@ -1,4 +1,7 @@
 use std::hint::black_box;
+use std::path::{Path, PathBuf};
+
+use clap::{Parser, ValueEnum};
 use std::time::{Duration, Instant};
 
 use panache_parser::parser::{Edit, experimental_block, parse_with_errors};
@@ -19,16 +22,43 @@ fn stats(mut samples: Vec<Duration>) -> (f64, f64) {
     )
 }
 
-fn main() {
-    let mut args = std::env::args().skip(1);
-    let flavor = match args.next().as_deref() {
-        Some("commonmark") => Flavor::CommonMark,
-        Some("quarto") => Flavor::Quarto,
-        _ => panic!("usage: compare_block_parsers <commonmark|quarto> <file>..."),
-    };
-    let options = ParserOptions::for_flavor(flavor);
-    for path in args {
-        let input = std::fs::read_to_string(&path).expect("read benchmark input");
+#[derive(Clone, Copy, ValueEnum)]
+enum ComparisonFlavor {
+    #[value(name = "commonmark")]
+    CommonMark,
+    Quarto,
+}
+
+#[derive(Parser)]
+struct Args {
+    #[arg(long)]
+    config: Option<PathBuf>,
+    #[arg(long)]
+    flavor: Option<ComparisonFlavor>,
+    #[arg(required = true)]
+    files: Vec<PathBuf>,
+}
+
+fn load_options(
+    path: &Path,
+    config: Option<&Path>,
+    flavor: Option<Flavor>,
+) -> std::io::Result<ParserOptions> {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    let (config, _) = panache::config::load(config, parent, Some(path), flavor)?;
+    Ok(config.parser_options())
+}
+
+fn main() -> std::io::Result<()> {
+    let args = Args::parse();
+    let flavor = args.flavor.map(|value| match value {
+        ComparisonFlavor::CommonMark => Flavor::CommonMark,
+        ComparisonFlavor::Quarto => Flavor::Quarto,
+    });
+    for file in &args.files {
+        let options = load_options(file, args.config.as_deref(), flavor)?;
+        let input = std::fs::read_to_string(file)?;
+        let path = file.display();
         let (baseline, errors) = parse_with_errors(&input, Some(options.clone()));
         let (tree, diagnostics) = match experimental_block::try_parse_with_errors(&input, &options)
         {
@@ -45,6 +75,9 @@ fn main() {
             println!("{path}: CST or diagnostics differ");
             continue;
         }
+        let Some(steps) = check_edits(&input, &options) else {
+            continue;
+        };
         let mut current = || {
             black_box(parse_with_errors(black_box(&input), Some(options.clone())));
         };
@@ -78,8 +111,9 @@ fn main() {
             input.len() as f64 / baseline_median,
             input.len() as f64 / prototype_median,
         );
-        compare_edits(&input, &options);
+        compare_edits(&input, &options, &steps);
     }
+    Ok(())
 }
 
 struct EditStep {
@@ -88,13 +122,13 @@ struct EditStep {
     text: String,
 }
 
-fn compare_edits(input: &str, options: &ParserOptions) {
+fn check_edits(input: &str, options: &ParserOptions) -> Option<Vec<EditStep>> {
     let Some(offset) = input
         .match_indices("\n\n")
         .nth(1)
         .map(|(offset, _)| offset + 2)
     else {
-        return;
+        return Some(Vec::new());
     };
     let mut text = input.to_owned();
     let mut steps = Vec::new();
@@ -120,11 +154,14 @@ fn compare_edits(input: &str, options: &ParserOptions) {
             experimental_block::try_parse_with_errors(&step.text, options)
         else {
             println!("  {} edit: prototype coverage gap", step.label);
-            return;
+            return None;
         };
-        if prototype.green() != expected.green() || errors != expected_errors {
+        if prototype.green() != expected.green()
+            || errors != expected_errors
+            || prototype.to_string() != step.text
+        {
             println!("  {} edit: parity check failed", step.label);
-            return;
+            return None;
         }
         for experimental in [false, true] {
             let replayed = replay(input, &steps[..=index], options, experimental, false);
@@ -133,11 +170,18 @@ fn compare_edits(input: &str, options: &ParserOptions) {
         }
     }
 
+    Some(steps)
+}
+
+fn compare_edits(input: &str, options: &ParserOptions, steps: &[EditStep]) {
+    if steps.is_empty() {
+        return;
+    }
     let mut current = vec![Vec::new(); steps.len()];
     let mut prototype = vec![Vec::new(); steps.len()];
     for iteration in 0..216 {
         for experimental in [iteration % 2 != 0, iteration % 2 == 0] {
-            let run = replay(input, &steps, options, experimental, iteration == 0);
+            let run = replay(input, steps, options, experimental, iteration == 0);
             if iteration == 0 {
                 let engine = if experimental {
                     "experimental"
@@ -247,5 +291,150 @@ fn replay(
         errors,
         samples,
         strategies,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use panache_parser::syntax::SyntaxKind;
+
+    fn parity(input: &str, options: &ParserOptions) -> panache_parser::SyntaxNode {
+        let (current, errors) = parse_with_errors(input, Some(options.clone()));
+        let (experimental, actual_errors) =
+            experimental_block::try_parse_with_errors(input, options).unwrap();
+        assert_eq!(experimental.to_string(), input);
+        assert_eq!(experimental.green(), current.green(), "{input}");
+        assert_eq!(actual_errors, errors);
+        experimental
+    }
+
+    #[test]
+    fn project_extensions_change_block_shapes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chapter.qmd");
+        let explicit = dir.path().join("enabled.toml");
+        std::fs::write(
+            dir.path().join("panache.toml"),
+            r"
+[extensions]
+pipe-tables = true
+[extensions.quarto]
+pipe-tables = false
+fenced-divs = false
+executable-code = false
+",
+        )
+        .unwrap();
+        std::fs::write(&explicit, "").unwrap();
+        let disabled = load_options(&path, None, None).unwrap();
+        let enabled = load_options(&path, Some(&explicit), None).unwrap();
+        for (input, kind) in [
+            ("a | b\n--|--\nx | y\n", SyntaxKind::PIPE_TABLE),
+            ("::: {.note}\nBody.\n:::\n", SyntaxKind::FENCED_DIV),
+            (
+                "```{r}\n#| label: [\nprint(1)\n```\n",
+                SyntaxKind::CODE_BLOCK,
+            ),
+        ] {
+            assert_eq!(
+                parity(input, &disabled).first_child().unwrap().kind(),
+                SyntaxKind::PARAGRAPH
+            );
+            assert_eq!(parity(input, &enabled).first_child().unwrap().kind(), kind);
+            let (_, errors) = experimental_block::try_parse_with_errors(input, &enabled).unwrap();
+            assert_eq!(errors.len(), usize::from(kind == SyntaxKind::CODE_BLOCK));
+        }
+
+        let mut input = format!(
+            "# Intro\n\nBefore.\n\na | b\n--|--\nx | y\n\n{}",
+            "After.\n\n".repeat(60)
+        );
+        let mut tree = parity(&input, &disabled);
+        for (original, replacement) in [("x | y", "*x* | y"), ("*x* | y", "*x* | y\nd | e")] {
+            let start = input.find(original).unwrap();
+            let edit = Edit {
+                range: start..start + original.len(),
+                insert: replacement.into(),
+            };
+            input = edit.apply(&input);
+            let result = experimental_block::reparse(
+                &tree.green().to_owned(),
+                &[],
+                &edit,
+                &input,
+                &disabled,
+            )
+            .unwrap();
+            assert_eq!(
+                result.strategy,
+                panache_parser::parser::ReparseStrategy::Region
+            );
+            tree = parity(&input, &disabled);
+            assert_eq!(&*result.green, tree.green());
+            assert!(result.errors.is_empty());
+        }
+    }
+
+    #[test]
+    fn configured_grid_table_can_fall_through_to_prose() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chapter.qmd");
+        let config = dir.path().join("panache.toml");
+        let input = "+-----+-----+\n| a   | b   |\n+=====+=====+\n| x   | y   |\n+-----+-----+\n";
+        std::fs::write(&config, "").unwrap();
+        let enabled = load_options(&path, None, None).unwrap();
+        let gap = experimental_block::try_parse_with_errors(input, &enabled).unwrap_err();
+        assert_eq!(gap.construct, "grid table");
+        assert_eq!(gap.offset, 0);
+        std::fs::write(&config, "[extensions.quarto]\ngrid-tables = false\n").unwrap();
+        let disabled = load_options(&path, None, None).unwrap();
+        assert_eq!(
+            parity(input, &disabled).first_child().unwrap().kind(),
+            SyntaxKind::PARAGRAPH
+        );
+    }
+
+    #[test]
+    fn project_flavor_selects_dialect() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("panache.toml"),
+            "[flavors]\ncommonmark = ['strict.md']\n",
+        )
+        .unwrap();
+        for (filename, kind) in [
+            ("strict.md", SyntaxKind::CODE_BLOCK),
+            ("chapter.qmd", SyntaxKind::PARAGRAPH),
+        ] {
+            let options = load_options(&dir.path().join(filename), None, None).unwrap();
+            assert_eq!(
+                parity("```rust\nfn main() {}\n", &options)
+                    .first_child()
+                    .unwrap()
+                    .kind(),
+                kind
+            );
+        }
+    }
+
+    #[test]
+    fn project_compat_controls_new_ordered_sublists() {
+        let dir = tempfile::tempdir().unwrap();
+        for (target, count) in [("3.9", 2), ("3.10", 1), ("latest", 1)] {
+            std::fs::write(
+                dir.path().join("panache.toml"),
+                format!("[compat]\npandoc = '{target}'\n"),
+            )
+            .unwrap();
+            let options = load_options(&dir.path().join("chapter.qmd"), None, None).unwrap();
+            let tree = parity("- outer\n  2. child\n", &options);
+            assert_eq!(
+                tree.descendants()
+                    .filter(|node| node.kind() == SyntaxKind::LIST)
+                    .count(),
+                count
+            );
+        }
     }
 }

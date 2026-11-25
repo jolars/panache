@@ -108,6 +108,7 @@ which = "8.0.5"
 uuid = { version = "1.23.0", features = ["v4"] }
 
 [features]
+experimental-block-parser = ["panache-parser/experimental-block-parser"]
 default = ["cli", "lsp"]
 cli = ["dep:clap", "dep:ignore"]
 lsp = [
@@ -222,3 +223,7 @@ required-features = ["lsp"]
 name = "lsp_settle"
 harness = false
 required-features = ["lsp"]
+
+[[example]]
+name = "compare_block_parsers"
+required-features = ["cli", "experimental-block-parser"]

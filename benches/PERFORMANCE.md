@@ -167,16 +167,35 @@ pipe table emitters. The comparison checks source round-trips, green trees, and
 diagnostics before timing either engine.
 
 ```sh
-cargo build --release -p panache-parser --features experimental-block-parser \
+cargo build --release --features experimental-block-parser \
   --example compare_block_parsers
-target/release/examples/compare_block_parsers commonmark \
+target/release/examples/compare_block_parsers --flavor commonmark \
   README.md benches/documents/pandoc_manual.md crates/panache-parser/README.md
-target/release/examples/compare_block_parsers quarto \
+target/release/examples/compare_block_parsers --flavor quarto \
   docs/guide/integrations.qmd docs/getting-started.qmd docs/guide/performance.qmd \
   benches/documents/{large_authoring,tables,math}.qmd
 cargo test -p panache-parser --features experimental-block-parser \
   --test commonmark experimental_block_coverage -- --nocapture
 ```
+
+The example resolves Panache project settings for each file. Run the full
+Julia guide from the pinned benchmark corpus with the checked-in config.
+
+```sh
+target/release/examples/compare_block_parsers \
+  --config benches/documents/block-parser.toml benches/documents/math.qmd
+```
+
+This config disables grid tables. The guide still exercises YAML metadata,
+fenced divs, pipe tables, and executable chunks. The example checks both
+engines against the same source, CST, and diagnostics for the original
+document and each edit before collecting timings.
+
+In one release run on the 30,112-byte guide, the full-parse median was
+565 µs for the incumbent and 359 µs for the planner. The p95 was 613 µs
+and 434 µs, respectively. The two region edits had medians of 221 µs and
+96 µs on the incumbent and 214 µs and 91 µs on the planner. Both engines
+submitted 1,940 and 1,255 fragment bytes for those edits.
 
 On Linux with an AMD Ryzen 9 7900, using Rust 1.98.1 and the workspace release
 profile at base revision `817e7ae0`, three runs collected 200 samples per engine
@@ -198,7 +217,8 @@ The CommonMark sweep found 561 examples with CST, source, and rendered HTML
 parity, 90 explicit coverage gaps, and one source mismatch. Example 143
 exercises fence info with multiple spaces before the language. The existing
 fence emitter used by both engines changes those bytes. The pinned Pandoc
-manual and the three downloaded Quarto documents did not qualify for timing.
+manual and the three downloaded Quarto documents did not qualify for timing
+in the prototype run with flavor defaults.
 Mixed quote and list nesting and several Pandoc block extensions remain outside
 the tested slice. Both engines submitted the same fragment sizes for the
 measured edits. For example, the Performance guide’s first edit replaced 387

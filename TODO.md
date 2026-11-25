@@ -253,7 +253,7 @@ starting point.
 - [x] Build a block-planning prototype and measure full parses and chained edits
   on real CommonMark and Quarto documents with identical CSTs and
   diagnostics.
-- [ ] Thread resolved project options through both engines. Start with Quarto
+- [x] Thread resolved project options through both engines. Start with Quarto
   project configs that override extension defaults. Test enabled and
   disabled constructs, dialect selection, and Pandoc compatibility settings.
   Add an extension-heavy Quarto document from the existing benchmark corpus.
