@@ -366,10 +366,12 @@ impl<'a> Parser<'a> {
             &self.lines,
             self.pos,
             block_type,
-            &prefix,
-            SyntaxKind::HTML_BLOCK,
-            html_blocks::SoftbreakFusion::None,
-            self.config,
+            &html_blocks::HtmlBlockContext {
+                prefix: &prefix,
+                wrapper_kind: SyntaxKind::HTML_BLOCK,
+                fusion: html_blocks::SoftbreakFusion::None,
+                config: self.config,
+            },
             Some(&content),
             myst_directive_closer.as_ref(),
         );

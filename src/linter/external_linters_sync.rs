@@ -52,7 +52,6 @@ pub fn run_linter_job_sync(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_linter_in_document(
     linter_name: &str,
     language: &str,

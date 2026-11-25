@@ -787,17 +787,21 @@ fn blockquote_body_end(lines: &[&str], start: usize, bq_depth: usize) -> usize {
     lines.len()
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct HtmlBlockContext<'a> {
+    pub prefix: &'a ContainerPrefix,
+    pub wrapper_kind: SyntaxKind,
+    pub fusion: SoftbreakFusion,
+    pub config: &'a ParserOptions,
+}
+
 fn try_parse_comment_pi_with_trailing_split(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     block_type: &HtmlBlockType,
-    wrapper_kind: SyntaxKind,
-    bq_depth: usize,
-    fusion: SoftbreakFusion,
-    config: &ParserOptions,
+    context: &HtmlBlockContext<'_>,
 ) -> Option<usize> {
+    let bq_depth = context.prefix.bq_depth();
     let marker: &str = match block_type {
         HtmlBlockType::Comment => "-->",
         HtmlBlockType::ProcessingInstruction => "?>",
@@ -841,25 +845,22 @@ fn try_parse_comment_pi_with_trailing_split(
             lines[start_pos]
         },
         (close_line_idx, marker_end_in_inner),
-        html_block_node_kind(wrapper_kind, block_type, config.dialect),
-        bq_depth,
-        fusion,
-        config,
+        html_block_node_kind(context.wrapper_kind, block_type, context.config.dialect),
+        context,
     ))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn parse_raw_html_block_with_trailing(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     first_inner: &str,
     (close_line_idx, marker_end_in_inner): (usize, usize),
-    wrapper_kind: SyntaxKind,
-    bq_depth: usize,
-    fusion: SoftbreakFusion,
-    config: &ParserOptions,
+    node_kind: SyntaxKind,
+    context: &HtmlBlockContext<'_>,
 ) -> usize {
+    let bq_depth = context.prefix.bq_depth();
+    let config = context.config;
     let close_line = lines[close_line_idx];
     let close_inner = if close_line_idx == start_pos {
         first_inner
@@ -879,7 +880,7 @@ fn parse_raw_html_block_with_trailing(
     };
     let trailing = &close_inner[marker_end_in_inner..];
 
-    builder.start_node(wrapper_kind.into());
+    builder.start_node(node_kind.into());
 
     if close_line_idx == start_pos {
         builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
@@ -916,7 +917,7 @@ fn parse_raw_html_block_with_trailing(
 
     builder.finish_node(); // HTML_BLOCK
 
-    let fusion_end: Option<usize> = match fusion {
+    let fusion_end: Option<usize> = match context.fusion {
         SoftbreakFusion::ToDocEnd => Some(lines.len()),
         SoftbreakFusion::ToFencedDivClose => Some(fenced_div_body_end(lines, close_line_idx + 1)),
         SoftbreakFusion::ToBlockquoteEnd => {
@@ -1190,19 +1191,21 @@ fn try_parse_standalone_block_tags_split(
 /// `first_line_content` supplies post-marker content when the caller has
 /// already emitted that line's prefixes. Continuation lines remain raw so
 /// container boundaries still terminate the block.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn parse_html_block_with_wrapper(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     block_type: HtmlBlockType,
-    prefix: &ContainerPrefix,
-    wrapper_kind: SyntaxKind,
-    fusion: SoftbreakFusion,
-    config: &ParserOptions,
+    context: &HtmlBlockContext<'_>,
     first_line_content: Option<&str>,
     myst_directive_closer: Option<&super::myst_directives::DirectiveCloser>,
 ) -> usize {
+    let HtmlBlockContext {
+        prefix,
+        wrapper_kind,
+        config,
+        ..
+    } = *context;
     if config.dialect == crate::options::Dialect::CommonMark {
         return parse_commonmark_html_block(
             builder,
@@ -1233,9 +1236,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                     prefix.strip_line_0_for_emission(lines[start_pos]),
                     (line, end),
                     SyntaxKind::HTML_BLOCK_RAW,
-                    bq_depth,
-                    fusion,
-                    config,
+                    context,
                 );
             }
             _ => {}
@@ -1251,10 +1252,7 @@ pub(crate) fn parse_html_block_with_wrapper(
             lines,
             start_pos,
             &block_type,
-            wrapper_kind,
-            bq_depth,
-            fusion,
-            config,
+            context,
         )
     {
         return consumed;
@@ -1477,12 +1475,11 @@ pub(crate) fn parse_html_block_with_wrapper(
     builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
     if let Some(end_line_idx) = multiline_open_end {
+        let open_lines = &lines[start_pos..=end_line_idx];
         if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
             emit_multiline_open_tag_with_attrs(
                 builder,
-                lines,
-                start_pos,
-                end_line_idx,
+                open_lines,
                 "div",
                 bq_depth,
                 lift_mode,
@@ -1493,9 +1490,7 @@ pub(crate) fn parse_html_block_with_wrapper(
         {
             emit_multiline_open_tag_with_attrs(
                 builder,
-                lines,
-                start_pos,
-                end_line_idx,
+                open_lines,
                 name,
                 bq_depth,
                 lift_mode,
@@ -1507,9 +1502,7 @@ pub(crate) fn parse_html_block_with_wrapper(
                 bq_messy_lift_tag == Some(name) || bq_multiline_close_lift_tag == Some(name);
             emit_multiline_open_tag_with_attrs(
                 builder,
-                lines,
-                start_pos,
-                end_line_idx,
+                open_lines,
                 name,
                 bq_depth,
                 lift_trailing,
@@ -1861,8 +1854,10 @@ pub(crate) fn parse_html_block_with_wrapper(
                         builder,
                         &pre_content,
                         &content_lines,
-                        leading,
-                        close_prefix,
+                        Some(HtmlCloseLine {
+                            leading,
+                            prefix: close_prefix,
+                        }),
                         prefix,
                         policy,
                         config,
@@ -1977,11 +1972,9 @@ pub(crate) fn parse_html_block_with_wrapper(
                     builder,
                     &pre_content,
                     &content_lines,
-                    prefix,
-                    wrapper_kind,
                     lift_mode,
                     false,
-                    config,
+                    context,
                 );
                 builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
                 emit_html_block_line(builder, line, bq_depth);
@@ -2002,11 +1995,9 @@ pub(crate) fn parse_html_block_with_wrapper(
             builder,
             &pre_content,
             &content_lines,
-            prefix,
-            wrapper_kind,
             lift_mode,
             true,
-            config,
+            context,
         );
     }
 
@@ -2128,17 +2119,20 @@ fn parse_commonmark_html_block(
 /// CST bytes remain byte-identical to source: the recursive parser is
 /// lossless on the same byte slice the legacy path would have captured
 /// as TEXT.
-#[allow(clippy::too_many_arguments)]
 fn emit_html_block_body(
     builder: &mut GreenNodeBuilder<'static>,
     pre_content: &str,
     content_lines: &[&str],
-    prefix: &ContainerPrefix,
-    wrapper_kind: SyntaxKind,
     lift_mode: bool,
     open_only: bool,
-    config: &ParserOptions,
+    context: &HtmlBlockContext<'_>,
 ) {
+    let HtmlBlockContext {
+        prefix,
+        wrapper_kind,
+        config,
+        ..
+    } = *context;
     let bq_depth = prefix.bq_depth();
     if pre_content.is_empty() && content_lines.is_empty() {
         return;
@@ -2174,8 +2168,7 @@ fn emit_html_block_body(
             builder,
             pre_content,
             content_lines,
-            "",
-            "",
+            None,
             prefix,
             LastParaDemote::Never,
             config,
@@ -2268,26 +2261,29 @@ fn emit_html_block_body_lifted_bq(
     )
 }
 
+struct HtmlCloseLine<'a> {
+    leading: &'a str,
+    prefix: &'a str,
+}
+
 /// Body-lift variant for the bq messy-shape lift — open-trailing,
 /// butted-close, or both. The open-trailing bytes (if any) sit in
 /// `pre_content` (line 0 of the body — no bq prefix in source because
 /// line 0's `> ` is consumed by the outer BLOCK_QUOTE). Content lines
 /// each carry their own bq prefix. The close line's `leading` (body
 /// bytes before `</tag>`) sits on the close line, prefixed in source
-/// by `close_line_prefix` (the bq prefix captured from `line`).
+/// by its blockquote prefix.
 ///
 /// Builds `prefixes` so each emitted line in the recursive parse
 /// output gets the right per-line bq prefix re-injected at line start:
 /// `pre_content` → empty prefix (no source `> ` precedes it); each
-/// content line → its stripped prefix; `leading` → `close_line_prefix`.
+/// content line and the leading text on the close line use their source prefix.
 /// Result CST stays byte-equal to source.
-#[allow(clippy::too_many_arguments)]
 fn emit_html_block_body_lifted_bq_messy(
     builder: &mut GreenNodeBuilder<'static>,
     pre_content: &str,
     content_lines: &[&str],
-    leading: &str,
-    close_line_prefix: &str,
+    close_line: Option<HtmlCloseLine<'_>>,
     prefix: &ContainerPrefix,
     demote_policy: LastParaDemote,
     config: &ParserOptions,
@@ -2302,9 +2298,17 @@ fn emit_html_block_body_lifted_bq_messy(
         prefix_lines.push(line);
         stripped_lines.push(inner);
     }
-    if !leading.is_empty() {
-        prefix_lines.push(ContainerPrefixLine::bq_only(close_line_prefix.to_string()));
-    }
+    let leading = if let Some(HtmlCloseLine {
+        leading,
+        prefix: close_prefix,
+    }) = close_line
+        && !leading.is_empty()
+    {
+        prefix_lines.push(ContainerPrefixLine::bq_only(close_prefix.to_string()));
+        leading
+    } else {
+        ""
+    };
     let mut state = ContainerPrefixState::new(prefix_lines);
     emit_html_block_body_lifted_inner(
         builder,
@@ -3108,7 +3112,7 @@ pub(crate) fn pandoc_html_block_start_is_valid(
             ))
 }
 
-/// Emit a multi-line open tag spanning `lines[start_pos..=end_line_idx]` as
+/// Emit the lines of a multi-line open tag as
 /// structural CST tokens, exposing the attribute region as `HTML_ATTRS` for
 /// `AttributeNode::cast` to find. Bytes are byte-identical to the source —
 /// only tokenization granularity changes. Used for `<div>` (Pandoc dialect)
@@ -3123,37 +3127,29 @@ pub(crate) fn pandoc_html_block_start_is_valid(
 ///
 /// Bytes inside HTML_ATTRS may include trailing whitespace before the next
 /// newline; `parse_html_attribute_list` tolerates whitespace.
-#[allow(clippy::too_many_arguments)]
 fn emit_multiline_open_tag_with_attrs(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
-    start_pos: usize,
-    end_line_idx: usize,
     tag_name: &str,
     bq_depth: usize,
     lift_trailing: bool,
     pre_content: &mut String,
 ) {
     let prefix_len = 1 + tag_name.len();
-    for (line_idx, raw) in lines
-        .iter()
-        .enumerate()
-        .take(end_line_idx + 1)
-        .skip(start_pos)
-    {
+    for (line_idx, raw) in lines.iter().enumerate() {
         let stripped = if bq_depth > 0 {
             strip_n_blockquote_markers(raw, bq_depth)
         } else {
             raw
         };
         let bq_prefix_len = raw.len() - stripped.len();
-        if bq_prefix_len > 0 && line_idx != start_pos {
+        if bq_prefix_len > 0 && line_idx != 0 {
             emit_bq_prefix_tokens(builder, &raw[..bq_prefix_len]);
         }
         let line = stripped;
         let (line_no_nl, newline_str) = strip_newline(line);
 
-        if line_idx == start_pos {
+        if line_idx == 0 {
             let bytes = line_no_nl.as_bytes();
             let indent_end = bytes.iter().position(|&b| b != b' ').unwrap_or(bytes.len());
             if indent_end > 0 {
@@ -3167,7 +3163,7 @@ fn emit_multiline_open_tag_with_attrs(
             } else {
                 builder.token(SyntaxKind::TEXT.into(), after_indent);
             }
-        } else if line_idx < end_line_idx {
+        } else if line_idx + 1 < lines.len() {
             let bytes = line_no_nl.as_bytes();
             let indent_end = bytes
                 .iter()
@@ -3834,10 +3830,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -3858,10 +3856,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -3882,10 +3882,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -3913,10 +3915,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK_DIV,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK_DIV,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -3941,10 +3945,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK_DIV,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK_DIV,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -3969,10 +3975,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -4005,10 +4013,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK_DIV,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK_DIV,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -4052,10 +4062,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK_DIV,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK_DIV,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );
@@ -4093,10 +4105,12 @@ mod tests {
             &lines,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            SyntaxKind::HTML_BLOCK,
-            SoftbreakFusion::ToDocEnd,
-            &opts,
+            &HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind: SyntaxKind::HTML_BLOCK,
+                fusion: SoftbreakFusion::ToDocEnd,
+                config: &opts,
+            },
             None,
             None,
         );

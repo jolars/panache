@@ -38,9 +38,9 @@ use super::blocks::headings::{
 };
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::html_blocks::{
-    HtmlBlockType, SoftbreakFusion, is_pandoc_inline_block_tag_name, is_pandoc_void_block_tag_name,
-    pandoc_html_block_start_is_valid, pandoc_html_open_tag_closes, parse_html_block_with_wrapper,
-    probe_open_tag_line_has_close_gt, try_parse_html_block_start,
+    HtmlBlockContext, HtmlBlockType, SoftbreakFusion, is_pandoc_inline_block_tag_name,
+    is_pandoc_void_block_tag_name, pandoc_html_block_start_is_valid, pandoc_html_open_tag_closes,
+    parse_html_block_with_wrapper, probe_open_tag_line_has_close_gt, try_parse_html_block_start,
 };
 use super::blocks::indented_code::{
     is_indented_code_line, parse_indented_code_block, parse_vitepress_indented_code,
@@ -1955,10 +1955,12 @@ impl BlockParser for HtmlBlockParser {
             lines,
             line_pos,
             block_type,
-            prefix,
-            wrapper_kind,
-            fusion,
-            ctx.config,
+            &HtmlBlockContext {
+                prefix,
+                wrapper_kind,
+                fusion,
+                config: ctx.config,
+            },
             None,
             ctx.myst_directive_closer.as_ref(),
         );

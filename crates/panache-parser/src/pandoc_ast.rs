@@ -465,9 +465,9 @@ fn code_block_with_extra_strip(node: &SyntaxNode, extra: usize) -> Block {
         content = strip_indented_code_indent(&content);
     }
     if let Some(fmt) = raw_format {
-        return Block::RawBlock(fmt, content);
+        return Block::Raw(fmt, content);
     }
-    Block::CodeBlock(attr, content)
+    Block::Code(attr, content)
 }
 
 /// Columns of indentation standing between the start of a fenced block and its
@@ -675,20 +675,19 @@ pub fn normalize_native(s: &str) -> String {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::enum_variant_names)]
 enum Block {
     Para(Vec<Inline>),
     Plain(Vec<Inline>),
     Header(usize, Attr, Vec<Inline>),
-    BlockQuote(Vec<Block>),
-    CodeBlock(Attr, String),
+    Quote(Vec<Block>),
+    Code(Attr, String),
     HorizontalRule,
     BulletList(Vec<Vec<Block>>),
     OrderedList(usize, &'static str, &'static str, Vec<Vec<Block>>),
-    RawBlock(String, String),
+    Raw(String, String),
     Table(TableData),
     Div(Attr, Vec<Block>),
-    LineBlock(Vec<Vec<Inline>>),
+    Line(Vec<Vec<Inline>>),
     DefinitionList(Vec<(Vec<Inline>, Vec<Vec<Block>>)>),
     /// `Figure attr (Caption Nothing [caption-blocks]) [body-blocks]` —
     /// pandoc's implicit_figures wraps an image-only paragraph whose
@@ -733,7 +732,6 @@ impl GridCell {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::enum_variant_names)]
 enum Inline {
     Str(String),
     Space,
@@ -749,7 +747,7 @@ enum Inline {
     Image(Attr, Vec<Inline>, String, String),
     Math(&'static str, String),
     Span(Attr, Vec<Inline>),
-    RawInline(String, String),
+    Raw(String, String),
     Quoted(&'static str, Vec<Inline>),
     Note(Vec<Block>),
     Cite(Vec<Citation>, Vec<Inline>),
@@ -793,7 +791,7 @@ fn block_from(node: &SyntaxNode) -> Option<Block> {
         SyntaxKind::PARAGRAPH => Some(Block::Para(coalesce_inlines(inlines_from(node)))),
         SyntaxKind::PLAIN => Some(Block::Plain(coalesce_inlines(inlines_from(node)))),
         SyntaxKind::HEADING => Some(heading_block(node)),
-        SyntaxKind::BLOCK_QUOTE => Some(Block::BlockQuote(blockquote_blocks(node))),
+        SyntaxKind::BLOCK_QUOTE => Some(Block::Quote(blockquote_blocks(node))),
         SyntaxKind::CODE_BLOCK => Some(code_block(node)),
         SyntaxKind::HORIZONTAL_RULE => Some(Block::HorizontalRule),
         SyntaxKind::LIST => Some(list_block(node)),
@@ -924,9 +922,9 @@ fn code_block(node: &SyntaxNode) -> Block {
         content = strip_indented_code_indent(&content);
     }
     if let Some(fmt) = raw_format {
-        return Block::RawBlock(fmt, content);
+        return Block::Raw(fmt, content);
     }
-    Block::CodeBlock(attr, content)
+    Block::Code(attr, content)
 }
 
 /// Pandoc's raw-attribute syntax (`Ext_raw_attribute`) treats a fenced code
@@ -1199,7 +1197,7 @@ fn html_block(node: &SyntaxNode) -> Block {
     while content.ends_with('\n') {
         content.pop();
     }
-    Block::RawBlock("html".to_string(), content)
+    Block::Raw("html".to_string(), content)
 }
 
 /// Project an `HTML_BLOCK_RAW` node — a single-construct opaque HTML
@@ -1213,7 +1211,7 @@ fn html_block(node: &SyntaxNode) -> Block {
 /// `collect_html_block_text_skip_bq_markers`.
 fn html_raw_block(node: &SyntaxNode, out: &mut Vec<Block>) {
     let content = collect_html_block_text_skip_bq_markers(node);
-    out.push(Block::RawBlock(
+    out.push(Block::Raw(
         "html".to_string(),
         html_raw_block_text(&content),
     ));
@@ -1429,7 +1427,7 @@ fn emit_html_block(node: &SyntaxNode, out: &mut Vec<Block>) {
         } else {
             content
         };
-        out.push(Block::RawBlock("html".to_string(), raw));
+        out.push(Block::Raw("html".to_string(), raw));
         return;
     }
     let walker_input = if strip_first_line_indent {
@@ -1539,7 +1537,7 @@ fn emit_html_block_structural(node: &SyntaxNode, out: &mut Vec<Block>) {
         match child.kind() {
             SyntaxKind::HTML_BLOCK_TAG => {
                 let text = open_tag_raw_block_text(&child);
-                out.push(Block::RawBlock("html".to_string(), text));
+                out.push(Block::Raw("html".to_string(), text));
             }
             SyntaxKind::BLANK_LINE => {}
             _ => collect_block(&child, out),
@@ -1672,7 +1670,7 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
             if i > text_start {
                 flush_html_block_text(&content[text_start..i], out);
             }
-            out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+            out.push(Block::Raw("html".to_string(), tag_text.to_string()));
             i += tag_end;
             text_start = i;
             inline_pending = false;
@@ -1688,11 +1686,11 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
                     if i > text_start {
                         flush_html_block_text(&content[text_start..i], out);
                     }
-                    out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+                    out.push(Block::Raw("html".to_string(), tag_text.to_string()));
                     let interior = &content[i + tag_end..close_start];
                     flush_html_block_text(interior, out);
                     let close_text = &content[close_start..close_end];
-                    out.push(Block::RawBlock("html".to_string(), close_text.to_string()));
+                    out.push(Block::Raw("html".to_string(), close_text.to_string()));
                     i = close_end;
                     text_start = i;
                     inline_pending = false;
@@ -1701,7 +1699,7 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
                 if i > text_start {
                     flush_html_block_text(&content[text_start..i], out);
                 }
-                out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+                out.push(Block::Raw("html".to_string(), tag_text.to_string()));
                 i += tag_end;
                 text_start = i;
                 inline_pending = false;
@@ -1716,7 +1714,7 @@ fn split_html_block_by_tags(content: &str, out: &mut Vec<Block>) {
                 if i > text_start {
                     flush_html_block_text(&content[text_start..i], out);
                 }
-                out.push(Block::RawBlock("html".to_string(), tag_text.to_string()));
+                out.push(Block::Raw("html".to_string(), tag_text.to_string()));
                 i += tag_end;
                 text_start = i;
                 inline_pending = false;
@@ -1939,7 +1937,7 @@ fn tex_block(node: &SyntaxNode) -> Block {
     while content.ends_with('\n') {
         content.pop();
     }
-    Block::RawBlock("tex".to_string(), content)
+    Block::Raw("tex".to_string(), content)
 }
 
 fn fenced_div(node: &SyntaxNode) -> Block {
@@ -2334,12 +2332,12 @@ fn line_block(node: &SyntaxNode) -> Block {
             _ => lines.push(coalesce_inlines(out)),
         }
     }
-    Block::LineBlock(lines)
+    Block::Line(lines)
 }
 
 fn latex_command_inline(node: &SyntaxNode) -> Inline {
     let content = node.text().to_string();
-    Inline::RawInline("tex".to_string(), content)
+    Inline::Raw("tex".to_string(), content)
 }
 
 fn bracketed_span_inline(node: &SyntaxNode) -> Inline {
@@ -2829,7 +2827,6 @@ fn simple_table_aligns(row: &SyntaxNode, cols: &[(usize, usize)]) -> Vec<&'stati
 /// present, else the first separator — both via `grid_dash_widths`. The
 /// alignment row also drives per-column alignment via
 /// `grid_separator_aligns`.
-#[allow(clippy::needless_range_loop)]
 fn grid_table(node: &SyntaxNode) -> Option<TableData> {
     let mut tagged: Vec<(SyntaxKind, String)> = Vec::new();
     for child in node.children() {
@@ -2850,25 +2847,19 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
     let layout = crate::grid_layout::analyze_grid(&lines)?;
     let row_seps = &layout.row_seps;
     let ncols = layout.cols_pos.len() - 1;
-    let nrows = row_seps.len() - 1;
-
-    let mut block_kind: Vec<&'static str> = vec!["body"; nrows];
-    for r in 0..nrows {
-        let start = row_seps[r];
-        let end = row_seps[r + 1];
-        for i in (start + 1)..end {
-            match tagged[i].0 {
-                SyntaxKind::TABLE_HEADER => block_kind[r] = "head",
-                SyntaxKind::TABLE_FOOTER => block_kind[r] = "foot",
-                _ => {}
-            }
-        }
-    }
-
     let mut head_rows: Vec<Vec<GridCell>> = Vec::new();
     let mut body_rows: Vec<Vec<GridCell>> = Vec::new();
     let mut foot_rows: Vec<Vec<GridCell>> = Vec::new();
-    for r in 0..nrows {
+    for (r, bounds) in row_seps.windows(2).enumerate() {
+        let mut kind = "body";
+        for (line_kind, _) in &tagged[bounds[0] + 1..bounds[1]] {
+            match line_kind {
+                SyntaxKind::TABLE_HEADER => kind = "head",
+                SyntaxKind::TABLE_FOOTER => kind = "foot",
+                _ => {}
+            }
+        }
+
         let mut row_cells: Vec<&crate::grid_layout::GridCellRect> = layout
             .cells
             .iter()
@@ -2886,7 +2877,7 @@ fn grid_table(node: &SyntaxNode) -> Option<TableData> {
                 }
             })
             .collect();
-        match block_kind[r] {
+        match kind {
             "head" => head_rows.push(row),
             "foot" => foot_rows.push(row),
             _ => body_rows.push(row),
@@ -3583,7 +3574,7 @@ fn emit_latex_command_with_absorb<I>(
         }
         if absorbed > 0 {
             content.push_str(&text[..absorbed]);
-            out.push(Inline::RawInline("tex".to_string(), content));
+            out.push(Inline::Raw("tex".to_string(), content));
             iter.next();
             let remainder = &text[absorbed..];
             if !remainder.is_empty() {
@@ -3592,7 +3583,7 @@ fn emit_latex_command_with_absorb<I>(
             return;
         }
     }
-    out.push(Inline::RawInline("tex".to_string(), content));
+    out.push(Inline::Raw("tex".to_string(), content));
 }
 
 fn push_inline_node(node: &SyntaxNode, out: &mut Vec<Inline>) {
@@ -3986,7 +3977,7 @@ fn inline_from_node(node: &SyntaxNode) -> Inline {
         SyntaxKind::LATEX_COMMAND => latex_command_inline(node),
         SyntaxKind::BRACKETED_SPAN => bracketed_span_inline(node),
         SyntaxKind::INLINE_HTML_SPAN => inline_html_span_inline(node),
-        SyntaxKind::INLINE_HTML => Inline::RawInline("html".to_string(), node.text().to_string()),
+        SyntaxKind::INLINE_HTML => Inline::Raw("html".to_string(), node.text().to_string()),
         SyntaxKind::FOOTNOTE_REFERENCE => footnote_reference_inline(node),
         SyntaxKind::INLINE_FOOTNOTE => inline_footnote_inline(node),
         other => Inline::Unsupported(format!("{other:?}")),
@@ -4220,7 +4211,7 @@ fn autolink_inline(node: &SyntaxNode) -> Inline {
         return Inline::Link(attr, vec![Inline::Str(url)], dest, String::new());
     }
     if !is_known_uri_scheme(&url) {
-        return Inline::RawInline("html".to_string(), node.text().to_string());
+        return Inline::Raw("html".to_string(), node.text().to_string());
     }
     let attr = Attr {
         id: String::new(),
@@ -4737,7 +4728,7 @@ fn inlines_to_plaintext(inlines: &[Inline]) -> String {
             }
             Inline::Math(_, c) => s.push_str(c),
             Inline::Span(_, children) => s.push_str(&inlines_to_plaintext(children)),
-            Inline::RawInline(_, _) => {}
+            Inline::Raw(_, _) => {}
             Inline::Quoted(_, children) => s.push_str(&inlines_to_plaintext(children)),
             Inline::Note(_) => {}
             Inline::Cite(_, text) => s.push_str(&inlines_to_plaintext(text)),
@@ -4800,12 +4791,12 @@ fn write_block(b: &Block, out: &mut String) {
             write_inline_list(inlines, out);
             out.push_str(" ]");
         }
-        Block::BlockQuote(blocks) => {
+        Block::Quote(blocks) => {
             out.push_str("BlockQuote [");
             write_block_list(blocks, out);
             out.push_str(" ]");
         }
-        Block::CodeBlock(attr, content) => {
+        Block::Code(attr, content) => {
             out.push_str("CodeBlock (");
             write_attr(attr, out);
             out.push_str(") ");
@@ -4836,7 +4827,7 @@ fn write_block(b: &Block, out: &mut String) {
             }
             out.push_str(" ]");
         }
-        Block::RawBlock(format, content) => {
+        Block::Raw(format, content) => {
             out.push_str("RawBlock ( Format ");
             write_haskell_string(format, out);
             out.push_str(" ) ");
@@ -4852,7 +4843,7 @@ fn write_block(b: &Block, out: &mut String) {
             write_block_list(blocks, out);
             out.push_str(" ]");
         }
-        Block::LineBlock(lines) => {
+        Block::Line(lines) => {
             out.push_str("LineBlock [");
             for (i, line) in lines.iter().enumerate() {
                 if i > 0 {
@@ -5060,7 +5051,7 @@ fn write_inline(inline: &Inline, out: &mut String) {
             write_inline_list(children, out);
             out.push_str(" ]");
         }
-        Inline::RawInline(format, content) => {
+        Inline::Raw(format, content) => {
             out.push_str("RawInline ( Format ");
             write_haskell_string(format, out);
             out.push_str(" ) ");
@@ -5258,7 +5249,7 @@ fn inline_to_json(inline: &Inline) -> Value {
             "t": "Span",
             "c": [attr_to_json(attr), inlines_to_json(children)],
         }),
-        Inline::RawInline(format, content) => json!({
+        Inline::Raw(format, content) => json!({
             "t": "RawInline",
             "c": [format, content],
         }),
@@ -5286,10 +5277,10 @@ fn block_to_json(b: &Block) -> Value {
             "t": "Header",
             "c": [level, attr_to_json(attr), inlines_to_json(inlines)],
         }),
-        Block::BlockQuote(blocks) => {
+        Block::Quote(blocks) => {
             json!({ "t": "BlockQuote", "c": blocks_to_json(blocks) })
         }
-        Block::CodeBlock(attr, content) => json!({
+        Block::Code(attr, content) => json!({
             "t": "CodeBlock",
             "c": [attr_to_json(attr), content],
         }),
@@ -5308,7 +5299,7 @@ fn block_to_json(b: &Block) -> Value {
                 ],
             })
         }
-        Block::RawBlock(format, content) => json!({
+        Block::Raw(format, content) => json!({
             "t": "RawBlock",
             "c": [format, content],
         }),
@@ -5317,7 +5308,7 @@ fn block_to_json(b: &Block) -> Value {
             "t": "Div",
             "c": [attr_to_json(attr), blocks_to_json(blocks)],
         }),
-        Block::LineBlock(lines) => {
+        Block::Line(lines) => {
             let lines_json: Vec<Vec<Value>> =
                 lines.iter().map(|line| inlines_to_json(line)).collect();
             json!({ "t": "LineBlock", "c": lines_json })

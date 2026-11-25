@@ -303,17 +303,16 @@ impl<'a, 'cfg> ContinuationPolicy<'a, 'cfg> {
     /// The HTML probe does share `html_block_cannot_interrupt`, so a tag
     /// that stays lazy text in a quote also stays lazy text in an open
     /// definition PLAIN.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn definition_plain_can_continue(
         &self,
         stripped_content: &str,
         raw_content: &str,
-        content_indent: usize,
         block_ctx: &BlockContext,
         lines: &[&str],
         pos: usize,
         plain_open: bool,
     ) -> bool {
+        let content_indent = block_ctx.content_indent;
         let prev_line_blank = if pos > 0 {
             let prev_line = lines[pos - 1];
             let (prev_bq_depth, prev_inner) = count_blockquote_markers(prev_line);

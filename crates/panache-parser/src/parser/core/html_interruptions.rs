@@ -1,4 +1,5 @@
 use super::*;
+use crate::parser::utils::list_item_buffer::{HtmlBlockLiftOptions, try_emit_html_block_lift};
 
 impl<'a> Parser<'a> {
     /// Whether an HTML block about to interrupt an open paragraph should
@@ -84,10 +85,12 @@ impl<'a> Parser<'a> {
                 &synthetic,
                 0,
                 block_type.clone(),
-                &ContainerPrefix::default(),
-                SyntaxKind::HTML_BLOCK,
-                html_blocks::SoftbreakFusion::None,
-                self.config,
+                &html_blocks::HtmlBlockContext {
+                    prefix: &ContainerPrefix::default(),
+                    wrapper_kind: SyntaxKind::HTML_BLOCK,
+                    fusion: html_blocks::SoftbreakFusion::None,
+                    config: self.config,
+                },
                 None,
                 None,
             );
@@ -119,10 +122,12 @@ impl<'a> Parser<'a> {
                 &single,
                 0,
                 block_type,
-                &ContainerPrefix::default(),
-                wrapper_kind,
-                html_blocks::SoftbreakFusion::None,
-                self.config,
+                &html_blocks::HtmlBlockContext {
+                    prefix: &ContainerPrefix::default(),
+                    wrapper_kind,
+                    fusion: html_blocks::SoftbreakFusion::None,
+                    config: self.config,
+                },
                 None,
                 None,
             );
@@ -137,15 +142,17 @@ impl<'a> Parser<'a> {
             text.push_str(line);
         }
         let use_paragraph = self.pos > 0 && is_blank_line(self.lines[self.pos - 1]);
-        let lifted = crate::parser::utils::list_item_buffer::try_emit_html_block_lift(
+        let lifted = try_emit_html_block_lift(
             &mut self.builder,
             &text,
             self.config,
-            &[content_col],
-            &[],
-            use_paragraph,
-            "",
-            false,
+            &HtmlBlockLiftOptions {
+                gobble: &[content_col],
+                bq_prefixes: &[],
+                use_paragraph,
+                line0_prefix: "",
+                allow_unclosed_div: false,
+            },
         );
         if !lifted {
             return None;
@@ -196,10 +203,12 @@ impl<'a> Parser<'a> {
                 &synthetic,
                 0,
                 block_type.clone(),
-                &ContainerPrefix::default(),
-                SyntaxKind::HTML_BLOCK,
-                html_blocks::SoftbreakFusion::None,
-                self.config,
+                &html_blocks::HtmlBlockContext {
+                    prefix: &ContainerPrefix::default(),
+                    wrapper_kind: SyntaxKind::HTML_BLOCK,
+                    fusion: html_blocks::SoftbreakFusion::None,
+                    config: self.config,
+                },
                 None,
                 None,
             );
@@ -214,22 +223,18 @@ impl<'a> Parser<'a> {
         for line in &self.lines[self.pos + 1..self.pos + probe_consumed] {
             text.push_str(line);
         }
-        let use_paragraph = self.pos > 0 && is_blank_line(self.lines[self.pos - 1]);
-        let line0_prefix = indent_to_emit.unwrap_or("");
+        let lift_options = HtmlBlockLiftOptions {
+            gobble: &[content_col],
+            bq_prefixes: &[],
+            use_paragraph: self.pos > 0 && is_blank_line(self.lines[self.pos - 1]),
+            line0_prefix: indent_to_emit.unwrap_or(""),
+            allow_unclosed_div: true,
+        };
 
         let lift_ok = {
             let mut probe = GreenNodeBuilder::new();
             probe.start_node(SyntaxKind::DOCUMENT.into());
-            let ok = crate::parser::utils::list_item_buffer::try_emit_html_block_lift(
-                &mut probe,
-                &text,
-                self.config,
-                &[content_col],
-                &[],
-                use_paragraph,
-                line0_prefix,
-                true,
-            );
+            let ok = try_emit_html_block_lift(&mut probe, &text, self.config, &lift_options);
             probe.finish_node();
             ok
         };
@@ -239,16 +244,7 @@ impl<'a> Parser<'a> {
 
         self.emit_buffered_plain_if_needed();
         self.prepare_for_block_element();
-        crate::parser::utils::list_item_buffer::try_emit_html_block_lift(
-            &mut self.builder,
-            &text,
-            self.config,
-            &[content_col],
-            &[],
-            use_paragraph,
-            line0_prefix,
-            true,
-        );
+        try_emit_html_block_lift(&mut self.builder, &text, self.config, &lift_options);
         Some(probe_consumed)
     }
 
@@ -312,10 +308,12 @@ impl<'a> Parser<'a> {
                 &synthetic,
                 0,
                 block_type,
-                &ContainerPrefix::default(),
-                SyntaxKind::HTML_BLOCK,
-                html_blocks::SoftbreakFusion::None,
-                self.config,
+                &html_blocks::HtmlBlockContext {
+                    prefix: &ContainerPrefix::default(),
+                    wrapper_kind: SyntaxKind::HTML_BLOCK,
+                    fusion: html_blocks::SoftbreakFusion::None,
+                    config: self.config,
+                },
                 None,
                 None,
             );
@@ -420,15 +418,17 @@ impl<'a> Parser<'a> {
             text.push_str(line);
         }
         let use_paragraph = self.pos > 0 && is_blank_line(self.lines[self.pos - 1]);
-        let lifted = crate::parser::utils::list_item_buffer::try_emit_html_block_lift(
+        let lifted = try_emit_html_block_lift(
             &mut self.builder,
             &text,
             self.config,
-            &[content_col],
-            &[],
-            use_paragraph,
-            "",
-            false,
+            &HtmlBlockLiftOptions {
+                gobble: &[content_col],
+                bq_prefixes: &[],
+                use_paragraph,
+                line0_prefix: "",
+                allow_unclosed_div: false,
+            },
         );
         if !lifted {
             return None;
@@ -489,10 +489,12 @@ impl<'a> Parser<'a> {
                 &synthetic,
                 0,
                 block_type.clone(),
-                &ContainerPrefix::default(),
-                SyntaxKind::HTML_BLOCK,
-                html_blocks::SoftbreakFusion::None,
-                self.config,
+                &html_blocks::HtmlBlockContext {
+                    prefix: &ContainerPrefix::default(),
+                    wrapper_kind: SyntaxKind::HTML_BLOCK,
+                    fusion: html_blocks::SoftbreakFusion::None,
+                    config: self.config,
+                },
                 None,
                 None,
             );
@@ -511,10 +513,12 @@ impl<'a> Parser<'a> {
             &single,
             0,
             block_type,
-            &ContainerPrefix::default(),
-            wrapper_kind,
-            html_blocks::SoftbreakFusion::None,
-            self.config,
+            &html_blocks::HtmlBlockContext {
+                prefix: &ContainerPrefix::default(),
+                wrapper_kind,
+                fusion: html_blocks::SoftbreakFusion::None,
+                config: self.config,
+            },
             None,
             None,
         );

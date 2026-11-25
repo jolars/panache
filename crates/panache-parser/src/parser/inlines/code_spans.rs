@@ -7,15 +7,16 @@ use crate::parser::utils::attributes::{
     AttributeBlock, emit_attribute_node, try_parse_trailing_attributes,
 };
 
+type CodeSpanAttributes<'a> = (AttributeBlock, &'a str);
+
 /// Try to parse a code span starting at the current position.
 /// Returns `(total_len, code_content, backtick_count, attributes)` if
 /// successful. When trailing attributes are present, `attributes` carries both
 /// the parsed [`AttributeBlock`] (for raw-inline / extension-gating decisions)
 /// and the raw `{...}` source slice (for lossless structured emission).
-#[allow(clippy::type_complexity)]
 pub fn try_parse_code_span(
     text: &str,
-) -> Option<(usize, &str, usize, Option<(AttributeBlock, &str)>)> {
+) -> Option<(usize, &str, usize, Option<CodeSpanAttributes<'_>>)> {
     let opening_backticks = text.bytes().take_while(|&b| b == b'`').count();
     if opening_backticks == 0 {
         return None;

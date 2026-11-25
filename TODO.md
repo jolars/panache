@@ -14,6 +14,12 @@ This document tracks implementation status for Panache's features.
   `collect`.
 - [x] Pass the existing `BracketResolution` to `commit_resolution` so callers
   name the link text and suffix offsets.
+- [x] Remove stale Clippy overrides from the inline IR builder, external linter
+  runner, and Quarto schema serialization.
+- [x] Pass named context to HTML block parsing and lifting, and read definition
+  continuation indentation from the existing block context.
+- [x] Use slices and iterators in grid table loops, simplify private Pandoc AST
+  variant names, and name the inline code span's attribute pair.
 
 The WASM formatter's positional signature is used by the playground. Treat
 changes to that signature as JavaScript API changes.

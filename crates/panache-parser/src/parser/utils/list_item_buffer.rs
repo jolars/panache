@@ -641,11 +641,13 @@ impl ListItemBuffer {
                     builder,
                     &text,
                     config,
-                    gobble,
-                    &bq_prefixes,
-                    use_paragraph,
-                    "",
-                    allow_unclosed_div,
+                    &HtmlBlockLiftOptions {
+                        gobble,
+                        bq_prefixes: &bq_prefixes,
+                        use_paragraph,
+                        line0_prefix: "",
+                        allow_unclosed_div,
+                    },
                 )
             {
                 return;
@@ -767,6 +769,14 @@ impl ListItemBuffer {
     }
 }
 
+pub(crate) struct HtmlBlockLiftOptions<'a> {
+    pub gobble: &'a [usize],
+    pub bq_prefixes: &'a [String],
+    pub use_paragraph: bool,
+    pub line0_prefix: &'a str,
+    pub allow_unclosed_div: bool,
+}
+
 /// Attempt the Pandoc HTML-block-first-line structural lift on the
 /// buffered list-item text. Returns `true` if `text` was emitted as
 /// one or more HTML block CST nodes (no surrounding PLAIN/PARAGRAPH
@@ -800,17 +810,19 @@ impl ListItemBuffer {
 /// out of `text` (empty outside a quote); they are re-injected ahead of
 /// the item indent at graft time, which is the order they sit in on a
 /// quoted item's line (`>   after`). Same contract as the table/div lift.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn try_emit_html_block_lift(
     builder: &mut GreenNodeBuilder<'static>,
     text: &str,
     config: &ParserOptions,
-    gobble: &[usize],
-    bq_prefixes: &[String],
-    use_paragraph: bool,
-    line0_prefix: &str,
-    allow_unclosed_div: bool,
+    options: &HtmlBlockLiftOptions<'_>,
 ) -> bool {
+    let HtmlBlockLiftOptions {
+        gobble,
+        bq_prefixes,
+        use_paragraph,
+        line0_prefix,
+        allow_unclosed_div,
+    } = *options;
     let first_line = text.split_inclusive('\n').next().unwrap_or(text);
     let first_line_no_nl = first_line
         .strip_suffix("\r\n")

@@ -373,7 +373,6 @@ fn build_hugo_index(
 /// Like [`build_ir`] but writes into a caller-provided `Vec<IrEvent>`,
 /// clearing it first. Used by [`build_full_plans`] to amortise the
 /// per-call allocation through a thread-local scratch pool.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn build_ir_into(
     text: &str,
     start: usize,

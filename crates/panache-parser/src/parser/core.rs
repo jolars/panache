@@ -1963,7 +1963,6 @@ impl<'a> Parser<'a> {
                     || policy.definition_plain_can_continue(
                         stripped_content,
                         content,
-                        content_indent,
                         &BlockContext {
                             has_blank_before: self.pos == 0 || prev_line_blank,
                             has_blank_before_strict: self.pos == 0 || prev_line_blank,

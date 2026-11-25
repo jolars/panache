@@ -77,7 +77,6 @@ pub struct GridLayout {
 /// `lines` must already be dedented to the table's own left edge (no container
 /// indent). Returns `None` when the input doesn't form a grid (fewer than two
 /// column boundaries or fewer than two separator lines).
-#[allow(clippy::needless_range_loop)]
 pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
     // Tabs require a tab-stop-aware source map. Until geometry supports one,
     // leave these tables to callers' preservation paths.
@@ -199,10 +198,8 @@ pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
             else {
                 continue;
             };
-            for r in sr..er {
-                for c in sc..ec {
-                    occupied[r][c] = true;
-                }
+            for row in &mut occupied[sr..er] {
+                row[sc..ec].fill(true);
             }
             cells.push(GridCellRect {
                 start_row: sr,
@@ -222,7 +219,6 @@ pub fn analyze_grid(lines: &[&str]) -> Option<GridLayout> {
     })
 }
 
-#[allow(clippy::needless_range_loop)]
 fn find_grid_cell(
     grid: &[Vec<char>],
     lines: &[&str],
@@ -233,17 +229,12 @@ fn find_grid_cell(
 ) -> Option<(usize, usize, String)> {
     let i = row_seps[sr];
     let j = cols_pos[sc];
-    let nrows = row_seps.len() - 1;
-    let ncols = cols_pos.len() - 1;
-
-    for ec in (sc + 1)..=ncols {
-        let k = cols_pos[ec];
+    for (ec, &k) in cols_pos.iter().enumerate().skip(sc + 1) {
         let top_ok = (j + 1..k).all(|c| matches!(grid[i][c], '-' | '=' | ':' | '+'));
         if !top_ok {
             break;
         }
-        for er in (sr + 1)..=nrows {
-            let l = row_seps[er];
+        for (er, &l) in row_seps.iter().enumerate().skip(sr + 1) {
             let left_ok = (i + 1..l).all(|r| matches!(grid[r][j], '|' | '+'));
             if !left_ok {
                 break;
@@ -269,8 +260,8 @@ fn find_grid_cell(
             }
 
             let mut content_lines: Vec<String> = Vec::new();
-            for r in (i + 1)..l {
-                let slice = grid_column_slice(lines[r], j + 1, k);
+            for line in &lines[i + 1..l] {
+                let slice = grid_column_slice(line, j + 1, k);
                 let stripped = slice.strip_prefix(' ').unwrap_or(slice);
                 content_lines.push(stripped.trim_end().to_string());
             }
