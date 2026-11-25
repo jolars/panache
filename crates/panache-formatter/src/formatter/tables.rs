@@ -78,6 +78,34 @@ impl Formatter {
 /// border. See `format_grid_table`.
 const TABLE_BLOCK_INDENT: usize = 2;
 
+/// `table_indent` for a top-level table, or 0 right after a list: an indent up
+/// to the item's content column would move the table into the last list item.
+fn top_level_table_indent(node: &SyntaxNode, config: &FormatContext) -> usize {
+    let mut prev = node.prev_sibling_or_token();
+    while let Some(element) = &prev {
+        if element.kind() == SyntaxKind::BLANK_LINE {
+            prev = element.prev_sibling_or_token();
+        } else {
+            break;
+        }
+    }
+    if prev.is_some_and(|element| element.kind() == SyntaxKind::LIST) {
+        0
+    } else {
+        config.table_indent
+    }
+}
+
+/// Block indent of a simple or multiline table, which adds `table_indent` to
+/// its container's indent.
+fn simple_table_indent(node: &SyntaxNode, config: &FormatContext, indent: usize) -> usize {
+    if indent == 0 {
+        top_level_table_indent(node, config)
+    } else {
+        config.table_indent + indent
+    }
+}
+
 fn indent_table_block(block: &str, indent: usize) -> String {
     if indent == 0 {
         return block.to_string();
@@ -1010,7 +1038,7 @@ pub(super) fn format_pipe_table(
         output.push('\n');
     }
     let block_indent = if indent == 0 {
-        config.table_indent
+        top_level_table_indent(node, config)
     } else {
         indent
     };
@@ -1869,7 +1897,7 @@ fn format_simple_table(
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output, config.table_indent + indent)
+    indent_table_block(&output, simple_table_indent(node, config, indent))
 }
 
 fn extract_multiline_columns(separator: &SyntaxNode) -> Vec<(usize, usize)> {
@@ -2233,7 +2261,7 @@ fn format_multiline_table(
                     .any(|line| line.trim_end().width() > end.saturating_sub(start))
             })
     }) {
-        return indent_table_block(&raw_table, config.table_indent + indent);
+        return indent_table_block(&raw_table, simple_table_indent(node, config, indent));
     }
 
     let base_offset = table_data
@@ -2397,7 +2425,7 @@ fn format_multiline_table(
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output, config.table_indent + indent)
+    indent_table_block(&output, simple_table_indent(node, config, indent))
 }
 
 #[cfg(test)]
