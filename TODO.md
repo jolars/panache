@@ -257,22 +257,57 @@ starting point.
   project configs that override extension defaults. Test enabled and
   disabled constructs, dialect selection, and Pandoc compatibility settings.
   Add an extension-heavy Quarto document from the existing benchmark corpus.
-- [ ] Port block rules in bounded slices. Start with mixed lists and block
-  quotes, then cover the remaining Pandoc and flavor-specific blocks. Put
-  continuation, interruption, and finalization in the block planner and
-  reuse lossless emitters. Track unsupported inputs and CST divergences
-  until every supported flavor and option combination has a replacement
-  path.
-- [ ] Gate on lossless source, CST and diagnostic parity using the golden
-  suites, CommonMark and Pandoc conformance, and representative project
-  corpora. Investigate intentional differences against the appropriate
-  upstream reference and pin them with fixtures.
-- [ ] Exercise the shared reparser against the replacement in chained edits and
-  seeded fuzzing. Check full-parse equivalence, subtree identity, fallbacks,
-  and actual fragment work. Recheck release full-parse throughput and
-  incremental latency on the same resolved configs, including the LSP gates.
-  Review how the completed port handles container rules before deciding
-  whether it simplifies the parser.
+- [x] Port the first mixed list and block quote slice for CommonMark and Quarto.
+  Plan continuation, interruption, and finalization before CST emission.
+  Check source, CST, and diagnostic parity for the covered cases.
+- [ ] Finish CommonMark list and block quote planning. Cover blank-line
+  ownership, marker and indentation edge cases, lazy continuation, and
+  interruption by core blocks. Pin newly supported spec examples.
+- [ ] Finish Pandoc list and block quote planning. Cover fancy and example
+  markers, blank-line and indentation extensions, and
+  compatibility-dependent sublists. Move simple lists onto the shared
+  planner once both dialects preserve their existing CSTs.
+- [ ] Port definition lists and footnote bodies. Cover nested blocks and the
+  lines that end each body, and pin the CST with Pandoc fixtures.
+- [ ] Port grid tables, including nested content and compatibility-dependent
+  cell compacting. Recheck the default Quarto benchmark documents.
+- [ ] Port Pandoc simple and multiline tables. Check caption placement and table
+  boundaries inside containers against Pandoc-native fixtures.
+- [ ] Port Pandoc HTML blocks. Check raw HTML, Markdown inside HTML, and open
+  and close tag boundaries inside lists and block quotes.
+- [ ] Port Pandoc line blocks, title blocks, and raw TeX blocks. Check each
+  construct with its extension enabled and disabled.
+- [ ] Port display math and fenced math. Check block boundaries, lossless
+  emission, and diagnostics across the dialects that support them.
+- [ ] Enable the Pandoc, R Markdown, and MultiMarkdown flavors in the
+  replacement. Check their flavor defaults and port any remaining
+  flavor-specific metadata or block rules.
+- [ ] Enable GFM and Jupyter. Cover alerts, task items, and notebook-specific
+  block handling with focused parity fixtures.
+- [ ] Enable Hugo and mdsvex. Cover block shortcodes and Svelte blocks with
+  their respective flavor fixtures.
+- [ ] Port MyST directives, targets, and other MyST block rules. Check directive
+  body and closing-fence behavior against the MyST fixtures.
+- [ ] Port VitePress containers and alert handling. Check nested containers,
+  code fences, and unclosed containers.
+- [ ] Finalize the block-to-inline handoff. Have the planner resolve block
+  boundaries and pass finalized content ranges to inline parsing. Remove
+  redundant boundary checks and scans, and preserve source prefixes during
+  CST emission. Pin the Pandoc case where a backtick line closes an inline
+  code span rather than opening a fenced block.
+- [ ] Sweep the golden suites and CommonMark and Pandoc conformance for lossless
+  source, CST, and diagnostic parity. Check resolved extension overrides and
+  compatibility targets. Verify intentional differences against the upstream
+  reference and pin them with fixtures.
+- [ ] Run full-parse parity on representative projects for each flavor. Record
+  unsupported constructs and divergences by file and source offset, then
+  close them in focused slices before the cutover.
+- [ ] Gate incremental correctness with chained edits and seeded fuzzing on the
+  shared reparser. Check full-parse equivalence, diagnostics, subtree
+  identity, fallback behavior, and fragment work.
+- [ ] Run the release throughput, incremental latency, and LSP gates using the
+  same documents and resolved options for both engines. Review the completed
+  container rules and record whether the planner simplifies them.
 - [ ] In one cutover, route the parser API, CLI, formatter, linter, LSP, and
   WASM through the replacement. Remove the old engine, comparison feature,
   and dual-engine dispatch. Keep focused regressions and rerun workspace

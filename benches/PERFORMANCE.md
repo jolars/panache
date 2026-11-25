@@ -205,13 +205,13 @@ also types inside the region and replaces the whole file. It measures parser
 latency with cached reference labels. The example reports throughput, p95, bytes replaced, and bytes
 submitted to fragment parsers, including seam checks.
 
-| Document | Full parse, current | Full parse, prototype | Region edit, current | Region edit, prototype |
-| --- | ---: | ---: | ---: | ---: |
-| Project README | 214–304 | 120–168 | 139–247 | 120–207 |
-| Parser README | 19–33 | 10–17 | 17–30 | 12–21 |
-| Integrations | 168–198 | 104–126 | 93–102 | 81–89 |
-| Getting Started | 272–278 | 148–154 | 106–110 | 97–101 |
-| Performance | 1090–1311 | 910–1086 | 204–230 | 190–214 |
+  | Document        | Full parse, current | Full parse, prototype | Region edit, current | Region edit, prototype |
+  | ---             | ---:                | ---:                  | ---:                 | ---:                   |
+  | Project README  |             214–304 |               120–168 |              139–247 |                120–207 |
+  | Parser README   |               19–33 |                 10–17 |                17–30 |                  12–21 |
+  | Integrations    |             168–198 |               104–126 |               93–102 |                  81–89 |
+  | Getting Started |             272–278 |               148–154 |              106–110 |                 97–101 |
+  | Performance     |           1090–1311 |              910–1086 |              204–230 |                190–214 |
 
 The CommonMark sweep found 561 examples with CST, source, and rendered HTML
 parity, 90 explicit coverage gaps, and one source mismatch. Example 143
