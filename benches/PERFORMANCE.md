@@ -237,3 +237,12 @@ model can remove with broader dialect coverage remains open.
 The production LSP write-phase gate passed. The parse benchmark's
 `large_authoring_single_edit` case missed the 3.80× threshold on both the
 clean baseline (3.65×) and the experimental branch (3.70×).
+
+The first mixed-container slice raised CommonMark parity to 590 examples.
+The sweep reports 61 explicit gaps and the same source mismatch in example
+143. It prints the example number, construct, and source byte offset for
+each gap. The release comparison reaches the Pandoc manual's nested block
+at byte 155207. With default Quarto options, grid tables are still the
+first unsupported construct in the large authoring, tables, and math
+benchmarks. The math benchmark passes preflight with the checked-in
+configuration that disables grid tables.

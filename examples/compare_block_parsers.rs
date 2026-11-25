@@ -428,13 +428,15 @@ executable-code = false
             )
             .unwrap();
             let options = load_options(&dir.path().join("chapter.qmd"), None, None).unwrap();
-            let tree = parity("- outer\n  2. child\n", &options);
-            assert_eq!(
-                tree.descendants()
-                    .filter(|node| node.kind() == SyntaxKind::LIST)
-                    .count(),
-                count
-            );
+            for input in ["- outer\n  2. child\n", "> - outer\n>   2. child\n"] {
+                let tree = parity(input, &options);
+                assert_eq!(
+                    tree.descendants()
+                        .filter(|node| node.kind() == SyntaxKind::LIST)
+                        .count(),
+                    count
+                );
+            }
         }
     }
 }

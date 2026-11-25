@@ -4,6 +4,8 @@
 //! with resolved extension settings. Compare the result with the incumbent parser before using a
 //! document as a benchmark workload.
 
+mod containers;
+
 use std::{cell::OnceCell, ops::Range, sync::Arc};
 
 use rowan::{GreenNode, GreenNodeBuilder};
@@ -14,7 +16,6 @@ use crate::syntax::{SyntaxKind as K, SyntaxNode};
 use super::block_dispatcher::{
     emit_div_fence_close, emit_div_fence_open, emit_reference_definition_lines, fence_enabled,
 };
-use super::blocks::blockquotes::emit_one_blockquote_marker;
 use super::blocks::code_blocks::{
     FenceInfo, is_closing_fence, is_gfm_math_fence, parse_fenced_code_block, try_parse_fence_open,
 };
@@ -46,7 +47,6 @@ use super::diagnostics::Diagnostics;
 use super::utils::container_stack::{byte_index_at_column, leading_indent};
 use super::utils::helpers::{is_blank_line, split_lines_inclusive};
 use super::utils::inline_emission::emit_inlines;
-use super::utils::marker_utils::try_parse_blockquote_marker;
 use super::utils::text_buffer::ParagraphBuffer;
 use super::{
     CostGuards, Edit, Reparsed, SyntaxError, populate_refdef_labels, reparse::reparse_using,
@@ -68,7 +68,7 @@ enum Block<'a> {
     Reference(Range<usize>, ReferenceSpans),
     PipeTable(usize, PreparedPipeTable<'a>),
     List(usize, Vec<ListItem>),
-    Quote(Range<usize>),
+    Containers(usize, Vec<containers::Event<'a>>),
     IndentedCode(Range<usize>),
     Html(Range<usize>, HtmlBlockType),
     Code(Range<usize>, FenceInfo),
@@ -347,40 +347,30 @@ fn plan<'a>(
             blocks.push(Block::IndentedCode(pos..end));
             pos = end;
             continue;
-        } else if marker == Some(b'>') {
-            if !fresh {
-                return Err(unsupported("block quote interruption"));
-            }
-            let start = pos;
-            while let Some(&line) = lines.get(pos) {
-                if let Some((_, tail)) = try_parse_blockquote_marker(line) {
-                    if !is_blank_line(&line[tail..]) && !is_quote_prose(&line[tail..], options) {
-                        return Err(unsupported("block quote inner block"));
-                    }
-                } else if is_blank_line(line) {
-                    break;
-                } else if !commonmark
-                    || !is_quote_prose(line, options)
-                    || pos == start
-                    || lines[pos - 1].trim() == ">"
-                {
-                    return Err(unsupported("block quote continuation"));
-                }
-                pos += 1;
-            }
-            blocks.push(Block::Quote(start..pos));
+        } else if indent < 4
+            && marker == Some(b'>')
+            && (fresh || !options.extensions.blank_before_blockquote)
+        {
+            plan_containers(input, lines, &mut pos, options, &mut blocks)?;
             continue;
         } else if indent < 4
-            && (fresh || commonmark)
+            && (fresh || commonmark || options.extensions.lists_without_preceding_blankline)
             && matches!(marker, Some(b'-' | b'+' | b'*' | b'0'..=b'9'))
             && let Some(first) = try_parse_list_marker(line, options, OpenListHint::None)
+            && (fresh
+                || !commonmark
+                || marker_start_number(&first.marker).is_none_or(|start| start == 1))
         {
-            if !fresh || indent_bytes != indent {
-                return Err(unsupported("list interruption or indentation"));
+            let start = pos;
+            if fresh
+                && indent_bytes == indent
+                && let Some(items) = plan_list(lines, &mut pos, first, indent, 0, options)
+            {
+                blocks.push(Block::List(indent, items));
+            } else {
+                pos = start;
+                plan_containers(input, lines, &mut pos, options, &mut blocks)?;
             }
-            let items = plan_list(lines, &mut pos, first, indent, 0, options)
-                .ok_or_else(|| unsupported("list continuation or inner block"))?;
-            blocks.push(Block::List(indent, items));
             continue;
         } else if commonmark
             && options.extensions.raw_html
@@ -440,6 +430,25 @@ fn plan<'a>(
     }
     blocks.extend(divs.into_iter().map(|_| Block::CloseDiv(None)));
     Ok(blocks)
+}
+
+fn plan_containers<'a>(
+    input: &str,
+    lines: &[&'a str],
+    pos: &mut usize,
+    options: &ParserOptions,
+    blocks: &mut Vec<Block<'a>>,
+) -> Result<(), Unsupported> {
+    let (consumed, events) =
+        containers::plan(&lines[*pos..], options).map_err(|(unhandled, construct)| {
+            Unsupported {
+                offset: unhandled.as_ptr() as usize - input.as_ptr() as usize,
+                construct,
+            }
+        })?;
+    blocks.push(Block::Containers(*pos, events));
+    *pos += consumed;
+    Ok(())
 }
 
 /// Parse a document with the experimental engine.
@@ -513,7 +522,9 @@ fn parse_at(
             Block::List(indent, items) => {
                 emit_list(&mut builder, &lines, items, indent, options);
             }
-            Block::Quote(range) => emit_quote(&mut builder, &lines[range], options),
+            Block::Containers(start, events) => {
+                containers::emit(&mut builder, events, &lines, start, &diagnostics, options)
+            }
             Block::IndentedCode(range) => {
                 parse_indented_code_block(&mut builder, &lines[..range.end], range.start, 0, 0);
             }
@@ -627,41 +638,6 @@ fn emit_list(
     }
     builder.finish_node();
     end
-}
-
-fn emit_quote(builder: &mut GreenNodeBuilder<'static>, lines: &[&str], options: &ParserOptions) {
-    builder.start_node(K::BLOCK_QUOTE.into());
-    let mut paragraph = ParagraphBuffer::new();
-    for &line in lines {
-        let marker = try_parse_blockquote_marker(line);
-        let content = marker.map_or(line, |(_, tail)| &line[tail..]);
-        if is_blank_line(content) && !paragraph.is_empty() {
-            paragraph.emit_with_inlines(builder, options, false);
-            paragraph.clear();
-            builder.finish_node();
-        }
-        let open = !paragraph.is_empty();
-        if let Some((marker_end, tail)) = marker {
-            if open {
-                paragraph.push_marker(marker_end - 1, tail > marker_end);
-            } else {
-                emit_one_blockquote_marker(builder, marker_end - 1, tail > marker_end);
-            }
-        }
-        if is_blank_line(content) {
-            emit_blank(builder, content);
-        } else {
-            if !open {
-                builder.start_node(K::PARAGRAPH.into());
-            }
-            paragraph.push_text(content);
-        }
-    }
-    if !paragraph.is_empty() {
-        paragraph.emit_with_inlines(builder, options, false);
-        builder.finish_node();
-    }
-    builder.finish_node();
 }
 
 /// Splice an edit into a tree produced by the experimental engine.

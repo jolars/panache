@@ -444,6 +444,8 @@ fn experimental_block_coverage() {
     let examples = read_spec(&manifest_path(SPEC_FIXTURE_REL));
     let mut matches = 0;
     let mut gaps = 0;
+    let required = [235, 251, 254, 259, 260, 263, 292, 293, 320, 321];
+    let mut missing = Vec::new();
     let mut differences = Vec::new();
     for example in &examples {
         match experimental_block::try_parse_with_errors(&example.markdown, &options) {
@@ -460,13 +462,26 @@ fn experimental_block_coverage() {
                     differences.push(example.number);
                 }
             }
-            Err(_) => gaps += 1,
+            Err(gap) => {
+                gaps += 1;
+                println!(
+                    "example {}: unsupported {} at byte {}",
+                    example.number, gap.construct, gap.offset
+                );
+                if required.contains(&example.number) {
+                    missing.push(example.number);
+                }
+            }
         }
     }
     println!(
         "experimental block parser: {matches} parity, {gaps} explicit gaps, {} differences: {differences:?}",
         differences.len()
     );
-    assert!(matches >= 561, "experimental block coverage regressed");
+    assert!(
+        missing.is_empty(),
+        "required container examples: {missing:?}"
+    );
+    assert!(matches > 561, "experimental block coverage regressed");
     assert!(differences.iter().all(|&example| example == 143));
 }

@@ -8,7 +8,11 @@ fn check(input: &str, options: &ParserOptions) -> SyntaxNode {
     let (actual, actual_errors) =
         experimental_block::try_parse_with_errors(input, options).unwrap();
     assert_eq!(actual.to_string(), input);
-    assert_eq!(actual.green(), expected.green(), "{input}");
+    assert_eq!(
+        actual.green(),
+        expected.green(),
+        "{input}\nactual {actual:#?}\nexpected {expected:#?}"
+    );
     assert_eq!(actual_errors, errors);
     actual
 }
@@ -162,4 +166,115 @@ fn hashpipe_edit_shifts_and_preserves_its_diagnostic() {
         experimental_block::try_parse_with_errors(&updated, &options).unwrap();
     assert_eq!(reparsed.errors, expected_errors);
     assert_eq!(&*reparsed.green, full.green());
+}
+
+#[test]
+fn mixed_lists_and_quotes_preserve_cst() {
+    for flavor in [Flavor::CommonMark, Flavor::Quarto] {
+        let options = ParserOptions::for_flavor(flavor);
+        for input in [
+            "- > - foo\n",
+            "> - first\n> - second\n",
+            "> - first\n  lazy\n",
+            "- > first\r\n  > continued\r\n- next",
+            "> - # heading\n>   text\n",
+        ] {
+            check(input, &options);
+        }
+    }
+}
+
+#[test]
+fn mixed_container_region_edits_match_full_parse() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    let mut text = format!(
+        "# Intro\n\n> - original\n> - second\n\n{}",
+        "Unaffected prose.\n\n".repeat(60)
+    );
+    let mut tree = check(&text, &options);
+    for (old, new) in [("original", "updated"), ("updated", "revised *text*")] {
+        let start = text.find(old).unwrap();
+        let edit = Edit {
+            range: start..start + old.len(),
+            insert: new.into(),
+        };
+        text = edit.apply(&text);
+        let result =
+            experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &text, &options)
+                .expect("expected a mixed-container splice");
+        assert_eq!(result.strategy, ReparseStrategy::Region);
+        let updated = SyntaxNode::new_root(result.green);
+        assert_eq!(updated.green(), check(&text, &options).green());
+        for (before, after) in [
+            (tree.first_child().unwrap(), updated.first_child().unwrap()),
+            (tree.last_child().unwrap(), updated.last_child().unwrap()),
+        ] {
+            assert!(std::ptr::eq(before.green(), after.green()));
+        }
+        tree = updated;
+    }
+    let start = text.find("second").unwrap();
+    let edit = Edit {
+        range: start..start + "second".len(),
+        insert: "<div>".into(),
+    };
+    assert!(
+        experimental_block::reparse(
+            &tree.green().to_owned(),
+            &[],
+            &edit,
+            &edit.apply(&text),
+            &options,
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn quoted_ordered_sublist_respects_pandoc_compatibility() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    for compat in [
+        panache_parser::PandocCompat::V3_9,
+        panache_parser::PandocCompat::V3_10,
+    ] {
+        options.pandoc_compat = compat;
+        check("> - outer\n>   2. child\n", &options);
+    }
+}
+
+#[test]
+fn unsupported_nested_block_points_to_its_content() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    let input = "Intro\n\n> - <div>\n";
+    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
+    assert_eq!(gap.offset, input.find("<div>").unwrap());
+}
+
+#[test]
+fn mixed_containers_respect_blank_before_blockquote() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "Paragraph\n> - quoted item\n";
+    check(input, &options);
+
+    options.extensions.blank_before_blockquote = false;
+    check(input, &options);
+}
+
+#[test]
+fn fenced_code_in_a_quoted_list_preserves_its_prefixes() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("> - item\n>   ```\n>   code\n>   ```\n", &options);
+}
+
+#[test]
+fn fenced_div_can_contain_a_mixed_list_and_quote() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("::: {.note}\n> - item\n:::\n", &options);
+}
+
+#[test]
+fn quoted_list_preserves_empty_items_and_blank_lines() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("> -\n>\n> - next\n", &options);
+    check("> - a\n>\tcontinued\n", &options);
 }
