@@ -501,17 +501,14 @@ pub(crate) fn try_parse_fence_open(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn prepare_fence_open_line<'a>(
     builder: &mut GreenNodeBuilder<'static>,
-    source_line: &'a str,
+    window: &StrippedLines<'a, '_>,
     first_line_override: Option<&'a str>,
-    bq_depth: usize,
-    list_content_col: usize,
-    list_marker_consumed_on_line_0: bool,
-    bq_outer: bool,
-    content_indent: usize,
-) -> (&'a str, &'a str) {
+) -> &'a str {
+    let source_line = window.raw_at(0);
+    let prefix = window.prefix();
+    let bq_depth = prefix.bq_depth();
     if let Some(first_line) = first_line_override {
         if bq_depth > 0 && source_line != first_line {
             let stripped = strip_n_blockquote_markers(source_line, bq_depth);
@@ -525,12 +522,13 @@ fn prepare_fence_open_line<'a>(
         if leading_ws_len > 0 {
             builder.token(SyntaxKind::WHITESPACE.into(), &first_line[..leading_ws_len]);
         }
-        return (first_trimmed, first_line);
+        return first_trimmed;
     }
 
     let mut s: &'a str = source_line;
     let mut pending_ws_start: Option<usize> = None;
-    let suppress_list = list_marker_consumed_on_line_0;
+    let list_content_col = prefix.list_content_col();
+    let suppress_list = prefix.list_marker_consumed_on_line_0;
 
     let flush_ws = |builder: &mut GreenNodeBuilder<'static>,
                     pending: &mut Option<usize>,
@@ -575,7 +573,7 @@ fn prepare_fence_open_line<'a>(
             *s = strip_n_blockquote_markers(s, bq_depth);
         };
 
-    if bq_outer {
+    if bq_outer_of_list(prefix) {
         do_strip_bq(builder, &mut s, &mut pending_ws_start);
         do_strip_list(&mut s, &mut pending_ws_start);
     } else {
@@ -583,6 +581,7 @@ fn prepare_fence_open_line<'a>(
         do_strip_bq(builder, &mut s, &mut pending_ws_start);
     }
 
+    let content_indent = prefix.content_indent();
     if content_indent > 0 {
         let indent_bytes = byte_index_at_column(s, content_indent);
         if s.len() >= indent_bytes && indent_bytes > 0 {
@@ -602,7 +601,7 @@ fn prepare_fence_open_line<'a>(
     if leading_ws_len > 0 {
         builder.token(SyntaxKind::WHITESPACE.into(), &s[..leading_ws_len]);
     }
-    (first_trimmed, s)
+    first_trimmed
 }
 
 pub(crate) fn compute_hashpipe_preamble_line_count(
@@ -1050,7 +1049,6 @@ pub(crate) fn parse_fenced_code_block(
     let prefix = window.prefix();
     let bq_depth = prefix.bq_depth();
     let list_content_col = prefix.list_content_col();
-    let list_marker_consumed_on_line_0 = prefix.list_marker_consumed_on_line_0;
     let bq_outer = bq_outer_of_list(prefix);
     let content_indent = prefix.content_indent();
     let lazy_gobble = prefix.lazy_blockquote_gobble;
@@ -1068,17 +1066,7 @@ pub(crate) fn parse_fenced_code_block(
         }
         trimmed
     } else {
-        prepare_fence_open_line(
-            builder,
-            lines[start_pos],
-            first_line_override,
-            bq_depth,
-            list_content_col,
-            list_marker_consumed_on_line_0,
-            bq_outer,
-            content_indent,
-        )
-        .0
+        prepare_fence_open_line(builder, window, first_line_override)
     };
 
     builder.start_node(SyntaxKind::CODE_FENCE_OPEN.into());
@@ -1279,22 +1267,11 @@ pub(crate) fn parse_fenced_math_block(
     let prefix = window.prefix();
     let bq_depth = prefix.bq_depth();
     let list_content_col = prefix.list_content_col();
-    let list_marker_consumed_on_line_0 = prefix.list_marker_consumed_on_line_0;
     let bq_outer = bq_outer_of_list(prefix);
-    let content_indent = prefix.content_indent();
 
     builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
-    let (first_trimmed, _first_inner) = prepare_fence_open_line(
-        builder,
-        lines[start_pos],
-        first_line_override,
-        bq_depth,
-        list_content_col,
-        list_marker_consumed_on_line_0,
-        bq_outer,
-        content_indent,
-    );
+    let first_trimmed = prepare_fence_open_line(builder, window, first_line_override);
     let (opening_without_newline, opening_newline) = strip_newline(first_trimmed);
     builder.token(
         SyntaxKind::DISPLAY_MATH_MARKER.into(),
