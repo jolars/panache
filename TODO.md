@@ -6,7 +6,7 @@ This document tracks implementation status for Panache's features.
 
 - [x] Remove stale `too_many_arguments` overrides on `ChunkOptionEntry::new` and
   `reparse_region`.
-- [ ] Share a named line-start policy between `StreamingCoreSink` and
+- [x] Share a named line-start policy between `StreamingCoreSink` and
   `TraversalBuilder`. Give the escape flags in `escape_special_chars` named
   fields at the call sites.
 - [ ] Move shared include-walk state into traversal structs for

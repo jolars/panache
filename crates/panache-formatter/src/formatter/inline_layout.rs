@@ -16,38 +16,20 @@ use std::borrow::Cow;
 use std::fmt::Write;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-/// Escape special characters in text to prevent ambiguous parsing.
-///
-/// # Arguments
-/// * `text` - The text to escape
-/// * `skip_emphasis_delim` - Whether to skip escaping * and _ (when direct child of EMPHASIS/STRONG)
-/// * `prev_is_text` - Whether the previous token was TEXT (for intraword underscore detection)
-/// * `next_is_text` - Whether the next token is TEXT (for intraword underscore detection)
-/// * `escape_underscores` - Whether word-boundary underscores should be escaped
-/// * `escape_square_brackets` - Whether `[` / `]` should be escaped. Callers set this
-///   to false when the surrounding extension set makes a `\[` / `\]` pair ambiguous
-///   with display math (`tex_math_single_backslash`); under that extension a bare
-///   pair of literal brackets in a paragraph would reparse as a `DISPLAY_MATH`
-///   span after escaping, breaking idempotency.
-/// * `escape_pipes` - Whether `|` should be escaped. Callers set this to the
-///   union of the `|`-consuming extensions (`pipe_tables`, `line_blocks`,
-///   `grid_tables`): a literal `|` only needs escaping where it could
-///   round-trip into a pipe table, line block, or grid-table row. Flavors with
-///   none of these (e.g. CommonMark) leave it bare, matching pandoc's
-///   commonmark writer.
-/// * `escape_tildes` - Whether literal `~` characters should be escaped because
-///   a formatting transformation would otherwise create inline syntax.
-#[allow(clippy::too_many_arguments)]
-fn escape_special_chars(
-    text: &str,
-    skip_emphasis_delim: bool,
+struct EscapeOptions {
+    // Neighboring text tokens can make a boundary underscore intraword.
     prev_is_text: bool,
     next_is_text: bool,
     escape_underscores: bool,
+    // An escaped bracket pair can reparse as display math.
     escape_square_brackets: bool,
+    // Escape pipes when the flavor uses them in tables or line blocks.
     escape_pipes: bool,
     escape_tildes: bool,
-) -> String {
+}
+
+/// Escape special characters in text to prevent ambiguous parsing.
+fn escape_special_chars(text: &str, options: EscapeOptions) -> String {
     let mut result = String::with_capacity(text.len() * 2);
     let is_single_underscore = text == "_";
     let mut chars = text.char_indices().peekable();
@@ -55,9 +37,7 @@ fn escape_special_chars(
     while let Some((byte_idx, ch)) = chars.next() {
         match ch {
             '*' => {
-                if !skip_emphasis_delim {
-                    result.push('\\');
-                }
+                result.push('\\');
                 result.push(ch);
             }
             '_' => {
@@ -65,16 +45,14 @@ fn escape_special_chars(
                 let at_end = chars.peek().is_none();
 
                 if is_single_underscore {
-                    if !skip_emphasis_delim {
-                        result.push('\\');
-                    }
+                    result.push('\\');
                     result.push(ch);
                     continue;
                 }
 
                 let intraword_start =
-                    at_start && prev_is_text && !matches!(chars.peek(), Some((_, '_')));
-                let intraword_end = at_end && next_is_text;
+                    at_start && options.prev_is_text && !matches!(chars.peek(), Some((_, '_')));
+                let intraword_end = at_end && options.next_is_text;
                 let intraword_mid = !at_start
                     && !at_end
                     && text[..byte_idx]
@@ -85,21 +63,21 @@ fn escape_special_chars(
 
                 let is_intraword = intraword_start || intraword_end || intraword_mid;
 
-                if escape_underscores && !skip_emphasis_delim && !is_intraword {
+                if options.escape_underscores && !is_intraword {
                     result.push('\\');
                 }
                 result.push(ch);
             }
             '[' | ']' => {
-                if escape_square_brackets {
+                if options.escape_square_brackets {
                     result.push('\\');
                 }
                 result.push(ch);
             }
-            '|' if !escape_pipes => {
+            '|' if !options.escape_pipes => {
                 result.push(ch);
             }
-            '~' if !escape_tildes => {
+            '~' if !options.escape_tildes => {
                 result.push(ch);
             }
             '|' | '~' | '`' => {
@@ -263,20 +241,28 @@ pub(super) enum WrapStrategy {
     ListSemantic,
 }
 
+#[derive(Clone, Copy, Default)]
+struct LineStartPolicy {
+    avoid_unsafe_line_start: bool,
+    avoid_blockquote_line_start: bool,
+    avoid_definition_marker_line_start: bool,
+    /// Avoid starting a wrapped line with an ATX heading (`#`) or setext/thematic
+    /// (`---`/`===`) marker. Set by every mode: a `=`/`-` run pushed to its own
+    /// line promotes the paragraph into a setext heading in every flavor.
+    avoid_heading_line_start: bool,
+    /// Avoid manufacturing a tilde code fence that interrupts a paragraph.
+    avoid_tilde_fence_line_start: bool,
+    avoid_hugo_shortcode_line_start: bool,
+    avoid_vitepress_fence_line_start: bool,
+    escape_fancy_list_line_start: bool,
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct NodeWrapOptions<'a> {
     pub widths: &'a [usize],
     pub mode: NodeWrapMode,
     pub atomic_links_root: bool,
-    pub avoid_unsafe_line_start: bool,
-    pub avoid_blockquote_line_start: bool,
-    pub avoid_definition_marker_line_start: bool,
-    /// Avoid starting a wrapped line with an ATX heading (`#`) or setext/thematic
-    /// (`---`/`===`) marker. Set by every mode: a `=`/`-` run pushed to its own
-    /// line promotes the paragraph into a setext heading in every flavor.
-    pub avoid_heading_line_start: bool,
-    /// Avoid manufacturing a tilde code fence that interrupts a paragraph.
-    pub avoid_tilde_fence_line_start: bool,
+    line_start: LineStartPolicy,
     /// Force a line break at every existing soft break (`NEWLINE`) in addition
     /// to the breaks `mode` produces. Set by the `Semantic` wrap mode, which
     /// layers sembr break-preservation on top of the sentence-break path.
@@ -289,11 +275,10 @@ impl<'a> NodeWrapOptions<'a> {
             widths,
             mode: NodeWrapMode::Reflow,
             atomic_links_root: false,
-            avoid_unsafe_line_start: false,
-            avoid_blockquote_line_start: false,
-            avoid_definition_marker_line_start: false,
-            avoid_heading_line_start: true,
-            avoid_tilde_fence_line_start: false,
+            line_start: LineStartPolicy {
+                avoid_heading_line_start: true,
+                ..LineStartPolicy::default()
+            },
             preserve_newlines: false,
         }
     }
@@ -303,11 +288,12 @@ impl<'a> NodeWrapOptions<'a> {
             widths: &[],
             mode: NodeWrapMode::Sentence,
             atomic_links_root: true,
-            avoid_unsafe_line_start: true,
-            avoid_blockquote_line_start: true,
-            avoid_definition_marker_line_start: false,
-            avoid_heading_line_start: true,
-            avoid_tilde_fence_line_start: false,
+            line_start: LineStartPolicy {
+                avoid_unsafe_line_start: true,
+                avoid_blockquote_line_start: true,
+                avoid_heading_line_start: true,
+                ..LineStartPolicy::default()
+            },
             preserve_newlines: false,
         }
     }
@@ -328,24 +314,20 @@ impl WrapStrategy {
                 || config.dialect() == Dialect::CommonMark;
         let avoid_blockquote_start = !config.parser_extensions.blank_before_blockquote;
         let mut options = match self {
-            Self::ParagraphReflow => NodeWrapOptions {
-                avoid_unsafe_line_start: avoid_unsafe_in_paragraph_reflow,
-                avoid_blockquote_line_start: avoid_blockquote_start,
-                ..NodeWrapOptions::reflow(widths)
-            },
-            Self::ParagraphSentence => NodeWrapOptions::sentence(),
-            Self::ParagraphSemantic => NodeWrapOptions::semantic(),
-            Self::ListReflow => NodeWrapOptions {
-                avoid_unsafe_line_start: true,
-                avoid_blockquote_line_start: avoid_blockquote_start,
-                ..NodeWrapOptions::reflow(widths)
-            },
-            Self::ListSentence => NodeWrapOptions::sentence(),
-            Self::ListSemantic => NodeWrapOptions::semantic(),
+            Self::ParagraphReflow | Self::ListReflow => {
+                let mut options = NodeWrapOptions::reflow(widths);
+                options.line_start.avoid_unsafe_line_start =
+                    matches!(self, Self::ListReflow) || avoid_unsafe_in_paragraph_reflow;
+                options.line_start.avoid_blockquote_line_start = avoid_blockquote_start;
+                options
+            }
+            Self::ParagraphSentence | Self::ListSentence => NodeWrapOptions::sentence(),
+            Self::ParagraphSemantic | Self::ListSemantic => NodeWrapOptions::semantic(),
         };
-        options.avoid_tilde_fence_line_start =
+        options.line_start.avoid_tilde_fence_line_start =
             config.dialect() == Dialect::CommonMark && config.parser_extensions.fenced_code_blocks;
-        options.avoid_definition_marker_line_start = config.parser_extensions.definition_lists;
+        options.line_start.avoid_definition_marker_line_start =
+            config.parser_extensions.definition_lists;
         options
     }
 }
@@ -501,28 +483,16 @@ struct StreamingCoreSink<'a> {
     pending_piece: Option<SentenceSegment>,
     merge_initialism_year: bool,
     profile: ResolvedProfile<'a>,
-    avoid_unsafe_line_start: bool,
-    avoid_blockquote_line_start: bool,
-    avoid_definition_marker_line_start: bool,
-    avoid_heading_line_start: bool,
-    avoid_tilde_fence_line_start: bool,
-    avoid_hugo_shortcode_line_start: bool,
-    avoid_vitepress_fence_line_start: bool,
-    escape_fancy_list_line_start: bool,
+    line_start: LineStartPolicy,
 }
 
 impl<'a> StreamingCoreSink<'a> {
-    #[allow(clippy::too_many_arguments)]
     fn new(
         line_widths: &'a [usize],
         sentence_mode: bool,
         merge_initialism_year: bool,
         profile: ResolvedProfile<'a>,
-        avoid_unsafe_line_start: bool,
-        avoid_blockquote_line_start: bool,
-        avoid_definition_marker_line_start: bool,
-        avoid_heading_line_start: bool,
-        avoid_tilde_fence_line_start: bool,
+        line_start: LineStartPolicy,
     ) -> Self {
         Self {
             default_line_width: line_widths.last().copied().unwrap_or(0),
@@ -536,26 +506,20 @@ impl<'a> StreamingCoreSink<'a> {
             pending_piece: None,
             merge_initialism_year,
             profile,
-            avoid_unsafe_line_start,
-            avoid_blockquote_line_start,
-            avoid_definition_marker_line_start,
-            avoid_heading_line_start,
-            avoid_tilde_fence_line_start,
-            avoid_hugo_shortcode_line_start: false,
-            avoid_vitepress_fence_line_start: false,
-            escape_fancy_list_line_start: false,
+            line_start,
         }
     }
 
     fn piece_would_start_unsafe_line(&self, text: &str) -> bool {
-        (self.avoid_definition_marker_line_start && is_definition_marker_piece(text))
-            || (self.avoid_blockquote_line_start && is_unsafe_block_line_start_piece(text))
-            || (self.avoid_unsafe_line_start && is_unsafe_list_line_start_piece(text))
-            || (self.avoid_heading_line_start
+        (self.line_start.avoid_definition_marker_line_start && is_definition_marker_piece(text))
+            || (self.line_start.avoid_blockquote_line_start
+                && is_unsafe_block_line_start_piece(text))
+            || (self.line_start.avoid_unsafe_line_start && is_unsafe_list_line_start_piece(text))
+            || (self.line_start.avoid_heading_line_start
                 && (is_atx_heading_marker_piece(text) || is_setext_or_thematic_marker_piece(text)))
-            || (self.avoid_tilde_fence_line_start && is_tilde_fence_piece(text))
-            || (self.avoid_vitepress_fence_line_start && text.starts_with(":::"))
-            || (self.avoid_hugo_shortcode_line_start
+            || (self.line_start.avoid_tilde_fence_line_start && is_tilde_fence_piece(text))
+            || (self.line_start.avoid_vitepress_fence_line_start && text.starts_with(":::"))
+            || (self.line_start.avoid_hugo_shortcode_line_start
                 && (text.starts_with("{{<") || text.starts_with("{{%")))
     }
 
@@ -577,7 +541,7 @@ impl<'a> StreamingCoreSink<'a> {
                 self.prev_ws_after && self.piece_would_start_unsafe_line(segment.text.as_str());
             // A literal colon run at the start of a paragraph must also stay
             // with its next word so it cannot become a standalone closer.
-            let would_end_with_vitepress_fence = self.avoid_vitepress_fence_line_start
+            let would_end_with_vitepress_fence = self.line_start.avoid_vitepress_fence_line_start
                 && self.line.starts_with(":::")
                 && self.line.bytes().all(|byte| byte == b':');
             if self.line_has_piece
@@ -598,7 +562,7 @@ impl<'a> StreamingCoreSink<'a> {
         // Reindenting lazy list-item text can turn a preserved line's literal
         // marker into a sublist. Keep it literal and attached to its text on
         // subsequent passes, when its punctuation is already escaped.
-        let escaped_marker = (self.escape_fancy_list_line_start && !self.line_has_piece)
+        let escaped_marker = (self.line_start.escape_fancy_list_line_start && !self.line_has_piece)
             .then(|| escape_fancy_list_marker(&segment.text))
             .flatten();
         if let Some(escaped) = &escaped_marker {
@@ -703,11 +667,7 @@ pub(super) fn wrap_text_first_fit(text: &str, line_width: usize) -> Vec<String> 
         false,
         false,
         ResolvedProfile::builtin_only(SentenceLanguage::English),
-        false,
-        false,
-        false,
-        false,
-        false,
+        LineStartPolicy::default(),
     );
     for (idx, word) in words.iter().enumerate() {
         let ws_after = idx + 1 < words.len();
@@ -847,31 +807,16 @@ struct TraversalBuilder<'a> {
 }
 
 impl<'a> TraversalBuilder<'a> {
-    #[allow(clippy::too_many_arguments)]
     fn new(
         line_widths: &'a [usize],
         sentence_mode: bool,
         profile: ResolvedProfile<'a>,
-        avoid_unsafe_line_start: bool,
-        avoid_blockquote_line_start: bool,
-        avoid_definition_marker_line_start: bool,
-        avoid_heading_line_start: bool,
-        avoid_tilde_fence_line_start: bool,
+        line_start: LineStartPolicy,
         preserve_newlines: bool,
         escape_literal_tildes: bool,
     ) -> Self {
         Self {
-            sink: StreamingCoreSink::new(
-                line_widths,
-                sentence_mode,
-                true,
-                profile,
-                avoid_unsafe_line_start,
-                avoid_blockquote_line_start,
-                avoid_definition_marker_line_start,
-                avoid_heading_line_start,
-                avoid_tilde_fence_line_start,
-            ),
+            sink: StreamingCoreSink::new(line_widths, sentence_mode, true, profile, line_start),
             current_piece: None,
             current_piece_boundary_text: None,
             current_piece_boundary_class: SentenceBoundaryClass::Normal,
@@ -1141,15 +1086,18 @@ fn process_node_recursive(
                         }
                         let processed_word = escape_special_chars(
                             word,
-                            false,
-                            prev_is_text,
-                            next_is_text,
-                            !in_link_text,
-                            !config.parser_extensions.tex_math_single_backslash,
-                            config.parser_extensions.pipe_tables
-                                || config.parser_extensions.line_blocks
-                                || config.parser_extensions.grid_tables,
-                            sink.escape_literal_tildes(),
+                            EscapeOptions {
+                                prev_is_text,
+                                next_is_text,
+                                escape_underscores: !in_link_text,
+                                escape_square_brackets: !config
+                                    .parser_extensions
+                                    .tex_math_single_backslash,
+                                escape_pipes: config.parser_extensions.pipe_tables
+                                    || config.parser_extensions.line_blocks
+                                    || config.parser_extensions.grid_tables,
+                                escape_tildes: sink.escape_literal_tildes(),
+                            },
                         );
                         sink.push_piece(&processed_word);
                         saw_word = true;
@@ -1658,26 +1606,25 @@ pub(super) fn wrapped_lines_for_node(
     };
     let escape_literal_tildes =
         !options.preserve_newlines && east_asian_break_creates_subscript(config, node);
+    let line_start = LineStartPolicy {
+        // A shortcode on its own physical line interrupts Markdown inlines.
+        avoid_hugo_shortcode_line_start: config.parser_extensions.hugo_shortcodes,
+        avoid_vitepress_fence_line_start: config.parser_extensions.vitepress_containers,
+        escape_fancy_list_line_start: options.preserve_newlines
+            && config.parser_extensions.fancy_lists
+            && node
+                .ancestors()
+                .any(|ancestor| ListItem::can_cast(ancestor.kind())),
+        ..options.line_start
+    };
     let mut builder = TraversalBuilder::new(
         line_widths,
         sentence_mode,
         profile,
-        options.avoid_unsafe_line_start,
-        options.avoid_blockquote_line_start,
-        options.avoid_definition_marker_line_start,
-        options.avoid_heading_line_start,
-        options.avoid_tilde_fence_line_start,
+        line_start,
         options.preserve_newlines,
         escape_literal_tildes,
     );
-    // A shortcode on its own physical line interrupts Markdown inlines.
-    builder.sink.avoid_hugo_shortcode_line_start = config.parser_extensions.hugo_shortcodes;
-    builder.sink.avoid_vitepress_fence_line_start = config.parser_extensions.vitepress_containers;
-    builder.sink.escape_fancy_list_line_start = options.preserve_newlines
-        && config.parser_extensions.fancy_lists
-        && node
-            .ancestors()
-            .any(|ancestor| ListItem::can_cast(ancestor.kind()));
     process_node_recursive(
         config,
         node,
@@ -1885,8 +1832,8 @@ mod tests {
             ..crate::config::Config::default()
         };
         let options_disabled = WrapStrategy::ParagraphReflow.options(&config_disabled, &[80]);
-        assert!(!options_disabled.avoid_unsafe_line_start);
-        assert!(!options_disabled.avoid_blockquote_line_start);
+        assert!(!options_disabled.line_start.avoid_unsafe_line_start);
+        assert!(!options_disabled.line_start.avoid_blockquote_line_start);
 
         let mut parser_cfg_enabled = parser_cfg;
         parser_cfg_enabled.lists_without_preceding_blankline = true;
@@ -1896,8 +1843,8 @@ mod tests {
             ..crate::config::Config::default()
         };
         let options_enabled = WrapStrategy::ParagraphReflow.options(&config_enabled, &[80]);
-        assert!(options_enabled.avoid_unsafe_line_start);
-        assert!(options_enabled.avoid_blockquote_line_start);
+        assert!(options_enabled.line_start.avoid_unsafe_line_start);
+        assert!(options_enabled.line_start.avoid_blockquote_line_start);
     }
 
     #[test]
@@ -1910,7 +1857,7 @@ mod tests {
         };
         assert!(!config.parser_extensions.lists_without_preceding_blankline);
         let options = WrapStrategy::ParagraphReflow.options(&config, &[80]);
-        assert!(options.avoid_unsafe_line_start);
+        assert!(options.line_start.avoid_unsafe_line_start);
     }
 
     #[test]
@@ -1927,9 +1874,9 @@ mod tests {
             WrapStrategy::ParagraphSemantic,
         ] {
             let options = strategy.options(&config, &[]);
-            assert!(options.avoid_unsafe_line_start);
-            assert!(options.avoid_blockquote_line_start);
-            assert!(options.avoid_heading_line_start);
+            assert!(options.line_start.avoid_unsafe_line_start);
+            assert!(options.line_start.avoid_blockquote_line_start);
+            assert!(options.line_start.avoid_heading_line_start);
         }
     }
 }
