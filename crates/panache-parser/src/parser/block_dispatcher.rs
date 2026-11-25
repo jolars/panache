@@ -1456,7 +1456,7 @@ impl BlockParser for TableParser {
 /// When `spans` is `None` (the dispatcher only calls this after a successful
 /// detection, so this is defensive), each input line is emitted verbatim via
 /// `emit_line_tokens` to preserve CST losslessness.
-fn emit_reference_definition_lines(
+pub(super) fn emit_reference_definition_lines(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     spans: Option<ReferenceSpans>,
@@ -2155,6 +2155,60 @@ fn content_for_fenced_div_detection<'a>(ctx: &BlockContext, content: &'a str) ->
     content
 }
 
+pub(super) fn emit_div_fence_open(
+    builder: &mut GreenNodeBuilder<'static>,
+    line_no_bq: &str,
+    div_fence: &DivFenceInfo,
+) {
+    use crate::syntax::SyntaxKind;
+    builder.start_node(SyntaxKind::DIV_FENCE_OPEN.into());
+
+    let trimmed = line_no_bq.trim_start();
+
+    let leading_ws_len = line_no_bq.len() - trimmed.len();
+    if leading_ws_len > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &line_no_bq[..leading_ws_len]);
+    }
+
+    let fence_str: String = ":".repeat(div_fence.fence_count);
+    builder.token(SyntaxKind::TEXT.into(), &fence_str);
+
+    let after_colons = &trimmed[div_fence.fence_count..];
+    let (content_before_newline, newline_str) = strip_newline(after_colons);
+
+    if !div_fence.attributes.is_empty() {
+        let content_after_space = content_before_newline.trim_start();
+        let leading_space_len = content_before_newline.len() - content_after_space.len();
+        if leading_space_len > 0 {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &content_before_newline[..leading_space_len],
+            );
+        }
+
+        emit_div_info_node(builder, &div_fence.attributes);
+
+        let after_attrs = &content_after_space[div_fence.attributes.len()..];
+
+        if !after_attrs.is_empty() {
+            let suffix_trimmed = after_attrs.trim_start();
+            let ws_len = after_attrs.len() - suffix_trimmed.len();
+            if ws_len > 0 {
+                builder.token(SyntaxKind::WHITESPACE.into(), &after_attrs[..ws_len]);
+            }
+            if !suffix_trimmed.is_empty() {
+                builder.token(SyntaxKind::TEXT.into(), suffix_trimmed);
+            }
+        }
+    }
+
+    if !newline_str.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline_str);
+    }
+
+    builder.finish_node(); // DIV_FENCE_OPEN
+}
+
 impl BlockParser for FencedDivOpenParser {
     fn effect(&self) -> BlockEffect {
         BlockEffect::OpenFencedDiv
@@ -2210,54 +2264,11 @@ impl BlockParser for FencedDivOpenParser {
 
         builder.start_node(SyntaxKind::FENCED_DIV.into());
 
-        builder.start_node(SyntaxKind::DIV_FENCE_OPEN.into());
-
-        let full_line = lines[line_pos];
-        let line_no_bq = strip_n_blockquote_markers(full_line, ctx.blockquote_depth);
-        let trimmed = line_no_bq.trim_start();
-
-        let leading_ws_len = line_no_bq.len() - trimmed.len();
-        if leading_ws_len > 0 {
-            builder.token(SyntaxKind::WHITESPACE.into(), &line_no_bq[..leading_ws_len]);
-        }
-
-        let fence_str: String = ":".repeat(div_fence.fence_count);
-        builder.token(SyntaxKind::TEXT.into(), &fence_str);
-
-        let after_colons = &trimmed[div_fence.fence_count..];
-        let (content_before_newline, newline_str) = strip_newline(after_colons);
-
-        if !div_fence.attributes.is_empty() {
-            let content_after_space = content_before_newline.trim_start();
-            let leading_space_len = content_before_newline.len() - content_after_space.len();
-            if leading_space_len > 0 {
-                builder.token(
-                    SyntaxKind::WHITESPACE.into(),
-                    &content_before_newline[..leading_space_len],
-                );
-            }
-
-            emit_div_info_node(builder, &div_fence.attributes);
-
-            let after_attrs = &content_after_space[div_fence.attributes.len()..];
-
-            if !after_attrs.is_empty() {
-                let suffix_trimmed = after_attrs.trim_start();
-                let ws_len = after_attrs.len() - suffix_trimmed.len();
-                if ws_len > 0 {
-                    builder.token(SyntaxKind::WHITESPACE.into(), &after_attrs[..ws_len]);
-                }
-                if !suffix_trimmed.is_empty() {
-                    builder.token(SyntaxKind::TEXT.into(), suffix_trimmed);
-                }
-            }
-        }
-
-        if !newline_str.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-        }
-
-        builder.finish_node(); // DIV_FENCE_OPEN
+        emit_div_fence_open(
+            builder,
+            strip_n_blockquote_markers(lines[line_pos], ctx.blockquote_depth),
+            &div_fence,
+        );
 
         1
     }
@@ -2268,6 +2279,27 @@ impl BlockParser for FencedDivOpenParser {
 }
 
 pub(crate) struct FencedDivCloseParser;
+
+pub(super) fn emit_div_fence_close(builder: &mut GreenNodeBuilder<'static>, line_no_bq: &str) {
+    use crate::syntax::SyntaxKind;
+    builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
+
+    let trimmed = line_no_bq.trim_start();
+
+    let leading_ws_len = line_no_bq.len() - trimmed.len();
+    if leading_ws_len > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &line_no_bq[..leading_ws_len]);
+    }
+
+    let (content_without_newline, line_ending) = strip_newline(trimmed);
+    builder.token(SyntaxKind::TEXT.into(), content_without_newline);
+
+    if !line_ending.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), line_ending);
+    }
+
+    builder.finish_node();
+}
 
 impl BlockParser for FencedDivCloseParser {
     fn effect(&self) -> BlockEffect {
@@ -2334,30 +2366,14 @@ impl BlockParser for FencedDivCloseParser {
         lines: &StrippedLines<'_, '_>,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        use crate::syntax::SyntaxKind;
-
         let line_pos = lines.pos();
         let lines = lines.raw();
 
-        builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
+        emit_div_fence_close(
+            builder,
+            strip_n_blockquote_markers(lines[line_pos], ctx.blockquote_depth),
+        );
 
-        let full_line = lines[line_pos];
-        let line_no_bq = strip_n_blockquote_markers(full_line, ctx.blockquote_depth);
-        let trimmed = line_no_bq.trim_start();
-
-        let leading_ws_len = line_no_bq.len() - trimmed.len();
-        if leading_ws_len > 0 {
-            builder.token(SyntaxKind::WHITESPACE.into(), &line_no_bq[..leading_ws_len]);
-        }
-
-        let (content_without_newline, line_ending) = strip_newline(trimmed);
-        builder.token(SyntaxKind::TEXT.into(), content_without_newline);
-
-        if !line_ending.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), line_ending);
-        }
-
-        builder.finish_node();
         1
     }
 

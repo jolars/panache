@@ -157,3 +157,63 @@ these buckets. Identify which one BEFORE editing:
   gate.** `ReferenceDefinitionParser` was the canonical example —
   the multi-line `String::new() + push_str` ran on every line; the
   byte gate is what unlocked the 15% wall-time jump.
+
+## Experimental block planner
+
+The `experimental-block-parser` feature exposes a second parser to tests and
+the comparison example. The planner records block ranges and container
+decisions before CST emission. It uses Panache's inline, YAML, raw HTML, and
+pipe table emitters. The comparison checks source round-trips, green trees, and
+diagnostics before timing either engine.
+
+```sh
+cargo build --release -p panache-parser --features experimental-block-parser \
+  --example compare_block_parsers
+target/release/examples/compare_block_parsers commonmark \
+  README.md benches/documents/pandoc_manual.md crates/panache-parser/README.md
+target/release/examples/compare_block_parsers quarto \
+  docs/guide/integrations.qmd docs/getting-started.qmd docs/guide/performance.qmd \
+  benches/documents/{large_authoring,tables,math}.qmd
+cargo test -p panache-parser --features experimental-block-parser \
+  --test commonmark experimental_block_coverage -- --nocapture
+```
+
+On Linux with an AMD Ryzen 9 7900, using Rust 1.98.1 and the workspace release
+profile at base revision `817e7ae0`, three runs collected 200 samples per engine
+and case after 16 warmups. The table gives the range of run medians in
+microseconds. The edit column measures the first region splice in a chain that
+also types inside the region and replaces the whole file. It measures parser
+latency with cached reference labels. The example reports throughput, p95, bytes replaced, and bytes
+submitted to fragment parsers, including seam checks.
+
+| Document | Full parse, current | Full parse, prototype | Region edit, current | Region edit, prototype |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 214–304 | 120–168 | 139–247 | 120–207 |
+| Parser README | 19–33 | 10–17 | 17–30 | 12–21 |
+| Integrations | 168–198 | 104–126 | 93–102 | 81–89 |
+| Getting Started | 272–278 | 148–154 | 106–110 | 97–101 |
+| Performance | 1090–1311 | 910–1086 | 204–230 | 190–214 |
+
+The CommonMark sweep found 561 examples with CST, source, and rendered HTML
+parity, 90 explicit coverage gaps, and one source mismatch. Example 143
+exercises fence info with multiple spaces before the language. The existing
+fence emitter used by both engines changes those bytes. The pinned Pandoc
+manual and the three downloaded Quarto documents did not qualify for timing.
+Mixed quote and list nesting and several Pandoc block extensions remain outside
+the tested slice. Both engines submitted the same fragment sizes for the
+measured edits. For example, the Performance guide’s first edit replaced 387
+bytes and submitted 1,643 bytes across the region and its seam checks.
+
+The planner keeps paragraph promotion, list continuation, and fenced div
+closing ahead of emission. Top-level paragraphs retain line ranges that the
+inline emitter reads directly. Pipe table recognition records prepared rows
+and caption bounds, so the prototype emits each table directly into the CST.
+The incumbent dispatcher builds a separate green subtree during detection
+and copies it into the CST. Lists and quotes still use separate continuation
+rules, and the code and HTML emitters still scan their bounded inputs. The experiment demonstrates the cost of
+emitting equivalent CSTs for the supported slice. How much control flow the
+model can remove with broader dialect coverage remains open.
+
+The production LSP write-phase gate passed. The parse benchmark's
+`large_authoring_single_edit` case missed the 3.80× threshold on both the
+clean baseline (3.65×) and the experimental branch (3.70×).

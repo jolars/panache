@@ -262,12 +262,83 @@ pub fn reparse_with_cost_guards(
     options: &ParserOptions,
     cost_guards: CostGuards,
 ) -> Option<Reparsed> {
+    reparse_using(
+        prev_green,
+        prev_errors,
+        edit,
+        new_text,
+        options,
+        cost_guards,
+        &parse_current,
+    )
+}
+
+pub(super) trait BlockParse:
+    Fn(&str, &ParserOptions, super::core::ParseOrigin) -> Option<(SyntaxNode, Vec<SyntaxError>)>
+{
+}
+
+impl<F> BlockParse for F where
+    F: Fn(&str, &ParserOptions, super::core::ParseOrigin) -> Option<(SyntaxNode, Vec<SyntaxError>)>
+{
+}
+
+pub(super) fn parse_current(
+    text: &str,
+    options: &ParserOptions,
+    origin: super::core::ParseOrigin,
+) -> Option<(SyntaxNode, Vec<SyntaxError>)> {
+    Some(
+        match origin {
+            super::core::ParseOrigin::Document => Parser::new(text, options),
+            super::core::ParseOrigin::Fragment => Parser::new_fragment(text, options),
+        }
+        .parse_with_errors(),
+    )
+}
+
+pub(super) fn reparse_using(
+    prev_green: &rowan::GreenNode,
+    prev_errors: &[SyntaxError],
+    edit: &Edit,
+    new_text: &str,
+    options: &ParserOptions,
+    cost_guards: CostGuards,
+    parse: &impl BlockParse,
+) -> Option<Reparsed> {
     let mut options = options.clone();
     populate_refdef_labels(new_text, &mut options);
+    let result = reparse_attempt(
+        prev_green,
+        prev_errors,
+        edit,
+        new_text,
+        &options,
+        cost_guards,
+        parse,
+    )?;
+    assert_matches_full_parse(&result, new_text, &options, parse);
+    Some(result)
+}
+
+#[derive(Clone, Copy)]
+struct EditRanges {
+    old: (usize, usize),
+    new: (usize, usize),
+}
+
+fn reparse_attempt(
+    prev_green: &rowan::GreenNode,
+    prev_errors: &[SyntaxError],
+    edit: &Edit,
+    new_text: &str,
+    options: &ParserOptions,
+    cost_guards: CostGuards,
+    parse: &impl BlockParse,
+) -> Option<Reparsed> {
     let prev_tree = SyntaxNode::new_root(prev_green.clone());
 
-    if let Some(result) = reparse_token(&prev_tree, prev_errors, edit, new_text, &options) {
-        assert_matches_full_parse(&result, new_text, &options);
+    if let Some(result) = reparse_token(&prev_tree, prev_errors, edit, new_text, options) {
         return Some(result);
     }
 
@@ -290,24 +361,30 @@ pub fn reparse_with_cost_guards(
 
     if let Some(result) = reparse_region(
         new_text,
-        &options,
+        options,
         &prev_tree,
         prev_errors,
-        old_edit,
-        new_edit,
+        EditRanges {
+            old: old_edit,
+            new: new_edit,
+        },
         cost_guards,
+        parse,
     ) {
         return Some(result);
     }
 
     reparse_ranges(
         new_text,
-        &options,
+        options,
         &prev_tree,
         prev_errors,
-        old_edit,
-        new_edit,
+        EditRanges {
+            old: old_edit,
+            new: new_edit,
+        },
         cost_guards,
+        parse,
     )
 }
 
@@ -620,14 +697,14 @@ fn reparse_ranges(
     config: &ParserOptions,
     old_tree: &SyntaxNode,
     old_errors: &[SyntaxError],
-    old_edit_range: (usize, usize),
-    new_edit_range: (usize, usize),
+    edit: EditRanges,
     cost_guards: CostGuards,
+    parse: &impl BlockParse,
 ) -> Option<Reparsed> {
     let input_len = input.len();
 
-    let old_edit = normalize_range(old_edit_range)?;
-    let new_edit = normalize_range(new_edit_range)?;
+    let old_edit = normalize_range(edit.old)?;
+    let new_edit = normalize_range(edit.new)?;
     if new_edit.1 > input_len {
         return None;
     }
@@ -667,9 +744,8 @@ fn reparse_ranges(
         find_top_level_heading_section_window(old_tree, old_edit, new_edit, input_len)
         && !window_is_too_wide(cost_guards, section_window.new_start, input_len)
         && let Some(result) =
-            reparse_section_window(input, config, old_tree, old_errors, section_window)
+            reparse_section_window(input, config, old_tree, old_errors, section_window, parse)
     {
-        assert_matches_full_parse(&result, input, config);
         return Some(result);
     }
 
@@ -779,7 +855,8 @@ fn reparse_ranges(
         return None;
     }
 
-    let (suffix_tree, suffix_errors) = Parser::new(suffix_text, config).parse_with_errors();
+    let (suffix_tree, suffix_errors) =
+        parse(suffix_text, config, super::core::ParseOrigin::Document)?;
     let errors = merge_incremental_errors(old_errors, new_restart, suffix_errors)?;
 
     // Splice on the green tree directly: retain the prefix children verbatim
@@ -800,7 +877,6 @@ fn reparse_ranges(
         reparse_range: (new_restart, len),
         strategy: ReparseStrategy::SuffixWindow,
     };
-    assert_matches_full_parse(&result, input, config);
     Some(result)
 }
 
@@ -1331,6 +1407,7 @@ fn reparse_section_window(
     old_tree: &SyntaxNode,
     old_errors: &[SyntaxError],
     section_window: SectionWindow,
+    parse: &impl BlockParse,
 ) -> Option<Reparsed> {
     if !input.is_char_boundary(section_window.new_start)
         || !input.is_char_boundary(section_window.new_end)
@@ -1376,8 +1453,11 @@ fn reparse_section_window(
         return None;
     }
 
-    let (tail_tree, tail_errors) =
-        Parser::new(&input[section_window.new_start..], config).parse_with_errors();
+    let (tail_tree, tail_errors) = parse(
+        &input[section_window.new_start..],
+        config,
+        super::core::ParseOrigin::Document,
+    )?;
     let errors = merge_incremental_errors(old_errors, section_window.new_start, tail_errors)?;
     let tail_green = tail_tree.green();
     let window_len = section_window.new_end - section_window.new_start;
@@ -1569,12 +1649,18 @@ fn parse_fragment_at(
     text: &str,
     offset: usize,
     config: &ParserOptions,
-) -> (SyntaxNode, Vec<SyntaxError>) {
-    if offset == 0 {
-        Parser::new(text, config).parse_with_errors()
-    } else {
-        Parser::new_fragment(text, config).parse_with_errors()
-    }
+    parse: &impl BlockParse,
+) -> Option<(SyntaxNode, Vec<SyntaxError>)> {
+    use super::core::ParseOrigin;
+    parse(
+        text,
+        config,
+        if offset == 0 {
+            ParseOrigin::Document
+        } else {
+            ParseOrigin::Fragment
+        },
+    )
 }
 
 /// Lines whose reading can pair with a partner *arbitrarily far away* in the
@@ -1747,9 +1833,12 @@ fn reparse_region(
     config: &ParserOptions,
     old_tree: &SyntaxNode,
     old_errors: &[SyntaxError],
-    old_edit: (usize, usize),
-    new_edit: (usize, usize),
+    EditRanges {
+        old: old_edit,
+        new: new_edit,
+    }: EditRanges,
     cost_guards: CostGuards,
+    parse: &impl BlockParse,
 ) -> Option<Reparsed> {
     if old_tree.kind() != SyntaxKind::DOCUMENT {
         return None;
@@ -1823,14 +1912,14 @@ fn reparse_region(
         return None;
     }
 
-    let (frag_tree, frag_errors) = parse_fragment_at(fragment, region.start, config);
+    let (frag_tree, frag_errors) = parse_fragment_at(fragment, region.start, config, parse)?;
     let frag_children = green_children(&frag_tree);
     let old_children = green_children(old_tree);
 
     if let Some((prev_start, prev_end)) = region.prev {
         let guard = format!("{}{}", &old_text[prev_start..region.start], fragment);
         let seam = region.start - prev_start;
-        let (parsed, _) = parse_fragment_at(&guard, prev_start, config);
+        let (parsed, _) = parse_fragment_at(&guard, prev_start, config, parse)?;
         let (before, after) = split_children_at(&parsed, seam)?;
         if after != frag_children {
             return None;
@@ -1845,7 +1934,7 @@ fn reparse_region(
     if tail_end > region.end {
         let guard = format!("{}{}", fragment, &old_text[region.end..tail_end]);
         let seam = fragment.len();
-        let (parsed, _) = parse_fragment_at(&guard, region.start, config);
+        let (parsed, _) = parse_fragment_at(&guard, region.start, config, parse)?;
         let (before, after) = split_children_at(&parsed, seam)?;
         if before != frag_children {
             return None;
@@ -1868,7 +1957,6 @@ fn reparse_region(
         reparse_range: (region.start, new_region_end),
         strategy: ReparseStrategy::Region,
     };
-    assert_matches_full_parse(&result, input, config);
     Some(result)
 }
 
@@ -2029,9 +2117,12 @@ mod tests {
                 &options,
                 &old_tree,
                 &old_errors,
-                (at, at + 4),
-                (at, at + 4),
+                EditRanges {
+                    old: (at, at + 4),
+                    new: (at, at + 4),
+                },
                 CostGuards::Enforced,
+                &parse_current,
             )
             .map(|reparsed| {
                 let full = super::super::parse(&updated, Some(options.clone()));
@@ -2198,9 +2289,12 @@ mod tests {
             &options,
             &old_tree,
             &old_errors,
-            (at, at),
-            (at, at + insert.len()),
+            EditRanges {
+                old: (at, at),
+                new: (at, at + insert.len()),
+            },
             CostGuards::Enforced,
+            &parse_current,
         ) {
             Some(reparsed) => Spliced {
                 tree: SyntaxNode::new_root(reparsed.green),

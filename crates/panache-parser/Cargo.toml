@@ -35,6 +35,7 @@ unicode-width = "0.2.2"
 
 [features]
 default = []
+experimental-block-parser = []
 serde = ["dep:serde"]
 schema = ["serde", "dep:schemars"]
 
@@ -47,3 +48,7 @@ serde_json = "1.0.150"
 badness-parser = "=0.13.0"
 insta = "1.47.2"
 toml = "1.1.2"
+
+[[example]]
+name = "compare_block_parsers"
+required-features = ["experimental-block-parser"]

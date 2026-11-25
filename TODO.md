@@ -242,6 +242,42 @@ analogue; do not re-audit them: call hierarchy, type hierarchy,
 
 ## Parser
 
+### Block parser replacement
+
+Develop the replacement on the `block-parser` branch behind
+`experimental-block-parser`. Switch all production entry points in one cutover
+once the replacement meets the gates below. See the [prototype
+measurements](benches/PERFORMANCE.md#experimental-block-planner) for the
+starting point.
+
+- [x] Build a block-planning prototype and measure full parses and chained edits
+  on real CommonMark and Quarto documents with identical CSTs and
+  diagnostics.
+- [ ] Thread resolved project options through both engines. Start with Quarto
+  project configs that override extension defaults. Test enabled and
+  disabled constructs, dialect selection, and Pandoc compatibility settings.
+  Add an extension-heavy Quarto document from the existing benchmark corpus.
+- [ ] Port block rules in bounded slices. Start with mixed lists and block
+  quotes, then cover the remaining Pandoc and flavor-specific blocks. Put
+  continuation, interruption, and finalization in the block planner and
+  reuse lossless emitters. Track unsupported inputs and CST divergences
+  until every supported flavor and option combination has a replacement
+  path.
+- [ ] Gate on lossless source, CST and diagnostic parity using the golden
+  suites, CommonMark and Pandoc conformance, and representative project
+  corpora. Investigate intentional differences against the appropriate
+  upstream reference and pin them with fixtures.
+- [ ] Exercise the shared reparser against the replacement in chained edits and
+  seeded fuzzing. Check full-parse equivalence, subtree identity, fallbacks,
+  and actual fragment work. Recheck release full-parse throughput and
+  incremental latency on the same resolved configs, including the LSP gates.
+  Review how the completed port handles container rules before deciding
+  whether it simplifies the parser.
+- [ ] In one cutover, route the parser API, CLI, formatter, linter, LSP, and
+  WASM through the replacement. Remove the old engine, comparison feature,
+  and dual-engine dispatch. Keep focused regressions and rerun workspace
+  checks, conformance, and release benchmarks after the switch.
+
 ### Issues
 
 Note any known parser issues here.

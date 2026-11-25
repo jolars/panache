@@ -565,7 +565,7 @@ fn extract_block_tag_name(text: &str, accept_closing: bool) -> Option<String> {
 /// Whether this block type ends at a blank line (CommonMark types 6 & 7
 /// in CommonMark dialect). Such blocks do NOT close on a matching tag /
 /// marker — only at end of input or the next blank line.
-fn ends_at_blank_line(block_type: &HtmlBlockType) -> bool {
+pub(in crate::parser) fn ends_at_blank_line(block_type: &HtmlBlockType) -> bool {
     matches!(
         block_type,
         HtmlBlockType::Type7
@@ -579,7 +579,7 @@ fn ends_at_blank_line(block_type: &HtmlBlockType) -> bool {
 /// Check if a line contains the closing marker for the given HTML block type.
 /// Only meaningful for types 1–5 and the legacy "type 6 closed by tag" path;
 /// blank-line-terminated types (6 in CommonMark, 7) never match here.
-fn is_closing_marker(line: &str, block_type: &HtmlBlockType) -> bool {
+pub(in crate::parser) fn is_closing_marker(line: &str, block_type: &HtmlBlockType) -> bool {
     match block_type {
         HtmlBlockType::Comment => line.contains("-->"),
         HtmlBlockType::ProcessingInstruction => line.contains("?>"),

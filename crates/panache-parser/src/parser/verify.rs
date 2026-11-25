@@ -52,8 +52,10 @@ pub(crate) fn assert_matches_full_parse(
     result: &super::Reparsed,
     input: &str,
     options: &crate::options::ParserOptions,
+    parse: &impl super::reparse::BlockParse,
 ) {
-    let (full, full_errors) = super::Parser::new(input, options).parse_with_errors();
+    let (full, full_errors) = parse(input, options, super::core::ParseOrigin::Document)
+        .expect("successful reparse must support the full document");
     assert_eq!(
         fingerprint(&SyntaxNode::new_root(result.green.clone())),
         fingerprint(&full),
@@ -75,6 +77,7 @@ pub(crate) fn assert_matches_full_parse(
     _result: &super::Reparsed,
     _input: &str,
     _options: &crate::options::ParserOptions,
+    _parse: &impl super::reparse::BlockParse,
 ) {
 }
 
@@ -108,7 +111,12 @@ mod tests {
             reparse_range: (0, input.len()),
             strategy: ReparseStrategy::SuffixWindow,
         };
-        assert_matches_full_parse(&wrong, input, &crate::options::ParserOptions::default());
+        assert_matches_full_parse(
+            &wrong,
+            input,
+            &crate::options::ParserOptions::default(),
+            &super::super::reparse::parse_current,
+        );
     }
 
     #[cfg(debug_assertions)]
@@ -125,7 +133,12 @@ mod tests {
             reparse_range: (0, input.len()),
             strategy: ReparseStrategy::SuffixWindow,
         };
-        assert_matches_full_parse(&wrong, input, &options);
+        assert_matches_full_parse(
+            &wrong,
+            input,
+            &options,
+            &super::super::reparse::parse_current,
+        );
     }
 
     #[cfg(debug_assertions)]
@@ -142,6 +155,11 @@ mod tests {
             reparse_range: (0, input.len()),
             strategy: ReparseStrategy::SuffixWindow,
         };
-        assert_matches_full_parse(&result, input, &options);
+        assert_matches_full_parse(
+            &result,
+            input,
+            &options,
+            &super::super::reparse::parse_current,
+        );
     }
 }

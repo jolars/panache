@@ -17,6 +17,8 @@ pub mod yaml;
 
 mod block_dispatcher;
 mod core;
+#[cfg(feature = "experimental-block-parser")]
+pub mod experimental_block;
 mod verify;
 
 pub use core::Parser;

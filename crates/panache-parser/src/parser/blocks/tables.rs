@@ -1557,6 +1557,28 @@ pub(crate) fn try_parse_pipe_table(
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
+    let jupyter_lines = std::cell::OnceCell::new();
+    let table = prepare_pipe_table(window, config, &jupyter_lines)?;
+    table.emit(builder, window, config);
+    Some(table.lines_consumed)
+}
+
+pub(crate) struct PreparedPipeTable<'a> {
+    header: PipeTableRow<'a>,
+    rows: Vec<PipeTableRow<'a>>,
+    actual_start: usize,
+    separator_pos: usize,
+    end_pos: usize,
+    caption_before: Option<(usize, usize)>,
+    caption_after: Option<(usize, usize)>,
+    pub(crate) lines_consumed: usize,
+}
+
+pub(crate) fn prepare_pipe_table<'a>(
+    window: &StrippedLines<'a, '_>,
+    config: &ParserOptions,
+    jupyter_lines: &'a std::cell::OnceCell<std::sync::Arc<super::jupyter::Lookahead>>,
+) -> Option<PreparedPipeTable<'a>> {
     let lines = window.raw();
     let start_pos = window.pos();
     if start_pos + 1 >= lines.len() {
@@ -1595,8 +1617,7 @@ pub(crate) fn try_parse_pipe_table(
         return None;
     }
 
-    let jupyter_lines = std::cell::OnceCell::new();
-    let header = prepare_pipe_table_row(window, actual_start, config, &jupyter_lines);
+    let header = prepare_pipe_table_row(window, actual_start, config, jupyter_lines);
     let separator_pos = header.end;
     if separator_pos >= lines.len() || pipe_delimiters(header.text.trim(), config).is_empty() {
         return None;
@@ -1627,7 +1648,7 @@ pub(crate) fn try_parse_pipe_table(
         if line.trim().is_empty() || window.ends_container_lines(end_pos) {
             break;
         }
-        let row = prepare_pipe_table_row(window, end_pos, config, &jupyter_lines);
+        let row = prepare_pipe_table_row(window, end_pos, config, jupyter_lines);
         if !row.text.contains('|') {
             break;
         }
@@ -1649,31 +1670,6 @@ pub(crate) fn try_parse_pipe_table(
         find_caption_after_table(window, end_pos)
     };
 
-    builder.start_node(SyntaxKind::PIPE_TABLE.into());
-
-    if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-        emit_caption_blank_lines(builder, window, cap_end, actual_start);
-    }
-
-    emit_pipe_table_row(builder, window, &header, SyntaxKind::TABLE_HEADER, config);
-
-    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-    let separator_tail = window.emit_or_dispatch_tail(builder, separator_pos);
-    emit_separator_tokens(builder, separator_tail);
-    builder.finish_node();
-
-    for row in &rows {
-        emit_pipe_table_row(builder, window, row, SyntaxKind::TABLE_ROW, config);
-    }
-
-    if let Some((cap_start, cap_end)) = caption_after {
-        emit_caption_blank_lines(builder, window, end_pos, cap_start);
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-    }
-
-    builder.finish_node(); // PipeTable
-
     let table_start = caption_before
         .map(|(start, _)| start)
         .unwrap_or(actual_start);
@@ -1683,7 +1679,60 @@ pub(crate) fn try_parse_pipe_table(
         end_pos
     };
 
-    Some(table_end - table_start)
+    Some(PreparedPipeTable {
+        header,
+        rows,
+        actual_start,
+        separator_pos,
+        end_pos,
+        caption_before,
+        caption_after,
+        lines_consumed: table_end - table_start,
+    })
+}
+
+impl PreparedPipeTable<'_> {
+    pub(crate) fn emit(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        window: &StrippedLines<'_, '_>,
+        config: &ParserOptions,
+    ) {
+        let Self {
+            header,
+            rows,
+            actual_start,
+            separator_pos,
+            end_pos,
+            caption_before,
+            caption_after,
+            ..
+        } = self;
+        builder.start_node(SyntaxKind::PIPE_TABLE.into());
+
+        if let Some((cap_start, cap_end)) = caption_before {
+            emit_table_caption(builder, window, *cap_start, *cap_end, config);
+            emit_caption_blank_lines(builder, window, *cap_end, *actual_start);
+        }
+
+        emit_pipe_table_row(builder, window, header, SyntaxKind::TABLE_HEADER, config);
+
+        builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
+        let separator_tail = window.emit_or_dispatch_tail(builder, *separator_pos);
+        emit_separator_tokens(builder, separator_tail);
+        builder.finish_node();
+
+        for row in rows {
+            emit_pipe_table_row(builder, window, row, SyntaxKind::TABLE_ROW, config);
+        }
+
+        if let Some((cap_start, cap_end)) = caption_after {
+            emit_caption_blank_lines(builder, window, *end_pos, *cap_start);
+            emit_table_caption(builder, window, *cap_start, *cap_end, config);
+        }
+
+        builder.finish_node(); // PipeTable
+    }
 }
 
 #[cfg(test)]

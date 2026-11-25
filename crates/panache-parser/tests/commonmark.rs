@@ -435,3 +435,38 @@ fn commonmark_full_report() {
     eprintln!("(report written to {})", report_path.display());
     eprintln!("(json written to {})", json_path.display());
 }
+
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn experimental_block_coverage() {
+    use panache_parser::parser::{experimental_block, parse_with_errors};
+    let options = commonmark_options();
+    let examples = read_spec(&manifest_path(SPEC_FIXTURE_REL));
+    let mut matches = 0;
+    let mut gaps = 0;
+    let mut differences = Vec::new();
+    for example in &examples {
+        match experimental_block::try_parse_with_errors(&example.markdown, &options) {
+            Ok((tree, errors)) => {
+                let (expected, expected_errors) =
+                    parse_with_errors(&example.markdown, Some(options.clone()));
+                if tree.green() == expected.green()
+                    && errors == expected_errors
+                    && tree.to_string() == example.markdown
+                    && matches_expected(example, &html_renderer::render(&tree))
+                {
+                    matches += 1;
+                } else {
+                    differences.push(example.number);
+                }
+            }
+            Err(_) => gaps += 1,
+        }
+    }
+    println!(
+        "experimental block parser: {matches} parity, {gaps} explicit gaps, {} differences: {differences:?}",
+        differences.len()
+    );
+    assert!(matches >= 561, "experimental block coverage regressed");
+    assert!(differences.iter().all(|&example| example == 143));
+}
