@@ -211,3 +211,13 @@ fallback-config = "configs/hugo.toml"
 # Hugo/Goldmark: hugo.toml.
 repo = "gohugoio/hugoDocs"
 fallback-config = "configs/hugo.toml"
+
+[[repositories]]
+# VitePress: packages/docs/.vitepress/config/index.ts and packages/docs/package.json.
+repo = "vuejs/pinia"
+fallback-config = "configs/vitepress.toml"
+
+[[repositories]]
+# VitePress: docs/.vitepress/config.ts.
+repo = "vuejs/vitepress"
+fallback-config = "configs/vitepress.toml"

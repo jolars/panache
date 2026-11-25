@@ -1,0 +1,2 @@
+extend = "github-docs.toml"
+flavor = "vitepress"

@@ -45,6 +45,7 @@ The shared fallbacks use ordinary Panache configuration:
   | `quarto.toml`      | Quarto, with the GitHub documentation mappings.                               |
   | `rmarkdown.toml`   | R Markdown, with the GitHub documentation mappings.                           |
   | `pandoc.toml`      | Pandoc, with the GitHub documentation mappings.                               |
+  | `vitepress.toml`   | VitePress, with the GitHub documentation mappings.                            |
 
 `github-docs.toml` maps READMEs, contributing guides, and other conventional
 repository documentation to GFM. The other fallbacks extend it so a GitHub
@@ -55,9 +56,10 @@ README does not inherit the site's Markdown flavor.
 The initial manifest records the build files inspected in all 40 upstream
 repositories on October 15, 2026. Quarto projects declare `_quarto.yml`;
 bookdown projects declare their output formats in `_output.yml`; Hugo projects
-configure Hugo and Goldmark. These declarations determine fallback selection.
-The comments beside each repository identify the evidence and any upstream
-Panache config.
+configure Hugo and Goldmark. The VitePress repositories have site configuration
+under `.vitepress/`. These declarations determine fallback selection. The
+comments beside each repository identify the evidence and any upstream Panache
+config.
 
 The GitLab `umwelt-info/website` repository currently declares
 `flavor = "commonmark"` in its own `panache.toml`, so CommonMark takes
