@@ -9,7 +9,7 @@ This document tracks implementation status for Panache's features.
 - [x] Share a named line-start policy between `StreamingCoreSink` and
   `TraversalBuilder`. Give the escape flags in `escape_special_chars` named
   fields at the call sites.
-- [ ] Move shared include-walk state into traversal structs for
+- [x] Move shared include-walk state into traversal structs for
   `lint_loaded_document_with_includes` and the execution planner's
   `collect`.
 - [ ] Pass the existing `BracketResolution` to `commit_resolution` so callers

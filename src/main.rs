@@ -2282,9 +2282,6 @@ fn run() -> io::Result<()> {
                             let docs = cached.iter().map(linted_document_from_cached).collect();
                             return (job.idx, Ok(build_lint_outcome(&job.file_path, docs)));
                         }
-                        let mut documents = Vec::new();
-                        let mut visited = std::collections::HashSet::new();
-                        let mut active = std::collections::HashSet::new();
                         let lint_result = if let Some(batch) = &execution_batch {
                             let external = execution_results.get_or_init(|| batch.run());
                             lint_execution_sources(
@@ -2295,23 +2292,25 @@ fn run() -> io::Result<()> {
                                 external,
                                 graph_diags,
                             )
-                            .map(|docs| documents = docs)
                         } else {
-                            lint_loaded_document_with_includes(
+                            let mut traversal = IncludeLintTraversal {
+                                db: &db,
+                                config: &job.cfg,
+                                file_config: job.file_config,
+                                graph_diags,
+                                documents: Vec::new(),
+                                visited: std::collections::HashSet::new(),
+                                active: std::collections::HashSet::new(),
+                            };
+                            traversal.lint_document(
                                 &job.file_path,
                                 &job.input,
                                 Some(job.file_text),
-                                &job.cfg,
-                                job.file_config,
-                                &mut documents,
-                                &mut visited,
-                                &mut active,
-                                &db,
-                                graph_diags,
-                            )
+                            );
+                            Ok(traversal.documents)
                         };
                         match lint_result {
-                            Ok(()) => {
+                            Ok(documents) => {
                                 if let (Some(cache_handle), Some((ff, cf, tf))) =
                                     (cache_shared.as_ref(), cache_keys.as_ref())
                                 {
@@ -2871,130 +2870,129 @@ fn lint_execution_sources(
     Ok(documents)
 }
 
-#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
-fn lint_loaded_document_with_includes(
-    doc_path: &Path,
-    input: &str,
-    file_text: Option<panache::salsa::FileText>,
-    cfg: &panache::Config,
+struct IncludeLintTraversal<'a> {
+    db: &'a panache::salsa::SalsaDb,
+    config: &'a panache::Config,
     file_config: panache::salsa::FileConfig,
-    results: &mut Vec<LintedDocument>,
-    visited: &mut std::collections::HashSet<PathBuf>,
-    active: &mut std::collections::HashSet<PathBuf>,
-    db: &panache::salsa::SalsaDb,
-    graph_diags: Option<&ProjectGraphDiagnostics>,
-) -> io::Result<()> {
-    if !visited.insert(doc_path.to_path_buf()) {
-        return Ok(());
-    }
+    graph_diags: Option<&'a ProjectGraphDiagnostics>,
+    documents: Vec<LintedDocument>,
+    visited: std::collections::HashSet<PathBuf>,
+    active: std::collections::HashSet<PathBuf>,
+}
 
-    active.insert(doc_path.to_path_buf());
-
-    // Reuse the root file's FileText handle (constructed in
-    // lint_documents_with_includes) so the salsa cache hits across
-    // project_graph and built_in_lint_plan. For included files reuse the handle
-    // `load_referenced_files` already registered in the VFS, so the queries can
-    // resolve the document's path from its `FileText` identity;
-    // mint a fresh (pathless) one only as a last resort.
-    let file_text = file_text
-        .or_else(|| db.file_text_if_cached(doc_path))
-        .unwrap_or_else(|| panache::salsa::FileText::from_str(db, input));
-
-    // Source built-in diagnostics from the salsa-tracked plan rather than
-    // running the rule registry a second time in the host. Salsa's plan
-    // already covers built-in rules, frontmatter-yaml errors, and the metadata
-    // pipeline; the host adds external linters (sync) and project-graph
-    // diagnostics on top.
-    let plan = panache::salsa::built_in_lint_plan(db, file_text, file_config).clone();
-    let mut diagnostics = plan.diagnostics;
-    if !plan.external_jobs.is_empty() {
-        diagnostics.extend(run_external_lint_jobs_sync(&plan.external_jobs, input));
-        diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
-    }
-
-    // Re-materialize the cached tree for the include scan; it is shared with
-    // built_in_lint_plan/project_graph via salsa so this is a refcount bump,
-    // not a parse.
-    let tree = panache::salsa::parsed_tree_root(db, file_text, file_config);
-    let base_dir = doc_path.parent().unwrap_or(Path::new("."));
-    let roots = panache::includes::find_project_roots(doc_path);
-    let project_root = roots.quarto.clone();
-    let resolution =
-        panache::includes::collect_includes(&tree, input, base_dir, project_root.as_deref(), cfg);
-
-    diagnostics.extend(resolution.diagnostics);
-    // Project-graph diagnostics only apply to documents that participate in a
-    // project (Quarto/bookdown root) or that pull in includes. For the
-    // overwhelmingly common flat-directory case (e.g. linting a folder of
-    // standalone .md files) skip the salsa accumulator entirely; this is the
-    // dominant per-file cost on large many-file batches.
-    if let Some(graph_diags) = graph_diags {
-        // Project batch: the accumulator was run once for the whole project (it
-        // is keyed on the root file, so a per-file call would recompute the
-        // same cross-document graph N times — the O(n^2) hot spot). Look up this
-        // document's precomputed cross-file diagnostics.
-        if let Some(entries) = graph_diags.get(doc_path) {
-            diagnostics.extend(entries.iter().cloned());
+impl IncludeLintTraversal<'_> {
+    fn lint_document(
+        &mut self,
+        doc_path: &Path,
+        input: &str,
+        file_text: Option<panache::salsa::FileText>,
+    ) {
+        if !self.visited.insert(doc_path.to_path_buf()) {
+            return;
         }
-    } else if roots.quarto.is_some() || roots.bookdown.is_some() || !resolution.includes.is_empty()
-    {
-        let graph_diags = panache::salsa::project_graph::accumulated::<
-            panache::salsa::GraphDiagnostic,
-        >(db, file_text, file_config);
-        for entry in graph_diags {
-            if entry.0.path.as_path() == doc_path {
-                diagnostics.push(entry.0.diagnostic.clone());
+
+        self.active.insert(doc_path.to_path_buf());
+
+        // Reuse the root file's FileText handle so the salsa cache hits across
+        // project_graph and built_in_lint_plan. For included files reuse the handle
+        // `load_referenced_files` already registered in the VFS, so the queries can
+        // resolve the document's path from its `FileText` identity;
+        // mint a fresh (pathless) one only as a last resort.
+        let file_text = file_text
+            .or_else(|| self.db.file_text_if_cached(doc_path))
+            .unwrap_or_else(|| panache::salsa::FileText::from_str(self.db, input));
+
+        // Source built-in diagnostics from the salsa-tracked plan rather than
+        // running the rule registry a second time in the host. Salsa's plan
+        // already covers built-in rules, frontmatter-yaml errors, and the metadata
+        // pipeline; the host adds external linters (sync) and project-graph
+        // diagnostics on top.
+        let plan = panache::salsa::built_in_lint_plan(self.db, file_text, self.file_config).clone();
+        let mut diagnostics = plan.diagnostics;
+        if !plan.external_jobs.is_empty() {
+            diagnostics.extend(run_external_lint_jobs_sync(&plan.external_jobs, input));
+            diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+        }
+
+        // Re-materialize the cached tree for the include scan; it is shared with
+        // built_in_lint_plan/project_graph via salsa so this is a refcount bump,
+        // not a parse.
+        let tree = panache::salsa::parsed_tree_root(self.db, file_text, self.file_config);
+        let base_dir = doc_path.parent().unwrap_or(Path::new("."));
+        let roots = panache::includes::find_project_roots(doc_path);
+        let project_root = roots.quarto.clone();
+        let resolution = panache::includes::collect_includes(
+            &tree,
+            input,
+            base_dir,
+            project_root.as_deref(),
+            self.config,
+        );
+
+        diagnostics.extend(resolution.diagnostics);
+        // Project-graph diagnostics only apply to documents that participate in a
+        // project (Quarto/bookdown root) or that pull in includes. For the
+        // overwhelmingly common flat-directory case (e.g. linting a folder of
+        // standalone .md files) skip the salsa accumulator entirely; this is the
+        // dominant per-file cost on large many-file batches.
+        if let Some(graph_diags) = self.graph_diags {
+            // Project batch: the accumulator was run once for the whole project (it
+            // is keyed on the root file, so a per-file call would recompute the
+            // same cross-document graph N times — the O(n^2) hot spot). Look up this
+            // document's precomputed cross-file diagnostics.
+            if let Some(entries) = graph_diags.get(doc_path) {
+                diagnostics.extend(entries.iter().cloned());
+            }
+        } else if roots.quarto.is_some()
+            || roots.bookdown.is_some()
+            || !resolution.includes.is_empty()
+        {
+            let graph_diags = panache::salsa::project_graph::accumulated::<
+                panache::salsa::GraphDiagnostic,
+            >(self.db, file_text, self.file_config);
+            for entry in graph_diags {
+                if entry.0.path.as_path() == doc_path {
+                    diagnostics.push(entry.0.diagnostic.clone());
+                }
             }
         }
-    }
 
-    for include in &resolution.includes {
-        if active.contains(&include.path) {
-            diagnostics.push(panache::includes::include_cycle_diagnostic(
-                input,
-                include.range,
-                &include.path,
-            ));
-            continue;
-        }
-        if visited.contains(&include.path) {
-            continue;
-        }
-        match fs::read_to_string(&include.path) {
-            Ok(include_input) => {
-                lint_loaded_document_with_includes(
-                    &include.path,
-                    &include_input,
-                    None,
-                    cfg,
-                    file_config,
-                    results,
-                    visited,
-                    active,
-                    db,
-                    graph_diags,
-                )?;
-            }
-            Err(err) => {
-                diagnostics.push(panache::includes::include_read_error_diagnostic(
+        for include in &resolution.includes {
+            if self.active.contains(&include.path) {
+                diagnostics.push(panache::includes::include_cycle_diagnostic(
                     input,
                     include.range,
                     &include.path,
-                    &err.to_string(),
                 ));
+                continue;
+            }
+            if self.visited.contains(&include.path) {
+                continue;
+            }
+            match fs::read_to_string(&include.path) {
+                Ok(include_input) => {
+                    self.lint_document(&include.path, &include_input, None);
+                }
+                Err(err) => {
+                    diagnostics.push(panache::includes::include_read_error_diagnostic(
+                        input,
+                        include.range,
+                        &include.path,
+                        &err.to_string(),
+                    ));
+                }
             }
         }
+
+        diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
+        self.documents.push(LintedDocument {
+            path: doc_path.to_path_buf(),
+            input: input.to_string(),
+            diagnostics,
+        });
+
+        self.active.remove(doc_path);
     }
-
-    diagnostics.sort_by_key(|d| (d.location.line, d.location.column));
-    results.push(LintedDocument {
-        path: doc_path.to_path_buf(),
-        input: input.to_string(),
-        diagnostics,
-    });
-
-    active.remove(doc_path);
-    Ok(())
 }
 
 fn print_fix_summary(fixed: usize, remaining: usize, file: &Path) {

@@ -81,25 +81,24 @@ pub fn execution_plan(db: &dyn Db, file: FileText, config: FileConfig) -> Execut
     let root = normalize_path(&path);
     let base = root.parent().unwrap_or(Path::new(".")).to_path_buf();
     let project = crate::includes::find_quarto_root(&root).unwrap_or_else(|| base.clone());
-    let mut plan = ExecutionPlan {
-        root,
-        complete: true,
-        config_key: format!("{:?}", config.config(db)),
-        ..Default::default()
-    };
-    let mut snippets = BTreeMap::<String, Vec<CodeSnippet>>::new();
-    let mut active = BTreeSet::new();
-    collect(
+    let mut traversal = ExecutionSourceTraversal {
         db,
-        file,
         config,
-        &base,
-        &project,
-        None,
-        &mut plan,
-        &mut snippets,
-        &mut active,
-    );
+        base: &base,
+        project: &project,
+        plan: ExecutionPlan {
+            root,
+            complete: true,
+            config_key: format!("{:?}", config.config(db)),
+            ..Default::default()
+        },
+        snippets: BTreeMap::new(),
+        active: BTreeSet::new(),
+    };
+    traversal.collect(file, None);
+    let ExecutionSourceTraversal {
+        mut plan, snippets, ..
+    } = traversal;
     if plan.complete {
         let mut linters: Vec<_> = config.config(db).linters.iter().collect();
         linters.sort_by_key(|(language, _)| *language);
@@ -122,111 +121,107 @@ pub fn execution_plan(db: &dyn Db, file: FileText, config: FileConfig) -> Execut
     plan
 }
 
-#[allow(clippy::too_many_arguments)]
-fn collect(
-    db: &dyn Db,
-    file: FileText,
+struct ExecutionSourceTraversal<'a> {
+    db: &'a dyn Db,
     config: FileConfig,
-    base: &Path,
-    project: &Path,
-    parent: Option<usize>,
-    plan: &mut ExecutionPlan,
-    snippets: &mut BTreeMap<String, Vec<CodeSnippet>>,
-    active: &mut BTreeSet<PathBuf>,
-) {
-    db.unwind_if_revision_cancelled();
-    let path = normalize_path(&db.path_of(file).expect("execution sources have paths"));
-    plan.dependencies.insert(path.clone());
-    let Some(text) = file.text(db).clone() else {
-        plan.complete = false;
-        return;
-    };
-    active.insert(path.clone());
-    let base_offset = plan.original_input.len();
-    plan.original_input.push_str(&text);
-    // Unmapped separators keep a boundary insertion owned by one occurrence.
-    plan.original_input.push('\n');
-    let occurrence = plan.sources.len();
-    plan.sources.push(SourceOccurrence {
-        path: path.clone(),
-        text: text.clone(),
-        arena_range: base_offset..base_offset + text.len(),
-        parent,
-    });
-    let tree = crate::salsa::parsed_tree_root(db, file, config);
-    enum Event {
-        Snippet(CodeSnippet),
-        Include(crate::includes::IncludeOccurrence),
-    }
-    let mut events: Vec<_> = crate::utils::collect_code_snippets(&tree, &text)
-        .into_values()
-        .flatten()
-        .map(|s| (s.original_range.start, Event::Snippet(s)))
-        .collect();
-    if config.config(db).flavor == Flavor::Quarto {
-        events.extend(
-            crate::includes::include_occurrences(&tree, base, Some(project), config.config(db))
+    base: &'a Path,
+    project: &'a Path,
+    plan: ExecutionPlan,
+    snippets: BTreeMap<String, Vec<CodeSnippet>>,
+    active: BTreeSet<PathBuf>,
+}
+
+impl ExecutionSourceTraversal<'_> {
+    fn collect(&mut self, file: FileText, parent: Option<usize>) {
+        self.db.unwind_if_revision_cancelled();
+        let path = normalize_path(&self.db.path_of(file).expect("execution sources have paths"));
+        self.plan.dependencies.insert(path.clone());
+        let Some(text) = file.text(self.db).clone() else {
+            self.plan.complete = false;
+            return;
+        };
+        self.active.insert(path.clone());
+        let base_offset = self.plan.original_input.len();
+        self.plan.original_input.push_str(&text);
+        // Unmapped separators keep a boundary insertion owned by one occurrence.
+        self.plan.original_input.push('\n');
+        let occurrence = self.plan.sources.len();
+        self.plan.sources.push(SourceOccurrence {
+            path: path.clone(),
+            text: text.clone(),
+            arena_range: base_offset..base_offset + text.len(),
+            parent,
+        });
+        let tree = crate::salsa::parsed_tree_root(self.db, file, self.config);
+        enum Event {
+            Snippet(CodeSnippet),
+            Include(crate::includes::IncludeOccurrence),
+        }
+        let mut events: Vec<_> = crate::utils::collect_code_snippets(&tree, &text)
+            .into_values()
+            .flatten()
+            .map(|s| (s.original_range.start, Event::Snippet(s)))
+            .collect();
+        if self.config.config(self.db).flavor == Flavor::Quarto {
+            events.extend(
+                crate::includes::include_occurrences(
+                    &tree,
+                    self.base,
+                    Some(self.project),
+                    self.config.config(self.db),
+                )
                 .into_iter()
                 .map(|i| (usize::from(i.range.start()), Event::Include(i))),
-        );
-    }
-    events.sort_by_key(|(offset, _)| *offset);
-    for (_, event) in events {
-        match event {
-            Event::Snippet(mut snippet) => {
-                snippet.original_range.start += base_offset;
-                snippet.original_range.end += base_offset;
-                for offset in &mut snippet.line_starts {
-                    *offset += base_offset;
+            );
+        }
+        events.sort_by_key(|(offset, _)| *offset);
+        for (_, event) in events {
+            match event {
+                Event::Snippet(mut snippet) => {
+                    snippet.original_range.start += base_offset;
+                    snippet.original_range.end += base_offset;
+                    for offset in &mut snippet.line_starts {
+                        *offset += base_offset;
+                    }
+                    self.snippets
+                        .entry(snippet.language.clone())
+                        .or_default()
+                        .push(snippet);
                 }
-                snippets
-                    .entry(snippet.language.clone())
-                    .or_default()
-                    .push(snippet);
-            }
-            Event::Include(include) => {
-                let target = normalize_path(&include.path);
-                plan.dependencies.insert(target.clone());
-                let child = db.file_text(target.clone());
-                let diagnostic = if active.contains(&target) {
-                    Some(crate::includes::include_cycle_diagnostic(
-                        &text,
-                        include.range,
-                        &target,
-                    ))
-                } else if child.is_none_or(|child| child.text(db).is_none()) {
-                    Some(crate::includes::include_not_found_diagnostic(
-                        &text,
-                        include.range,
-                        &target,
-                    ))
-                } else {
-                    None
-                };
-                if let Some(diagnostic) = diagnostic {
-                    plan.complete = false;
-                    plan.diagnostics.push(SourceDiagnostic {
-                        path: path.clone(),
-                        diagnostic,
-                        include_target: Some(target),
-                    });
-                } else if let Some(child) = child {
-                    collect(
-                        db,
-                        child,
-                        config,
-                        base,
-                        project,
-                        Some(occurrence),
-                        plan,
-                        snippets,
-                        active,
-                    );
+                Event::Include(include) => {
+                    let target = normalize_path(&include.path);
+                    self.plan.dependencies.insert(target.clone());
+                    let child = self.db.file_text(target.clone());
+                    let diagnostic = if self.active.contains(&target) {
+                        Some(crate::includes::include_cycle_diagnostic(
+                            &text,
+                            include.range,
+                            &target,
+                        ))
+                    } else if child.is_none_or(|child| child.text(self.db).is_none()) {
+                        Some(crate::includes::include_not_found_diagnostic(
+                            &text,
+                            include.range,
+                            &target,
+                        ))
+                    } else {
+                        None
+                    };
+                    if let Some(diagnostic) = diagnostic {
+                        self.plan.complete = false;
+                        self.plan.diagnostics.push(SourceDiagnostic {
+                            path: path.clone(),
+                            diagnostic,
+                            include_target: Some(target),
+                        });
+                    } else if let Some(child) = child {
+                        self.collect(child, Some(occurrence));
+                    }
                 }
             }
         }
+        self.active.remove(&path);
     }
-    active.remove(&path);
 }
 
 /// Load execution dependencies on the writer, preserving already loaded buffers.
