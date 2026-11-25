@@ -2027,19 +2027,17 @@ fn parse_commonmark_html_block(
     let mut close_start = None;
     if !is_closing_marker(first, block_type) {
         while let Some(&line) = lines.get(end_pos) {
-            let (depth, _) = count_blockquote_markers(line);
-            // Only enclosing quote markers are structural here. Any further
-            // `>` belongs to the HTML, including a multiline tag's closer.
-            let content = strip_n_blockquote_markers(line, prefix.bq_depth());
+            let Some(content) = prefix.strip_through_last_quote(line) else {
+                break;
+            };
             // An outer directive fence also bounds opaque HTML in its body.
             if myst_directive_closer.is_some_and(|closer| closer.matches(line)) {
                 break;
             }
             // Raw HTML accepts no lazy continuation outside its container.
-            if depth < prefix.bq_depth()
-                || (prefix.list_content_col() > 0
-                    && !content.trim().is_empty()
-                    && !prefix.resolve(line).reaches_frame())
+            if (prefix.list_content_col() > 0
+                && !content.trim().is_empty()
+                && !prefix.resolve(line).reaches_frame())
                 || (ends_at_blank_line(block_type) && content.trim().is_empty())
             {
                 break;

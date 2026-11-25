@@ -6,7 +6,7 @@
 
 mod containers;
 
-use std::{cell::OnceCell, ops::Range, sync::Arc};
+use std::{borrow::Cow, cell::OnceCell, ops::Range, sync::Arc};
 
 use rowan::{GreenNode, GreenNodeBuilder};
 
@@ -47,7 +47,9 @@ use super::blocks::tables::{
 };
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
-use super::utils::container_stack::{gobbled_indent_prefix_len, leading_indent};
+use super::utils::container_stack::{
+    byte_index_at_column, gobbled_indent_prefix_len, leading_indent,
+};
 use super::utils::helpers::{is_blank_line, split_lines_inclusive};
 use super::utils::inline_emission::emit_inlines;
 use super::utils::text_buffer::ParagraphBuffer;
@@ -99,9 +101,23 @@ fn plain_container_text(text: &str) -> bool {
 fn is_quote_prose(text: &str, options: &ParserOptions) -> bool {
     let (columns, indent) = leading_indent(text);
     let content = &text[indent..];
+    if options.dialect == Dialect::CommonMark {
+        return columns < 4
+            && !content.starts_with('>')
+            && try_parse_atx_heading(text).is_none()
+            && try_parse_horizontal_rule(text).is_none()
+            && !try_parse_fence_open(text, options.dialect)
+                .is_some_and(|fence| fence_enabled(&fence, options))
+            && (!options.extensions.raw_html
+                || try_parse_html_block_start(text, true)
+                    .is_none_or(|kind| matches!(kind, HtmlBlockType::Type7)))
+            && try_parse_list_marker(text, options, OpenListHint::None).is_none()
+            && !(options.extensions.reference_links
+                && content.starts_with('[')
+                && reference_definition_spans(text, true, options.dialect, false).is_some());
+    }
     columns < 4
-        && (plain_container_text(content)
-            || (options.dialect == Dialect::CommonMark && content.starts_with(':')))
+        && plain_container_text(content)
         && try_parse_list_marker(text, options, OpenListHint::None).is_none()
         && !(content.starts_with('[') && content.contains("]:"))
 }
@@ -133,6 +149,10 @@ fn plan_list(
         let tail = &lines[*pos][content_start..];
         if marker.virtual_marker_space
             || is_blank_line(tail)
+            || (options.dialect == Dialect::CommonMark
+                && options.extensions.reference_links
+                && tail.trim_start().starts_with('[')
+                && (!tail.contains(']') || tail.contains("]:")))
             || is_task_checkbox(tail)
             || leading_indent(tail).0 >= 4
             || !plain_container_text(tail)
@@ -167,6 +187,15 @@ fn plan_list(
                 break;
             }
             if !restricted_markers.is_empty() {
+                return None;
+            }
+            if options.dialect == Dialect::CommonMark
+                && try_parse_setext_heading(
+                    &[tail, &line[byte_index_at_column(line, content_col)..]],
+                    0,
+                )
+                .is_some()
+            {
                 return None;
             }
             if columns >= content_col + 4 || !plain_container_text(line) {
@@ -378,7 +407,8 @@ fn plan<'a>(
             && let Some(first) = try_parse_list_marker(line, options, OpenListHint::None)
             && (fresh
                 || !commonmark
-                || marker_start_number(&first.marker).is_none_or(|start| start == 1))
+                || (marker_start_number(&first.marker).is_none_or(|start| start == 1)
+                    && !is_blank_line(&line[indent_bytes + first.marker_len..])))
         {
             let start = pos;
             if fresh
@@ -496,6 +526,35 @@ fn parse_at(
     let lines = split_lines_inclusive(input);
     let jupyter_lines = OnceCell::new();
     let blocks = plan(input, &lines, options, origin, &jupyter_lines)?;
+    let mut emission_options = Cow::Borrowed(options);
+    if options.dialect == Dialect::CommonMark {
+        for block in &blocks {
+            let Block::Containers(_, events) = block else {
+                continue;
+            };
+            for event in events {
+                let containers::Event::Reference(_, reference) = event else {
+                    continue;
+                };
+                let spans = &reference.spans;
+                let label = super::inlines::refdef_map::normalize_label(
+                    &reference.source[spans.indent + 1..spans.label_close],
+                );
+                if !emission_options
+                    .refdef_labels
+                    .as_ref()
+                    .is_some_and(|labels| labels.contains(&label))
+                {
+                    let labels = emission_options
+                        .to_mut()
+                        .refdef_labels
+                        .get_or_insert_with(Default::default);
+                    Arc::make_mut(labels).insert(label);
+                }
+            }
+        }
+    }
+    let options = emission_options.as_ref();
     let mut builder = GreenNodeBuilder::new();
     let diagnostics = Diagnostics::new();
     let prefix = ContainerPrefix::default();

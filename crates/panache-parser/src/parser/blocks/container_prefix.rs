@@ -643,9 +643,7 @@ impl ContainerPrefix {
     }
 
     /// Build a `ContainerPrefix` directly from a sequence of strip ops.
-    /// Intended for tests; production code should use
-    /// [`Self::from_stack`] or [`Self::from_ctx`].
-    #[cfg(test)]
+    #[cfg(any(test, feature = "experimental-block-parser"))]
     pub fn from_ops(ops_slice: &[StripOp], list_marker_consumed_on_line_0: bool) -> Self {
         Self {
             ops: SmallVec::from_slice(ops_slice),
@@ -660,6 +658,41 @@ impl ContainerPrefix {
             list_start_supplies_blank: true,
             html_closer_supplies_blank: true,
         }
+    }
+
+    /// Strip required container prefixes through the innermost quote while
+    /// retaining any following list indentation as part of the block body.
+    pub fn strip_through_last_quote<'a>(&self, line: &'a str) -> Option<&'a str> {
+        let Some(last) = self
+            .ops()
+            .iter()
+            .rposition(|op| *op == StripOp::BlockQuoteMarker)
+        else {
+            return Some(line);
+        };
+        Self::strip_required_ops(line, &self.ops()[..=last])
+    }
+
+    pub fn strip_required_ops<'a>(mut line: &'a str, ops: &[StripOp]) -> Option<&'a str> {
+        for &op in ops {
+            match op {
+                StripOp::BlockQuoteMarker => {
+                    let (tail, count) = strip_blockquote_markers_counted(line, 1);
+                    if count == 0 {
+                        return None;
+                    }
+                    line = tail;
+                }
+                StripOp::ListAdvance(columns) | StripOp::ContentIndent(columns) => {
+                    let column = columns as usize;
+                    if leading_indent(line).0 < column && !line.trim().is_empty() {
+                        return None;
+                    }
+                    line = &line[byte_index_at_column(line, column)..];
+                }
+            }
+        }
+        Some(line)
     }
 
     /// Strip every op in order, reading every `ListAdvance` as the

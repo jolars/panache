@@ -442,46 +442,153 @@ fn experimental_block_coverage() {
     use panache_parser::parser::{experimental_block, parse_with_errors};
     let options = commonmark_options();
     let examples = read_spec(&manifest_path(SPEC_FIXTURE_REL));
-    let mut matches = 0;
-    let mut gaps = 0;
-    let required = [235, 251, 254, 259, 260, 263, 292, 293, 320, 321];
-    let mut missing = Vec::new();
-    let mut differences = Vec::new();
+    let mut failures = Vec::new();
     for example in &examples {
-        match experimental_block::try_parse_with_errors(&example.markdown, &options) {
-            Ok((tree, errors)) => {
-                let (expected, expected_errors) =
-                    parse_with_errors(&example.markdown, Some(options.clone()));
-                if tree.green() == expected.green()
-                    && errors == expected_errors
-                    && tree.to_string() == example.markdown
-                    && matches_expected(example, &html_renderer::render(&tree))
-                {
-                    matches += 1;
-                } else {
-                    differences.push(example.number);
+        let (tree, errors) =
+            match experimental_block::try_parse_with_errors(&example.markdown, &options) {
+                Ok(result) => result,
+                Err(gap) => {
+                    failures.push(format!(
+                        "{}: unsupported {} at byte {}",
+                        example.number, gap.construct, gap.offset
+                    ));
+                    continue;
                 }
-            }
-            Err(gap) => {
-                gaps += 1;
-                println!(
-                    "example {}: unsupported {} at byte {}",
-                    example.number, gap.construct, gap.offset
-                );
-                if required.contains(&example.number) {
-                    missing.push(example.number);
-                }
-            }
+            };
+        let (expected, expected_errors) =
+            parse_with_errors(&example.markdown, Some(options.clone()));
+        // Example 143 has an existing fenced code info-string discrepancy.
+        if example.number == 143 {
+            continue;
+        }
+        if tree.to_string() != example.markdown
+            || errors != expected_errors
+            || tree.green() != expected.green()
+        {
+            failures.push(format!(
+                "{}: parser parity failed\nactual {tree:#?}\nexpected {expected:#?}",
+                example.number
+            ));
+        }
+        if !matches_expected(example, &html_renderer::render(&tree)) {
+            failures.push(format!("{}: rendered HTML differs", example.number));
         }
     }
-    println!(
-        "experimental block parser: {matches} parity, {gaps} explicit gaps, {} differences: {differences:?}",
-        differences.len()
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn experimental_sibling_markers_close_list_item_quotes() {
+    use panache_parser::parser::experimental_block;
+
+    for (input, expected) in [
+        (
+            "- > first\r\n  > continued\r\n- next",
+            "<ul>\n<li>\n<blockquote>\n<p>first\ncontinued</p>\n</blockquote>\n</li>\n<li>next</li>\n</ul>\n",
+        ),
+        (
+            "- > foo\n- > - bar\n \n  \t- nested\n",
+            "<ul>\n<li>\n<blockquote>\n<p>foo</p>\n</blockquote>\n</li>\n<li>\n<blockquote>\n<ul>\n<li>bar</li>\n</ul>\n</blockquote>\n<ul>\n<li>nested</li>\n</ul>\n</li>\n</ul>\n",
+        ),
+    ] {
+        let (tree, errors) =
+            experimental_block::try_parse_with_errors(input, &commonmark_options()).unwrap();
+        assert_eq!(tree.to_string(), input);
+        assert!(errors.is_empty());
+        assert_eq!(
+            normalize_html(&html_renderer::render(&tree)),
+            normalize_html(expected)
+        );
+    }
+}
+
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn experimental_indented_code_continues_after_the_item_marker_line() {
+    use panache_parser::parser::experimental_block;
+
+    for (input, expected) in [
+        (
+            "- >     code\n  >       second\n",
+            "<ul>\n<li>\n<blockquote>\n<pre><code>code\n  second\n</code></pre>\n</blockquote>\n</li>\n</ul>\n",
+        ),
+        (
+            "> - >     code\n>   >       second\n",
+            "<blockquote>\n<ul>\n<li>\n<blockquote>\n<pre><code>code\n  second\n</code></pre>\n</blockquote>\n</li>\n</ul>\n</blockquote>\n",
+        ),
+        (
+            "-     code\n        second\n",
+            "<ul>\n<li>\n<pre><code>code\n  second\n</code></pre>\n</li>\n</ul>\n",
+        ),
+        (
+            "> -     code\n>         second\n",
+            "<blockquote>\n<ul>\n<li>\n<pre><code>code\n  second\n</code></pre>\n</li>\n</ul>\n</blockquote>\n",
+        ),
+    ] {
+        let (tree, errors) =
+            experimental_block::try_parse_with_errors(input, &commonmark_options()).unwrap();
+        assert_eq!(tree.to_string(), input);
+        assert!(errors.is_empty());
+        assert_eq!(
+            normalize_html(&html_renderer::render(&tree)),
+            normalize_html(expected)
+        );
+    }
+}
+
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn experimental_reference_title_can_continue_after_a_list_marker() {
+    use panache_parser::parser::experimental_block;
+
+    let input = "- [ref]: /url\n  \"title\"\n\n[ref]\n";
+    let expected = "<ul>\n<li></li>\n</ul>\n<p><a href=\"/url\" title=\"title\">ref</a></p>\n";
+    let (tree, errors) =
+        experimental_block::try_parse_with_errors(input, &commonmark_options()).unwrap();
+    assert_eq!(tree.to_string(), input);
+    assert!(errors.is_empty());
+    assert_eq!(
+        normalize_html(&html_renderer::render(&tree)),
+        normalize_html(expected)
     );
-    assert!(
-        missing.is_empty(),
-        "required container examples: {missing:?}"
-    );
-    assert!(matches > 561, "experimental block coverage regressed");
-    assert!(differences.iter().all(|&example| example == 143));
+}
+
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn experimental_reference_definitions_continue_inside_containers() {
+    use panache_parser::parser::experimental_block;
+
+    for (input, expected) in [
+        (
+            "> [ref]:\n>   /url\n\n[ref]\n",
+            "<blockquote>\n</blockquote>\n<p><a href=\"/url\">ref</a></p>\n",
+        ),
+        (
+            "- > [ref]: /url\n  > \"title\"\n\n[ref]\n",
+            "<ul>\n<li>\n<blockquote>\n</blockquote>\n</li>\n</ul>\n<p><a href=\"/url\" title=\"title\">ref</a></p>\n",
+        ),
+        (
+            "> [long\n> label]: /url \"long\n> title\"\n\n[long label]\n",
+            "<blockquote>\n</blockquote>\n<p><a href=\"/url\" title=\"long\ntitle\">long label</a></p>\n",
+        ),
+        (
+            "- [long\n  label]: /url\n\n[long label]\n",
+            "<ul>\n<li></li>\n</ul>\n<p><a href=\"/url\">long label</a></p>\n",
+        ),
+        (
+            "> [ref]:\n/url\n\n[ref]\n",
+            "<blockquote>\n<p>[ref]:\n/url</p>\n</blockquote>\n<p>[ref]</p>\n",
+        ),
+    ] {
+        let (tree, errors) =
+            experimental_block::try_parse_with_errors(input, &commonmark_options()).unwrap();
+        assert_eq!(tree.to_string(), input);
+        assert!(errors.is_empty());
+        assert_eq!(
+            normalize_html(&html_renderer::render(&tree)),
+            normalize_html(expected),
+            "{input}"
+        );
+    }
 }

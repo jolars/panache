@@ -260,7 +260,7 @@ starting point.
 - [x] Port the first mixed list and block quote slice for CommonMark and Quarto.
   Plan continuation, interruption, and finalization before CST emission.
   Check source, CST, and diagnostic parity for the covered cases.
-- [ ] Finish CommonMark list and block quote planning. Cover blank-line
+- [x] Finish CommonMark list and block quote planning. Cover blank-line
   ownership, marker and indentation edge cases, lazy continuation, and
   interruption by core blocks. Pin newly supported spec examples.
 - [ ] Finish Pandoc list and block quote planning. Cover fancy and example

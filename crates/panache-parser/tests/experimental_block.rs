@@ -7,7 +7,7 @@ fn check(input: &str, options: &ParserOptions) -> SyntaxNode {
     let (expected, errors) = parse_with_errors(input, Some(options.clone()));
     let (actual, actual_errors) =
         experimental_block::try_parse_with_errors(input, options).unwrap();
-    assert_eq!(actual.to_string(), input);
+    assert_eq!(actual.to_string(), input, "expected {expected:#?}");
     assert_eq!(
         actual.green(),
         expected.green(),
@@ -176,12 +176,15 @@ fn mixed_lists_and_quotes_preserve_cst() {
             "- > - foo\n",
             "> - first\n> - second\n",
             "> - first\n  lazy\n",
-            "- > first\r\n  > continued\r\n- next",
             "> - # heading\n>   text\n",
         ] {
             check(input, &options);
         }
     }
+    check(
+        "- > first\r\n  > continued\r\n- next",
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
 }
 
 #[test]
@@ -218,15 +221,13 @@ fn mixed_container_region_edits_match_full_parse() {
         range: start..start + "second".len(),
         insert: "<div>".into(),
     };
-    assert!(
-        experimental_block::reparse(
-            &tree.green().to_owned(),
-            &[],
-            &edit,
-            &edit.apply(&text),
-            &options,
-        )
-        .is_none()
+    let updated = edit.apply(&text);
+    let result =
+        experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options)
+            .expect("expected a mixed-container splice for the HTML edit");
+    assert_eq!(
+        SyntaxNode::new_root(result.green).green(),
+        check(&updated, &options).green()
     );
 }
 
@@ -243,11 +244,9 @@ fn quoted_ordered_sublist_respects_pandoc_compatibility() {
 }
 
 #[test]
-fn unsupported_nested_block_points_to_its_content() {
+fn commonmark_html_in_quoted_lists_preserves_cst() {
     let options = ParserOptions::for_flavor(Flavor::CommonMark);
-    let input = "Intro\n\n> - <div>\n";
-    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
-    assert_eq!(gap.offset, input.find("<div>").unwrap());
+    check("Intro\n\n> - <div>\n", &options);
 }
 
 #[test]
@@ -301,13 +300,216 @@ fn commonmark_non_initial_ordered_markers_continue_paragraphs() {
 }
 
 #[test]
+fn commonmark_container_prose_can_start_with_punctuation() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("> #hashtag\n*emphasis*\n", &options);
+    check("- +literal\n  -dash\n", &options);
+}
+
+#[test]
+fn commonmark_lazy_quote_accepts_inline_html() {
+    check(
+        "> paragraph\n<span>\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
+fn commonmark_nested_quote_owns_all_opener_indentation() {
+    check(
+        "- item\n    > quote\n\n      paragraph\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
+fn commonmark_core_blocks_inside_list_and_quote_paragraphs() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    for input in [
+        "- paragraph\n  ***\n",
+        "> paragraph\n> ***\n",
+        "> - paragraph\n>   <div>\n",
+        "> paragraph\n> <div>\n",
+        "- paragraph\n  <div>\n",
+        "> paragraph\n> [ref]: /url\n",
+        "> - paragraph\n>   ---\n",
+        "- > \n  > text\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn commonmark_html_in_quote_inside_list() {
+    check(
+        "- > <div>\n  > body\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
+fn commonmark_fence_interrupting_a_quote_inside_a_list_keeps_its_prefix_once() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    let input = "- > a\n  > ```\n  > code\n  > ```\n";
+    let (tree, errors) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+    assert_eq!(tree.to_string(), input);
+    assert!(errors.is_empty());
+    assert!(
+        tree.descendants()
+            .any(|node| node.kind() == panache_parser::syntax::SyntaxKind::CODE_BLOCK)
+    );
+}
+
+#[test]
+fn commonmark_setext_heading_on_a_list_continuation_line() {
+    check(
+        "- a\n  ===\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
+fn commonmark_empty_item_opener_keeps_quoted_paragraph_together() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("> - \n>   next\n", &options);
+    check("- > - \n  >   next\n", &options);
+}
+
+#[test]
+fn commonmark_heading_interrupting_a_list_preserves_its_indent() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("- a\n  ## b\n", &options);
+    check("> - a\n>   ## b\n", &options);
+}
+
+#[test]
+fn commonmark_multiline_reference_stays_inside_its_list_item() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("- a\n\n  [ref]:\n  /url\n- next\n", &options);
+    let input = "- a\n\n  [ref]:\n/url\n";
+    let (tree, _) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+    assert_eq!(tree.to_string(), input);
+    assert!(
+        !tree
+            .descendants()
+            .any(|node| node.kind() == panache_parser::syntax::SyntaxKind::REFERENCE_DEFINITION)
+    );
+}
+
+#[test]
+fn commonmark_invalid_reference_definition_is_container_prose() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("> [missing-destination]:\n", &options);
+    check("- [missing-destination]:\n", &options);
+}
+
+#[test]
+fn commonmark_nested_quote_marker_respects_paragraph_precedence() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    for (underline, kind) in [
+        ("-", K::HEADING),
+        ("---", K::HEADING),
+        ("===", K::HEADING),
+        ("2. b", K::PARAGRAPH),
+        ("*", K::PARAGRAPH),
+    ] {
+        let input = format!("- > a\n  > {underline}\n");
+        let (tree, errors) = experimental_block::try_parse_with_errors(&input, &options).unwrap();
+        assert_eq!(tree.to_string(), input);
+        assert!(errors.is_empty());
+        let quote = tree
+            .descendants()
+            .find(|node| node.kind() == K::BLOCK_QUOTE)
+            .unwrap();
+        assert_eq!(
+            quote.children().map(|node| node.kind()).collect::<Vec<_>>(),
+            [kind],
+            "{tree:#?}"
+        );
+    }
+}
+
+#[test]
+fn commonmark_task_checkbox_does_not_change_list_continuation() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("- [x] done\n  continued\n- next\n", &options);
+    check("> - [ ] **open**\n", &options);
+    check("> a\n> - [x] done\n", &options);
+    check("- > a\n  > - [x] done\n", &options);
+}
+
+#[test]
+fn commonmark_indented_code_in_alternating_list_and_quote_frames() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    for (input, expected_code) in [
+        (
+            "- > -     code\n  >         more\n  > - sibling\n",
+            "    code\n  >         more\n",
+        ),
+        (
+            "> - >       code\n>   >\n>   >       more\n> - sibling\n",
+            "      code\n>   >\n>   >       more\n",
+        ),
+    ] {
+        let (tree, errors) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+        assert_eq!(tree.to_string(), input);
+        assert!(errors.is_empty());
+        let code: Vec<_> = tree
+            .descendants()
+            .filter(|node| node.kind() == panache_parser::syntax::SyntaxKind::CODE_BLOCK)
+            .collect();
+        assert_eq!(code.len(), 1, "{tree:#?}");
+        assert_eq!(code[0].to_string(), expected_code);
+    }
+}
+
+#[test]
+fn commonmark_html_in_alternating_list_and_quote_frames() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("- > - <div>\n  >   body\n", &options);
+    check("> - > <div>\n>   > body\n", &options);
+}
+
+#[test]
+fn commonmark_fence_in_alternating_list_and_quote_frames() {
+    let options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("- > - ```\n  >   body\n  >   ```\n", &options);
+
+    // The incumbent loses a fence byte in this order of containers.
+    let input = "> - > ```\n>   > body\n>   > ```\n";
+    let (tree, errors) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+    assert_eq!(tree.to_string(), input);
+    assert!(errors.is_empty());
+    let code = tree
+        .descendants()
+        .find(|node| node.kind() == panache_parser::syntax::SyntaxKind::CODE_BLOCK)
+        .unwrap();
+    assert_eq!(code.to_string(), "```\n>   > body\n>   > ```\n");
+}
+
+#[test]
+fn commonmark_fence_in_quote_inside_list() {
+    check(
+        "- > ```\n  > code\n  > ```\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
+fn commonmark_fence_on_quoted_list_marker_line() {
+    check(
+        "> - ```\n>   code\n>   ```\n",
+        &ParserOptions::for_flavor(Flavor::CommonMark),
+    );
+}
+
+#[test]
 fn experimental_parser_declines_unimplemented_container_forms() {
     for (flavor, input) in [
-        (Flavor::CommonMark, "> A\n> ---\n"),
-        (Flavor::CommonMark, "-     code\n"),
         (Flavor::Quarto, "- [x] done\n"),
         (Flavor::Quarto, "- > foo\n  \tcode\n"),
-        (Flavor::CommonMark, "- > foo\n- > - bar\n \n  \t- nested\n"),
     ] {
         let options = ParserOptions::for_flavor(flavor);
         assert!(
@@ -375,10 +577,10 @@ fn lazy_quote_continuations_respect_dialect() {
 }
 
 #[test]
-fn declines_reference_definitions_with_optional_indent_inside_quotes() {
+fn reference_definitions_with_optional_indent_inside_quotes() {
     let options = ParserOptions::for_flavor(Flavor::CommonMark);
     for input in ["> [id]: /url\n", ">  [id]: /url\n", ">    [id]: /url\n"] {
-        assert!(experimental_block::try_parse_with_errors(input, &options).is_err());
+        check(input, &options);
     }
 }
 

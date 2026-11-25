@@ -510,7 +510,9 @@ fn prepare_fence_open_line<'a>(
     let prefix = window.prefix();
     let bq_depth = prefix.bq_depth();
     if let Some(first_line) = first_line_override {
-        if bq_depth > 0 && source_line != first_line {
+        let quote_prefix_emitted =
+            prefix.list_marker_consumed_on_line_0 && !prefix.lazy_blockquote_gobble;
+        if !quote_prefix_emitted && bq_depth > 0 && source_line != first_line {
             let stripped = strip_n_blockquote_markers(source_line, bq_depth);
             let prefix_len = source_line.len().saturating_sub(stripped.len());
             if prefix_len > 0 {
@@ -1044,6 +1046,53 @@ pub(crate) fn parse_fenced_code_block(
     flavor: Flavor,
     myst_directive_closer: Option<&DirectiveCloser>,
 ) -> usize {
+    emit_fenced_code_block(
+        builder,
+        window,
+        fence,
+        first_line_override,
+        diags,
+        flavor,
+        FenceBoundary::Scan(myst_directive_closer),
+    )
+}
+
+#[cfg(feature = "experimental-block-parser")]
+pub(crate) fn emit_planned_fenced_code_block(
+    builder: &mut GreenNodeBuilder<'static>,
+    window: &StrippedLines<'_, '_>,
+    fence: FenceInfo,
+    first_line: &str,
+    diags: &Diagnostics,
+    flavor: Flavor,
+    closed: bool,
+) {
+    emit_fenced_code_block(
+        builder,
+        window,
+        fence,
+        Some(first_line),
+        diags,
+        flavor,
+        FenceBoundary::Planned(closed),
+    );
+}
+
+enum FenceBoundary<'a> {
+    Scan(Option<&'a DirectiveCloser>),
+    #[cfg(feature = "experimental-block-parser")]
+    Planned(bool),
+}
+
+fn emit_fenced_code_block(
+    builder: &mut GreenNodeBuilder<'static>,
+    window: &StrippedLines<'_, '_>,
+    fence: FenceInfo,
+    first_line_override: Option<&str>,
+    diags: &Diagnostics,
+    flavor: Flavor,
+    boundary: FenceBoundary<'_>,
+) -> usize {
     let lines = window.raw();
     let start_pos = window.pos();
     let prefix = window.prefix();
@@ -1095,38 +1144,49 @@ pub(crate) fn parse_fenced_code_block(
     let mut content_lines: Vec<&str> = Vec::new(); // Store original lines for lossless parsing
     let mut found_closing = false;
 
-    while current_pos < lines.len() {
-        let line = lines[current_pos];
+    match boundary {
+        FenceBoundary::Scan(closer) => {
+            while current_pos < lines.len() {
+                let line = lines[current_pos];
 
-        let probe = if bq_outer {
-            line
-        } else {
-            strip_list_indent(line, list_content_col)
-        };
-        let (line_bq_depth, _) = count_blockquote_markers(probe);
-        let gobbled_lazily = Dialect::for_flavor(flavor) == crate::options::Dialect::Pandoc
-            && bq_depth > 0
-            && !line.trim().is_empty();
-        if line_bq_depth < bq_depth && !gobbled_lazily {
-            break;
+                let probe = if bq_outer {
+                    line
+                } else {
+                    strip_list_indent(line, list_content_col)
+                };
+                let (line_bq_depth, _) = count_blockquote_markers(probe);
+                let gobbled_lazily = Dialect::for_flavor(flavor) == crate::options::Dialect::Pandoc
+                    && bq_depth > 0
+                    && !line.trim().is_empty();
+                if line_bq_depth < bq_depth && !gobbled_lazily {
+                    break;
+                }
+
+                let inner_stripped = window.peek_prefix_at(current_pos);
+
+                // The directive extracts its body before nested code is parsed, so
+                // its closer takes precedence over a code closer or unfinished code.
+                if closer.is_some_and(|closer| closer.matches(line)) {
+                    break;
+                }
+
+                if is_closing_fence(inner_stripped, &fence) {
+                    found_closing = true;
+                    current_pos += 1;
+                    break;
+                }
+
+                content_lines.push(line);
+                current_pos += 1;
+            }
         }
-
-        let inner_stripped = window.peek_prefix_at(current_pos);
-
-        // The directive extracts its body before nested code is parsed, so
-        // its closer takes precedence over a code closer or unfinished code.
-        if myst_directive_closer.is_some_and(|closer| closer.matches(line)) {
-            break;
+        #[cfg(feature = "experimental-block-parser")]
+        FenceBoundary::Planned(closed) => {
+            found_closing = closed;
+            current_pos = lines.len();
+            content_lines
+                .extend_from_slice(&lines[start_pos + 1..current_pos - usize::from(closed)]);
         }
-
-        if is_closing_fence(inner_stripped, &fence) {
-            found_closing = true;
-            current_pos += 1;
-            break;
-        }
-
-        content_lines.push(line);
-        current_pos += 1;
     }
 
     if !content_lines.is_empty() {

@@ -1462,7 +1462,6 @@ pub(super) fn emit_reference_definition_lines(
     spans: Option<ReferenceSpans>,
 ) {
     use crate::parser::utils::helpers::emit_line_tokens;
-    use crate::syntax::SyntaxKind;
 
     if lines.is_empty() {
         return;
@@ -1475,7 +1474,17 @@ pub(super) fn emit_reference_definition_lines(
         return;
     };
 
-    fn emit_separator(builder: &mut GreenNodeBuilder<'static>, seg: &str) {
+    emit_reference_definition_spans(builder, &lines.concat(), spans);
+}
+
+pub(super) fn emit_reference_definition_spans(
+    builder: &mut impl crate::parser::inlines::sink::InlineSink,
+    s: &str,
+    spans: ReferenceSpans,
+) {
+    use crate::syntax::SyntaxKind;
+
+    fn emit_separator(builder: &mut impl crate::parser::inlines::sink::InlineSink, seg: &str) {
         let bytes = seg.as_bytes();
         let mut i = 0;
         while i < bytes.len() {
@@ -1504,7 +1513,7 @@ pub(super) fn emit_reference_definition_lines(
         }
     }
 
-    fn emit_text_lines(builder: &mut GreenNodeBuilder<'static>, seg: &str) {
+    fn emit_text_lines(builder: &mut impl crate::parser::inlines::sink::InlineSink, seg: &str) {
         let bytes = seg.as_bytes();
         let mut i = 0;
         let mut start = 0;
@@ -1538,9 +1547,6 @@ pub(super) fn emit_reference_definition_lines(
             builder.token(SyntaxKind::TEXT.into(), &seg[start..]);
         }
     }
-
-    let joined: String = lines.concat();
-    let s = &joined[..];
 
     if spans.indent > 0 {
         builder.token(SyntaxKind::WHITESPACE.into(), &s[..spans.indent]);

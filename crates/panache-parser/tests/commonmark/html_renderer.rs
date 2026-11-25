@@ -49,12 +49,12 @@ fn parse_reference_definition(node: &SyntaxNode) -> Option<(String, RefDef)> {
             SyntaxKind::LINK => {
                 for grand in child.children() {
                     if grand.kind() == SyntaxKind::LINK_TEXT {
-                        label = collect_label_text(&grand);
+                        label = text_without_line_prefix(&grand);
                     }
                 }
             }
             SyntaxKind::REFERENCE_URL => url_raw = Some(child.text().to_string()),
-            SyntaxKind::REFERENCE_TITLE => title_raw = Some(child.text().to_string()),
+            SyntaxKind::REFERENCE_TITLE => title_raw = Some(text_without_line_prefix(&child)),
             _ => {}
         }
     }
@@ -137,6 +137,19 @@ fn normalize_label(label: &str) -> String {
 ///     label `*foo* bar` in the ref-def (#554, #558).
 ///   - backslashes in `ESCAPED_CHAR` tokens so `[bar][foo\!]` does not
 ///     match `[foo!]:` (#545).
+fn text_without_line_prefix(node: &SyntaxNode) -> String {
+    let mut text = String::new();
+    for token in node
+        .descendants_with_tokens()
+        .filter_map(NodeOrToken::into_token)
+    {
+        if token.kind() != SyntaxKind::LINE_PREFIX {
+            text.push_str(token.text());
+        }
+    }
+    text
+}
+
 fn collect_label_text(node: &SyntaxNode) -> String {
     node.text().to_string()
 }
@@ -557,6 +570,16 @@ fn code_block_content(node: &SyntaxNode) -> String {
             }
         }
     } else {
+        // Indented code under a quote starts after that quote's prefix. An
+        // enclosing list outside the quote has already supplied its indent.
+        let li_indent = if node
+            .parent()
+            .is_some_and(|parent| parent.kind() == SyntaxKind::BLOCK_QUOTE)
+        {
+            0
+        } else {
+            li_indent
+        };
         let first_line_is_marker_line = code_block_is_first_block_in_list_item(node);
         for child in node.children() {
             if child.kind() == SyntaxKind::CODE_CONTENT {

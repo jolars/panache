@@ -99,6 +99,17 @@ pub(crate) fn parse_indented_code_block(
     bq_depth: usize,
     base_indent: usize,
 ) -> usize {
+    parse_indented_code_block_with_first(builder, lines, start_pos, bq_depth, base_indent, None)
+}
+
+pub(crate) fn parse_indented_code_block_with_first(
+    builder: &mut GreenNodeBuilder<'static>,
+    lines: &[&str],
+    start_pos: usize,
+    bq_depth: usize,
+    base_indent: usize,
+    first: Option<&str>,
+) -> usize {
     use super::blockquotes::{
         count_blockquote_markers, emit_one_line_prefix_marker, strip_n_blockquote_markers,
     };
@@ -114,13 +125,16 @@ pub(crate) fn parse_indented_code_block(
         let line = lines[current_pos];
 
         let (line_bq_depth, _) = count_blockquote_markers(line);
-        let inner = if bq_depth > 0 {
+        let first = first.filter(|_| current_pos == start_pos);
+        let inner = if let Some(first) = first {
+            first
+        } else if bq_depth > 0 {
             strip_n_blockquote_markers(line, bq_depth)
         } else {
             line
         };
 
-        if line_bq_depth < bq_depth {
+        if first.is_none() && line_bq_depth < bq_depth {
             break;
         }
 
@@ -157,25 +171,13 @@ pub(crate) fn parse_indented_code_block(
                     }
                 }
             }
-            let (blank_content, newline_str) = strip_newline(inner);
-            if !blank_content.is_empty() {
-                builder.token(SyntaxKind::WHITESPACE.into(), blank_content);
-            }
-            builder.token(SyntaxKind::TEXT.into(), "");
-            builder.token(
-                SyntaxKind::NEWLINE.into(),
-                if newline_str.is_empty() {
-                    "\n"
-                } else {
-                    newline_str
-                },
-            );
+            emit_indented_code_line(builder, inner);
             current_pos += 1;
             continue;
         }
 
-        let (indent_cols, indent_bytes) = leading_indent(inner);
-        if indent_cols < code_indent {
+        let (indent_cols, _) = leading_indent(inner);
+        if indent_cols < if first.is_some() { 4 } else { code_indent } {
             break;
         }
 
@@ -192,22 +194,7 @@ pub(crate) fn parse_indented_code_block(
             }
         }
 
-        if indent_bytes > 0 {
-            let indent_str = &inner[..indent_bytes];
-            builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
-        }
-
-        let content = &inner[indent_bytes..];
-
-        let (content_without_newline, newline_str) = strip_newline(content);
-
-        if !content_without_newline.is_empty() {
-            builder.token(SyntaxKind::TEXT.into(), content_without_newline);
-        }
-
-        if !newline_str.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline_str);
-        }
+        emit_indented_code_line(builder, inner);
 
         current_pos += 1;
     }
@@ -216,6 +203,28 @@ pub(crate) fn parse_indented_code_block(
     builder.finish_node(); // CodeBlock
 
     current_pos
+}
+
+pub(crate) fn emit_indented_code_line(builder: &mut GreenNodeBuilder<'static>, line: &str) {
+    let (content, newline) = strip_newline(line);
+    let blank = line.trim().is_empty();
+    let indent = if blank {
+        content.len()
+    } else {
+        leading_indent(content).1
+    };
+    if indent > 0 {
+        builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent]);
+    }
+    if blank || indent < content.len() {
+        builder.token(SyntaxKind::TEXT.into(), &content[indent..]);
+    }
+    if !newline.is_empty() || blank {
+        builder.token(
+            SyntaxKind::NEWLINE.into(),
+            if newline.is_empty() { "\n" } else { newline },
+        );
+    }
 }
 
 use crate::parser::utils::container_stack::leading_indent;
