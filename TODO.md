@@ -2,6 +2,22 @@
 
 This document tracks implementation status for Panache's features.
 
+## Code hygiene
+
+- [x] Remove stale `too_many_arguments` overrides on `ChunkOptionEntry::new` and
+  `reparse_region`.
+- [ ] Share a named line-start policy between `StreamingCoreSink` and
+  `TraversalBuilder`. Give the escape flags in `escape_special_chars` named
+  fields at the call sites.
+- [ ] Move shared include-walk state into traversal structs for
+  `lint_loaded_document_with_includes` and the execution planner's
+  `collect`.
+- [ ] Pass the existing `BracketResolution` to `commit_resolution` so callers
+  name the link text and suffix offsets.
+
+The WASM formatter's positional signature is used by the playground. Treat
+changes to that signature as JavaScript API changes.
+
 ## Language Server
 
 ### Issues

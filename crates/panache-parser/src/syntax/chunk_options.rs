@@ -214,7 +214,6 @@ pub struct ChunkOptionEntry {
 }
 
 impl ChunkOptionEntry {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         key: Option<String>,
         value: Option<String>,

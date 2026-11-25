@@ -1741,7 +1741,6 @@ fn merge_region_errors(
 ///
 /// Every check is a decline. `None` costs the caller the window tiers it would
 /// have tried anyway.
-#[allow(clippy::too_many_arguments)]
 #[inline(never)]
 fn reparse_region(
     input: &str,
