@@ -9,15 +9,15 @@
 //! range into a CST subtree, but "what is this byte range?" is answered
 //! exclusively by the IR.
 
+use std::ops::Range;
+
 use super::sink::InlineSink;
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
 #[cfg(test)]
 use rowan::GreenNodeBuilder;
 
-use super::inline_ir::{
-    BracketPlan, ConstructDispo, ConstructPlan, DelimChar, EmphasisKind, EmphasisPlan,
-};
+use super::inline_ir::{ConstructDispo, DelimChar, EmphasisKind, InlinePlans};
 
 use super::bookdown::{
     try_parse_bookdown_definition, try_parse_bookdown_reference, try_parse_bookdown_text_reference,
@@ -63,6 +63,14 @@ use super::subscript::{emit_subscript, try_parse_subscript};
 use super::superscript::{emit_superscript, try_parse_superscript};
 use super::svelte::{emit_svelte_template, try_parse_svelte_template};
 
+#[derive(Clone, Copy, Default)]
+struct InlineParseMode {
+    suppress_bare_uris: bool,
+    suppress_inner_links: bool,
+    suppress_footnote_refs: bool,
+    stop_at_bracket: bool,
+}
+
 /// Parse inline text into the CST builder.
 ///
 /// Top-level entry point for inline parsing. Builds the IR plans
@@ -102,19 +110,15 @@ pub fn parse_inline_text_recursive(
     let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
     parse_inline_range_impl(
         text,
-        0,
-        text.len(),
+        0..text.len(),
         config,
         builder,
-        false,
-        &plans.emphasis,
-        &plans.brackets,
-        &plans.constructs,
-        &plans.hugo,
-        false,
-        suppress_footnote_refs,
+        &plans,
         &mask,
-        false,
+        InlineParseMode {
+            suppress_footnote_refs,
+            ..InlineParseMode::default()
+        },
     );
 
     log::trace!("Recursive inline parsing complete");
@@ -155,19 +159,17 @@ pub fn parse_inline_text(
     let plans = super::inline_ir::build_full_plans(text, 0, text.len(), config);
     parse_inline_range_impl(
         text,
-        0,
-        text.len(),
+        0..text.len(),
         config,
         builder,
-        true,
-        &plans.emphasis,
-        &plans.brackets,
-        &plans.constructs,
-        &plans.hugo,
-        suppress_inner_links,
-        suppress_footnote_refs,
+        &plans,
         &mask,
-        false,
+        InlineParseMode {
+            suppress_bare_uris: true,
+            suppress_inner_links,
+            suppress_footnote_refs,
+            ..InlineParseMode::default()
+        },
     );
 }
 
@@ -390,40 +392,35 @@ pub(super) fn inline_bracket_end(
     let plans = super::inline_ir::build_bracket_content_plans(text, start, end, config);
     let pos = parse_inline_range_impl(
         text,
-        start,
-        end,
+        start..end,
         config,
         &mut Discard,
-        false,
-        &plans.emphasis,
-        &plans.brackets,
-        &plans.constructs,
-        &plans.hugo,
-        false,
-        false,
+        &plans,
         &mask,
-        true,
+        InlineParseMode {
+            stop_at_bracket: true,
+            ..InlineParseMode::default()
+        },
     );
     (pos < end && text.as_bytes()[pos] == b']').then_some(pos)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn parse_inline_range_impl(
     text: &str,
-    start: usize,
-    end: usize,
+    range: Range<usize>,
     config: &ParserOptions,
     builder: &mut impl InlineSink,
-    nested_in_link: bool,
-    plan: &EmphasisPlan,
-    bracket_plan: &BracketPlan,
-    construct_plan: &ConstructPlan,
-    hugo: &super::hugo::HugoIndex,
-    suppress_inner_links: bool,
-    suppress_footnote_refs: bool,
+    plans: &InlinePlans,
     mask: &[bool; 256],
-    stop_at_bracket: bool,
+    mode: InlineParseMode,
 ) -> usize {
+    let Range { start, end } = range;
+    let InlineParseMode {
+        suppress_bare_uris,
+        suppress_inner_links,
+        suppress_footnote_refs,
+        stop_at_bracket,
+    } = mode;
     log::trace!(
         "parse_inline_range: start={}, end={}, text={:?}",
         start,
@@ -473,7 +470,7 @@ fn parse_inline_range_impl(
             pos += 2;
             continue;
         }
-        if let Some(dispo) = construct_plan.lookup(pos) {
+        if let Some(dispo) = plans.constructs.lookup(pos) {
             match *dispo {
                 ConstructDispo::SuppressedCitation { end: dispo_end } => {
                     if dispo_end <= end
@@ -633,7 +630,7 @@ fn parse_inline_range_impl(
             text_start: ref_text_start,
             text_end: ref_text_end,
             end: ref_end,
-        }) = bracket_plan.lookup(pos)
+        }) = plans.brackets.lookup(pos)
         {
             let is_image = *is_image;
             let dispo_suffix_end = *ref_end;
@@ -728,7 +725,7 @@ fn parse_inline_range_impl(
             is_image,
             suffix_end,
             ..
-        }) = bracket_plan.lookup(pos)
+        }) = plans.brackets.lookup(pos)
         {
             let is_image = *is_image;
             let dispo_suffix_end = *suffix_end;
@@ -986,7 +983,7 @@ fn parse_inline_range_impl(
 
         if byte == b'{'
             && config.extensions.hugo_shortcodes
-            && let Some(span) = hugo.scan_at(&text[..end], pos)
+            && let Some(span) = plans.hugo.scan_at(&text[..end], pos)
             && pos + span.end <= end
         {
             if pos > text_start {
@@ -1222,7 +1219,7 @@ fn parse_inline_range_impl(
             && let Some((len, content)) = try_parse_strikeout_with_hugo(
                 &text[..end],
                 pos,
-                config.extensions.hugo_shortcodes.then_some(hugo),
+                config.extensions.hugo_shortcodes.then_some(&plans.hugo),
             )
         {
             if pos > text_start {
@@ -1375,7 +1372,7 @@ fn parse_inline_range_impl(
             continue;
         }
 
-        if !nested_in_link
+        if !suppress_bare_uris
             && config.extensions.autolink_bare_uris
             && bare_uri_has_left_boundary(text, pos)
             && let Some((len, url)) =
@@ -1528,7 +1525,7 @@ fn parse_inline_range_impl(
         }
 
         if byte == b'*' || byte == b'_' {
-            match plan.lookup(pos) {
+            match plans.emphasis.lookup(pos) {
                 Some(DelimChar::Open {
                     len,
                     partner,
@@ -1548,19 +1545,15 @@ fn parse_inline_range_impl(
                     builder.token(marker_kind.into(), &text[pos..pos + len]);
                     parse_inline_range_impl(
                         text,
-                        pos + len,
-                        partner,
+                        pos + len..partner,
                         config,
                         builder,
-                        nested_in_link,
-                        plan,
-                        bracket_plan,
-                        construct_plan,
-                        hugo,
-                        suppress_inner_links,
-                        suppress_footnote_refs,
+                        plans,
                         mask,
-                        false,
+                        InlineParseMode {
+                            stop_at_bracket: false,
+                            ..mode
+                        },
                     );
                     builder.token(marker_kind.into(), &text[partner..partner + partner_len]);
                     builder.finish_node();
@@ -1577,7 +1570,7 @@ fn parse_inline_range_impl(
                     let bytes = text.as_bytes();
                     let mut end_pos = pos + 1;
                     while end_pos < end && bytes[end_pos] == byte {
-                        match plan.lookup(end_pos) {
+                        match plans.emphasis.lookup(end_pos) {
                             Some(DelimChar::Literal) | None => end_pos += 1,
                             _ => break,
                         }
