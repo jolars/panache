@@ -250,6 +250,12 @@ once the replacement meets the gates below. See the [prototype
 measurements](benches/PERFORMANCE.md#experimental-block-planner) for the
 starting point.
 
+After each major parser change or completed roadmap item, rerun
+`compare_block_parsers` in release mode on the same machine with the same
+documents and parser options. Record the median and p95 for full parses and
+incremental edits for both engines, along with any files that did not reach
+timing. Compare the results with the previous checkpoint to spot regressions.
+
 - [x] Build a block-planning prototype and measure full parses and chained edits
   on real CommonMark and Quarto documents with identical CSTs and
   diagnostics.
