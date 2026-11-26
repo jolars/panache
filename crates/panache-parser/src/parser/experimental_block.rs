@@ -6,7 +6,7 @@
 
 mod containers;
 
-use std::{borrow::Cow, cell::OnceCell, ops::Range, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, ops::Range, sync::Arc};
 
 use rowan::{GreenNode, GreenNodeBuilder};
 
@@ -39,7 +39,8 @@ use super::blocks::metadata::{
 };
 use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
 use super::blocks::tables::{
-    PreparedPipeTable, is_table_caption_start, prepare_pipe_table, try_parse_grid_separator,
+    PreparedGridTable, PreparedPipeTable, is_dash_table_caption, is_table_caption_start,
+    prepare_grid_table, prepare_pipe_table,
 };
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
@@ -65,7 +66,8 @@ enum Block<'a> {
     Setext(Range<usize>, usize),
     Rule(usize),
     Reference(Range<usize>, ReferenceSpans),
-    PipeTable(usize, PreparedPipeTable<'a>),
+    GridTable(usize, PreparedGridTable),
+    PipeTable(usize, PreparedPipeTable),
     Containers(usize, Vec<containers::Event<'a>>),
     IndentedCode(Range<usize>),
     Html(Range<usize>, HtmlBlockType),
@@ -128,7 +130,7 @@ fn plan<'a>(
     lines: &'a [&'a str],
     options: &ParserOptions,
     origin: ParseOrigin,
-    jupyter_lines: &'a OnceCell<Arc<super::blocks::jupyter::Lookahead>>,
+    jupyter_lines: &RefCell<super::blocks::jupyter::LookaheadCache>,
 ) -> Result<Vec<Block<'a>>, Unsupported> {
     let prefix = ContainerPrefix::default();
     let mut blocks = Vec::new();
@@ -240,6 +242,20 @@ fn plan<'a>(
             pos = end;
             continue;
         } else if fresh
+            && options.extensions.grid_tables
+            && (line.starts_with('+')
+                || (options.extensions.table_captions && is_table_caption_start(line)))
+            && let Some(table) = prepare_grid_table(&StrippedLines::new(
+                lines,
+                pos,
+                &prefix.clone().with_div_closer_boundary(!divs.is_empty()),
+            ))
+        {
+            let consumed = table.lines_consumed;
+            blocks.push(Block::GridTable(pos, table));
+            pos += consumed;
+            continue;
+        } else if fresh
             && indent < 4
             && options.extensions.pipe_tables
             && (content.contains('|') || is_table_caption_start(line))
@@ -248,9 +264,8 @@ fn plan<'a>(
                 || !try_parse_list_marker(line, options, OpenListHint::None)
                     .is_some_and(|marker| matches!(marker.marker, ListMarker::Bullet(_))))
             && let Some(table) = prepare_pipe_table(
-                &StrippedLines::new(lines, pos, &prefix),
+                &StrippedLines::new(lines, pos, &prefix).with_jupyter_lookahead(jupyter_lines),
                 options,
-                jupyter_lines,
             )
         {
             let consumed = table.lines_consumed;
@@ -332,11 +347,6 @@ fn plan<'a>(
             continue;
         } else if !commonmark && options.extensions.raw_html && marker == Some(b'<') {
             return Err(unsupported("Pandoc HTML block"));
-        } else if options.extensions.grid_tables
-            && marker == Some(b'+')
-            && try_parse_grid_separator(line).is_some()
-        {
-            return Err(unsupported("grid table"));
         } else if options.extensions.line_blocks
             && fresh
             && marker == Some(b'|')
@@ -346,9 +356,23 @@ fn plan<'a>(
         } else if !commonmark
             && ((options.extensions.pandoc_title_block && marker == Some(b'%'))
                 || (options.extensions.raw_tex && marker == Some(b'\\'))
-                || (options.extensions.tex_math_dollars && content.starts_with("$$")))
+                || (options.extensions.tex_math_dollars && content.starts_with("$$"))
+                || (marker == Some(b':')
+                    && is_dash_table_caption(&StrippedLines::new(lines, pos, &prefix), options)))
         {
             return Err(unsupported("extended Pandoc block"));
+        } else if !commonmark
+            && fresh
+            && marker == Some(b'[')
+            && containers::footnote_marker(line, options).is_some()
+            && lines
+                .get(pos + 1)
+                .is_some_and(|line| leading_indent(line).0 < 4)
+            && try_parse_setext_heading(lines, pos).is_some()
+        {
+            blocks.push(Block::Setext(pos..pos + 1, pos + 1));
+            pos += 2;
+            continue;
         } else if !commonmark
             && (containers::footnote_marker(line, options).is_some()
                 || (fresh && containers::root_definition_term(lines, pos, options)))
@@ -377,7 +401,7 @@ fn plan_containers<'a>(
     lines: &'a [&'a str],
     pos: &mut usize,
     options: &ParserOptions,
-    jupyter_lines: &'a OnceCell<Arc<super::blocks::jupyter::Lookahead>>,
+    jupyter_lines: &RefCell<super::blocks::jupyter::LookaheadCache>,
     outer_div_indent: Option<usize>,
     blocks: &mut Vec<Block<'a>>,
 ) -> Result<(), Unsupported> {
@@ -417,7 +441,7 @@ fn parse_at(
         });
     }
     let lines = split_lines_inclusive(input);
-    let jupyter_lines = OnceCell::new();
+    let jupyter_lines = RefCell::default();
     let blocks = plan(input, &lines, options, origin, &jupyter_lines)?;
     let mut emission_options = Cow::Borrowed(options);
     if options.dialect == Dialect::CommonMark {
@@ -485,6 +509,10 @@ fn parse_at(
                 builder.start_node(K::REFERENCE_DEFINITION.into());
                 emit_reference_definition_lines(&mut builder, &lines[range], Some(spans));
                 builder.finish_node();
+            }
+            Block::GridTable(pos, table) => {
+                let window = StrippedLines::new(&lines, pos, &prefix);
+                table.emit(&mut builder, &window, options);
             }
             Block::PipeTable(pos, table) => {
                 let window = StrippedLines::new(&lines, pos, &prefix);

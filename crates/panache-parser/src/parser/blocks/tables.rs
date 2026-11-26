@@ -3,6 +3,7 @@
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
+use std::{borrow::Cow, ops::Range};
 use unicode_width::UnicodeWidthChar;
 
 use crate::parser::inlines::sink::{InjectedMarker, InlineSink, MarkerInjectingSink};
@@ -101,7 +102,10 @@ impl<'a, 'p> LineView for StrippedLines<'a, 'p> {
     }
     fn ends_container_lines(&self, i: usize) -> bool {
         let prefix = self.prefix();
-        (prefix.div_closer_ends_lines() && line_is_fenced_div_closer(self.raw()[i]))
+        (i > self.dispatch_pos()
+            && self.dispatch_override().is_some()
+            && ContainerPrefix::strip_required_ops(self.raw()[i], prefix.ops()).is_none())
+            || (prefix.div_closer_ends_lines() && line_is_fenced_div_closer(self.raw()[i]))
             || note_marker_ends_lines(prefix, self.raw()[i])
             || list_start_ends_lines(prefix, self.raw()[i])
             || html_closer_ends_lines(prefix, self.raw()[i])
@@ -1010,6 +1014,65 @@ fn simple_table_bounds(window: &StrippedLines<'_, '_>) -> Option<(usize, usize, 
 }
 
 #[cfg(feature = "experimental-block-parser")]
+pub(in crate::parser) fn may_open_dash_table(first: &str, next: &str) -> bool {
+    is_multiline_border(first) || try_parse_table_separator(next).is_some()
+}
+
+#[cfg(feature = "experimental-block-parser")]
+pub(in crate::parser) fn is_dash_table_caption(
+    window: &StrippedLines<'_, '_>,
+    options: &ParserOptions,
+) -> bool {
+    let pos = window.pos();
+    let line = window.strip_at(pos);
+    if !options.extensions.table_captions
+        || !(options.extensions.simple_tables || options.extensions.multiline_tables)
+        || !is_bare_colon_caption_start(line)
+    {
+        return false;
+    }
+
+    let matches_table = |start, dispatch, trailing_caption: bool| {
+        let table = window.with_positions(start, dispatch);
+        let accepts_end = |end| {
+            !trailing_caption
+                || find_caption_after_table(window, end).is_some_and(|(start, _)| start == pos)
+        };
+        (options.extensions.simple_tables
+            && simple_table_bounds(&table).is_some_and(|(_, end, _, _)| accepts_end(end)))
+            || (options.extensions.multiline_tables
+                && valid_multiline_table_shape(&table)
+                    .is_some_and(|shape| accepts_end(shape.end_pos)))
+    };
+
+    if is_caption_followed_by_table(window, pos)
+        && let Some((_, caption_end)) = caption_range_starting_at(window, pos)
+    {
+        let start = (caption_end..window.line_count()).find(|&i| !window.line(i).trim().is_empty());
+        if start.is_some_and(|start| matches_table(start, pos, false)) {
+            return true;
+        }
+    }
+
+    if pos == 0
+        || !(window.line(pos - 1).trim().is_empty() || is_multiline_border(window.line(pos - 1)))
+    {
+        return false;
+    }
+    let preceding_block = (0..pos)
+        .rev()
+        .skip_while(|&i| window.line(i).trim().is_empty())
+        .take_while(|&i| {
+            let line = window.line(i);
+            !line.trim().is_empty()
+                && !is_bare_colon_caption_start(line)
+                && !line_is_fenced_div_fence(line)
+        })
+        .last();
+    preceding_block.is_some_and(|start| matches_table(start, start, true))
+}
+
+#[cfg(feature = "experimental-block-parser")]
 pub(in crate::parser) fn opens_simple_table(window: &StrippedLines<'_, '_>) -> bool {
     simple_table_bounds(window).is_some()
 }
@@ -1422,10 +1485,9 @@ fn parse_pipe_table_row(line: &str, config: &ParserOptions) -> Vec<String> {
         .collect()
 }
 
-struct PipeTableRow<'a> {
+struct PipeTableRow {
     start: usize,
     end: usize,
-    text: &'a str,
 }
 
 /// Jupyter extracts multiline math before Markdown sees a table's logical
@@ -1434,34 +1496,35 @@ fn prepare_pipe_table_row<'a>(
     window: &StrippedLines<'a, '_>,
     start: usize,
     config: &ParserOptions,
-    jupyter_lines: &'a std::cell::OnceCell<std::sync::Arc<super::jupyter::Lookahead>>,
-) -> PipeTableRow<'a> {
+) -> (PipeTableRow, Cow<'a, str>) {
     let first = window.strip_at(start);
-    let single = PipeTableRow {
-        start,
-        end: start + 1,
-        text: first,
-    };
+    let single = (
+        PipeTableRow {
+            start,
+            end: start + 1,
+        },
+        Cow::Borrowed(first),
+    );
     if !config.extensions.tex_math_jupyter
         || !crate::parser::inlines::math::pending_jupyter_math(first)
     {
         return single;
     }
 
-    // Ordinary rows never materialize a suffix. Reuse the parser's stripped
-    // view across tables when multiline math does need the full matcher.
-    let lines = jupyter_lines.get_or_init(|| window.jupyter_lookahead(start, first, true));
-    let text = lines.text_at(start);
+    let lookahead = window.jupyter_lookahead(start, first, true);
+    let text = lookahead.text_at(start);
     let Some(len) = crate::parser::inlines::math::jupyter_logical_line_len(text) else {
         return single;
     };
     let text = &text[..len];
     let count = text.bytes().filter(|&b| b == b'\n').count() + usize::from(!text.ends_with('\n'));
-    PipeTableRow {
-        start,
-        end: start + count,
-        text,
-    }
+    (
+        PipeTableRow {
+            start,
+            end: start + count,
+        },
+        Cow::Owned(text.to_owned()),
+    )
 }
 
 /// Emit a pipe table row with inline-parsed cells.
@@ -1469,7 +1532,7 @@ fn prepare_pipe_table_row<'a>(
 fn emit_pipe_table_row(
     builder: &mut GreenNodeBuilder<'static>,
     window: &StrippedLines<'_, '_>,
-    row: &PipeTableRow<'_>,
+    row: &PipeTableRow,
     row_kind: SyntaxKind,
     config: &ParserOptions,
     inject_list_indent: bool,
@@ -1601,15 +1664,16 @@ pub(crate) fn try_parse_pipe_table(
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
-    let jupyter_lines = std::cell::OnceCell::new();
-    let table = prepare_pipe_table(window, config, &jupyter_lines)?;
-    table.emit(builder, window, config);
+    let local_lookahead = std::cell::RefCell::default();
+    let window = window.with_fallback_jupyter_lookahead(&local_lookahead);
+    let table = prepare_pipe_table(&window, config)?;
+    table.emit(builder, &window, config);
     Some(table.lines_consumed)
 }
 
-pub(crate) struct PreparedPipeTable<'a> {
-    header: PipeTableRow<'a>,
-    rows: Vec<PipeTableRow<'a>>,
+pub(crate) struct PreparedPipeTable {
+    header: PipeTableRow,
+    rows: Vec<PipeTableRow>,
     actual_start: usize,
     separator_pos: usize,
     end_pos: usize,
@@ -1618,11 +1682,10 @@ pub(crate) struct PreparedPipeTable<'a> {
     pub(crate) lines_consumed: usize,
 }
 
-pub(crate) fn prepare_pipe_table<'a>(
-    window: &StrippedLines<'a, '_>,
+pub(crate) fn prepare_pipe_table(
+    window: &StrippedLines<'_, '_>,
     config: &ParserOptions,
-    jupyter_lines: &'a std::cell::OnceCell<std::sync::Arc<super::jupyter::Lookahead>>,
-) -> Option<PreparedPipeTable<'a>> {
+) -> Option<PreparedPipeTable> {
     let lines = window.raw();
     let start_pos = window.pos();
     if start_pos + 1 >= lines.len() {
@@ -1650,7 +1713,11 @@ pub(crate) fn prepare_pipe_table<'a>(
         (start_pos, None)
     };
 
-    if actual_start + 1 >= lines.len() {
+    if actual_start + 1 >= lines.len()
+        || (window.dispatch_override().is_some()
+            && (window.ends_container_lines(actual_start)
+                || window.ends_container_lines(actual_start + 1)))
+    {
         return None;
     }
 
@@ -1661,9 +1728,9 @@ pub(crate) fn prepare_pipe_table<'a>(
         return None;
     }
 
-    let header = prepare_pipe_table_row(window, actual_start, config, jupyter_lines);
+    let (header, header_text) = prepare_pipe_table_row(window, actual_start, config);
     let separator_pos = header.end;
-    if separator_pos >= lines.len() || pipe_delimiters(header.text.trim(), config).is_empty() {
+    if separator_pos >= lines.len() || pipe_delimiters(header_text.trim(), config).is_empty() {
         return None;
     }
 
@@ -1679,7 +1746,7 @@ pub(crate) fn prepare_pipe_table<'a>(
 
     let alignments = try_parse_pipe_separator(window.line(separator_pos))?;
 
-    let header_cells = parse_pipe_table_row(header.text, config);
+    let header_cells = parse_pipe_table_row(&header_text, config);
 
     if config.dialect == Dialect::CommonMark && header_cells.len() != alignments.len() {
         return None;
@@ -1692,8 +1759,8 @@ pub(crate) fn prepare_pipe_table<'a>(
         if line.trim().is_empty() || window.ends_container_lines(end_pos) {
             break;
         }
-        let row = prepare_pipe_table_row(window, end_pos, config, jupyter_lines);
-        if !row.text.contains('|') {
+        let (row, text) = prepare_pipe_table_row(window, end_pos, config);
+        if !text.contains('|') {
             break;
         }
         end_pos = row.end;
@@ -1735,7 +1802,7 @@ pub(crate) fn prepare_pipe_table<'a>(
     })
 }
 
-impl PreparedPipeTable<'_> {
+impl PreparedPipeTable {
     pub(crate) fn emit(
         &self,
         builder: &mut GreenNodeBuilder<'static>,
@@ -2634,7 +2701,7 @@ fn extract_grid_cells_from_line(line: &str, _columns: &[GridColumn]) -> Vec<Stri
 fn emit_grid_table_row(
     builder: &mut GreenNodeBuilder<'static>,
     window: &StrippedLines<'_, '_>,
-    indices: &[usize],
+    indices: Range<usize>,
     columns: &[GridColumn],
     row_kind: SyntaxKind,
     config: &ParserOptions,
@@ -2645,7 +2712,7 @@ fn emit_grid_table_row(
 
     builder.start_node(row_kind.into());
 
-    let first_line = window.emit_or_dispatch_tail(builder, indices[0]);
+    let first_line = window.emit_or_dispatch_tail(builder, indices.start);
     let cell_contents = extract_grid_cells_from_line(first_line, columns);
     let (line_without_newline, newline_str) = strip_newline(first_line);
     let trimmed = line_without_newline.trim();
@@ -2654,7 +2721,7 @@ fn emit_grid_table_row(
 
     if actual_pipe_count != expected_pipe_count {
         emit_line_tokens(builder, first_line);
-        for &idx in &indices[1..] {
+        for idx in indices.start + 1..indices.end {
             let tail = window.emit_or_dispatch_tail(builder, idx);
             emit_line_tokens(builder, tail);
         }
@@ -2725,7 +2792,7 @@ fn emit_grid_table_row(
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
-    for &idx in &indices[1..] {
+    for idx in indices.start + 1..indices.end {
         let tail = window.emit_or_dispatch_tail(builder, idx);
         emit_line_tokens(builder, tail);
     }
@@ -2733,13 +2800,32 @@ fn emit_grid_table_row(
     builder.finish_node();
 }
 
-/// Try to parse a grid table starting at the given position.
-/// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_grid_table(
     window: &StrippedLines<'_, '_>,
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
+    let table = prepare_grid_table(window)?;
+    table.emit(builder, window, config);
+    Some(table.lines_consumed)
+}
+
+struct GridRow {
+    lines: Range<usize>,
+    kind: SyntaxKind,
+    columns: Vec<GridColumn>,
+}
+
+pub(crate) struct PreparedGridTable {
+    rows_with_separator: Vec<GridRow>,
+    final_row: GridRow,
+    caption_before: Option<(usize, usize)>,
+    caption_after: Option<(usize, usize)>,
+    body: Range<usize>,
+    pub(crate) lines_consumed: usize,
+}
+
+pub(crate) fn prepare_grid_table(window: &StrippedLines<'_, '_>) -> Option<PreparedGridTable> {
     let lines = window.raw();
     let start_pos = window.pos();
     if start_pos >= lines.len() {
@@ -2747,12 +2833,6 @@ pub(crate) fn try_parse_grid_table(
     }
 
     let view = UniformStripView(window);
-
-    if try_parse_grid_separator(view.line(start_pos)).is_none()
-        && !is_caption_followed_by_table(&view, start_pos)
-    {
-        return None;
-    }
 
     let (actual_start, caption_before) = if is_caption_followed_by_table(&view, start_pos) {
         let (cap_start, cap_end) = caption_range_starting_at(&view, start_pos)?;
@@ -2769,55 +2849,66 @@ pub(crate) fn try_parse_grid_table(
         return None;
     }
 
-    let first_line = view.line(actual_start);
-    let _columns = try_parse_grid_separator(first_line)?;
-
+    let first_columns = try_parse_grid_separator(view.line(actual_start))?;
     let mut end_pos = actual_start + 1;
-    let mut found_header_sep = false;
-    let mut in_footer = false;
+    let mut row_start = end_pos;
+    let mut rows_with_separator = Vec::new();
+    let mut section = SyntaxKind::TABLE_HEADER;
+    if first_columns
+        .iter()
+        .any(|column| column.is_header_separator)
+    {
+        section = SyntaxKind::TABLE_ROW;
+    }
 
     while end_pos < lines.len() {
         let line = view.line(end_pos);
-
-        if line.trim().is_empty() {
+        if line.trim().is_empty() || view.ends_container_lines(end_pos) {
             break;
         }
 
-        if view.ends_container_lines(end_pos) {
-            break;
-        }
-
-        if try_parse_grid_partial_separator(line).is_some() {
-            end_pos += 1;
-            continue;
-        }
-
-        if let Some(sep_cols) = try_parse_grid_separator(line) {
-            if sep_cols.iter().any(|c| c.is_header_separator) {
-                if !found_header_sep {
-                    found_header_sep = true;
-                } else if !in_footer {
-                    in_footer = true;
-                }
+        let full = try_parse_grid_separator(line);
+        let header_separator = full
+            .as_ref()
+            .is_some_and(|columns| columns.iter().any(|column| column.is_header_separator));
+        if let Some(columns) = full.or_else(|| try_parse_grid_partial_separator(line)) {
+            rows_with_separator.push(GridRow {
+                lines: row_start..end_pos,
+                kind: section,
+                columns,
+            });
+            row_start = end_pos + 1;
+            if header_separator {
+                section = if section == SyntaxKind::TABLE_HEADER {
+                    SyntaxKind::TABLE_ROW
+                } else {
+                    SyntaxKind::TABLE_FOOTER
+                };
             }
-            end_pos += 1;
-            continue;
+        } else if !is_grid_content_row(line) {
+            break;
         }
-
-        if is_grid_content_row(line) {
-            end_pos += 1;
-            continue;
-        }
-
-        break;
+        end_pos += 1;
     }
 
-    if end_pos <= actual_start + 1 {
+    if end_pos == actual_start + 1 {
         return None;
     }
 
-    let caption_before = caption_before
-        .or_else(|| find_caption_before_table(&view, actual_start, window.dispatch_pos()));
+    if section == SyntaxKind::TABLE_HEADER {
+        for row in &mut rows_with_separator {
+            row.kind = SyntaxKind::TABLE_ROW;
+        }
+        section = SyntaxKind::TABLE_ROW;
+    }
+
+    let caption_before = caption_before.or_else(|| {
+        if actual_start > window.dispatch_pos() {
+            find_caption_before_table(&view, actual_start, window.dispatch_pos())
+        } else {
+            None
+        }
+    });
 
     let caption_after = if caption_before.is_some() {
         None
@@ -2825,116 +2916,73 @@ pub(crate) fn try_parse_grid_table(
         find_caption_after_table(&view, end_pos)
     };
 
-    builder.start_node(SyntaxKind::GRID_TABLE.into());
+    let table_start = caption_before.map_or(actual_start, |(start, _)| start);
+    let table_end = caption_after.map_or(end_pos, |(_, end)| end);
+    Some(PreparedGridTable {
+        rows_with_separator,
+        final_row: GridRow {
+            lines: row_start..end_pos,
+            kind: section,
+            columns: first_columns,
+        },
+        caption_before,
+        caption_after,
+        body: actual_start..end_pos,
+        lines_consumed: table_end - table_start,
+    })
+}
 
-    if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-        emit_caption_blank_lines(builder, window, cap_end, actual_start);
+impl PreparedGridTable {
+    #[cfg(feature = "experimental-block-parser")]
+    pub(crate) fn can_open_on_list_marker(&self, window: &StrippedLines<'_, '_>) -> bool {
+        self.caption_before.is_some()
+            || self.caption_after.is_some()
+            || (self.final_row.lines.is_empty()
+                && try_parse_grid_separator(window.detect_at(self.body.end - 1)).is_some())
     }
 
-    let mut past_header_sep = false;
-    let mut in_footer_section = false;
-    let mut current_row_indices: Vec<usize> = Vec::new();
-    let mut current_row_kind = SyntaxKind::TABLE_HEADER;
+    pub(crate) fn emit(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        window: &StrippedLines<'_, '_>,
+        config: &ParserOptions,
+    ) {
+        builder.start_node(SyntaxKind::GRID_TABLE.into());
 
-    for idx in actual_start..end_pos {
-        let line = view.line(idx);
-        if let Some(sep_cols) = try_parse_grid_separator(line) {
-            if !current_row_indices.is_empty() {
-                emit_grid_table_row(
-                    builder,
-                    window,
-                    &current_row_indices,
-                    &sep_cols,
-                    current_row_kind,
-                    config,
-                );
-                current_row_indices.clear();
-            }
+        if let Some((start, end)) = self.caption_before {
+            emit_table_caption(builder, window, start, end, config);
+            emit_caption_blank_lines(builder, window, end, self.body.start);
+        }
 
-            let is_header_sep = sep_cols.iter().any(|c| c.is_header_separator);
-
-            if is_header_sep {
-                if !past_header_sep {
-                    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-                    let tail = window.emit_or_dispatch_tail(builder, idx);
-                    emit_separator_tokens(builder, tail);
-                    builder.finish_node();
-                    past_header_sep = true;
-                } else {
-                    if !in_footer_section {
-                        in_footer_section = true;
-                    }
-                    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-                    let tail = window.emit_or_dispatch_tail(builder, idx);
-                    emit_separator_tokens(builder, tail);
-                    builder.finish_node();
-                }
-            } else {
-                builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-                let tail = window.emit_or_dispatch_tail(builder, idx);
-                emit_separator_tokens(builder, tail);
-                builder.finish_node();
-            }
-        } else if let Some(sep_cols) = try_parse_grid_partial_separator(line) {
-            if !current_row_indices.is_empty() {
-                emit_grid_table_row(
-                    builder,
-                    window,
-                    &current_row_indices,
-                    &sep_cols,
-                    current_row_kind,
-                    config,
-                );
-                current_row_indices.clear();
-            }
+        let emit_separator = |builder: &mut GreenNodeBuilder<'static>, pos| {
             builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-            let tail = window.emit_or_dispatch_tail(builder, idx);
+            let tail = window.emit_or_dispatch_tail(builder, pos);
             emit_separator_tokens(builder, tail);
             builder.finish_node();
-        } else if is_grid_content_row(line) {
-            current_row_kind = if !past_header_sep && found_header_sep {
-                SyntaxKind::TABLE_HEADER
-            } else if in_footer_section {
-                SyntaxKind::TABLE_FOOTER
-            } else {
-                SyntaxKind::TABLE_ROW
-            };
-
-            current_row_indices.push(idx);
+        };
+        let emit_row = |builder: &mut GreenNodeBuilder<'static>, row: &GridRow| {
+            emit_grid_table_row(
+                builder,
+                window,
+                row.lines.clone(),
+                &row.columns,
+                row.kind,
+                config,
+            );
+        };
+        emit_separator(builder, self.body.start);
+        for row in &self.rows_with_separator {
+            emit_row(builder, row);
+            emit_separator(builder, row.lines.end);
         }
+        emit_row(builder, &self.final_row);
+
+        if let Some((start, end)) = self.caption_after {
+            emit_caption_blank_lines(builder, window, self.body.end, start);
+            emit_table_caption(builder, window, start, end, config);
+        }
+        builder.finish_node();
     }
-
-    if !current_row_indices.is_empty()
-        && let Some(sep_cols) = try_parse_grid_separator(view.line(actual_start))
-    {
-        emit_grid_table_row(
-            builder,
-            window,
-            &current_row_indices,
-            &sep_cols,
-            current_row_kind,
-            config,
-        );
-    }
-
-    if let Some((cap_start, cap_end)) = caption_after {
-        emit_caption_blank_lines(builder, window, end_pos, cap_start);
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-    }
-
-    builder.finish_node(); // GRID_TABLE
-
-    let table_start = caption_before
-        .map(|(start, _)| start)
-        .unwrap_or(actual_start);
-    let table_end = if let Some((_, cap_end)) = caption_after {
-        cap_end
-    } else {
-        end_pos
-    };
-
-    Some(table_end - table_start)
 }
 
 #[cfg(test)]
@@ -3356,7 +3404,12 @@ fn multiline_table_shape(window: &StrippedLines<'_, '_>) -> Option<MultilineShap
 
 #[cfg(feature = "experimental-block-parser")]
 pub(in crate::parser) fn opens_multiline_table_shape(window: &StrippedLines<'_, '_>) -> bool {
-    multiline_table_shape(window).is_some_and(|shape| {
+    valid_multiline_table_shape(window).is_some()
+}
+
+#[cfg(feature = "experimental-block-parser")]
+fn valid_multiline_table_shape(window: &StrippedLines<'_, '_>) -> Option<MultilineShape> {
+    multiline_table_shape(window).filter(|shape| {
         let separator = window.line(shape.column_sep_pos);
         try_parse_table_separator(separator).is_some() || parse_single_dash_run(separator).is_some()
     })

@@ -5,7 +5,7 @@ mod bodies;
 use bodies::{body_blank_depth, body_column, definition_marker, definition_term};
 pub(super) use bodies::{footnote_marker, root_definition_term};
 
-use std::{borrow::Cow, cell::OnceCell, ops::Range, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, ops::Range};
 
 use rowan::GreenNodeBuilder;
 
@@ -31,7 +31,7 @@ use super::super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_hor
 use super::super::blocks::indented_code::{
     emit_indented_code_line, parse_indented_code_block_with_first,
 };
-use super::super::blocks::jupyter::Lookahead;
+use super::super::blocks::jupyter::LookaheadCache;
 use super::super::blocks::line_blocks::try_parse_line_block_start;
 use super::super::blocks::lists::{
     ListItemEmissionInput, ListMarker, ListMarkerMatch, OpenListHint, OrderedMarker,
@@ -41,8 +41,9 @@ use super::super::blocks::lists::{
 use super::super::blocks::raw_blocks::can_start_raw_block;
 use super::super::blocks::reference_links::emit_footnote_marker;
 use super::super::blocks::tables::{
-    PreparedPipeTable, is_table_caption_start, opens_multiline_table_shape, opens_simple_table,
-    prepare_pipe_table, try_parse_grid_separator, try_parse_pipe_separator,
+    PreparedGridTable, PreparedPipeTable, is_table_caption_start, may_open_dash_table,
+    opens_multiline_table_shape, opens_simple_table, prepare_grid_table, prepare_pipe_table,
+    try_parse_pipe_separator,
 };
 use super::super::diagnostics::Diagnostics;
 use super::super::inlines::sink::{InjectedMarker, MarkerInjectingSink};
@@ -86,11 +87,12 @@ pub(super) enum Event<'a> {
     Atx(&'a str, usize),
     Rule(&'a str),
     Setext(ParagraphBuffer, Vec<Prefix<'a>>, &'a str),
-    PipeTable(usize, ContainerPrefix, PreparedPipeTable<'a>, bool),
+    GridTable(usize, ContainerPrefix, PreparedGridTable, &'a str, &'a str),
+    PipeTable(usize, ContainerPrefix, PreparedPipeTable, bool),
     BodyPipeTable(
         Range<usize>,
         ContainerPrefix,
-        PreparedPipeTable<'a>,
+        PreparedPipeTable,
         &'a str,
         &'a str,
     ),
@@ -256,7 +258,6 @@ fn deferred_pandoc_block(line: &str, options: &ParserOptions) -> Option<&'static
         b'<' if ext.raw_html && try_parse_html_block_start(line, false).is_some() => {
             Some("Pandoc HTML block")
         }
-        b'+' if ext.grid_tables && try_parse_grid_separator(line).is_some() => Some("grid table"),
         b'|' if ext.line_blocks && try_parse_line_block_start(line).is_some() => Some("line block"),
         b'$' if ext.tex_math_dollars && content.starts_with("$$") => Some("display math"),
         b'\\' if can_start_raw_block(content, options) => Some("raw TeX block"),
@@ -332,6 +333,44 @@ fn container_ops(frames: &[Frame]) -> Vec<StripOp> {
         }
     }
     ops
+}
+
+fn table_prefix(
+    ops: &[StripOp],
+    frames: &[Frame],
+    marker_consumed: bool,
+    outer_div_open: bool,
+    options: &ParserOptions,
+) -> ContainerPrefix {
+    let in_div = outer_div_open
+        || frames
+            .iter()
+            .any(|frame| matches!(frame, Frame::Div { .. }));
+    let section = frames
+        .iter()
+        .rposition(|frame| matches!(frame, Frame::Quote) || body_column(frame).is_some());
+    let columns = frames[section.map_or(0, |index| index + 1)..]
+        .iter()
+        .filter_map(|frame| match frame {
+            Frame::Item { column, .. } => Some(*column as u32),
+            _ => None,
+        });
+    ContainerPrefix::from_ops(ops, marker_consumed)
+        .with_div_closer_boundary(in_div)
+        .with_list_start_boundary(options, columns)
+}
+
+fn trailing_prefix_indent<'a>(line: &'a str, tail: &str, prefixes: &[Prefix<'_>]) -> &'a str {
+    let bytes = prefixes
+        .iter()
+        .rev()
+        .map_while(|part| match part {
+            Prefix::Indent(indent) => Some(indent.len()),
+            _ => None,
+        })
+        .sum::<usize>();
+    let start = line.len() - tail.len();
+    &line[start - bytes..start]
 }
 
 fn opaque_block_columns(frames: &[Frame], allow_list_first: bool) -> Option<(usize, usize, bool)> {
@@ -417,7 +456,7 @@ fn plan_reference<'a>(
 pub(super) fn plan<'a>(
     lines: &'a [&'a str],
     options: &ParserOptions,
-    jupyter_lines: &'a OnceCell<Arc<Lookahead>>,
+    jupyter_lines: &RefCell<LookaheadCache>,
     outer_div_indent: Option<usize>,
 ) -> Result<(usize, Vec<Event<'a>>), UnsupportedLine<'a>> {
     if lines.is_empty() {
@@ -434,7 +473,9 @@ pub(super) fn plan<'a>(
     let mut next_nonblank = 0;
     let mut blank_lookahead = (0, 0);
     let mut div_closed_by_list = false;
+    let mut body_quote_run = false;
     'lines: while let Some(&line) = lines.get(pos) {
+        let in_body_quote_run = std::mem::take(&mut body_quote_run);
         let mut remaining = line;
         let mut prefixes = Vec::new();
         let mut matched = 0;
@@ -538,7 +579,7 @@ pub(super) fn plan<'a>(
             .frames
             .iter()
             .any(|frame| body_column(frame).is_some() || matches!(frame, Frame::DefinitionList));
-        if in_body && is_blank_line(remaining) {
+        if (in_body || in_body_quote_run) && is_blank_line(remaining) {
             let quote_depth = prefixes
                 .iter()
                 .filter(|part| matches!(part, Prefix::Quote(..)))
@@ -558,6 +599,14 @@ pub(super) fn plan<'a>(
                 } else {
                     body_blank_depth(&planner.frames, lines, blank_lookahead.0, options)
                 };
+            // A marked blank belongs to the quote even when the next
+            // nonblank line will continue it without a marker.
+            let explicit_quote_depth = planner.frames[..matched]
+                .iter()
+                .rposition(|frame| matches!(frame, Frame::Quote))
+                .map_or(0, |index| index + 1);
+            let depth = depth.max(explicit_quote_depth);
+            body_quote_run = explicit_quote_depth > 0 && depth == explicit_quote_depth;
             planner.close_to(depth);
             if depth == 0 && prefixes.is_empty() {
                 break;
@@ -643,7 +692,11 @@ pub(super) fn plan<'a>(
             }
             planner.close_to(depth + 1);
             planner.frames.pop();
-            planner.events.push(Event::CloseDiv(remaining, indent));
+            if planner.frames.last().is_some_and(|frame| body_column(frame).is_some()) {
+                planner.events.push(Event::CloseDiv(unstripped, ""));
+            } else {
+                planner.events.push(Event::CloseDiv(remaining, indent));
+            }
             pos += 1;
             continue;
         }
@@ -684,15 +737,35 @@ pub(super) fn plan<'a>(
             matched = item + 1;
         }
 
-        if matches!(planner.frames.get(matched), Some(Frame::Footnote))
-            && !planner.paragraph.is_empty()
+        if !planner.paragraph.is_empty()
             && !prefixes.is_empty()
             && prefixes
                 .iter()
                 .all(|prefix| matches!(prefix, Prefix::Quote(..)))
-            && footnote_marker(remaining, options).is_some()
         {
-            planner.push_text("", std::mem::take(&mut prefixes));
+            match planner.frames.get(matched) {
+                Some(Frame::Footnote) if footnote_marker(remaining, options).is_some() => {
+                    planner.push_text("", std::mem::take(&mut prefixes));
+                }
+                Some(Frame::Definition { .. })
+                    if definition_marker(
+                        remaining,
+                        lines,
+                        pos,
+                        &planner.frames[..matched],
+                        options,
+                    )
+                    .is_some() =>
+                {
+                    planner.flush();
+                    for prefix in prefixes.drain(..) {
+                        if let Prefix::Quote(indent, space) = prefix {
+                            planner.events.push(Event::QuoteLinePrefix(indent, space));
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
 
         if sibling.is_none() && matched < planner.frames.len() {
@@ -844,14 +917,36 @@ pub(super) fn plan<'a>(
                     }
                 }
             }
-            if !planner.paragraph.is_empty()
+            let unmatched = planner.frames.get(matched);
+            let active_body = matches!(unmatched, Some(Frame::Definition { .. } | Frame::Footnote));
+            let note_quote = matches!(unmatched, Some(Frame::Quote))
+                && planner.frames[..matched]
+                    .iter()
+                    .any(|frame| matches!(frame, Frame::Footnote));
+            let after_body_block = active_body
+                && pos > 0
+                && !is_blank_line(lines[pos - 1])
+                && planner.paragraph.is_empty();
+            let lazy_quote_line = in_body_quote_run
+                && matched + 1 == planner.frames.len()
+                && matches!(unmatched, Some(Frame::Quote));
+            if lazy_quote_line {
+                // The marked blank can be followed by an unmarked line run.
+                // Dispatch those lines inside the quote, including new blocks.
+                matched += 1;
+                body_quote_run = true;
+            } else if (!planner.paragraph.is_empty() || after_body_block)
                 && !is_blank_line(remaining)
                 && !(in_body && options.extensions.fenced_divs && is_div_closing_fence(remaining))
-                && !(in_body && footnote_marker(remaining, options).is_some())
+                && !(in_body && !note_quote && footnote_marker(remaining, options).is_some())
                 && !(in_body
                     && try_parse_definition_marker(remaining).is_some()
                     && matches!(planner.frames.get(matched), Some(Frame::Definition { .. })))
                 && (is_quote_prose(remaining, options)
+                    || (note_quote && footnote_marker(remaining, options).is_some())
+                    || (matches!(unmatched, Some(Frame::Footnote))
+                        && options.extensions.blank_before_header
+                        && try_parse_atx_heading(remaining).is_some())
                     || (div_closed_by_list && is_div_closing_fence(remaining))
                     || (!commonmark
                         && planner.paragraph_kind == K::PLAIN
@@ -872,6 +967,7 @@ pub(super) fn plan<'a>(
             {
                 // Missing quote markers do not erase the indent of an
                 // enclosing list item on the same lazy continuation.
+                let matched_prefixes = prefixes.len();
                 for frame in &planner.frames[matched..] {
                     if let Frame::Item { column, .. } = frame
                         && leading_indent(remaining).0 >= *column
@@ -885,7 +981,11 @@ pub(super) fn plan<'a>(
                 if div_closed_by_list && is_div_closing_fence(remaining) {
                     div_closed_by_list = false;
                 }
-                if !commonmark && planner.paragraph_kind == K::PARAGRAPH {
+                if !commonmark
+                    && (planner.paragraph_kind == K::PARAGRAPH
+                        || (matches!(unmatched, Some(Frame::Definition { .. }))
+                            && prefixes.len() == matched_prefixes))
+                {
                     remaining = restore_trailing_indent(line, remaining, &mut prefixes);
                 }
                 planner.push_text(remaining, prefixes);
@@ -1177,7 +1277,10 @@ pub(super) fn plan<'a>(
                     && indent < 4
                     && try_parse_atx_heading(remaining).is_none()
                     && try_parse_horizontal_rule(remaining).is_none()
-                    && try_parse_fence_open(remaining, options.dialect).is_none()
+                    && !try_parse_fence_open(remaining, options.dialect)
+                        .is_some_and(|fence| fence_enabled(&fence, options))
+                    && deferred_pandoc_block(remaining, options)
+                        .is_none_or(|construct| opened_body && construct == "line block")
                     && let Some(blanks) = definition_term(lines, pos, &planner.frames, options)
                 {
                     let term = restore_trailing_indent(line, remaining, &mut prefixes);
@@ -1208,6 +1311,12 @@ pub(super) fn plan<'a>(
                         .any(|frame| matches!(frame, Frame::Footnote))
                     && let Some((indent, id, end)) = footnote_marker(remaining, options)
                 {
+                    if !planner.paragraph.is_empty()
+                        && planner.paragraph_kind == K::PARAGRAPH
+                        && matches!(planner.frames.last(), Some(Frame::Quote))
+                    {
+                        planner.push_text("", std::mem::take(&mut prefixes));
+                    }
                     planner.flush();
                     let marker_line =
                         if matches!(planner.frames.last(), Some(Frame::Definition { .. })) {
@@ -1251,70 +1360,81 @@ pub(super) fn plan<'a>(
             .frames
             .iter()
             .any(|frame| body_column(frame).is_some() || matches!(frame, Frame::DefinitionList));
-        if in_body
-            && options.extensions.pipe_tables
+        let definition_opener = opened_body
+            && !note_opener
+            && matches!(planner.frames.last(), Some(Frame::Definition { .. }));
+        let note_opener = note_opener && matches!(planner.frames.last(), Some(Frame::Footnote));
+        if !opener_as_text
+            && !definition_opener
+            && options.extensions.grid_tables
             && planner.paragraph.is_empty()
-            && (remaining.contains('|') || is_table_caption_start(remaining))
+            && (remaining.starts_with('+')
+                || (options.extensions.table_captions && is_table_caption_start(remaining)))
         {
             let ops = container_ops(&planner.frames);
-            let prefix = ContainerPrefix::from_ops(&ops, true);
-            let mut end = pos + 1;
-            let mut separator_seen = false;
-            while let Some(tail) = lines
-                .get(end)
-                .and_then(|raw| ContainerPrefix::strip_required_ops(raw, &ops))
-            {
-                if is_blank_line(tail) {
-                    if !options.extensions.table_captions {
-                        break;
-                    }
-                    let blanks_start = end;
-                    while lines
-                        .get(end)
-                        .and_then(|raw| ContainerPrefix::strip_required_ops(raw, &ops))
-                        .is_some_and(is_blank_line)
-                    {
-                        end += 1;
-                    }
-                    if separator_seen
-                        && !lines
-                            .get(end)
-                            .and_then(|raw| ContainerPrefix::strip_required_ops(raw, &ops))
-                            .is_some_and(is_table_caption_start)
-                    {
-                        end = blanks_start;
-                        break;
-                    }
-                    continue;
-                }
-                if !(tail.contains('|')
-                    || (options.extensions.table_captions && is_table_caption_start(tail)))
-                {
-                    break;
-                }
-                separator_seen |= try_parse_pipe_separator(tail).is_some();
-                end += 1;
+            let prefix = table_prefix(
+                &ops,
+                &planner.frames,
+                in_body || opened_item,
+                outer_div_indent.is_some(),
+                options,
+            );
+            let takes_indent = in_body || matches!(ops.last(), Some(StripOp::ListAdvance(_)));
+            let indent = if takes_indent {
+                trailing_prefix_indent(line, remaining, &prefixes)
+            } else {
+                ""
+            };
+            let mut window = StrippedLines::new(lines, pos, &prefix);
+            if in_body {
+                window = window.with_dispatch_override(remaining, indent);
             }
-            let indent = prefixes
-                .iter()
-                .rev()
-                .take_while(|part| matches!(part, Prefix::Indent(_)))
-                .map(|part| match part {
-                    Prefix::Indent(text) => text.len(),
-                    _ => 0,
-                })
-                .sum::<usize>();
-            let indent = &line[line.len() - remaining.len() - indent..line.len() - remaining.len()];
-            let window = StrippedLines::new(&lines[..end], pos, &prefix)
-                .with_dispatch_override(remaining, indent);
-            if let Some(table) = prepare_pipe_table(&window, options, jupyter_lines) {
+            if window.detect_at(pos) == remaining
+                && let Some(table) = prepare_grid_table(&window)
+                && (!opened_item || table.can_open_on_list_marker(&window))
+            {
+                if takes_indent {
+                    while matches!(prefixes.last(), Some(Prefix::Indent(_))) {
+                        prefixes.pop();
+                    }
+                }
+                planner.structural_prefixes(prefixes);
+                let consumed = table.lines_consumed;
+                planner
+                    .events
+                    .push(Event::GridTable(pos, prefix, table, remaining, indent));
+                pos += consumed;
+                continue;
+            }
+        }
+        if in_body
+            && !definition_opener
+            && options.extensions.pipe_tables
+            && planner.paragraph.is_empty()
+            && (remaining.contains('|')
+                || (options.extensions.table_captions && is_table_caption_start(remaining)))
+        {
+            let ops = container_ops(&planner.frames);
+            let prefix = table_prefix(
+                &ops,
+                &planner.frames,
+                true,
+                outer_div_indent.is_some(),
+                options,
+            );
+            let indent = trailing_prefix_indent(line, remaining, &prefixes);
+            let window =
+                StrippedLines::new(lines, pos, &prefix).with_dispatch_override(remaining, indent);
+            if let Some(table) =
+                prepare_pipe_table(&window.with_jupyter_lookahead(jupyter_lines), options)
+            {
                 while matches!(prefixes.last(), Some(Prefix::Indent(_))) {
                     prefixes.pop();
                 }
                 planner.structural_prefixes(prefixes);
                 let consumed = table.lines_consumed;
                 planner.events.push(Event::BodyPipeTable(
-                    pos..end,
+                    pos..pos + consumed,
                     prefix,
                     table,
                     remaining,
@@ -1378,7 +1498,9 @@ pub(super) fn plan<'a>(
                     end += 1;
                 }
                 let window = StrippedLines::new(&lines[..end], pos, &prefix);
-                if let Some(table) = prepare_pipe_table(&window, options, jupyter_lines) {
+                if let Some(table) =
+                    prepare_pipe_table(&window.with_jupyter_lookahead(jupyter_lines), options)
+                {
                     if matches!(ops.last(), Some(StripOp::ListAdvance(_))) {
                         while matches!(prefixes.last(), Some(Prefix::Indent(_))) {
                             prefixes.pop();
@@ -1406,25 +1528,31 @@ pub(super) fn plan<'a>(
         {
             let ops = container_ops(&planner.frames);
             let prefix = ContainerPrefix::from_ops(&ops, opened_item);
-            let end = pos
-                + 1
-                + lines[pos + 1..]
-                    .iter()
-                    .take_while(|raw| {
-                        is_blank_line(raw)
-                            || ContainerPrefix::strip_required_ops(raw, &ops).is_some()
-                    })
-                    .count();
-            let window = StrippedLines::new(&lines[..end], pos, &prefix);
+            let next = ContainerPrefix::strip_required_ops(lines[pos + 1], &ops);
+            let possible = next.is_some_and(|next| may_open_dash_table(remaining, next));
             let window = if in_body {
-                window.with_dispatch_override(remaining, "")
+                StrippedLines::new(lines, pos, &prefix).with_dispatch_override(remaining, "")
+            } else if possible {
+                let end = pos
+                    + 1
+                    + lines[pos + 1..]
+                        .iter()
+                        .take_while(|raw| {
+                            is_blank_line(raw)
+                                || ContainerPrefix::strip_required_ops(raw, &ops).is_some()
+                        })
+                        .count();
+                StrippedLines::new(&lines[..end], pos, &prefix)
             } else {
-                window
+                StrippedLines::new(lines, pos, &prefix)
             };
-            if options.extensions.simple_tables && opens_simple_table(&window) {
+            if possible && options.extensions.simple_tables && opens_simple_table(&window) {
                 return Err((remaining.trim_start_matches([' ', '\t']), "simple table"));
             }
-            if options.extensions.multiline_tables && opens_multiline_table_shape(&window) {
+            if possible
+                && options.extensions.multiline_tables
+                && opens_multiline_table_shape(&window)
+            {
                 return Err((remaining.trim_start_matches([' ', '\t']), "multiline table"));
             }
         }
@@ -1474,8 +1602,17 @@ pub(super) fn plan<'a>(
             && remaining.trim_start_matches(' ').starts_with(':')
             && let Some(fence) = try_parse_div_fence_open(remaining)
         {
+            let opener = if planner
+                .frames
+                .last()
+                .is_some_and(|frame| body_column(frame).is_some())
+            {
+                restore_trailing_indent(line, remaining, &mut prefixes)
+            } else {
+                remaining
+            };
             planner.structural_prefixes(prefixes);
-            planner.events.push(Event::OpenDiv(remaining, fence));
+            planner.events.push(Event::OpenDiv(opener, fence));
             planner.frames.push(Frame::Div {
                 indent: leading_indent(remaining).0,
             });
@@ -1549,7 +1686,6 @@ pub(super) fn plan<'a>(
             continue;
         } else if let Some(fence) = try_parse_fence_open(remaining, options.dialect)
             && fence_enabled(&fence, options)
-            && !(options.extensions.tex_math_gfm && is_gfm_math_fence(&fence))
         {
             if !commonmark
                 && !planner.paragraph.is_empty()
@@ -1560,15 +1696,23 @@ pub(super) fn plan<'a>(
                 pos += 1;
                 continue;
             }
+            if options.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
+                return Err((remaining.trim_start_matches([' ', '\t']), "fenced math"));
+            }
             if in_body {
                 let ops = container_ops(&planner.frames);
                 let prefix = ContainerPrefix::from_ops(&ops, true);
                 let mut end = pos + 1;
                 let mut closed = false;
                 for raw in &lines[end..] {
-                    let Some(tail) = ContainerPrefix::strip_required_ops(raw, &ops) else {
-                        break;
-                    };
+                    let tail = ContainerPrefix::strip_required_ops(raw, &ops).or_else(|| {
+                        if !matches!(planner.frames.last(), Some(Frame::Footnote)) {
+                            return None;
+                        }
+                        let tail = ContainerPrefix::strip_required_ops(raw, &ops[..ops.len() - 1])?;
+                        is_closing_fence(tail, &fence).then_some(tail)
+                    });
+                    let Some(tail) = tail else { break };
                     end += 1;
                     if is_closing_fence(tail, &fence) {
                         closed = true;
@@ -1692,7 +1836,8 @@ pub(super) fn plan<'a>(
         } else if !note_opener
             && (!matches!(planner.frames.last(), Some(Frame::Definition { .. }))
                 || opened_body
-                || leading_indent(line).0 < 4)
+                || leading_indent(line).0 < 4
+                || (pos > 0 && is_blank_line(lines[pos - 1])))
             && let Some(level) = try_parse_atx_heading(remaining)
         {
             if !planner.paragraph.is_empty() && options.extensions.blank_before_header {
@@ -1702,7 +1847,11 @@ pub(super) fn plan<'a>(
                     planner.interrupt_commonmark(line, remaining, prefixes)
                 } else {
                     planner.flush();
-                    let heading = if matches!(planner.frames.last(), Some(Frame::Footnote)) {
+                    let heading = if matches!(planner.frames.last(), Some(Frame::Footnote))
+                        || (matches!(planner.frames.last(), Some(Frame::Definition { .. }))
+                            && pos > 0
+                            && is_blank_line(lines[pos - 1]))
+                    {
                         remaining
                     } else {
                         restore_trailing_indent(line, remaining, &mut prefixes)
@@ -1724,7 +1873,7 @@ pub(super) fn plan<'a>(
                 prefixes,
                 underline,
             ));
-        } else if try_parse_horizontal_rule(remaining).is_some() {
+        } else if !definition_opener && try_parse_horizontal_rule(remaining).is_some() {
             if !commonmark && !opened_item && !opened_body && !planner.paragraph.is_empty() {
                 planner.push_text(remaining, prefixes);
                 pos += 1;
@@ -1738,7 +1887,9 @@ pub(super) fn plan<'a>(
                 remaining
             };
             planner.events.push(Event::Rule(rule));
-        } else if (commonmark || !opened_item)
+        } else if !note_opener
+            && !definition_opener
+            && (commonmark || !opened_item)
             && options.extensions.reference_links
             && planner.paragraph.is_empty()
             && remaining.trim_start().starts_with('[')
@@ -1790,7 +1941,8 @@ pub(super) fn plan<'a>(
         } else if !commonmark
             && !opener_as_text
             && let Some(construct) = deferred_pandoc_block(remaining, options)
-            && (construct != "line block" || planner.paragraph.is_empty())
+            && (construct != "line block"
+                || (!note_opener && !definition_opener && planner.paragraph.is_empty()))
         {
             return Err((remaining.trim_start_matches([' ', '\t']), construct));
         } else if opener_as_text
@@ -2007,6 +2159,11 @@ pub(super) fn emit(
                 }
                 emit_setext_underline(builder, underline);
                 builder.finish_node();
+            }
+            Event::GridTable(pos, prefix, table, tail, indent) => {
+                let window = StrippedLines::new(&lines[start..], pos, &prefix)
+                    .with_dispatch_override(tail, indent);
+                table.emit(builder, &window, options);
             }
             Event::PipeTable(pos, prefix, table, inject_list_indent) => {
                 let window = StrippedLines::new(&lines[start..], pos, &prefix);

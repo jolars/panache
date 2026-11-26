@@ -8,6 +8,7 @@ use super::container_prefix::{StripOp, StrippedLines};
 
 #[derive(Default)]
 pub(crate) struct LookaheadCache {
+    source: Option<(usize, usize)>,
     entries: Vec<Arc<Lookahead>>,
 }
 
@@ -29,6 +30,14 @@ impl LookaheadCache {
         first: &str,
         unicode_blank: bool,
     ) -> Arc<Lookahead> {
+        // Line indexes are relative to the source window. The block
+        // planner can pass a container slice or a bounded table scan.
+        let raw = lines.raw();
+        let source = (raw.as_ptr() as usize, raw.len());
+        if self.source != Some(source) {
+            self.entries.clear();
+            self.source = Some(source);
+        }
         // Dispatch advances monotonically. Drop expired views so lookup and
         // retained text do not grow with the number of blocks in a document.
         self.entries

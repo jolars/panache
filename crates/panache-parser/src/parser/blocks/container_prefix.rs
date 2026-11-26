@@ -660,6 +660,29 @@ impl ContainerPrefix {
         }
     }
 
+    #[cfg(feature = "experimental-block-parser")]
+    pub fn with_div_closer_boundary(mut self, in_div: bool) -> Self {
+        self.div_closer_ends_lines = in_div;
+        self
+    }
+
+    #[cfg(feature = "experimental-block-parser")]
+    pub fn with_list_start_boundary(
+        mut self,
+        options: &ParserOptions,
+        columns: impl IntoIterator<Item = u32>,
+    ) -> Self {
+        let mut content_column = 0;
+        for column in columns {
+            content_column += column;
+            self.list_item_ladder.push(content_column);
+        }
+        if !self.list_item_ladder.is_empty() {
+            self.list_start_detect = Some(ListMarkerDetect::from_options(options));
+        }
+        self
+    }
+
     /// Strip required container prefixes through the innermost quote while
     /// retaining any following list indentation as part of the block body.
     pub fn strip_through_last_quote<'a>(&self, line: &'a str) -> Option<&'a str> {
@@ -1335,6 +1358,14 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
         cache: &'p std::cell::RefCell<super::jupyter::LookaheadCache>,
     ) -> Self {
         self.jupyter_lookahead = Some(cache);
+        self
+    }
+
+    pub(crate) fn with_fallback_jupyter_lookahead(
+        mut self,
+        cache: &'p std::cell::RefCell<super::jupyter::LookaheadCache>,
+    ) -> Self {
+        self.jupyter_lookahead.get_or_insert(cache);
         self
     }
 

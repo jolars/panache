@@ -275,7 +275,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
   planner once both dialects preserve their existing CSTs.
 - [x] Port definition lists and footnote bodies. Cover nested blocks and the
   lines that end each body, and pin the CST with Pandoc fixtures.
-- [ ] Port grid tables, including nested content and compatibility-dependent
+- [x] Port grid tables, including nested content and compatibility-dependent
   cell compacting. Recheck the default Quarto benchmark documents.
 - [ ] Port Pandoc simple and multiline tables. Check caption placement and table
   boundaries inside containers against Pandoc-native fixtures.

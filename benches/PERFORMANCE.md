@@ -162,9 +162,9 @@ these buckets. Identify which one BEFORE editing:
 
 The `experimental-block-parser` feature exposes a second parser to tests and
 the comparison example. The planner records block ranges and container
-decisions before CST emission. It uses Panache's inline, YAML, raw HTML, and
-pipe table emitters. The comparison checks source round-trips, green trees, and
-diagnostics before timing either engine.
+decisions before CST emission. It uses Panache's inline, YAML, raw HTML, pipe
+table, and grid table emitters. The comparison checks source round-trips,
+green trees, and diagnostics before timing either engine.
 
 ```sh
 cargo build --release --features experimental-block-parser \
@@ -305,3 +305,91 @@ baseline. Both engines' p95 timings varied between runs when the host was busy.
 
 With default Quarto options, `large_authoring.qmd`, `tables.qmd`, and
 `math.qmd` stopped at grid tables at bytes 990, 3539, and 28452, respectively.
+
+### Body boundary and table lookahead checkpoint
+
+The release comparison used the same machine, documents, and options for
+`319045e1` and the follow-up. All seven timed workloads passed preflight.
+Each cell gives median and p95 in microseconds, with the incumbent on the
+left and the planner on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 209.9 / 223.4 → 130.3 / 138.2 | 166.3 / 172.2 → 121.3 / 127.3 | 2.6 / 2.9 → 2.5 / 2.8 | 2.0 / 2.2 → 1.1 / 1.2 |
+| Pandoc manual | 5035.0 / 5090.1 → 2824.2 / 2874.5 | 2155.9 / 2192.3 → 1433.6 / 1476.1 | 42.9 / 47.9 → 42.6 / 46.8 | 3.8 / 5.7 → 2.8 / 3.4 |
+| Parser README | 18.0 / 18.4 → 10.5 / 10.8 | 19.9 / 20.4 → 11.8 / 12.6 | 9.7 / 9.9 → 6.7 / 6.9 | 1.5 / 1.6 → 0.8 / 0.9 |
+| Integrations | 159.2 / 174.4 → 97.5 / 105.7 | 89.7 / 106.5 → 78.1 / 88.7 | 41.7 / 47.6 → 35.6 / 40.9 | 2.5 / 3.3 → 1.1 / 1.4 |
+| Getting Started | 264.3 / 274.1 → 151.5 / 158.4 | 101.9 / 108.4 → 92.7 / 98.0 | 45.9 / 50.6 → 41.6 / 45.9 | 2.3 / 2.4 → 1.1 / 1.2 |
+| Performance | 1026.4 / 1051.0 → 874.1 / 892.4 | 196.7 / 222.3 → 184.0 / 201.8 | 100.2 / 117.6 → 90.3 / 108.8 | 2.8 / 3.2 → 1.4 / 1.6 |
+| Math with grid tables disabled | 483.9 / 502.9 → 319.4 / 329.3 | 190.9 / 207.3 → 182.0 / 196.5 | 84.4 / 93.3 → 78.2 / 85.8 | 2.4 / 2.7 → 1.2 / 1.3 |
+
+Planner full-parse medians were 56–85% of the incumbent medians
+after the follow-up and 56–86% at `319045e1`. For line-start edits
+the ratios were 59–95% after the follow-up and 73–99% at the baseline.
+With default Quarto options, `large_authoring.qmd`, `tables.qmd`, and
+`math.qmd` stopped at grid tables at bytes 990, 3539, and 28452, respectively.
+
+A separate in-process probe measured full parses of a Quarto footnote
+containing repeated blank-separated paragraphs. The paragraphs contained
+either a literal pipe or a dash-prefixed continuation line. Both builds
+used the workspace release parser and ran on the same logical CPU. The
+probe checked source, CST, and diagnostics against the incumbent before
+collecting five samples. Timings are median and range in milliseconds.
+
+| Paragraphs | Literal pipe at `319045e1` | Literal pipe after | Dash at `319045e1` | Dash after |
+| ---: | ---: | ---: | ---: | ---: |
+| 4,000 | 497.34 (492.03–500.91) | 2.23 (2.20–3.16) | 130.73 (130.63–132.41) | 3.13 (3.10–4.20) |
+| 8,000 | 1965.15 (1961.84–1980.51) | 4.42 (4.40–6.42) | 548.75 (546.37–549.08) | 6.23 (6.15–8.43) |
+
+### Grid table checkpoint
+
+The release comparison used the same machine, documents, and options as the
+previous checkpoint. Each cell gives median and p95 in microseconds, with
+incumbent timings on the left and planner timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 208.4 / 220.7 → 126.3 / 141.5 | 136.4 / 141.7 → 115.2 / 121.1 | 2.7 / 2.7 → 2.5 / 2.6 | 2.0 / 2.1 → 1.1 / 1.2 |
+| Pandoc manual | 5068.7 / 5155.4 → 2823.9 / 2926.3 | 1378.8 / 1404.7 → 1348.4 / 1365.7 | 43.4 / 47.7 → 43.2 / 47.5 | 3.6 / 4.0 → 2.7 / 2.9 |
+| Parser README | 18.0 / 18.4 → 10.1 / 10.5 | 16.3 / 16.8 → 11.1 / 11.8 | 9.6 / 9.7 → 6.3 / 6.5 | 1.5 / 1.6 → 0.7 / 0.8 |
+| Integrations | 161.7 / 236.6 → 99.6 / 151.8 | 90.3 / 96.3 → 78.8 / 83.6 | 41.0 / 45.0 → 34.8 / 37.7 | 2.5 / 2.7 → 1.1 / 1.2 |
+| Getting Started | 260.0 / 266.2 → 151.0 / 158.0 | 102.3 / 107.8 → 93.9 / 101.9 | 45.1 / 49.8 → 41.1 / 45.8 | 2.3 / 2.4 → 1.1 / 1.1 |
+| Performance | 1033.0 / 1043.5 → 882.7 / 894.1 | 196.0 / 205.1 → 186.2 / 194.2 | 98.7 / 105.2 → 89.9 / 95.0 | 2.8 / 3.0 → 1.3 / 1.4 |
+| Tables | 665.4 / 679.4 → 476.9 / 492.1 | 218.6 / 238.7 → 209.8 / 225.3 | 106.2 / 120.0 → 99.1 / 112.3 | 2.7 / 3.1 → 1.3 / 1.5 |
+| Math | 501.5 / 532.3 → 330.0 / 358.0 | 196.6 / 215.8 → 188.8 / 207.6 | 84.3 / 98.7 → 79.9 / 93.7 | 2.5 / 2.7 → 1.2 / 1.4 |
+| Math with grid tables disabled | 488.3 / 511.0 → 318.8 / 330.8 | 190.3 / 199.9 → 180.6 / 190.0 | 82.4 / 88.1 → 76.2 / 81.8 | 2.5 / 2.6 → 1.2 / 1.3 |
+
+In paired runs before and after the grid table port, the planner's full-parse
+medians were 56–85% of the incumbent medians across the seven workloads that
+reached timing in both runs. The planner's line-start edit medians were
+71–99% of the incumbent medians before the port and 68–98% after it.
+
+With default Quarto options, `tables.qmd` and `math.qmd` passed preflight
+and reached timing. The grid tables in `large_authoring.qmd` matched the
+incumbent CST. Preflight still found differences in fenced div nesting and
+inline prefix placement outside the tables. The previous build also failed
+preflight for that document with grid tables disabled.
+
+### Parser review follow-up
+
+The release comparison reran the grid table checkpoint before and after the
+review fixes, on the same machine with the same documents and options. The
+table gives median and p95 in microseconds after the fixes. Incumbent timings
+are on the left and planner timings are on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 210.3 / 223.4 → 128.4 / 141.1 | 138.5 / 153.9 → 119.2 / 133.4 | 2.7 / 2.9 → 2.6 / 3.4 | 2.0 / 2.3 → 1.2 / 1.3 |
+| Pandoc manual | 5131.9 / 5222.5 → 2860.2 / 2950.3 | 1395.0 / 1436.6 → 1408.0 / 1444.8 | 44.2 / 57.0 → 44.0 / 48.8 | 3.8 / 5.2 → 2.8 / 3.4 |
+| Parser README | 17.7 / 18.6 → 10.1 / 10.6 | 16.1 / 17.8 → 11.4 / 11.9 | 9.5 / 9.8 → 6.5 / 6.7 | 1.5 / 1.6 → 0.7 / 0.8 |
+| Integrations | 158.9 / 218.7 → 98.9 / 131.2 | 89.6 / 94.4 → 78.0 / 84.7 | 41.2 / 45.7 → 35.3 / 37.6 | 2.4 / 2.5 → 1.1 / 1.2 |
+| Getting Started | 257.3 / 299.1 → 150.1 / 178.8 | 101.5 / 112.3 → 94.6 / 102.2 | 45.9 / 52.8 → 42.1 / 47.5 | 2.2 / 2.4 → 1.1 / 1.2 |
+| Performance | 1024.3 / 1046.6 → 878.3 / 904.6 | 196.3 / 204.6 → 186.4 / 194.0 | 99.5 / 105.3 → 90.4 / 96.2 | 2.7 / 2.9 → 1.3 / 1.4 |
+| Tables | 651.6 / 665.3 → 451.4 / 466.3 | 219.4 / 227.6 → 211.2 / 221.0 | 105.5 / 112.4 → 101.0 / 108.1 | 2.6 / 2.7 → 1.3 / 1.5 |
+| Math | 484.8 / 493.5 → 319.0 / 328.1 | 194.4 / 202.4 → 187.4 / 197.5 | 83.5 / 89.7 → 79.9 / 84.9 | 2.4 / 2.5 → 1.2 / 1.3 |
+| Math with grid tables disabled | 484.0 / 524.7 → 317.3 / 347.1 | 189.9 / 209.5 → 182.6 / 196.3 | 81.6 / 99.2 → 77.1 / 83.7 | 2.4 / 2.6 → 1.2 / 1.3 |
+
+The planner's full-parse medians were 56–85% of the incumbent medians before
+the fixes and 56–86% afterward. Its line-start edit medians were 71–101% in
+both runs. Nine workloads reached timing in both runs. The default Quarto
+run for `large_authoring.qmd` still failed CST preflight.

@@ -724,12 +724,10 @@ fn quarto_list_and_quote_boundaries_preserve_cst() {
 }
 
 #[test]
-fn quarto_reports_deferred_blocks_at_their_source_offset() {
+fn quarto_grid_table_at_quoted_list_item_opener() {
     let options = ParserOptions::for_flavor(Flavor::Quarto);
     let input = "> - +---+\n>   | a |\n>   +---+\n";
-    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
-    assert_eq!(gap.construct, "grid table");
-    assert_eq!(gap.offset, input.find('+').unwrap());
+    check(input, &options);
 }
 
 #[test]
@@ -883,12 +881,7 @@ fn quarto_note_preserves_nested_block_diagnostics() {
 
 #[test]
 fn quarto_body_reports_deferred_child_offset() {
-    let input = "[^note]: text\n\n    +---+\n    | a |\n    +---+\n";
     let options = ParserOptions::for_flavor(Flavor::Quarto);
-    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
-    assert_eq!(gap.construct, "grid table");
-    assert_eq!(gap.offset, input.find('+').unwrap());
-
     let input = include_str!("fixtures/cases/definition_body_table_nested_containers/input.md");
     let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
     assert_eq!(gap.construct, "simple table");
@@ -933,4 +926,299 @@ fn quarto_definition_continuation_tab_indent_pandoc() {
         include_str!("fixtures/cases/definition_continuation_tab_indent_pandoc/input.md"),
         &ParserOptions::for_flavor(Flavor::Quarto),
     );
+}
+
+#[test]
+fn quarto_body_continuations_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "> [^n]: note\n>\nOutside\n",
+        "> [^n]: note\n>\n>\nOutside\n",
+        "[^n]:\nUnindented text\n",
+        "Term\n:   ```\n    code\n    ```\noutside\n",
+        "[^n]: note\n# Heading\n",
+        "[^a]: first\n\n    > quote\n    [^b]: next\n",
+        "[^n]: note\n\n    ```\n    sample\n```\n",
+        "- Term\n  :   `first\n  second`\n",
+        "> Intro\n> [^n]: note\n",
+        "> Term\n> :   first\n> :   second\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn quarto_body_opening_precedence_preserves_cst() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "[^n]: [link]: https://example.com\n",
+        "[^n]: | one\n    | two\n",
+        "Term\n:   ***\n",
+        "Before.\n\n---\n: orphan\n",
+        "Term\n:   A | B\n    --|--\n    X | Y\n",
+        "Term\n:   text\n\n    # Heading\n",
+        "[^n]: Heading\n-------\n",
+    ] {
+        check(input, &options);
+    }
+    options.extensions.fenced_code_blocks = false;
+    check("~~~text\n:   meaning\n", &options);
+}
+
+#[test]
+fn quarto_wrapped_body_table_captions() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "[^n]: note\n\n    Table: A caption\n    Continued caption\n\n    A | B\n    --|--\n    X | Y\n",
+        "[^n]: note\n\n    A | B\n    --|--\n    X | Y\n\n    Table: A caption\n    Continued caption\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn quarto_deferred_body_blocks_preserve_openers() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_gfm = true;
+    for (input, opener, expected) in [
+        (
+            ": Caption\n\nA    B\n--- ---\nx    y\n",
+            ": Caption",
+            "extended Pandoc block",
+        ),
+        (
+            "-------\nA    B\n--- ---\nx    y\n-------\n\n: Caption\n",
+            ": Caption",
+            "extended Pandoc block",
+        ),
+        (
+            "-------\nA    B\n--- ---\nx    y\n-------\n: Caption\n",
+            ": Caption",
+            "extended Pandoc block",
+        ),
+        ("> | line\n> :   definition\n", "| line", "line block"),
+        (
+            "> <div>\n> :   content\n> </div>\n",
+            "<div>",
+            "Pandoc HTML block",
+        ),
+        (
+            "[^n]: note\n\n    ```math\n    x\n    ```\n",
+            "```math",
+            "fenced math",
+        ),
+    ] {
+        let gap = experimental_block::try_parse_with_errors(input, &options).expect_err(input);
+        assert_eq!(
+            (gap.offset, gap.construct),
+            (input.find(opener).unwrap(), expected),
+            "{input}"
+        );
+    }
+}
+
+#[test]
+fn quarto_footnote_prose_containing_table_like_lines() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for body in [
+        "    sentence with a literal | pipe\n\n",
+        "    a sentence\n    - another sentence\n\n",
+    ] {
+        let input = format!("[^n]: note\n\n{}Outside\n", body.repeat(128));
+        check(&input, &options);
+    }
+}
+
+#[test]
+fn grid_tables_preserve_cst_across_pandoc_compatibility_targets() {
+    use panache_parser::{PandocCompat, syntax::SyntaxKind};
+
+    let grid = "+-----+---------+\n| one | - first |\n|     | - next  |\n+=====+=========+\n| two | *three* |\n+-----+---------+\n";
+    for compat in [PandocCompat::V3_11, PandocCompat::V3_12] {
+        let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+        options.pandoc_compat = compat;
+        for input in [
+            grid.to_owned(),
+            format!("Table: Leading caption\n\n{grid}"),
+            format!("{grid}\n: Trailing caption\n"),
+            grid.lines().map(|line| format!("> {line}\n")).collect(),
+            format!(
+                "- item\n\n{}\n- next\n",
+                grid.lines()
+                    .map(|line| format!("  {line}\n"))
+                    .collect::<String>()
+            ),
+            format!(
+                "[^note]: text\n\n{}\nOutside.\n",
+                grid.lines()
+                    .map(|line| format!("    {line}\n"))
+                    .collect::<String>()
+            ),
+        ] {
+            let tree = check(&input, &options);
+            assert!(
+                tree.descendants()
+                    .any(|node| node.kind() == SyntaxKind::GRID_TABLE),
+                "{input}"
+            );
+        }
+        let mixed = include_str!("fixtures/cases/grid_table_mixed_blocks_pandoc/input.md");
+        let tree = check(mixed, &options);
+        let native = panache_parser::to_pandoc_ast_with_options(&tree, &options);
+        let paragraph = if compat == PandocCompat::V3_11 {
+            "Plain"
+        } else {
+            "Para"
+        };
+        assert!(
+            native.contains(&format!("{paragraph} [ Str \"text\" ]")),
+            "{native}"
+        );
+        assert!(native.contains("Header 1"), "{native}");
+
+        check(&format!("::: note\n{grid}\n: Caption\n:::\n"), &options);
+        check(&format!("A paragraph\n{grid}"), &options);
+        options.extensions.grid_tables = false;
+        check(
+            "+-----+---------+\n| one | value   |\n+-----+---------+\n",
+            &options,
+        );
+    }
+}
+
+#[test]
+fn grid_table_container_fixtures_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        include_str!("fixtures/cases/blockquote_list_item_grid_table_rowspan/input.md"),
+        include_str!("fixtures/cases/fenced_div_close_grid_table/input.qmd"),
+        include_str!("fixtures/cases/grid_table_in_list_blockquote/input.md"),
+        include_str!("fixtures/cases/grid_table_indented_is_paragraph/input.md"),
+        include_str!("fixtures/cases/list_item_grid_table_caption_after_pandoc/input.md"),
+        include_str!("fixtures/cases/list_item_grid_table_marker_line_pandoc/input.md"),
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn grid_table_boundaries() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "Table: Caption\n\n+---+\n| a |\n+---+\n",
+        "# Heading\n+---+\n| a |\n+---+\n",
+        "> +---+\n| a |\n> +---+\n",
+        "- item\n\n  +---+\n| a |\n  +---+\n",
+        "[^note]: +---+\n    | a |\n    +---+\n",
+        "term\n\n:   +---+\n    | a |\n    +---+\n",
+        "> ::: note\n> +---+\n> | a |\n> +---+\n>\n> : Caption\n> :::\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn grid_table_cell_edit_preserves_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = format!(
+        "# Intro\n\n+-------+-------+\n| alpha | beta  |\n+-------+-------+\n\n{}",
+        "Unchanged paragraph.\n\n".repeat(60)
+    );
+    let tree = check(&input, &options);
+    let offset = input.find("alpha").unwrap();
+    let edit = Edit {
+        range: offset..offset + "alpha".len(),
+        insert: "gamma".into(),
+    };
+    let updated = edit.apply(&input);
+    let expected = check(&updated, &options);
+    let result =
+        experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options)
+            .expect("grid table cell edit can be spliced");
+    assert_eq!(result.green, expected.green().to_owned());
+    assert!(result.errors.is_empty());
+}
+
+#[test]
+fn jupyter_table_lookahead_crosses_container_boundaries_safely() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_jupyter = true;
+    check(
+        "[^n]:\n    a | b\n    --|--\n    $x\n\nc | $y\nz$ | d\n--|--\n",
+        &options,
+    );
+}
+
+#[test]
+fn grid_table_after_indented_quote_opener_is_lossless() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("10. a\n\n    > +---+\n    > | a |\n    > +---+\n", &options);
+}
+
+#[test]
+fn grid_caption_ends_at_sibling_list_marker() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check(
+        "- +---+\n  | a |\n  +---+\n\n  Table: Caption\n- sibling\n",
+        &options,
+    );
+}
+
+#[test]
+fn unfinished_grid_on_list_marker_line_stays_prose() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("- +---+\n  | a |\n  done\n", &options);
+}
+
+#[test]
+fn pipe_caption_in_note_ends_at_div_closer() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check(
+        "[^n]: note\n\n    ::: note\n    a | b\n    --|--\n    x | y\n\n    : cap\n    :::\n",
+        &options,
+    );
+}
+
+#[test]
+fn footnote_rule_indented_with_a_tab_is_not_setext() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("See [^n].\n\n[^n]:\n\t---\n", &options);
+}
+
+#[test]
+fn lazy_definition_continuation_preserves_nested_list_indent() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("Term\n:   definition\n    - `one\n  two`\n", &options);
+}
+
+#[test]
+fn lazy_quote_continuation_after_body_blank_classifies_heading() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "> Term\n> :   definition\n>\n# Heading\n",
+        "> Term\n> :   definition\n>\n# Heading\nText inside the quote.\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn dash_rules_do_not_claim_colon_prose_as_table_captions() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [": prose\n\n- - -\n", "--- ---\n: prose\n"] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn definition_opener_can_start_a_pipe_prefixed_term() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("Term\n:   | literal\n    : def\n", &options);
+}
+
+#[test]
+fn pandoc_tilde_math_fence_does_not_interrupt_quoted_prose() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_gfm = true;
+    check("> prose\n> ~~~math\n> x\n> ~~~\n", &options);
 }
