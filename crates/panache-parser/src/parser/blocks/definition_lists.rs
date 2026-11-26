@@ -118,6 +118,11 @@ pub(crate) fn emit_term(
         inline_emission::emit_inlines(builder, term_text, config, false);
     }
 
+    let trailing = &text[trimmed_text.len()..];
+    if !trailing.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), trailing);
+    }
+
     if !newline_str.is_empty() {
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }

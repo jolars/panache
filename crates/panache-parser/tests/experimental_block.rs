@@ -758,12 +758,179 @@ fn shared_container_review_regressions() {
     ] {
         check(input, &quarto);
     }
-    for (input, construct, opener) in [
-        ("- Term\n  : def\n", "definition list", ":"),
-        ("- a\n\n  ---\n  x\n  ---\n", "simple table", "---"),
+    check("- Term\n  : def\n", &quarto);
+    let input = "- a\n\n  ---\n  x\n  ---\n";
+    let gap = experimental_block::try_parse_with_errors(input, &quarto).unwrap_err();
+    assert_eq!(gap.construct, "simple table");
+    assert_eq!(gap.offset, input.find("---").unwrap());
+}
+
+#[test]
+fn quarto_nested_body_fixtures_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        include_str!("fixtures/cases/definition_list/input.md"),
+        include_str!("fixtures/cases/definition_list_blockquote_continuation/input.md"),
+        include_str!("fixtures/cases/definition_list_in_list_blockquote/input.md"),
+        include_str!("fixtures/cases/definition_list_pandoc_bare_leading_list/input.md"),
+        include_str!("fixtures/cases/footnote_bare_marker_body_heading/input.md"),
+        include_str!("fixtures/cases/footnote_bare_marker_body_table/input.md"),
+        include_str!("fixtures/cases/footnote_fenced_code_indent/input.md"),
+        include_str!("fixtures/cases/definition_list_bare_marker_pandoc/input.md"),
+        include_str!("fixtures/cases/definition_list_pandoc_loose_compact/input.md"),
+        include_str!("fixtures/cases/definition_list_inner_list_no_blank/input.md"),
+        include_str!("fixtures/cases/definition_list_in_list_item_nested/input.md"),
+        include_str!("fixtures/cases/definition_list_lazy_marker_in_blockquote_pandoc/input.md"),
+        include_str!("fixtures/cases/definition_list_nested_second_term_indent/input.md"),
+        include_str!("fixtures/cases/footnote_def_paragraph/input.md"),
+        include_str!("fixtures/cases/footnote_ref_in_footnote_def_is_text/input.md"),
+        include_str!("fixtures/cases/footnote_definition_in_list_item/input.md"),
+        include_str!("fixtures/cases/footnote_with_blockquote/input.md"),
+        include_str!("fixtures/cases/footnote_marker_line_blocks/input.md"),
+        include_str!("fixtures/cases/pipe_table_in_footnote_stops_at_note_marker/input.md"),
+        include_str!("fixtures/cases/footnote_continuation_tab_indent_pandoc/input.md"),
+        include_str!("fixtures/cases/footnote_paragraph_no_list_interrupt/input.md"),
+        include_str!("fixtures/cases/definition_list_in_nested_blockquote_pandoc/input.md"),
+        include_str!("fixtures/cases/definition_list_nesting/input.md"),
+        include_str!("fixtures/cases/footnote_definition_list/input.md"),
+        include_str!("fixtures/cases/definition_list_orphan_marker/input.md"),
+        include_str!("fixtures/cases/definition_term_trailing_whitespace/input.md"),
     ] {
-        let gap = experimental_block::try_parse_with_errors(input, &quarto).unwrap_err();
-        assert_eq!(gap.construct, construct);
-        assert_eq!(gap.offset, input.find(opener).unwrap());
+        check(input, &options);
     }
+}
+
+#[test]
+fn quarto_body_boundaries_and_extension_overrides() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "Term  \r\n:\tdefinition\r\n\r\nNext\r\n~   sibling",
+        "Term\n:   first\n    lazy\n\n    > quoted\n\nOutside\n",
+        "Term\n\n\n: orphan\n",
+        "Term\n:   body\n\n: caption\n\na | b\n--|--\nx | y\n",
+        "[^id]: opener\nunderindented prose\n[^next]: sibling\n\nOutside\n",
+        "[^id]:\n    # Heading\n\n    text\n\nOutside\n",
+        "[^id]: body\n    [^next]: indented\n\nOutside\n",
+        "::: note\nTerm\n:   body\n:::\nOutside\n",
+        "::: note\n[^id]: body\n:::\nOutside\n",
+        "- [^id]: marker-line note\n",
+        "> [^id]: quoted note\n>     continuation\n> [^next]: sibling\n",
+        "Term\n:   definition\n\n    [^id]: note\n\nOutside\n",
+        "Term\n:   > quoted\n    > body\n:   next definition\n",
+        "[^id]: term\n    :   definition\n\n[^next]: sibling\n",
+        "[^id]: body\n\n    - list\n    - sibling\n\nOutside\n",
+        "[^id]: body\n\n    ```\n    [^other]: code\n    ```\n[^other]: sibling\n",
+    ] {
+        check(input, &options);
+    }
+    for compat in [
+        panache_parser::PandocCompat::V3_7,
+        panache_parser::PandocCompat::Latest,
+    ] {
+        options.pandoc_compat = compat;
+        check("Term\n: a\n\n  short continuation\n\nOutside\n", &options);
+    }
+    options.extensions.definition_lists = false;
+    options.extensions.footnotes = false;
+    check("Term\n~   text\n\n[^n]: body\n", &options);
+}
+
+#[test]
+fn quarto_chained_body_edits_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let mut text = format!(
+        "# Intro\n\nTerm\n:   definition text\n\n{}[^note]: note body\n\n{}",
+        "A separator paragraph.\n\n".repeat(30),
+        "Unaffected paragraph.\n\n".repeat(40)
+    );
+    let mut tree = check(&text, &options);
+    for (old, new) in [
+        ("definition text", "modified text"),
+        ("[^note]", "[^renamed]"),
+    ] {
+        let start = text.find(old).unwrap();
+        let edit = Edit {
+            range: start..start + old.len(),
+            insert: new.into(),
+        };
+        text = edit.apply(&text);
+        let expected = check(&text, &options);
+        let attempt =
+            experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &text, &options);
+        if old == "[^note]" {
+            assert!(attempt.is_none());
+        } else {
+            let result = attempt.expect("definition body text can be spliced");
+            let updated = SyntaxNode::new_root(result.green);
+            assert_eq!(updated.green(), expected.green());
+            assert!(result.errors.is_empty());
+            assert!(std::ptr::eq(
+                tree.last_child().unwrap().green(),
+                updated.last_child().unwrap().green()
+            ));
+        }
+        tree = expected;
+    }
+}
+
+#[test]
+fn quarto_note_preserves_nested_block_diagnostics() {
+    let input = "[^note]:\n    ```{r}\n    #| label: [\n    print(1)\n    ```\n";
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    assert!(!parse_with_errors(input, Some(options.clone())).1.is_empty());
+    check(input, &options);
+}
+
+#[test]
+fn quarto_body_reports_deferred_child_offset() {
+    let input = "[^note]: text\n\n    +---+\n    | a |\n    +---+\n";
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
+    assert_eq!(gap.construct, "grid table");
+    assert_eq!(gap.offset, input.find('+').unwrap());
+
+    let input = include_str!("fixtures/cases/definition_body_table_nested_containers/input.md");
+    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
+    assert_eq!(gap.construct, "simple table");
+    assert_eq!(gap.offset, input.find("A    B").unwrap());
+}
+
+#[test]
+fn quarto_definition_marker_ends_definition_body_block() {
+    check(
+        include_str!("fixtures/cases/definition_marker_ends_definition_body_block/input.md"),
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
+}
+
+#[test]
+fn quarto_definition_marker_ends_list_item_block() {
+    check(
+        include_str!("fixtures/cases/definition_marker_ends_list_item_block/input.md"),
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
+}
+
+#[test]
+fn quarto_definition_marker_promotes_definition_body_term() {
+    check(
+        include_str!("fixtures/cases/definition_marker_promotes_definition_body_term/input.md"),
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
+}
+
+#[test]
+fn quarto_definition_marker_tab_straddle() {
+    check(
+        include_str!("fixtures/cases/definition_marker_tab_straddle/input.md"),
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
+}
+
+#[test]
+fn quarto_definition_continuation_tab_indent_pandoc() {
+    check(
+        include_str!("fixtures/cases/definition_continuation_tab_indent_pandoc/input.md"),
+        &ParserOptions::for_flavor(Flavor::Quarto),
+    );
 }

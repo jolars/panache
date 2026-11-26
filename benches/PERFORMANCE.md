@@ -279,3 +279,29 @@ In release scaling checks, increasing repeated quoted pipe tables from
 Increasing consecutive blank lines inside a list from 16,000 to 32,000
 increased the median from 1.0 ms to 2.0 ms. These checks measured the
 experimental parser over 15 samples per input.
+
+### Definition list and footnote body checkpoint
+
+The release comparison used the same AMD Ryzen 9 7900, Rust 1.98.1,
+documents, and parser options as the baseline run at `7f4282f6`.
+Seven workloads passed preflight. The table records median and p95 in
+microseconds, with the incumbent on the left of each arrow and the planner
+on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 217.9 / 312.6 → 132.5 / 184.3 | 139.6 / 153.7 → 118.8 / 138.5 | 2.7 / 3.2 → 2.6 / 3.0 | 2.1 / 2.3 → 1.1 / 1.4 |
+| Pandoc manual | 5188.8 / 5786.2 → 2883.4 / 3314.3 | 1439.2 / 1595.4 → 1417.5 / 1616.8 | 45.2 / 50.9 → 44.5 / 51.2 | 5.9 / 9.9 → 3.9 / 7.3 |
+| Parser README | 18.5 / 19.5 → 10.5 / 12.8 | 16.9 / 19.6 → 11.9 / 14.1 | 10.0 / 10.8 → 6.8 / 7.1 | 1.5 / 1.6 → 0.7 / 0.8 |
+| Integrations | 167.5 / 190.3 → 103.0 / 118.0 | 95.2 / 112.8 → 82.1 / 94.2 | 43.5 / 49.6 → 37.1 / 42.3 | 2.5 / 3.4 → 1.2 / 1.4 |
+| Getting Started | 272.7 / 358.7 → 158.4 / 221.2 | 109.6 / 134.4 → 98.5 / 115.7 | 49.2 / 62.4 → 43.6 / 50.1 | 2.4 / 3.6 → 1.2 / 1.4 |
+| Performance | 1058.2 / 1270.8 → 909.9 / 1015.4 | 203.9 / 233.8 → 189.8 / 211.2 | 102.2 / 119.5 → 92.4 / 102.7 | 2.9 / 3.8 → 1.4 / 1.7 |
+| Math with grid tables disabled | 500.6 / 570.5 → 330.4 / 458.1 | 203.0 / 292.3 → 193.6 / 245.6 | 88.3 / 123.1 → 83.6 / 113.3 | 2.6 / 4.0 → 1.3 / 1.8 |
+
+Planner full-parse medians were 56–86% of the incumbent medians,
+compared with 55–85% at the baseline. Line-start edit medians were
+70–98% of the incumbent medians, compared with 70–101% at the
+baseline. Both engines' p95 timings varied between runs when the host was busy.
+
+With default Quarto options, `large_authoring.qmd`, `tables.qmd`, and
+`math.qmd` stopped at grid tables at bytes 990, 3539, and 28452, respectively.

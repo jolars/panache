@@ -273,7 +273,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
   markers, blank-line and indentation extensions, and
   compatibility-dependent sublists. Move simple lists onto the shared
   planner once both dialects preserve their existing CSTs.
-- [ ] Port definition lists and footnote bodies. Cover nested blocks and the
+- [x] Port definition lists and footnote bodies. Cover nested blocks and the
   lines that end each body, and pin the CST with Pandoc fixtures.
 - [ ] Port grid tables, including nested content and compatibility-dependent
   cell compacting. Recheck the default Quarto benchmark documents.

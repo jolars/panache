@@ -20,7 +20,6 @@ use super::blocks::code_blocks::{
     FenceInfo, is_closing_fence, is_gfm_math_fence, parse_fenced_code_block, try_parse_fence_open,
 };
 use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
-use super::blocks::definition_lists::try_parse_definition_marker;
 use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
 use super::blocks::figures::paragraph_is_standalone_image;
 use super::blocks::headings::{
@@ -277,7 +276,15 @@ fn plan<'a>(
             && marker == Some(b'>')
             && (fresh || !options.extensions.blank_before_blockquote)
         {
-            plan_containers(input, lines, &mut pos, options, jupyter_lines, &mut blocks)?;
+            plan_containers(
+                input,
+                lines,
+                &mut pos,
+                options,
+                jupyter_lines,
+                divs.last().copied(),
+                &mut blocks,
+            )?;
             continue;
         } else if indent < 4
             && (fresh || commonmark)
@@ -291,7 +298,15 @@ fn plan<'a>(
                 || (marker_start_number(&first.marker).is_none_or(|start| start == 1)
                     && !is_blank_line(&line[indent_bytes + first.marker_len..])))
         {
-            plan_containers(input, lines, &mut pos, options, jupyter_lines, &mut blocks)?;
+            plan_containers(
+                input,
+                lines,
+                &mut pos,
+                options,
+                jupyter_lines,
+                divs.last().copied(),
+                &mut blocks,
+            )?;
             continue;
         } else if commonmark
             && options.extensions.raw_html
@@ -317,13 +332,6 @@ fn plan<'a>(
             continue;
         } else if !commonmark && options.extensions.raw_html && marker == Some(b'<') {
             return Err(unsupported("Pandoc HTML block"));
-        } else if !commonmark
-            && options.extensions.footnotes
-            && marker == Some(b'[')
-            && content.starts_with("[^")
-            && content.contains("]:")
-        {
-            return Err(unsupported("footnote definition"));
         } else if options.extensions.grid_tables
             && marker == Some(b'+')
             && try_parse_grid_separator(line).is_some()
@@ -336,14 +344,25 @@ fn plan<'a>(
         {
             return Err(unsupported("line block"));
         } else if !commonmark
-            && ((options.extensions.definition_lists
-                && matches!(marker, Some(b':' | b'~'))
-                && try_parse_definition_marker(line).is_some())
-                || (options.extensions.pandoc_title_block && marker == Some(b'%'))
+            && ((options.extensions.pandoc_title_block && marker == Some(b'%'))
                 || (options.extensions.raw_tex && marker == Some(b'\\'))
                 || (options.extensions.tex_math_dollars && content.starts_with("$$")))
         {
             return Err(unsupported("extended Pandoc block"));
+        } else if !commonmark
+            && (containers::footnote_marker(line, options).is_some()
+                || (fresh && containers::root_definition_term(lines, pos, options)))
+        {
+            plan_containers(
+                input,
+                lines,
+                &mut pos,
+                options,
+                jupyter_lines,
+                divs.last().copied(),
+                &mut blocks,
+            )?;
+            continue;
         } else {
             push_paragraph(&mut blocks, pos);
         }
@@ -359,14 +378,16 @@ fn plan_containers<'a>(
     pos: &mut usize,
     options: &ParserOptions,
     jupyter_lines: &'a OnceCell<Arc<super::blocks::jupyter::Lookahead>>,
+    outer_div_indent: Option<usize>,
     blocks: &mut Vec<Block<'a>>,
 ) -> Result<(), Unsupported> {
-    let (consumed, events) = containers::plan(&lines[*pos..], options, jupyter_lines).map_err(
-        |(unhandled, construct)| Unsupported {
-            offset: unhandled.as_ptr() as usize - input.as_ptr() as usize,
-            construct,
-        },
-    )?;
+    let (consumed, events) =
+        containers::plan(&lines[*pos..], options, jupyter_lines, outer_div_indent).map_err(
+            |(unhandled, construct)| Unsupported {
+                offset: unhandled.as_ptr() as usize - input.as_ptr() as usize,
+                construct,
+            },
+        )?;
     blocks.push(Block::Containers(*pos, events));
     *pos += consumed;
     Ok(())
@@ -534,6 +555,7 @@ fn emit_buffered_paragraph(
     kind: K,
     paragraph: &ParagraphBuffer,
     options: &ParserOptions,
+    suppress_footnote_refs: bool,
 ) {
     let kind = if options.extensions.implicit_figures
         && paragraph_is_standalone_image(&paragraph.get_text_for_parsing(), options)
@@ -543,7 +565,7 @@ fn emit_buffered_paragraph(
         kind
     };
     builder.start_node(kind.into());
-    paragraph.emit_with_inlines(builder, options, false);
+    paragraph.emit_with_inlines(builder, options, suppress_footnote_refs);
     builder.finish_node();
 }
 

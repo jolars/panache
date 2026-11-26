@@ -506,6 +506,15 @@ fn prepare_fence_open_line<'a>(
     window: &StrippedLines<'a, '_>,
     first_line_override: Option<&'a str>,
 ) -> &'a str {
+    if let Some((tail, _)) = window.dispatch_override() {
+        let trimmed = strip_leading_spaces(tail);
+        let tail = window.emit_or_dispatch_tail(builder, window.pos());
+        let indent = &tail[..tail.len() - trimmed.len()];
+        if !indent.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent);
+        }
+        return trimmed;
+    }
     let source_line = window.raw_at(0);
     let prefix = window.prefix();
     let bq_depth = prefix.bq_depth();

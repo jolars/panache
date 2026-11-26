@@ -1264,6 +1264,7 @@ pub(crate) struct StrippedLines<'a, 'p> {
     /// scan start can sit past a caption while dispatch stays at
     /// `line_pos`).
     dispatch: usize,
+    dispatch_override: Option<(&'a str, &'a str)>,
     prefix: &'p ContainerPrefix,
     hugo_lookahead: Option<&'p std::cell::RefCell<super::hugo::LookaheadCache>>,
     jupyter_lookahead: Option<&'p std::cell::RefCell<super::jupyter::LookaheadCache>>,
@@ -1277,6 +1278,7 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             base,
             dispatch: base,
             prefix,
+            dispatch_override: None,
             hugo_lookahead: None,
             jupyter_lookahead: None,
         }
@@ -1296,9 +1298,21 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             base,
             dispatch,
             prefix,
+            dispatch_override: None,
             hugo_lookahead: None,
             jupyter_lookahead: None,
         }
+    }
+
+    /// Use the planned body slice and its literal indent on the dispatch line.
+    #[cfg(feature = "experimental-block-parser")]
+    pub(crate) fn with_dispatch_override(mut self, tail: &'a str, indent: &'a str) -> Self {
+        self.dispatch_override = Some((tail, indent));
+        self
+    }
+
+    pub(crate) fn dispatch_override(&self) -> Option<(&'a str, &'a str)> {
+        self.dispatch_override
     }
 
     /// Number of lines available from `base` onward (line 0 plus lookahead).
@@ -1311,6 +1325,7 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
         Self {
             base,
             dispatch,
+            dispatch_override: self.dispatch_override.filter(|_| dispatch == self.dispatch),
             ..*self
         }
     }
@@ -1420,6 +1435,11 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
     /// dispatch line, [`ContainerPrefix::strip`] otherwise. Pure
     /// detection — emits nothing.
     pub fn strip_at(&self, i: usize) -> &'a str {
+        if i == self.dispatch
+            && let Some((tail, _)) = self.dispatch_override
+        {
+            return tail;
+        }
         let line = self.raw[i];
         if i == self.dispatch {
             self.prefix.strip_line_0_for_emission(line)
@@ -1437,6 +1457,11 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
     /// dispatch keeps its list indent under the emission strip, which would
     /// defeat such a test.
     pub fn detect_at(&self, i: usize) -> &'a str {
+        if i == self.dispatch
+            && let Some((tail, _)) = self.dispatch_override
+        {
+            return tail;
+        }
         let line = self.raw[i];
         if i == self.dispatch {
             self.prefix.strip_dispatch_line(line)
@@ -1496,6 +1521,12 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
         i: usize,
     ) -> &'a str {
         if i == self.dispatch {
+            if let Some((tail, indent)) = self.dispatch_override {
+                if !indent.is_empty() {
+                    builder.token(SyntaxKind::LINE_PREFIX.into(), indent);
+                }
+                return tail;
+            }
             let (mut tail, indent) = self
                 .prefix
                 .strip_line_0_with_indent_emit(self.raw[self.dispatch]);

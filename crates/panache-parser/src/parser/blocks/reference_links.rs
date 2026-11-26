@@ -528,6 +528,26 @@ pub fn try_parse_footnote_marker(line: &str) -> Option<(String, usize)> {
     Some((id.to_string(), pos))
 }
 
+/// Emit the original whitespace and label of an opened footnote definition.
+pub(crate) fn emit_footnote_marker(
+    builder: &mut rowan::GreenNodeBuilder<'static>,
+    indent: &str,
+    id: &str,
+    padding: &str,
+) {
+    use crate::syntax::SyntaxKind as K;
+    if !indent.is_empty() {
+        builder.token(K::WHITESPACE.into(), indent);
+    }
+    builder.token(K::FOOTNOTE_LABEL_START.into(), "[^");
+    builder.token(K::FOOTNOTE_LABEL_ID.into(), id);
+    builder.token(K::FOOTNOTE_LABEL_END.into(), "]");
+    builder.token(K::FOOTNOTE_LABEL_COLON.into(), ":");
+    if !padding.is_empty() {
+        builder.token(K::WHITESPACE.into(), padding);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{line_is_mmd_link_attribute_continuation, try_parse_reference_definition};

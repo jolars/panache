@@ -804,6 +804,7 @@ golden_test_cases!(
     definition_list_pandoc_bare_leading_list,
     definition_list_pandoc_loose_compact,
     definition_list_wrapping,
+    definition_term_trailing_whitespace,
     definition_marker_at_deep_content_col,
     definition_marker_tab_straddle,
     definition_term_not_item_content_continuation,

@@ -67,8 +67,9 @@ use super::blocks::myst_targets::{
 use super::blocks::raw_blocks;
 use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{
-    ReferenceSpans, line_is_mmd_link_attribute_continuation, reference_definition_spans,
-    try_parse_footnote_marker, try_parse_reference_definition_with_options,
+    ReferenceSpans, emit_footnote_marker, line_is_mmd_link_attribute_continuation,
+    reference_definition_spans, try_parse_footnote_marker,
+    try_parse_reference_definition_with_options,
 };
 use super::blocks::tables::{
     is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
@@ -1070,24 +1071,14 @@ impl BlockParser for FootnoteDefinitionParser {
         }
 
         builder.start_node(SyntaxKind::FOOTNOTE_DEFINITION.into());
-        if indent_len > 0 {
-            builder.token(SyntaxKind::WHITESPACE.into(), &content[..indent_len]);
-        }
+        let indent = &content[..indent_len];
         let marker_text = &content[indent_len..content_start];
         if let Some((id, _)) = try_parse_footnote_marker(marker_text) {
-            builder.token(SyntaxKind::FOOTNOTE_LABEL_START.into(), "[^");
-            builder.token(SyntaxKind::FOOTNOTE_LABEL_ID.into(), &id);
-            builder.token(SyntaxKind::FOOTNOTE_LABEL_END.into(), "]");
-            builder.token(SyntaxKind::FOOTNOTE_LABEL_COLON.into(), ":");
-            let marker_suffix = marker_text
-                .strip_prefix("[^")
-                .and_then(|tail| tail.strip_prefix(id.as_str()))
-                .and_then(|tail| tail.strip_prefix("]:"))
-                .unwrap_or("");
-            if !marker_suffix.is_empty() {
-                builder.token(SyntaxKind::WHITESPACE.into(), marker_suffix);
-            }
+            emit_footnote_marker(builder, indent, &id, &marker_text[id.len() + 4..]);
         } else {
+            if !indent.is_empty() {
+                builder.token(SyntaxKind::WHITESPACE.into(), indent);
+            }
             builder.token(SyntaxKind::FOOTNOTE_REFERENCE.into(), marker_text);
         }
 

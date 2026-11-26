@@ -1,0 +1,17 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..43
+  DEFINITION_LIST@0..43
+    DEFINITION_ITEM@0..43
+      TERM@0..28
+        TEXT@0..25 "Term with trailing sp ..."
+        WHITESPACE@25..27 "  "
+        NEWLINE@27..28 "\n"
+      DEFINITION@28..43
+        DEFINITION_MARKER@28..29 ":"
+        WHITESPACE@29..32 "   "
+        PLAIN@32..43
+          TEXT@32..42 "Definition"
+          NEWLINE@42..43 "\n"
