@@ -1,0 +1,7 @@
+[ BulletList
+    [ [ Div ( "box" , [] , [] ) [ Plain [ Str "hi" ] ]
+      , Plain [ Str "more" ]
+      ]
+    , [ Plain [ Str "after" ] ]
+    ]
+]

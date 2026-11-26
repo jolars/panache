@@ -1,0 +1,9 @@
+[ BulletList
+    [ [ BlockQuote
+          [ Div ( "" , [] , [] ) [ Para [ Str "inside" ] ] ]
+      ]
+    , [ Plain [ Str "next" ]
+      , RawBlock (Format "html") "</div>"
+      ]
+    ]
+]

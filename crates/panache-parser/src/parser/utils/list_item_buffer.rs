@@ -893,6 +893,24 @@ pub(crate) fn emit_html_block_lift_from_stripped(
     let refdefs = config.refdef_labels.clone().unwrap_or_default();
     let inner_root = crate::parser::parse_with_refdefs(parse_text, Some(config.clone()), refdefs);
 
+    graft_html_block_lift(
+        builder,
+        &inner_root,
+        TextSize::of(parse_text),
+        prefix_lines,
+        use_paragraph,
+        allow_unclosed_div,
+    )
+}
+
+pub(crate) fn graft_html_block_lift(
+    builder: &mut GreenNodeBuilder<'static>,
+    inner_root: &SyntaxNode,
+    source_len: TextSize,
+    prefix_lines: Vec<ContainerPrefixLine>,
+    use_paragraph: bool,
+    allow_unclosed_div: bool,
+) -> bool {
     let children: Vec<SyntaxNode> = inner_root.children().collect();
     if children.is_empty() {
         return false;
@@ -905,7 +923,7 @@ pub(crate) fn emit_html_block_lift_from_stripped(
         return false;
     }
     let total_end = children.last().unwrap().text_range().end();
-    if total_end != TextSize::of(parse_text) {
+    if total_end != source_len {
         return false;
     }
 

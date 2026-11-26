@@ -1,0 +1,6 @@
+- > <div>
+  > body
+
+- > ::: note
+  > text
+  > :::

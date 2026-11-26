@@ -5,6 +5,7 @@
 //! document as a benchmark workload.
 
 mod containers;
+mod html;
 
 use std::{borrow::Cow, cell::RefCell, ops::Range, sync::Arc};
 
@@ -39,8 +40,8 @@ use super::blocks::metadata::{
 };
 use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
 use super::blocks::tables::{
-    PreparedGridTable, PreparedPipeTable, is_dash_table_caption, is_table_caption_start,
-    prepare_grid_table, prepare_pipe_table,
+    DashTableKind, PreparedDashTable, PreparedGridTable, PreparedPipeTable, is_table_caption_start,
+    prepare_dash_table_at, prepare_grid_table, prepare_pipe_table,
 };
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
@@ -61,16 +62,18 @@ pub struct Unsupported {
 
 enum Block<'a> {
     Blank(usize),
-    Paragraph(Range<usize>),
+    Paragraph(Range<usize>, K),
     Atx(usize, usize),
     Setext(Range<usize>, usize),
     Rule(usize),
     Reference(Range<usize>, ReferenceSpans),
     GridTable(usize, PreparedGridTable),
+    DashTable(usize, PreparedDashTable),
     PipeTable(usize, PreparedPipeTable),
     Containers(usize, Vec<containers::Event<'a>>),
     IndentedCode(Range<usize>),
     Html(Range<usize>, HtmlBlockType),
+    PandocHtml(html::PreparedHtml),
     Code(Range<usize>, FenceInfo),
     Metadata(usize, usize, YamlContentOutcome),
     OpenDiv(usize, DivFenceInfo),
@@ -118,10 +121,10 @@ fn source_span<'a>(input: &'a str, lines: &[&str], range: Range<usize>) -> &'a s
 }
 
 fn push_paragraph(blocks: &mut Vec<Block<'_>>, pos: usize) {
-    if let Some(Block::Paragraph(range)) = blocks.last_mut() {
+    if let Some(Block::Paragraph(range, _)) = blocks.last_mut() {
         range.end = pos + 1;
     } else {
-        blocks.push(Block::Paragraph(pos..pos + 1));
+        blocks.push(Block::Paragraph(pos..pos + 1, K::PARAGRAPH));
     }
 }
 
@@ -132,13 +135,13 @@ fn plan<'a>(
     origin: ParseOrigin,
     jupyter_lines: &RefCell<super::blocks::jupyter::LookaheadCache>,
 ) -> Result<Vec<Block<'a>>, Unsupported> {
-    let prefix = ContainerPrefix::default();
+    let prefix = ContainerPrefix::from_ops(&[], false);
     let mut blocks = Vec::new();
     let mut divs = Vec::new();
     let mut pos = 0;
     let commonmark = options.dialect == Dialect::CommonMark;
     while let Some(&line) = lines.get(pos) {
-        let paragraph = matches!(blocks.last(), Some(Block::Paragraph(_)));
+        let paragraph = matches!(blocks.last(), Some(Block::Paragraph(..)));
         let fresh = !paragraph;
         let at_start = pos == 0 && origin == ParseOrigin::Document;
         let (indent, indent_bytes) = leading_indent(line);
@@ -146,6 +149,21 @@ fn plan<'a>(
         let marker = content.as_bytes().first().copied();
         let offset = line.as_ptr() as usize - input.as_ptr() as usize;
         let unsupported = |construct| Unsupported { offset, construct };
+        let div_prefix = divs
+            .last()
+            .map(|&indent| prefix.clone().with_div_closer_boundary(Some(indent), true));
+        let table_prefix = div_prefix.as_ref().unwrap_or(&prefix);
+        let dash_candidate = || {
+            (content.starts_with('-')
+                || lines
+                    .get(pos + 1)
+                    .is_some_and(|next| next.trim_start().starts_with('-'))
+                || (options.extensions.table_captions && is_table_caption_start(line)))
+                && (!options.extensions.raw_html
+                    || marker != Some(b'<')
+                    || try_parse_html_block_start(line, commonmark).is_none())
+                && try_parse_list_marker(line, options, OpenListHint::None).is_none()
+        };
 
         if is_blank_line(line) {
             blocks.push(Block::Blank(pos));
@@ -194,7 +212,7 @@ fn plan<'a>(
             divs.push(indent);
             blocks.push(Block::OpenDiv(pos, fence));
         } else if matches!(marker, Some(b'=' | b'-'))
-            && let Some(Block::Paragraph(range)) = blocks.last_mut()
+            && let Some(Block::Paragraph(range, _)) = blocks.last_mut()
             && (commonmark || range.len() == 1)
             && try_parse_setext_heading(lines, pos - 1).is_some()
         {
@@ -206,12 +224,6 @@ fn plan<'a>(
             && let Some(level) = try_parse_atx_heading(line)
         {
             blocks.push(Block::Atx(pos, level));
-        } else if indent < 4
-            && matches!(marker, Some(b'*' | b'-' | b'_'))
-            && (commonmark || fresh)
-            && try_parse_horizontal_rule(line).is_some()
-        {
-            blocks.push(Block::Rule(pos));
         } else if fresh
             && indent < 4
             && options.extensions.reference_links
@@ -241,18 +253,49 @@ fn plan<'a>(
             blocks.push(Block::Reference(pos..end, spans));
             pos = end;
             continue;
+        } else if !commonmark
+            && options.extensions.raw_html
+            && marker == Some(b'<')
+            && let Some(kind) = html::detect(line, fresh)
+            && let Some(block) = html::prepare(
+                StrippedLines::new(lines, pos, &prefix),
+                kind,
+                options,
+                if divs.is_empty() {
+                    SoftbreakFusion::ToDocEnd
+                } else {
+                    SoftbreakFusion::ToFencedDivClose
+                },
+                None,
+            )
+        {
+            if let Some(Block::Paragraph(_, kind)) = blocks.last_mut() {
+                *kind = K::PLAIN;
+            }
+            pos = block.end;
+            blocks.push(Block::PandocHtml(block));
+            continue;
         } else if fresh
             && options.extensions.grid_tables
             && (line.starts_with('+')
                 || (options.extensions.table_captions && is_table_caption_start(line)))
-            && let Some(table) = prepare_grid_table(&StrippedLines::new(
-                lines,
-                pos,
-                &prefix.clone().with_div_closer_boundary(!divs.is_empty()),
-            ))
+            && let Some(table) = prepare_grid_table(&StrippedLines::new(lines, pos, table_prefix))
         {
             let consumed = table.lines_consumed;
             blocks.push(Block::GridTable(pos, table));
+            pos += consumed;
+            continue;
+        } else if fresh
+            && options.extensions.multiline_tables
+            && dash_candidate()
+            && let Some(table) = prepare_dash_table_at(
+                &StrippedLines::new(lines, pos, table_prefix),
+                options,
+                DashTableKind::Multiline,
+            )
+        {
+            let consumed = table.lines_consumed;
+            blocks.push(Block::DashTable(pos, table));
             pos += consumed;
             continue;
         } else if fresh
@@ -272,6 +315,25 @@ fn plan<'a>(
             blocks.push(Block::PipeTable(pos, table));
             pos += consumed;
             continue;
+        } else if fresh
+            && options.extensions.simple_tables
+            && dash_candidate()
+            && let Some(table) = prepare_dash_table_at(
+                &StrippedLines::new(lines, pos, table_prefix),
+                options,
+                DashTableKind::Simple,
+            )
+        {
+            let consumed = table.lines_consumed;
+            blocks.push(Block::DashTable(pos, table));
+            pos += consumed;
+            continue;
+        } else if indent < 4
+            && matches!(marker, Some(b'*' | b'-' | b'_'))
+            && (commonmark || fresh)
+            && try_parse_horizontal_rule(line).is_some()
+        {
+            blocks.push(Block::Rule(pos));
         } else if indent >= 4 && fresh && !line.trim().is_empty() {
             let mut end = pos + 1;
             let mut cursor = end;
@@ -345,8 +407,6 @@ fn plan<'a>(
             blocks.push(Block::Html(pos..end, kind));
             pos = end;
             continue;
-        } else if !commonmark && options.extensions.raw_html && marker == Some(b'<') {
-            return Err(unsupported("Pandoc HTML block"));
         } else if options.extensions.line_blocks
             && fresh
             && marker == Some(b'|')
@@ -356,9 +416,7 @@ fn plan<'a>(
         } else if !commonmark
             && ((options.extensions.pandoc_title_block && marker == Some(b'%'))
                 || (options.extensions.raw_tex && marker == Some(b'\\'))
-                || (options.extensions.tex_math_dollars && content.starts_with("$$"))
-                || (marker == Some(b':')
-                    && is_dash_table_caption(&StrippedLines::new(lines, pos, &prefix), options)))
+                || (options.extensions.tex_math_dollars && content.starts_with("$$")))
         {
             return Err(unsupported("extended Pandoc block"));
         } else if !commonmark
@@ -481,12 +539,12 @@ fn parse_at(
             Block::Blank(pos) => {
                 emit_blank(&mut builder, lines[pos]);
             }
-            Block::Paragraph(range) => {
+            Block::Paragraph(range, kind) => {
                 let text = source_span(input, &lines, range);
-                let kind = if paragraph_is_standalone_image(text, options) {
+                let kind = if kind == K::PARAGRAPH && paragraph_is_standalone_image(text, options) {
                     K::FIGURE
                 } else {
-                    K::PARAGRAPH
+                    kind
                 };
                 builder.start_node(kind.into());
                 emit_inlines(&mut builder, text, options, false);
@@ -511,6 +569,10 @@ fn parse_at(
                 builder.finish_node();
             }
             Block::GridTable(pos, table) => {
+                let window = StrippedLines::new(&lines, pos, &prefix);
+                table.emit(&mut builder, &window, options);
+            }
+            Block::DashTable(pos, table) => {
                 let window = StrippedLines::new(&lines, pos, &prefix);
                 table.emit(&mut builder, &window, options);
             }
@@ -541,6 +603,7 @@ fn parse_at(
                     None,
                 );
             }
+            Block::PandocHtml(block) => block.emit(&mut builder),
             Block::Code(range, fence) => {
                 let window = StrippedLines::new(&lines[..range.end], range.start, &prefix);
                 parse_fenced_code_block(

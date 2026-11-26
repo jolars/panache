@@ -944,3 +944,21 @@
 
 # A dedented marker can continue a nested list at a different indent (issue #635).
 609
+
+# html-block: a div inside a quoted list item stops before the next item,
+# and comment trailing prose keeps its soft break inside the quote.
+610
+611
+
+# html-block: preserve consecutive comment tails, fenced div closers,
+# and completed native divs in list items.
+612
+613
+614
+
+# Closing-tag boundaries preserve an adjacent code fence and sibling fenced div.
+615
+616
+
+# Raw HTML, native divs, and fenced divs can start on a comment's closing line.
+617

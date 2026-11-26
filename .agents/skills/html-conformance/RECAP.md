@@ -354,70 +354,42 @@
 
 --------------------------------------------------------------------------------
 
-## Latest session — 2026-10-23 (review regression fixes)
+## Latest session — 2026-11-26 (experimental block planner)
 
-Consumer follow-up to the raw HTML and reference identity changes. All four
-reviewed regressions reproduced in focused lint tests before their fixes.
-Workspace **6853 → 6864 passing**. Check, Clippy, formatting, editor extension
-compilation, both conformance allowlists, and the regenerated Pandoc report pass.
-Pandoc remains **601/607**, with html-block **300/306** and html-inline **49/49**.
-All four CLI reproductions report no issues with caching disabled.
+Ported Pandoc HTML block dispatch to the planner for Quarto. The planner
+resolves interruption and container ownership before assembling the document
+CST. It shares HTML tag recognition and body parsing with the incumbent.
 
-- Heading declarations and heading-link conversion match raw labels consistently;
-  visible heading text still determines automatic IDs.
-- Shared label accessors omit container prefixes while retaining inline markup,
-  including image labels used by project usage indexing and hover.
-- Empty native divs bypass CommonMark raw HTML rescanning.
-- Direct figure captions contribute declarations, while inline image descriptions
-  and descriptions of nested images in captions remain excluded.
-- Explicit anchor navigation consults the shared symbol declaration index, so
-  caption spans resolve consistently with lint diagnostics.
-- Regression tests cover lint diagnostics, lossless syntax accessors, definition
-  navigation, and heading-link conversion. No CST shapes, formatter behavior,
-  conformance corpus entries, or allowlists changed.
+Pandoc 3.12 corpus coverage moved from **603/609 → 605/611**. HTML blocks
+moved from **300/306 → 302/308** and inline HTML stayed at **49/49**.
+Fixtures 0610 and 0611 pin sibling-list boundaries and comment trailing
+soft breaks inside a quoted item. The parser and formatter goldens for that
+comment confirm lossless prefixes and idempotency.
 
-## Previous session — 2026-10-23 (raw HTML boundaries and reference identity)
+- HTML continuation uses the same list-start boundary check as tables.
+  A tag inside a quoted item cannot consume the next item's matching close.
+- Comment and PI trailing prose use the dispatch line's stripped content.
+  Fusion inside a quote captures the full list and quote prefix and stops
+  when it no longer continues that quote.
+- A distant closer can turn an earlier paragraph with an invalid div
+  opener into raw HTML. The shared reparser declines when an edit can
+  change the pairing.
 
-Phases 3/7a consumer follow-up. Pandoc unchanged: **601/607**, html-block
-**300/306**, html-inline **49/49**. Workspace **6844 → 6853 passing**. Check,
-tests, Clippy, formatting, both allowlists, and the regenerated report pass.
+The workspace passed 7,216 tests with default features and 7,324 with all
+features. The six existing HTML typography cases remain in the blocked list.
 
-### What changed
-
-- Both declaration indexes scan opaque raw blocks with incoming literal context
-  and retain outgoing context, using the existing HTML attribute recognizer.
-- Declaration filtering handles closes anywhere in raw content and openers that
-  survive Markdown block boundaries, while preserving source ranges and memo parity.
-- Reference diagnostics, usages, and navigation preserve raw label identity.
-- Nine regressions cover syntax accessors, prefix mapping, index parity, context
-  edits, diagnostics, matching marked-up definitions, and heading-link actions.
-- CLI reproductions pass: both HTML cases are clean; the reference case reports
-  undefined-reference and unused-definition warnings. No CST shape or formatter
-  changes, corpus additions, allowlist edits, or golden fixture changes.
-
-### Files in committable diff
-
-- Parser HTML scanning and syntax wrappers — consumer context and label identity.
-- Salsa and linter consumers/tests — declaration-index and reference-usage fixes.
-- LSP consumers/tests and guides — navigation identity and behavior documentation.
-- This recap — raw-block boundary and reference-identity traps.
-
-### Suggested next sub-targets (ranked)
-
-1. **Unmatched emphasis inside native spans** — recursive inline termination.
-2. **Native-span edge whitespace projection** — CST keeps spaces; projector trims.
-3. **Standalone smart closing quotes** — unblock 0573-0578.
-4. **Semicolon-less legacy value refs** (`id="a&amp b"` → `a& b`).
-5. **Multi-line-second-div inter-tag** — depth-model gap.
-
-### New traps
-
-- Raw-content boundaries and reference identity are folded into Persistent traps.
-
---------------------------------------------------------------------------------
+Review follow-ups raised coverage to **611/617**, including **307/313** HTML
+blocks. Cases 0612–0617 cover comment tails, multiline bodies, quoted fences,
+and list sibling boundaries. Fusion follows a trailing block through its
+closer and leaves prefix-only EOF lines to the enclosing quote. The planner
+verifies grafted bytes and keeps lazy headings inside their containers.
+Task projection emits the checkbox before a structural HTML block. The
+incremental guard finds possible multiline openers before scanning a suffix.
 
 ## Earlier sessions (compact log)
 
+- 2026-10-23 — consumer review fixes — html 349/355 unchanged — reference label identity, empty divs, figure captions, and explicit-anchor navigation.
+- 2026-10-23 — raw HTML boundary and reference identity — preserved multiline raw attributes, source prefixes, and raw reference label spelling.
 - 2026-10-23 — raw HTML review fixes — html 349/355 unchanged; workspace 6829 → 6844 — EOF prefixes, multiline attribute fragments, and cross-block literal-state memos.
 - 2026-10-23 — raw HTML consumers — html 349/355 unchanged; workspace 6817 → 6829 — typed visible text skips attrs; declarations exclude image descriptions and inline literal contents.
 - 2026-10-07→08 — Phase G invalid names and raw boundaries — html 317 → 349 — shared span/div name gates; skip code, escapes, comments, quoted tags, and PIs in native-span matching; six typography cases deferred.

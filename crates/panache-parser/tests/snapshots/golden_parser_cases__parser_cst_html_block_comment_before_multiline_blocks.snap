@@ -1,0 +1,67 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..108
+  HTML_BLOCK_RAW@0..12
+    HTML_BLOCK_TAG@0..12
+      TEXT@0..12 "<!-- raw -->"
+  HTML_BLOCK_RAW@12..32
+    HTML_BLOCK_TAG@12..18
+      TEXT@12..17 "<pre>"
+      NEWLINE@17..18 "\n"
+    HTML_BLOCK_CONTENT@18..25
+      NEWLINE@18..19 "\n"
+      TEXT@19..24 "*raw*"
+      NEWLINE@24..25 "\n"
+    HTML_BLOCK_TAG@25..32
+      TEXT@25..31 "</pre>"
+      NEWLINE@31..32 "\n"
+  BLANK_LINE@32..33
+    BLANK_LINE@32..33 "\n"
+  HTML_BLOCK_RAW@33..48
+    HTML_BLOCK_TAG@33..48
+      TEXT@33..48 "<!-- native -->"
+  HTML_BLOCK_DIV@48..70
+    HTML_BLOCK_TAG@48..54
+      TEXT@48..52 "<div"
+      TEXT@52..53 ">"
+      NEWLINE@53..54 "\n"
+    BLANK_LINE@54..55
+      BLANK_LINE@54..55 "\n"
+    PARAGRAPH@55..62
+      EMPHASIS@55..61
+        EMPHASIS_MARKER@55..56 "*"
+        TEXT@56..60 "body"
+        EMPHASIS_MARKER@60..61 "*"
+      NEWLINE@61..62 "\n"
+    BLANK_LINE@62..63
+      BLANK_LINE@62..63 "\n"
+    HTML_BLOCK_TAG@63..70
+      TEXT@63..69 "</div>"
+      NEWLINE@69..70 "\n"
+  BLANK_LINE@70..71
+    BLANK_LINE@70..71 "\n"
+  HTML_BLOCK_RAW@71..86
+    HTML_BLOCK_TAG@71..86
+      TEXT@71..86 "<!-- fenced -->"
+  FENCED_DIV@86..108
+    DIV_FENCE_OPEN@86..95
+      TEXT@86..89 ":::"
+      WHITESPACE@89..90 " "
+      DIV_INFO@90..94
+        TEXT@90..94 "note"
+      NEWLINE@94..95 "\n"
+    BLANK_LINE@95..96
+      BLANK_LINE@95..96 "\n"
+    PARAGRAPH@96..103
+      EMPHASIS@96..102
+        EMPHASIS_MARKER@96..97 "*"
+        TEXT@97..101 "body"
+        EMPHASIS_MARKER@101..102 "*"
+      NEWLINE@102..103 "\n"
+    BLANK_LINE@103..104
+      BLANK_LINE@103..104 "\n"
+    DIV_FENCE_CLOSE@104..108
+      TEXT@104..107 ":::"
+      NEWLINE@107..108 "\n"

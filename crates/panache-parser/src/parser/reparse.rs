@@ -345,6 +345,17 @@ fn reparse_attempt(
     let old_edit = (edit.range.start, edit.range.end);
 
     let new_edit = edit.new_range();
+    let old_len = usize::from(prev_tree.text_range().end());
+    if old_edit.0 > old_edit.1
+        || old_edit.1 > old_len
+        || !new_text.is_char_boundary(new_edit.0)
+        || !new_text.is_char_boundary(new_edit.1)
+    {
+        return None;
+    }
+    if old_edit == (0, old_len) && new_edit == (0, new_text.len()) {
+        return None;
+    }
     let window_hopeless = window_is_too_wide(cost_guards, new_edit.0, new_text.len());
     let region_hopeless = region_is_too_wide(
         cost_guards,
@@ -352,6 +363,18 @@ fn reparse_attempt(
         new_text.len(),
     );
     if window_hopeless && region_hopeless {
+        return None;
+    }
+
+    if options.dialect == Dialect::Pandoc
+        && options.extensions.raw_html
+        && changes_pandoc_html_pairing(&prev_tree, edit, new_text)
+    {
+        return None;
+    }
+
+    if options.extensions.multiline_tables && changes_table_blank_lines(&prev_tree, edit, new_text)
+    {
         return None;
     }
 
@@ -386,6 +409,175 @@ fn reparse_attempt(
         cost_guards,
         parse,
     )
+}
+
+/// A Pandoc HTML opener can look like prose until a distant edit completes
+/// its opening tag or balances a rejected native div. The seam probes only
+/// see adjacent blocks, so they cannot verify a splice after such an edit.
+fn changes_pandoc_html_pairing(tree: &SyntaxNode, edit: &Edit, new_text: &str) -> bool {
+    let (start, end) = edit.new_range();
+    let line_start = new_text[..start].rfind('\n').map_or(0, |i| i + 1);
+    let line_end = new_text[end..]
+        .find('\n')
+        .map_or(new_text.len(), |i| end + i);
+
+    let removed = covering_text(
+        tree,
+        rowan::TextRange::new(
+            (edit.range.start as u32).into(),
+            (edit.range.end as u32).into(),
+        ),
+    );
+    new_text[line_start..line_end].contains('<')
+        || removed.contains('<')
+        || pandoc_html_open_tag_before(tree, &new_text[..start])
+}
+
+/// The unchanged prefix can contain a tag whose attribute region reaches
+/// the edit, even when the old CST represents it as prose. Only an opening
+/// tag without its terminating `>` can observe changes to later attributes
+/// or quotes. A complete tag is independent of subsequent prose edits.
+fn pandoc_html_open_tag_before(tree: &SyntaxNode, prefix: &str) -> bool {
+    use super::blocks::blockquotes::count_blockquote_markers;
+    use super::blocks::html_blocks::html_tag_has_unquoted_gt;
+    use memchr::memrchr;
+
+    // Find a possible multiline opener before walking the intervening
+    // text. Inline tags and complete first-line tags cannot reach the edit.
+    // Jump over a completed code block in one step, even if it contains
+    // thousands of apparent openers and there is HTML elsewhere.
+    let mut search_end = prefix.len();
+    loop {
+        let Some(offset) = memrchr(b'<', &prefix.as_bytes()[..search_end]) else {
+            return false;
+        };
+        search_end = offset;
+        if !pandoc_html_block_tag_at(&prefix[offset..]) {
+            continue;
+        }
+        if html_tag_has_unquoted_gt(prefix[offset..].bytes().take_while(|&byte| byte != b'\n')) {
+            continue;
+        }
+        let range = rowan::TextRange::at((offset as u32).into(), 1.into());
+        let node = match tree.covering_element(range) {
+            rowan::NodeOrToken::Node(node) => Some(node),
+            rowan::NodeOrToken::Token(token) => token.parent(),
+        };
+        if let Some(code) = node.and_then(|node| {
+            node.ancestors().find(|node| {
+                node.kind() == SyntaxKind::CODE_BLOCK
+                    && usize::from(node.text_range().end()) <= prefix.len()
+            })
+        }) {
+            search_end = code.text_range().start().into();
+            continue;
+        }
+        break;
+    }
+
+    // For each suffix, record whether it closes a tag entered unquoted,
+    // single-quoted, or double-quoted. Prepending a quote swaps the
+    // corresponding entry states. This composes in one backwards pass,
+    // even when a listing contains thousands of apparent openers.
+    let mut raw = [false; 3];
+    let mut quoted = [false; 3];
+    for line in prefix.rsplit('\n') {
+        let first_marker = line.find('>');
+        let tail = count_blockquote_markers(line.trim_start_matches([' ', '\t'])).1;
+        let quote_prefix_len = line.len() - tail.len();
+        for (offset, byte) in line.bytes().enumerate().rev() {
+            if byte == b'<' {
+                let closes = if first_marker.is_some_and(|marker| marker < offset) {
+                    quoted[0]
+                } else {
+                    raw[0]
+                };
+                if !closes && pandoc_html_block_tag_at(&line[offset..]) {
+                    return true;
+                }
+            }
+            update_html_close_state(&mut raw, byte);
+            if offset >= quote_prefix_len {
+                update_html_close_state(&mut quoted, byte);
+            }
+        }
+    }
+    false
+}
+
+fn pandoc_html_block_tag_at(text: &str) -> bool {
+    use super::blocks::html_blocks::{HtmlBlockType, try_parse_html_block_start};
+    let after = &text[1..];
+    let name = after.strip_prefix('/').unwrap_or(after);
+    if !name.starts_with(|ch: char| ch.is_ascii_alphabetic()) {
+        return false;
+    }
+    let len = name.bytes().take_while(u8::is_ascii_alphanumeric).count();
+    name[len..]
+        .chars()
+        .next()
+        .is_none_or(|ch| ch.is_whitespace() || matches!(ch, '>' | '/'))
+        && matches!(
+            try_parse_html_block_start(&text[..text.len() - name.len() + len], false),
+            Some(HtmlBlockType::BlockTag { .. })
+        )
+}
+
+fn update_html_close_state(closes: &mut [bool; 3], byte: u8) {
+    match byte {
+        b'>' => closes[0] = true,
+        b'\'' => closes.swap(0, 1),
+        b'"' => closes.swap(0, 2),
+        _ => {}
+    }
+}
+
+/// Multiline borders can pair across regions when a row break is introduced
+/// or removed. Only inspect edits that can change the local line structure.
+fn changes_table_blank_lines(tree: &SyntaxNode, edit: &Edit, new_text: &str) -> bool {
+    let removed = covering_text(
+        tree,
+        rowan::TextRange::new(
+            (edit.range.start as u32).into(),
+            (edit.range.end as u32).into(),
+        ),
+    );
+    let is_blank_prefix = |c: char| c.is_whitespace() || c == '>';
+    if !removed.trim_matches(is_blank_prefix).is_empty()
+        && !removed.contains(['\n', '\r'])
+        && !edit.insert.contains(['\n', '\r'])
+        && !edit.insert.trim_matches(is_blank_prefix).is_empty()
+    {
+        return false;
+    }
+    let (new_start, new_end) = edit.new_range();
+    let line_start = new_text[..new_start].rfind('\n').map_or(0, |i| i + 1);
+    let line_end = new_text[new_end..]
+        .find('\n')
+        .map_or(new_text.len(), |i| new_end + i + 1);
+    let old_lines = format!(
+        "{}{removed}{}",
+        &new_text[line_start..new_start],
+        &new_text[new_end..line_end],
+    );
+    let blank_positions = |text: &str| {
+        text.lines()
+            .enumerate()
+            .filter(|(_, line)| line.trim_matches(is_blank_prefix).is_empty())
+            .map(|(i, _)| i)
+            .collect::<Vec<_>>()
+    };
+    if blank_positions(&old_lines) == blank_positions(&new_text[line_start..line_end]) {
+        return false;
+    }
+    let has_border = |text: &str| {
+        text.lines().any(|line| {
+            let line = line.trim_start_matches([' ', '\t', '>']).trim_end();
+            line.bytes().filter(|&b| b == b'-').count() >= 2
+                && line.bytes().all(|b| matches!(b, b'-' | b' '))
+        })
+    };
+    has_border(new_text) || has_border(&old_lines)
 }
 
 /// The token tier: an edit confined to the interior of one plain-prose `TEXT`
@@ -484,6 +676,15 @@ fn reparse_token(
     new_leaf.push_str(&old_leaf[..lo]);
     new_leaf.push_str(&edit.insert);
     new_leaf.push_str(&old_leaf[hi..]);
+
+    if options.dialect == Dialect::Pandoc
+        && options.extensions.raw_html
+        && new_text
+            .get(..old_edit.0)
+            .is_some_and(|prefix| pandoc_html_open_tag_before(old_tree, prefix))
+    {
+        return None;
+    }
 
     let allowed = token_tier_allowed_mask(options);
     let inert = |text: &str| text.bytes().all(|byte| allowed[byte as usize]);
@@ -826,8 +1027,7 @@ fn reparse_ranges(
     // the top rule of a table that swallows the seam. `prefix_fence_state_is_stable`
     // cannot carry this one — dash runs are far too common for a parity count.
     if last_retained_block_kind(old_tree, old_restart)
-        .is_some_and(last_retained_block_absorbs_colon_line)
-        && first_nonblank_line_is_definition_marker(suffix_text)
+        .is_some_and(|kind| accepts_backward_attachment(kind, suffix_text, config))
     {
         return None;
     }
@@ -1129,15 +1329,22 @@ fn last_retained_block_kind(old_tree: &SyntaxNode, boundary: usize) -> Option<Sy
         .map(|child| child.kind())
 }
 
-fn last_retained_block_absorbs_colon_line(kind: SyntaxKind) -> bool {
-    matches!(
-        kind,
-        SyntaxKind::PARAGRAPH
-            | SyntaxKind::SIMPLE_TABLE
-            | SyntaxKind::MULTILINE_TABLE
-            | SyntaxKind::PIPE_TABLE
-            | SyntaxKind::GRID_TABLE
-    )
+fn accepts_backward_attachment(kind: SyntaxKind, text: &str, config: &ParserOptions) -> bool {
+    let Some(line) = text.lines().find(|line| !line.trim().is_empty()) else {
+        return false;
+    };
+    match kind {
+        SyntaxKind::PARAGRAPH => is_definition_marker_line(line),
+        SyntaxKind::SIMPLE_TABLE
+        | SyntaxKind::MULTILINE_TABLE
+        | SyntaxKind::PIPE_TABLE
+        | SyntaxKind::GRID_TABLE => {
+            is_definition_marker_line(line)
+                || (config.extensions.table_captions
+                    && super::blocks::tables::is_table_caption_start(line))
+        }
+        _ => false,
+    }
 }
 
 fn retained_prefix_has_thematic_break(old_tree: &SyntaxNode, boundary: usize) -> bool {
@@ -1152,20 +1359,6 @@ fn has_dash_rule_line(text: &str) -> bool {
         let trimmed = line.trim();
         trimmed.len() >= 3 && trimmed.bytes().all(|b| b == b'-')
     })
-}
-
-/// Whether the first non-blank line of `text` is a definition-list marker
-/// line (`:` or `~` followed by space or end of line).
-///
-/// Distinct from [`first_nonblank_line_is_container_marker`] in what it
-/// couples to: a container marker continues an open *container*, while a
-/// definition marker reaches back and rewrites the preceding *paragraph*.
-/// `:::` and `~~~` are fence openers, not markers, so the rest of the run must
-/// not be another delimiter character.
-fn first_nonblank_line_is_definition_marker(text: &str) -> bool {
-    text.lines()
-        .find(|line| !line.trim().is_empty())
-        .is_some_and(is_definition_marker_line)
 }
 
 fn is_definition_marker_line(line: &str) -> bool {
@@ -1436,8 +1629,7 @@ fn reparse_section_window(
         return None;
     }
     if last_retained_block_kind(old_tree, section_window.old_start)
-        .is_some_and(last_retained_block_absorbs_colon_line)
-        && first_nonblank_line_is_definition_marker(window_text)
+        .is_some_and(|kind| accepts_backward_attachment(kind, window_text, config))
     {
         return None;
     }

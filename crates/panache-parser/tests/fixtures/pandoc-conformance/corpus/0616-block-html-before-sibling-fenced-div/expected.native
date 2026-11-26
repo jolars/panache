@@ -1,0 +1,9 @@
+[ BulletList
+    [ [ BlockQuote
+          [ Div ( "" , [] , [] ) [ Para [ Str "body" ] ] ]
+      ]
+    , [ BlockQuote
+          [ Div ( "" , [ "note" ] , [] ) [ Para [ Str "text" ] ] ]
+      ]
+    ]
+]

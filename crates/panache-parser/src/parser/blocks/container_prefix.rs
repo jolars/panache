@@ -127,7 +127,7 @@ pub(crate) struct ContainerPrefix {
     /// is ordinary content — a table row in pandoc (probed).
     ///
     /// [`LineView::ends_container_lines`]: super::tables::LineView::ends_container_lines
-    div_closer_ends_lines: bool,
+    div_closer_indent: Option<usize>,
     /// Op index of the outermost `FootnoteDefinition`'s `ContentIndent`
     /// op, when a footnote is on the stack. Pandoc collects a note's
     /// raw lines in `noteBlock`, whose `rawLine` stops at a new note
@@ -255,16 +255,23 @@ impl ContainerPrefix {
         list_marker_consumed_on_line_0: bool,
         config: &ParserOptions,
     ) -> Self {
+        Self::from_stack_with_appended(stack, None, list_marker_consumed_on_line_0, config)
+    }
+
+    pub(crate) fn from_stack_with_appended(
+        stack: &[Container],
+        appended_item: Option<&Container>,
+        list_marker_consumed_on_line_0: bool,
+        config: &ParserOptions,
+    ) -> Self {
         struct PendingListAdvance {
             content_col: u32,
-            div_open: bool,
             html_open: Option<(String, u32)>,
         }
         let mut ops: SmallVec<[StripOp; INLINE_STRIP_OPS]> = SmallVec::new();
         let mut pending_list_advance: Option<PendingListAdvance> = None;
         let mut saw_list_advance = false;
-        let mut div_open = false;
-        let mut div_closer_ends_lines = false;
+        let mut div_closer_indent = None;
         let mut html_open: Option<(String, u32)> = None;
         let mut html_closer_tag: Option<(String, u32)> = None;
         let mut note_marker_op_bound = None;
@@ -273,18 +280,17 @@ impl ContainerPrefix {
         let mut list_start_supplies_blank = false;
         let mut html_closer_supplies_blank = false;
         let mut list_item_ladder: SmallVec<[u32; 4]> = SmallVec::new();
-        for c in stack {
+        for c in stack.iter().chain(appended_item) {
             match c {
                 Container::BlockQuote { .. } => {
                     if let Some(p) = pending_list_advance.take() {
                         ops.push(StripOp::ListAdvance(p.content_col));
                         saw_list_advance = true;
-                        div_closer_ends_lines |= p.div_open;
                         html_closer_tag = p.html_open.or(html_closer_tag);
                     }
                     list_item_ladder.clear();
                     ops.push(StripOp::BlockQuoteMarker);
-                    div_closer_ends_lines |= div_open;
+
                     html_closer_tag = html_open.clone().or(html_closer_tag);
                     div_chain_collects = true;
                     div_chain_appends = true;
@@ -295,13 +301,12 @@ impl ContainerPrefix {
                     if let Some(p) = pending_list_advance.take() {
                         ops.push(StripOp::ListAdvance(p.content_col));
                         saw_list_advance = true;
-                        div_closer_ends_lines |= p.div_open;
                         html_closer_tag = p.html_open.or(html_closer_tag);
                     }
                     list_item_ladder.clear();
                     note_marker_op_bound.get_or_insert(ops.len());
                     ops.push(StripOp::ContentIndent(*content_col as u32));
-                    div_closer_ends_lines |= div_open;
+
                     html_closer_tag = html_open.clone().or(html_closer_tag);
                     div_chain_collects = true;
                     div_chain_appends = true;
@@ -315,12 +320,11 @@ impl ContainerPrefix {
                             ops.push(StripOp::ListAdvance(p.content_col));
                         }
                         saw_list_advance = true;
-                        div_closer_ends_lines |= p.div_open;
                         html_closer_tag = p.html_open.or(html_closer_tag);
                     }
                     list_item_ladder.clear();
                     ops.push(StripOp::ContentIndent(*content_col as u32));
-                    div_closer_ends_lines |= div_open;
+
                     html_closer_tag = html_open.clone().or(html_closer_tag);
                     div_chain_collects = true;
                 }
@@ -331,7 +335,6 @@ impl ContainerPrefix {
                 } => {
                     pending_list_advance = Some(PendingListAdvance {
                         content_col: *content_col as u32,
-                        div_open,
                         html_open: html_open.clone(),
                     });
                     list_item_ladder.push(*content_col as u32);
@@ -342,8 +345,8 @@ impl ContainerPrefix {
                         html_closer_supplies_blank = false;
                     }
                 }
-                Container::FencedDiv { .. } => {
-                    div_open = true;
+                Container::FencedDiv { open_indent_cols } => {
+                    div_closer_indent = Some(*open_indent_cols);
                     div_chain_collects = false;
                     div_chain_appends = false;
                 }
@@ -353,10 +356,9 @@ impl ContainerPrefix {
         if let Some(p) = pending_list_advance {
             ops.push(StripOp::ListAdvance(p.content_col));
             saw_list_advance = true;
-            div_closer_ends_lines |= p.div_open;
             html_closer_tag = p.html_open.or(html_closer_tag);
         }
-        div_closer_ends_lines |= div_open;
+
         debug_assert_eq!(
             ops.iter()
                 .map(|op| match op {
@@ -372,7 +374,7 @@ impl ContainerPrefix {
             ops,
             list_marker_consumed_on_line_0,
             lazy_blockquote_gobble: config.dialect == Dialect::Pandoc,
-            div_closer_ends_lines,
+            div_closer_indent,
             note_marker_op_bound,
             list_start_detect,
             list_item_ladder,
@@ -421,7 +423,7 @@ impl ContainerPrefix {
             ops,
             list_marker_consumed_on_line_0: false,
             lazy_blockquote_gobble: ctx.config.dialect == Dialect::Pandoc,
-            div_closer_ends_lines: false,
+            div_closer_indent: None,
             note_marker_op_bound: None,
             list_start_detect: None,
             list_item_ladder: SmallVec::new(),
@@ -445,7 +447,7 @@ impl ContainerPrefix {
             ops,
             list_marker_consumed_on_line_0: false,
             lazy_blockquote_gobble: false,
-            div_closer_ends_lines: false,
+            div_closer_indent: None,
             note_marker_op_bound: None,
             list_start_detect: None,
             list_item_ladder: SmallVec::new(),
@@ -523,7 +525,7 @@ impl ContainerPrefix {
             ops,
             list_marker_consumed_on_line_0,
             lazy_blockquote_gobble: dialect == Dialect::Pandoc,
-            div_closer_ends_lines: false,
+            div_closer_indent: None,
             note_marker_op_bound: None,
             list_start_detect: None,
             list_item_ladder: SmallVec::new(),
@@ -540,8 +542,13 @@ impl ContainerPrefix {
 
     /// See the field of the same name: whether a bare `:::` ends the
     /// line run of the container this prefix strips.
+    #[cfg(test)]
     pub fn div_closer_ends_lines(&self) -> bool {
-        self.div_closer_ends_lines
+        self.div_closer_indent.is_some()
+    }
+
+    pub fn div_closer_indent(&self) -> Option<usize> {
+        self.div_closer_indent
     }
 
     /// See the field of the same name: the op a `[^x]:` line must fail
@@ -649,7 +656,7 @@ impl ContainerPrefix {
             ops: SmallVec::from_slice(ops_slice),
             list_marker_consumed_on_line_0,
             lazy_blockquote_gobble: false,
-            div_closer_ends_lines: false,
+            div_closer_indent: None,
             note_marker_op_bound: None,
             list_start_detect: None,
             list_item_ladder: SmallVec::new(),
@@ -661,8 +668,15 @@ impl ContainerPrefix {
     }
 
     #[cfg(feature = "experimental-block-parser")]
-    pub fn with_div_closer_boundary(mut self, in_div: bool) -> Self {
-        self.div_closer_ends_lines = in_div;
+    pub fn with_div_closer_boundary(mut self, indent: Option<usize>, supplies_blank: bool) -> Self {
+        self.div_closer_indent = indent;
+        self.div_closer_supplies_blank = supplies_blank;
+        self
+    }
+
+    #[cfg(feature = "experimental-block-parser")]
+    pub fn with_note_boundary(mut self, op_index: Option<usize>) -> Self {
+        self.note_marker_op_bound = op_index;
         self
     }
 
@@ -677,10 +691,56 @@ impl ContainerPrefix {
             content_column += column;
             self.list_item_ladder.push(content_column);
         }
-        if !self.list_item_ladder.is_empty() {
+        if self
+            .ops
+            .iter()
+            .any(|op| matches!(op, StripOp::ListAdvance(_)))
+        {
             self.list_start_detect = Some(ListMarkerDetect::from_options(options));
+            self.list_start_supplies_blank = self.list_item_ladder.is_empty();
         }
         self
+    }
+
+    /// Pandoc collects a list item's continuation lines with
+    /// `listContinuationLine`, which stops at a `listStart` reached by at
+    /// most 3 spaces in the frame the list was parsed in — for a nested
+    /// list, the enclosing item's content reparse, so the tolerance is 3
+    /// columns past the start of the marker's ladder band (see
+    /// `ContainerPrefix::list_start_band_start`). A three-way split, all
+    /// verified against `pandoc -f markdown -t native`: a marker at or
+    /// past the item's content column is nested-list content (the full
+    /// resolve stays inside the frame); one past its band's tolerance but
+    /// short of the content column is a lazy continuation; one within the
+    /// tolerance ends the run.
+    pub(crate) fn list_start_ends_line(&self, raw: &str) -> bool {
+        use super::lists::{OpenListHint, try_parse_list_marker_with};
+
+        let Some(detect) = self.list_start_detect() else {
+            return false;
+        };
+        let (FrameVerdict::Dedented { op_index, .. } | FrameVerdict::FakedIndent { op_index, .. }) =
+            self.resolve(raw)
+        else {
+            return false;
+        };
+        let ops = self.ops();
+        if !matches!(ops.get(op_index), Some(StripOp::ListAdvance(_))) {
+            return false;
+        }
+        ContainerPrefix::strip_required_ops(raw, &ops[..op_index]).is_some_and(|rest| {
+            let indent = leading_indent(rest).0;
+            let band = if ops[op_index + 1..]
+                .iter()
+                .any(|op| matches!(op, StripOp::BlockQuoteMarker | StripOp::ContentIndent(_)))
+            {
+                0
+            } else {
+                self.list_start_band_start(indent)
+            };
+            indent <= band + 3
+                && try_parse_list_marker_with(rest, detect, OpenListHint::None).is_some()
+        })
     }
 
     /// Strip required container prefixes through the innermost quote while
@@ -776,7 +836,7 @@ impl ContainerPrefix {
             ops,
             list_marker_consumed_on_line_0: self.list_marker_consumed_on_line_0,
             lazy_blockquote_gobble: self.lazy_blockquote_gobble,
-            div_closer_ends_lines: self.div_closer_ends_lines,
+            div_closer_indent: self.div_closer_indent,
             note_marker_op_bound,
             list_start_detect: self.list_start_detect,
             list_item_ladder: self.list_item_ladder.clone(),
@@ -1288,6 +1348,8 @@ pub(crate) struct StrippedLines<'a, 'p> {
     /// `line_pos`).
     dispatch: usize,
     dispatch_override: Option<(&'a str, &'a str)>,
+    strict_continuation: bool,
+    html_trailing_probe: bool,
     prefix: &'p ContainerPrefix,
     hugo_lookahead: Option<&'p std::cell::RefCell<super::hugo::LookaheadCache>>,
     jupyter_lookahead: Option<&'p std::cell::RefCell<super::jupyter::LookaheadCache>>,
@@ -1302,6 +1364,8 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             dispatch: base,
             prefix,
             dispatch_override: None,
+            strict_continuation: false,
+            html_trailing_probe: false,
             hugo_lookahead: None,
             jupyter_lookahead: None,
         }
@@ -1322,16 +1386,36 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
             dispatch,
             prefix,
             dispatch_override: None,
+            strict_continuation: false,
+            html_trailing_probe: false,
             hugo_lookahead: None,
             jupyter_lookahead: None,
         }
     }
 
+    pub(crate) fn with_html_trailing_probe(mut self, enabled: bool) -> Self {
+        self.html_trailing_probe = enabled;
+        self
+    }
+
+    pub(crate) fn is_html_trailing_probe(&self) -> bool {
+        self.html_trailing_probe
+    }
+
     /// Use the planned body slice and its literal indent on the dispatch line.
     #[cfg(feature = "experimental-block-parser")]
     pub(crate) fn with_dispatch_override(mut self, tail: &'a str, indent: &'a str) -> Self {
+        self.strict_continuation = true;
+        self.with_table_dispatch(tail, indent)
+    }
+
+    pub(crate) fn with_table_dispatch(mut self, tail: &'a str, indent: &'a str) -> Self {
         self.dispatch_override = Some((tail, indent));
         self
+    }
+
+    pub(crate) fn requires_continuation_prefix(&self) -> bool {
+        self.strict_continuation
     }
 
     pub(crate) fn dispatch_override(&self) -> Option<(&'a str, &'a str)> {

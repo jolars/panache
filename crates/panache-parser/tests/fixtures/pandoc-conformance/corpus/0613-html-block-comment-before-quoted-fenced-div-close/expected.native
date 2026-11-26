@@ -1,0 +1,13 @@
+[ BulletList
+    [ [ BlockQuote
+          [ Para [ Str "Quote." ]
+          , Div
+              ( "" , [ "box" ] , [] )
+              [ RawBlock (Format "html") "<!-- a -->"
+              , Para [ Str "tail" ]
+              ]
+          , Para [ Str "Outside" ]
+          ]
+      ]
+    ]
+]

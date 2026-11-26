@@ -124,6 +124,7 @@ pub struct Parser<'a> {
     dispatch_list_marker_consumed: bool,
     diagnostics: Diagnostics,
     origin: ParseOrigin,
+    html_trailing_probe: bool,
     hugo_lookahead: std::cell::RefCell<super::blocks::hugo::LookaheadCache>,
     jupyter_lookahead: std::cell::RefCell<super::blocks::jupyter::LookaheadCache>,
     /// Verified closing line and owning container depth of a Jupyter math span.
@@ -165,6 +166,7 @@ impl<'a> Parser<'a> {
             dispatch_list_marker_consumed: false,
             diagnostics: Diagnostics::new(),
             origin,
+            html_trailing_probe: false,
             hugo_lookahead: std::cell::RefCell::default(),
             jupyter_lookahead: std::cell::RefCell::default(),
             jupyter_math_end: None,
@@ -177,6 +179,13 @@ impl<'a> Parser<'a> {
 
     pub fn parse(self) -> SyntaxNode {
         self.parse_with_errors().0
+    }
+
+    /// Parse a candidate continuation after a closing HTML tag. Later raw
+    /// blocks can split their own line, but never probe another suffix.
+    pub(super) fn parse_html_trailing_probe(mut self) -> SyntaxNode {
+        self.html_trailing_probe = true;
+        self.parse()
     }
 
     /// Parse the CST and return host-ranged embedded-language errors.
@@ -2408,6 +2417,7 @@ impl<'a> Parser<'a> {
 
                 let lines_consumed = {
                     let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
+                        .with_html_trailing_probe(self.html_trailing_probe && self.pos > 0)
                         .with_hugo_lookahead(&self.hugo_lookahead)
                         .with_jupyter_lookahead(&self.jupyter_lookahead);
                     self.block_registry.parse_prepared(
@@ -2660,6 +2670,7 @@ impl<'a> Parser<'a> {
 
                 let lines_consumed = {
                     let stripped = StrippedLines::new(&self.lines, self.pos, &dispatcher_prefix)
+                        .with_html_trailing_probe(self.html_trailing_probe && self.pos > 0)
                         .with_hugo_lookahead(&self.hugo_lookahead)
                         .with_jupyter_lookahead(&self.jupyter_lookahead);
                     self.block_registry.parse_prepared(

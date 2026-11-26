@@ -3313,6 +3313,19 @@ fn list_item_blocks(item: &SyntaxNode, followed_by_blank: bool) -> Vec<Block> {
     let task_checkbox = task_checkbox_for_item(item);
     let mut checkbox_emitted = false;
     for child in item.children() {
+        // A task marker has its own CST token. When the item begins
+        // with a structural HTML block, its glyph has no prose to join.
+        if !checkbox_emitted
+            && out.is_empty()
+            && matches!(
+                child.kind(),
+                SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::HTML_BLOCK_DIV
+            )
+            && let Some(glyph) = task_checkbox
+        {
+            out.push(Block::Plain(vec![Inline::Str(glyph.to_string())]));
+            checkbox_emitted = true;
+        }
         match child.kind() {
             SyntaxKind::PLAIN => {
                 let mut inlines = coalesce_inlines(inlines_from(&child));

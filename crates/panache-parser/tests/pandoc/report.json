@@ -3,7 +3,7 @@
   "failing": 6,
   "pandoc_version": "3.12",
   "pass_pct": 99.0,
-  "passing": 601,
+  "passing": 611,
   "passing_ids": [
     1,
     2,
@@ -605,13 +605,23 @@
     604,
     605,
     606,
-    607
+    607,
+    608,
+    609,
+    610,
+    611,
+    612,
+    613,
+    614,
+    615,
+    616,
+    617
   ],
   "sections": [
     {
       "fail": 0,
       "name": "block",
-      "pass": 70
+      "pass": 71
     },
     {
       "fail": 0,
@@ -626,7 +636,7 @@
     {
       "fail": 6,
       "name": "html",
-      "pass": 349
+      "pass": 356
     },
     {
       "fail": 0,
@@ -636,7 +646,12 @@
     {
       "fail": 0,
       "name": "inline",
-      "pass": 17
+      "pass": 18
+    },
+    {
+      "fail": 0,
+      "name": "lists",
+      "pass": 1
     },
     {
       "fail": 0,
@@ -644,5 +659,5 @@
       "pass": 1
     }
   ],
-  "total_cases": 607
+  "total_cases": 617
 }

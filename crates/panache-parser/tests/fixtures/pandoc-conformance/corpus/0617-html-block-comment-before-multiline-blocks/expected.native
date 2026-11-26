@@ -1,0 +1,8 @@
+[ RawBlock (Format "html") "<!-- raw -->"
+, RawBlock (Format "html") "<pre>\n\n*raw*\n</pre>"
+, RawBlock (Format "html") "<!-- native -->"
+, Div ( "" , [] , [] ) [ Para [ Emph [ Str "body" ] ] ]
+, RawBlock (Format "html") "<!-- fenced -->"
+, Div
+    ( "" , [ "note" ] , [] ) [ Para [ Emph [ Str "body" ] ] ]
+]

@@ -7,8 +7,9 @@ use rowan::GreenNodeBuilder;
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{
-    ContainerPrefix, ContainerPrefixLine, ContainerPrefixState, emit_grafted_token,
+    ContainerPrefix, ContainerPrefixLine, ContainerPrefixState, StrippedLines, emit_grafted_token,
 };
+use super::tables::LineView;
 use crate::parser::utils::attributes::{emit_html_attrs_node, pandoc_html_attribute_names_valid};
 use crate::parser::utils::helpers::{strip_leading_spaces, strip_newline};
 
@@ -741,40 +742,18 @@ fn html_block_node_kind(
 /// would swallow the boundary (`:::`, `> `, list indent).
 #[derive(Clone, Copy)]
 pub(crate) enum SoftbreakFusion {
-    /// Outermost level: fuse continuation lines to the end of the document.
+    /// Outermost level: there is no enclosing container boundary.
     ToDocEnd,
     /// Inside a plain (no line-prefix) fenced div: fuse up to the div's
     /// closing `:::` fence, which the outer dispatcher still owns.
     ToFencedDivClose,
-    /// Inside a pure blockquote (no list / content-indent / directive
-    /// nesting): fuse up to the first line that no longer continues the
-    /// blockquote at the current marker depth. The continuation lines'
-    /// `> ` prefixes are stripped before reparse and re-injected during
-    /// graft so the CST stays byte-equal to source.
+    /// Inside a blockquote: fuse up to the first line that lacks the
+    /// required container prefixes. Strip those prefixes before reparse
+    /// and re-inject them during graft.
     ToBlockquoteEnd,
     /// Inside a list / content-indent container, or fusion otherwise
     /// disabled: keep the close-line-only split.
     None,
-}
-
-/// Index of the line that closes the fenced div enclosing `start` (the
-/// first bare `:::` close fence at the current nesting depth), or
-/// `lines.len()` when the div is unclosed at end of input. `start` must be
-/// past the comment/PI close line so `:::` lines inside the comment body
-/// don't terminate the scan early.
-fn fenced_div_body_end(lines: &[&str], start: usize) -> usize {
-    let mut depth = 0usize;
-    for (offset, line) in lines[start..].iter().enumerate() {
-        if super::fenced_divs::try_parse_div_fence_open(line).is_some() {
-            depth += 1;
-        } else if super::fenced_divs::is_div_closing_fence(line) {
-            if depth == 0 {
-                return start + offset;
-            }
-            depth -= 1;
-        }
-    }
-    lines.len()
 }
 
 fn blockquote_body_end(lines: &[&str], start: usize, bq_depth: usize) -> usize {
@@ -800,8 +779,11 @@ fn try_parse_comment_pi_with_trailing_split(
     start_pos: usize,
     block_type: &HtmlBlockType,
     context: &HtmlBlockContext<'_>,
+    first_line_content: Option<&str>,
 ) -> Option<usize> {
     let bq_depth = context.prefix.bq_depth();
+    let first_inner = first_line_content
+        .unwrap_or_else(|| context.prefix.strip_line_0_for_emission(lines[start_pos]));
     let marker: &str = match block_type {
         HtmlBlockType::Comment => "-->",
         HtmlBlockType::ProcessingInstruction => "?>",
@@ -811,7 +793,12 @@ fn try_parse_comment_pi_with_trailing_split(
     let mut close_line_idx: Option<usize> = None;
     let mut marker_end_in_inner: usize = 0;
     for (offset, line) in lines[start_pos..].iter().enumerate() {
-        let inner = if bq_depth > 0 {
+        if offset > 0 && context.prefix.list_start_ends_line(line) {
+            break;
+        }
+        let inner = if offset == 0 {
+            first_inner
+        } else if bq_depth > 0 {
             strip_n_blockquote_markers(line, bq_depth)
         } else {
             line
@@ -823,7 +810,9 @@ fn try_parse_comment_pi_with_trailing_split(
         }
     }
     let close_line_idx = close_line_idx?;
-    let close_inner = if bq_depth > 0 {
+    let close_inner = if close_line_idx == start_pos {
+        first_inner
+    } else if bq_depth > 0 {
         strip_n_blockquote_markers(lines[close_line_idx], bq_depth)
     } else {
         lines[close_line_idx]
@@ -839,15 +828,141 @@ fn try_parse_comment_pi_with_trailing_split(
         builder,
         lines,
         start_pos,
-        if bq_depth > 0 {
-            strip_n_blockquote_markers(lines[start_pos], bq_depth)
-        } else {
-            lines[start_pos]
-        },
+        first_inner,
         (close_line_idx, marker_end_in_inner),
         html_block_node_kind(context.wrapper_kind, block_type, context.config.dialect),
         context,
     ))
+}
+
+/// Locate the Markdown after any additional comment/PI tags on this line.
+fn trailing_block_start(mut text: &str) -> &str {
+    loop {
+        let start = text.trim_start_matches([' ', '\t']);
+        let marker = if start.starts_with("<!--") {
+            "-->"
+        } else if start.starts_with("<?") {
+            "?>"
+        } else {
+            return text;
+        };
+        let Some(end) = start.find(marker) else {
+            return text;
+        };
+        text = &start[end + marker.len()..];
+    }
+}
+
+fn html_block_ends_on_line(text: &str) -> bool {
+    let Some(HtmlBlockType::BlockTag {
+        tag_name,
+        depth_aware,
+        closes_at_open_tag,
+        is_closing,
+        ..
+    }) = try_parse_html_block_start(text, false)
+    else {
+        return false;
+    };
+    if closes_at_open_tag {
+        let start = text.trim_start();
+        return parse_open_tag(start)
+            .or_else(|| parse_close_tag(start))
+            .is_some_and(|end| start[end..].trim().is_empty());
+    }
+    if !depth_aware || is_closing {
+        return false;
+    }
+    let (line, _) = strip_newline(text);
+    let Some(open_end) = locate_open_tag_close_gt(line, &tag_name) else {
+        return false;
+    };
+    let body = &line[open_end + 1..];
+    matched_close_offset(body, &tag_name, true)
+        .is_some_and(|(_, end)| body[end..].trim().is_empty())
+}
+
+/// Only ordinary prose ends at a blank line. A block opened on the
+/// comment's closing line owns its body through the matching delimiter.
+enum TrailingBlock {
+    Prose,
+    Code(super::code_blocks::FenceInfo),
+    FencedDiv {
+        depth: usize,
+        code: Option<super::code_blocks::FenceInfo>,
+    },
+    Html {
+        tag: String,
+        depth: usize,
+    },
+}
+
+impl TrailingBlock {
+    fn detect(line: &str, config: &ParserOptions) -> Self {
+        if let Some(fence) = Self::code_fence(line, config) {
+            return Self::Code(fence);
+        }
+        if config.extensions.fenced_divs
+            && super::fenced_divs::try_parse_div_fence_open(line).is_some()
+        {
+            return Self::FencedDiv {
+                depth: 1,
+                code: None,
+            };
+        }
+        if config.extensions.raw_html
+            && let Some(HtmlBlockType::BlockTag {
+                tag_name,
+                depth_aware: true,
+                is_closing: false,
+                ..
+            }) = try_parse_html_block_start(line, false)
+        {
+            let (open, close) = count_tag_balance(line, &tag_name);
+            if open > close {
+                return Self::Html {
+                    tag: tag_name,
+                    depth: open - close,
+                };
+            }
+        }
+        Self::Prose
+    }
+
+    fn code_fence(line: &str, config: &ParserOptions) -> Option<super::code_blocks::FenceInfo> {
+        super::code_blocks::try_parse_fence_open(line, config.dialect)
+            .filter(|fence| super::super::block_dispatcher::fence_enabled(fence, config))
+    }
+
+    fn closes_on(&mut self, line: &str, config: &ParserOptions) -> bool {
+        match self {
+            Self::Prose => false,
+            Self::Code(fence) => super::code_blocks::is_closing_fence(line, fence),
+            Self::FencedDiv { depth, code } => {
+                if let Some(fence) = code {
+                    if super::code_blocks::is_closing_fence(line, fence) {
+                        *code = None;
+                    }
+                    return false;
+                }
+                if let Some(fence) = Self::code_fence(line, config) {
+                    *code = Some(fence);
+                    return false;
+                }
+                if super::fenced_divs::try_parse_div_fence_open(line).is_some() {
+                    *depth += 1;
+                } else if super::fenced_divs::is_div_closing_fence(line) {
+                    *depth -= 1;
+                }
+                *depth == 0
+            }
+            Self::Html { tag, depth } => {
+                let (open, close) = count_tag_balance(line, tag);
+                *depth = (*depth + open).saturating_sub(close);
+                *depth == 0
+            }
+        }
+    }
 }
 
 fn parse_raw_html_block_with_trailing(
@@ -917,60 +1032,81 @@ fn parse_raw_html_block_with_trailing(
 
     builder.finish_node(); // HTML_BLOCK
 
-    let fusion_end: Option<usize> = match context.fusion {
-        SoftbreakFusion::ToDocEnd => Some(lines.len()),
-        SoftbreakFusion::ToFencedDivClose => Some(fenced_div_body_end(lines, close_line_idx + 1)),
-        SoftbreakFusion::ToBlockquoteEnd => {
-            Some(blockquote_body_end(lines, close_line_idx + 1, bq_depth))
-        }
-        SoftbreakFusion::None => None,
-    };
-    if !trailing.is_empty() {
-        if let Some(end) = fusion_end
-            && close_line_idx + 1 < end
-        {
-            let mut inner_options = config.clone();
-            let refdefs = config.refdef_labels.clone().unwrap_or_default();
-            inner_options.refdef_labels = Some(refdefs.clone());
-            let mut fragment = String::from(trailing);
-            let mut prefix_lines: Vec<ContainerPrefixLine> = vec![ContainerPrefixLine::default()];
-            let mut stripped_lens: Vec<usize> = Vec::new();
-            for line in &lines[close_line_idx + 1..end] {
-                let inner = if bq_depth > 0 {
-                    strip_n_blockquote_markers(line, bq_depth)
-                } else {
-                    line
-                };
-                let prefix = &line[..line.len() - inner.len()];
-                fragment.push_str(inner);
-                prefix_lines.push(ContainerPrefixLine::bq_only(prefix.to_string()));
-                stripped_lens.push(inner.len());
-            }
-            let inner_root =
-                crate::parser::parse_with_refdefs(&fragment, Some(inner_options), refdefs);
-            if let Some(first) = inner_root.first_child() {
-                let block_end: usize = first.text_range().end().into();
-                let mut consumed_bytes = trailing.len();
-                let mut extra_lines = 0usize;
-                while extra_lines < stripped_lens.len() && consumed_bytes < block_end {
-                    consumed_bytes += stripped_lens[extra_lines];
-                    extra_lines += 1;
-                }
-                let mut bq = ContainerPrefixState::new(prefix_lines);
-                graft_subtree(builder, &first, &mut bq);
-                return close_line_idx + 1 + extra_lines;
-            }
-        }
-
-        let mut inner_options = config.clone();
-        let refdefs = config.refdef_labels.clone().unwrap_or_default();
-        inner_options.refdef_labels = Some(refdefs.clone());
-        let inner_root = crate::parser::parse_with_refdefs(trailing, Some(inner_options), refdefs);
-        let mut bq = None;
-        graft_document_children(builder, &inner_root, LastParaDemote::Never, &mut bq);
+    let next = close_line_idx + 1;
+    if trailing.is_empty() {
+        return next;
     }
 
-    close_line_idx + 1
+    let mut inner_options = config.clone();
+    let refdefs = config.refdef_labels.clone().unwrap_or_default();
+    inner_options.refdef_labels = Some(refdefs.clone());
+
+    // Trailing prose can continue up to the first blank line in its frame.
+    // Looking beyond that line reparses unrelated blocks, including later
+    // comments whose split would recursively reparse the same suffix.
+    let mut fragment = String::from(trailing);
+    let mut prefixes = vec![ContainerPrefixLine::default()];
+    let mut line_ends = vec![trailing.len()];
+    let block_start = trailing_block_start(trailing);
+    if !matches!(context.fusion, SoftbreakFusion::None)
+        && !block_start.trim().is_empty()
+        && super::headings::try_parse_atx_heading(block_start).is_none()
+        && !html_block_ends_on_line(block_start)
+    {
+        let mut block = TrailingBlock::detect(block_start, config);
+        let window = StrippedLines::new(lines, close_line_idx, context.prefix);
+        for (index, line) in lines.iter().enumerate().skip(next) {
+            let (prefix, inner) = context.prefix.split_pieces(line);
+            let div_closer = super::fenced_divs::is_div_closing_fence(inner);
+            let closes_trailing_div = div_closer
+                && matches!(block, TrailingBlock::FencedDiv { .. })
+                && window.starts_in_frame(index);
+            if (window.ends_container_lines(index) && !closes_trailing_div)
+                || (matches!(context.fusion, SoftbreakFusion::ToBlockquoteEnd)
+                    && !window.starts_in_frame(index))
+                || (matches!(context.fusion, SoftbreakFusion::ToFencedDivClose)
+                    && div_closer
+                    && !closes_trailing_div)
+                || inner.is_empty()
+                || (matches!(block, TrailingBlock::Prose) && inner.trim().is_empty())
+            {
+                break;
+            }
+            fragment.push_str(inner);
+            prefixes.push(prefix);
+            line_ends.push(fragment.len());
+            if block.closes_on(inner, config) {
+                break;
+            }
+        }
+    }
+
+    if line_ends.len() > 1 {
+        let root =
+            super::super::core::Parser::new(&fragment, &inner_options).parse_html_trailing_probe();
+        // A second tag can share the close line with the first. Graft all
+        // complete children through that line before advancing the caller.
+        let mut first_blocks = Vec::new();
+        for child in root.children() {
+            let end = usize::from(child.text_range().end());
+            first_blocks.push(child);
+            if end >= trailing.len()
+                && let Ok(extra_lines) = line_ends.binary_search(&end)
+                && let Some(source) = fragment.get(..end)
+                && root.text().slice(..rowan::TextSize::try_from(end).unwrap()) == source
+            {
+                let mut prefix_state = ContainerPrefixState::new(prefixes);
+                for block in first_blocks {
+                    graft_subtree(builder, &block, &mut prefix_state);
+                }
+                return next + extra_lines;
+            }
+        }
+    }
+
+    let root = crate::parser::parse_with_refdefs(trailing, Some(inner_options), refdefs);
+    graft_document_children(builder, &root, LastParaDemote::Never, &mut None);
+    next
 }
 
 enum RejectedDivBoundary {
@@ -1018,7 +1154,7 @@ fn rejected_div_boundary(
     } else {
         let mut close_offset = matched_close_offset(&text[open_gt + 1..], "div", false);
         for line in &lines[open_end + 1..body_end] {
-            if close_offset.is_some() {
+            if close_offset.is_some() || prefix.list_start_ends_line(line) {
                 break;
             }
             let inner = prefix.strip(line);
@@ -1134,16 +1270,14 @@ fn split_line_into_standalone_tags(line: &str) -> Option<Vec<StandaloneTagSegmen
 /// stripped via `strip_line_0_for_emission`; if that strip leaves any
 /// non-tag bytes (e.g. an un-stripped list marker), the segment scan
 /// bails and the block falls through to the legacy byte walker. Returns
-/// the number of lines consumed (always 1) on success.
+/// success after consuming one line.
 fn try_parse_standalone_block_tags_split(
     builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
-    start_pos: usize,
+    first_inner: &str,
     block_type: &HtmlBlockType,
     wrapper_kind: SyntaxKind,
-    prefix: &ContainerPrefix,
     config: &ParserOptions,
-) -> Option<usize> {
+) -> Option<()> {
     if config.dialect != crate::options::Dialect::Pandoc {
         return None;
     }
@@ -1159,7 +1293,6 @@ fn try_parse_standalone_block_tags_split(
     ) {
         return None;
     }
-    let first_inner = prefix.strip_line_0_for_emission(lines[start_pos]);
     let (line, nl) = strip_newline(first_inner);
     let segments = split_line_into_standalone_tags(line)?;
 
@@ -1181,7 +1314,7 @@ fn try_parse_standalone_block_tags_split(
     }
     builder.finish_node(); // HTML_BLOCK
 
-    Some(start_pos + 1)
+    Some(())
 }
 
 /// Parse an HTML block, allowing the caller to pick the wrapper SyntaxKind
@@ -1253,21 +1386,22 @@ pub(crate) fn parse_html_block_with_wrapper(
             start_pos,
             &block_type,
             context,
+            first_line_content,
         )
     {
         return consumed;
     }
 
-    if let Some(consumed) = try_parse_standalone_block_tags_split(
+    if try_parse_standalone_block_tags_split(
         builder,
-        lines,
-        start_pos,
+        first_line_content.unwrap_or_else(|| prefix.strip_line_0_for_emission(lines[start_pos])),
         &block_type,
         wrapper_kind,
-        prefix,
         config,
-    ) {
-        return consumed;
+    )
+    .is_some()
+    {
+        return start_pos + 1;
     }
 
     builder.start_node(html_block_node_kind(wrapper_kind, &block_type, config.dialect).into());
@@ -1475,13 +1609,17 @@ pub(crate) fn parse_html_block_with_wrapper(
     builder.start_node(SyntaxKind::HTML_BLOCK_TAG.into());
 
     if let Some(end_line_idx) = multiline_open_end {
+        if let Some(indent) = first_indent {
+            builder.token(SyntaxKind::WHITESPACE.into(), indent);
+        }
         let open_lines = &lines[start_pos..=end_line_idx];
         if wrapper_kind == SyntaxKind::HTML_BLOCK_DIV {
             emit_multiline_open_tag_with_attrs(
                 builder,
                 open_lines,
+                first_inner,
                 "div",
-                bq_depth,
+                prefix,
                 lift_mode,
                 &mut pre_content,
             );
@@ -1491,8 +1629,9 @@ pub(crate) fn parse_html_block_with_wrapper(
             emit_multiline_open_tag_with_attrs(
                 builder,
                 open_lines,
+                first_inner,
                 name,
-                bq_depth,
+                prefix,
                 lift_mode,
                 &mut pre_content,
             );
@@ -1503,13 +1642,14 @@ pub(crate) fn parse_html_block_with_wrapper(
             emit_multiline_open_tag_with_attrs(
                 builder,
                 open_lines,
+                first_inner,
                 name,
-                bq_depth,
+                prefix,
                 lift_trailing,
                 &mut pre_content,
             );
         } else {
-            emit_multiline_open_tag_simple(builder, lines, start_pos, end_line_idx, bq_depth);
+            emit_multiline_open_tag_simple(builder, open_lines, first_inner, prefix);
         }
     } else {
         // Content-container indentation belongs inside the raw block so that
@@ -1733,6 +1873,9 @@ pub(crate) fn parse_html_block_with_wrapper(
 
     while current_pos < lines.len() {
         let line = lines[current_pos];
+        if prefix.list_start_ends_line(line) {
+            break;
+        }
         let (line_bq_depth, inner) = count_blockquote_markers(line);
 
         let gobbled_lazily = config.dialect == crate::options::Dialect::Pandoc
@@ -3019,6 +3162,9 @@ fn find_multiline_open_end(
     let mut line_idx = start_pos + 1;
     while line_idx < lines.len() {
         let raw = lines[line_idx];
+        if prefix.list_start_ends_line(raw) {
+            break;
+        }
         let inner = prefix.strip(raw);
         for &b in inner.as_bytes() {
             match (quote, b) {
@@ -3053,32 +3199,28 @@ pub(crate) fn pandoc_html_open_tag_closes(
     if start_pos >= lines.len() {
         return false;
     }
-    let mut quote: Option<u8> = None;
-    for (offset, line) in lines.iter().enumerate().skip(start_pos) {
-        let inner = if offset == start_pos {
-            prefix.strip_line_0_for_emission(line)
-        } else {
-            prefix.strip(line)
-        };
-        let bytes = inner.as_bytes();
-        let mut i = 0usize;
-        if offset == start_pos {
-            while i < bytes.len() && bytes[i] == b' ' {
-                i += 1;
-            }
-            if bytes.get(i) != Some(&b'<') {
-                return false;
-            }
-            i += 1;
-        }
-        while i < bytes.len() {
-            match (quote, bytes[i]) {
-                (None, b'"') | (None, b'\'') => quote = Some(bytes[i]),
-                (Some(q), x) if x == q => quote = None,
-                (None, b'>') => return true,
-                _ => {}
-            }
-            i += 1;
+    let first = prefix.strip_line_0_for_emission(lines[start_pos]);
+    let Some(open) = first.trim_start_matches(' ').strip_prefix('<') else {
+        return false;
+    };
+    html_tag_has_unquoted_gt(
+        open.bytes().chain(
+            lines[start_pos + 1..]
+                .iter()
+                .take_while(|line| !prefix.list_start_ends_line(line))
+                .flat_map(|line| prefix.strip(line).bytes()),
+        ),
+    )
+}
+
+pub(crate) fn html_tag_has_unquoted_gt(bytes: impl IntoIterator<Item = u8>) -> bool {
+    let mut quote = None;
+    for byte in bytes {
+        match (quote, byte) {
+            (None, b'"' | b'\'') => quote = Some(byte),
+            (Some(q), b) if q == b => quote = None,
+            (None, b'>') => return true,
+            _ => {}
         }
     }
     false
@@ -3128,17 +3270,20 @@ pub(crate) fn pandoc_html_block_start_is_valid(
 fn emit_multiline_open_tag_with_attrs(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
+    first_inner: &str,
     tag_name: &str,
-    bq_depth: usize,
+    prefix: &ContainerPrefix,
     lift_trailing: bool,
     pre_content: &mut String,
 ) {
     let prefix_len = 1 + tag_name.len();
     for (line_idx, raw) in lines.iter().enumerate() {
-        let stripped = if bq_depth > 0 {
-            strip_n_blockquote_markers(raw, bq_depth)
+        let stripped = if line_idx == 0 {
+            first_inner
         } else {
-            raw
+            prefix
+                .strip_through_last_quote(raw)
+                .unwrap_or_else(|| strip_n_blockquote_markers(raw, prefix.bq_depth()))
         };
         let bq_prefix_len = raw.len() - stripped.len();
         if bq_prefix_len > 0 && line_idx != 0 {
@@ -3244,23 +3389,19 @@ fn emit_multiline_open_tag_with_attrs(
 fn emit_multiline_open_tag_simple(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
-    start_pos: usize,
-    end_line_idx: usize,
-    bq_depth: usize,
+    first_inner: &str,
+    prefix: &ContainerPrefix,
 ) {
-    for (line_idx, raw) in lines
-        .iter()
-        .enumerate()
-        .take(end_line_idx + 1)
-        .skip(start_pos)
-    {
-        let stripped = if bq_depth > 0 {
-            strip_n_blockquote_markers(raw, bq_depth)
+    for (line_idx, raw) in lines.iter().enumerate() {
+        let stripped = if line_idx == 0 {
+            first_inner
         } else {
-            raw
+            prefix
+                .strip_through_last_quote(raw)
+                .unwrap_or_else(|| strip_n_blockquote_markers(raw, prefix.bq_depth()))
         };
         let bq_prefix_len = raw.len() - stripped.len();
-        if bq_prefix_len > 0 && line_idx != start_pos {
+        if bq_prefix_len > 0 && line_idx != 0 {
             emit_bq_prefix_tokens(builder, &raw[..bq_prefix_len]);
         }
         let (line_no_nl, newline_str) = strip_newline(stripped);

@@ -27,6 +27,7 @@ impl Formatter {
 
         let mut text = String::new();
         let mut after_marker = false;
+        let mut prefix_start = 0;
         for element in node.descendants_with_tokens() {
             let NodeOrToken::Token(token) = element else {
                 continue;
@@ -40,6 +41,9 @@ impl Formatter {
                     continue;
                 }
                 if token.text().contains('>') {
+                    // The enclosing quote emits its own list indentation and
+                    // marker. Keep only indentation inside the quote.
+                    text.truncate(prefix_start);
                     after_marker = true;
                 } else if after_marker {
                     after_marker = false;
@@ -50,6 +54,7 @@ impl Formatter {
             }
             after_marker = false;
             text.push_str(token.text());
+            prefix_start = text.len();
         }
         // A prefix-only final line still belongs to the raw block without a
         // source newline; the enclosing container must emit that blank line.

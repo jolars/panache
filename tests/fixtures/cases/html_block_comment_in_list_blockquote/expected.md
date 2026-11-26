@@ -1,0 +1,4 @@
+- > <!-- hi -->
+  > trailing text
+
+- next

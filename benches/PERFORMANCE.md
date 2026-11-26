@@ -162,9 +162,9 @@ these buckets. Identify which one BEFORE editing:
 
 The `experimental-block-parser` feature exposes a second parser to tests and
 the comparison example. The planner records block ranges and container
-decisions before CST emission. It uses Panache's inline, YAML, raw HTML, pipe
-table, and grid table emitters. The comparison checks source round-trips,
-green trees, and diagnostics before timing either engine.
+decisions before CST emission. It uses Panache's inline, YAML, raw HTML,
+and table emitters. The comparison checks source round-trips, green trees,
+and diagnostics before timing either engine.
 
 ```sh
 cargo build --release --features experimental-block-parser \
@@ -393,3 +393,269 @@ The planner's full-parse medians were 56–85% of the incumbent medians before
 the fixes and 56–86% afterward. Its line-start edit medians were 71–101% in
 both runs. Nine workloads reached timing in both runs. The default Quarto
 run for `large_authoring.qmd` still failed CST preflight.
+
+### Simple and multiline table checkpoint
+
+The release comparison used the previous checkpoint's documents and options.
+Both runs used the same logical CPU on the AMD Ryzen 9 7900. Each cell gives
+median and p95 in microseconds, with incumbent timings on the left and planner
+timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 216.8 / 232.4 → 133.0 / 147.3 | 141.0 / 155.5 → 119.3 / 125.5 | 2.6 / 2.9 → 2.6 / 2.8 | 2.0 / 2.2 → 1.2 / 1.3 |
+| Pandoc manual | 5213.2 / 5303.5 → 2917.4 / 3101.9 | 1423.1 / 1477.5 → 1391.5 / 1429.2 | 44.9 / 49.5 → 44.8 / 49.4 | 4.0 / 7.3 → 3.0 / 5.1 |
+| Parser README | 18.3 / 21.1 → 10.3 / 10.9 | 16.5 / 17.4 → 11.5 / 12.6 | 9.6 / 10.0 → 6.6 / 6.8 | 1.5 / 1.6 → 0.8 / 0.8 |
+| Integrations | 166.0 / 181.1 → 103.0 / 111.3 | 95.9 / 105.2 → 82.8 / 89.4 | 42.9 / 47.8 → 38.4 / 41.8 | 2.6 / 3.0 → 1.3 / 1.4 |
+| Getting Started | 278.8 / 293.0 → 164.2 / 176.5 | 108.3 / 115.9 → 97.8 / 103.7 | 47.3 / 51.8 → 45.1 / 49.7 | 2.4 / 2.6 → 1.2 / 1.3 |
+| Performance | 1075.5 / 1109.4 → 914.9 / 938.8 | 204.6 / 213.4 → 189.5 / 204.9 | 102.0 / 108.4 → 93.6 / 99.0 | 3.0 / 3.2 → 1.5 / 1.6 |
+| Tables | 708.2 / 735.5 → 511.8 / 535.9 | 230.2 / 241.8 → 219.7 / 231.4 | 110.9 / 118.6 → 106.0 / 114.0 | 2.9 / 3.0 → 1.5 / 1.6 |
+| Math | 515.5 / 534.8 → 340.1 / 355.3 | 202.1 / 211.8 → 190.7 / 201.3 | 87.3 / 94.0 → 83.0 / 90.1 | 2.6 / 2.8 → 1.3 / 1.4 |
+| Math with grid tables disabled | 505.0 / 523.1 → 332.5 / 347.6 | 196.8 / 211.3 → 186.5 / 195.6 | 84.8 / 90.7 → 78.8 / 84.6 | 2.6 / 2.8 → 1.3 / 1.4 |
+
+The planner's full-parse medians were 56–85% of the incumbent medians in both
+runs. Its line-start medians moved from 70–101% to 70–98%, and its typing
+medians stayed within 68–100%. The planner's whole-file replacement medians
+were 0.8–3.0 µs after the port. The same nine workloads reached timing in both
+runs. `large_authoring.qmd` failed CST or diagnostic preflight in both runs.
+
+Three Pandoc corpus fixtures also ran with Quarto defaults. All three failed
+preflight before the port and reached timing afterward. Fixture 0541 has no
+second blank line, so the edit benchmark has no edit location for it.
+
+| Pandoc fixture | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| 0123, caption before a multiline table | 10.6 / 11.9 → 4.7 / 5.3 | 12.7 / 13.3 → 6.6 / 7.7 | 11.6 / 12.3 → 5.5 / 6.4 | 1.9 / 2.0 → 0.8 / 0.8 |
+| 0124, caption after a multiline table | 6.7 / 7.0 → 4.6 / 4.8 | 9.7 / 9.9 → 6.5 / 6.6 | 3.1 / 3.1 → 2.0 / 2.1 | 1.9 / 1.9 → 0.8 / 0.9 |
+| 0541, simple table in a blockquote | 3.5 / 3.7 → 2.2 / 2.4 | — | — | — |
+
+### Simple and multiline table review follow-up
+
+The release comparison used the same documents and options on the same
+logical CPU. Each cell gives median and p95 in microseconds, with incumbent
+timings on the left and planner timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 222.9 / 312.1 → 136.8 / 175.7 | 143.8 / 178.5 → 122.4 / 142.7 | 2.9 / 4.4 → 2.7 / 3.8 | 2.1 / 3.6 → 1.2 / 1.7 |
+| Pandoc manual | 5308.9 / 7944.0 → 2993.8 / 4476.6 | 1438.1 / 1737.0 → 1404.0 / 1573.2 | 46.0 / 67.4 → 45.2 / 53.1 | 3.9 / 9.4 → 3.0 / 4.1 |
+| Parser README | 18.5 / 19.0 → 10.9 / 11.3 | 16.8 / 22.6 → 11.9 / 17.0 | 10.0 / 14.1 → 6.8 / 8.6 | 1.5 / 1.7 → 0.8 / 0.9 |
+| Integrations | 164.6 / 174.8 → 101.8 / 109.0 | 96.6 / 103.0 → 84.2 / 91.4 | 45.3 / 50.0 → 39.1 / 43.9 | 2.5 / 2.7 → 1.2 / 1.3 |
+| Getting Started | 272.3 / 282.4 → 162.0 / 171.3 | 108.1 / 114.3 → 100.7 / 106.9 | 49.6 / 54.2 → 45.6 / 49.1 | 2.3 / 2.4 → 1.2 / 1.3 |
+| Performance | 1078.5 / 1094.0 → 924.6 / 937.2 | 204.3 / 213.4 → 193.2 / 211.8 | 104.2 / 109.9 → 95.5 / 101.4 | 2.9 / 3.0 → 1.4 / 1.5 |
+| Tables | 693.2 / 706.7 → 507.3 / 522.8 | 229.2 / 240.6 → 219.1 / 226.9 | 113.1 / 120.5 → 107.2 / 116.0 | 2.7 / 2.9 → 1.4 / 1.5 |
+| Math | 510.8 / 523.0 → 340.6 / 353.4 | 203.9 / 213.2 → 195.2 / 209.2 | 89.2 / 94.4 → 84.6 / 89.7 | 2.5 / 2.6 → 1.3 / 1.4 |
+| Math with grid tables disabled | 500.8 / 516.3 → 335.4 / 350.5 | 198.3 / 205.8 → 189.6 / 200.7 | 85.8 / 92.3 → 81.7 / 87.4 | 2.5 / 2.7 → 1.3 / 1.4 |
+
+Across the nine workloads timed in both runs, the planner's full-parse
+medians were 56–86% of the incumbent medians before and after the fixes.
+The planner's line-start medians moved from 70–98% to 71–98%, and its typing
+medians moved from 68–100% to 68–98%. Whole-file replacement medians were
+0.8–3.0 µs for the planner after the fixes. Preflight excluded
+`large_authoring.qmd` in both runs. The three Pandoc table fixtures continued
+to pass preflight.
+
+A separate release probe parsed repeated headerless simple tables formed by
+repeating `"---\nx\n---\n"`. It verified source, CST, and diagnostic parity
+before timing. Each measurement is the median of seven parses in
+milliseconds.
+
+| Tables | Incumbent | Planner |
+| ---: | ---: | ---: |
+| 1,000 | 1.43 | 0.48 |
+| 4,000 | 5.69 | 2.08 |
+| 16,000 | 23.51 | 8.18 |
+
+### Pandoc HTML block checkpoint
+
+The release comparison reran the previous checkpoint's workloads with the
+same parser options on logical CPU 4 of the AMD Ryzen 9 7900. Each cell gives
+median and p95 in microseconds, with incumbent timings on the left and planner
+timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 212.0 / 220.2 → 131.0 / 138.2 | 140.2 / 146.0 → 120.4 / 125.8 | 2.7 / 2.9 → 2.6 / 2.8 | 2.1 / 2.2 → 1.2 / 1.3 |
+| Pandoc manual | 5123.8 / 5234.5 → 2873.7 / 2988.8 | 1403.1 / 1438.9 → 1402.1 / 1434.1 | 44.7 / 48.8 → 44.7 / 48.4 | 3.9 / 4.2 → 2.9 / 3.2 |
+| Parser README | 18.2 / 19.9 → 10.4 / 10.8 | 16.5 / 17.6 → 11.5 / 12.4 | 9.7 / 9.9 → 6.5 / 6.7 | 1.5 / 1.6 → 0.8 / 0.8 |
+| Integrations | 162.2 / 168.1 → 99.8 / 106.0 | 93.3 / 99.4 → 81.0 / 87.3 | 42.7 / 45.8 → 36.2 / 40.0 | 2.6 / 2.8 → 1.2 / 1.4 |
+| Getting Started | 276.7 / 292.8 → 162.0 / 171.9 | 108.2 / 115.8 → 98.5 / 105.0 | 48.0 / 52.7 → 43.0 / 47.5 | 2.4 / 2.5 → 1.2 / 1.3 |
+| Performance | 1075.2 / 1094.2 → 914.8 / 931.5 | 202.9 / 214.6 → 190.3 / 198.0 | 103.0 / 109.2 → 92.2 / 97.2 | 3.1 / 3.2 → 1.5 / 1.6 |
+| Tables | 691.6 / 712.7 → 498.8 / 520.1 | 229.0 / 242.9 → 218.8 / 238.8 | 112.3 / 120.6 → 105.0 / 113.5 | 2.8 / 2.9 → 1.5 / 1.6 |
+| Math | 510.9 / 517.9 → 335.2 / 345.4 | 201.8 / 209.6 → 193.2 / 200.4 | 88.1 / 94.2 → 82.8 / 88.1 | 2.6 / 2.7 → 1.3 / 1.3 |
+| Math with grid tables disabled | 497.7 / 505.0 → 327.5 / 336.0 | 196.4 / 202.8 → 188.8 / 197.2 | 84.9 / 90.5 → 80.5 / 85.3 | 2.5 / 2.7 → 1.2 / 1.3 |
+
+Across these nine workloads, the planner's full-parse medians were 56–86% of
+the incumbent before the port and 56–85% afterward. Line-start edit medians
+moved from 71–101% to 70–100%, and typing medians moved from 68–102% to
+67–100%. The planner's whole-file replacement medians were 0.8–2.9 µs after
+the port. `large_authoring.qmd` failed CST or diagnostic preflight in both
+runs.
+
+The three table fixtures passed preflight in both runs. Five HTML fixtures
+that the planner previously declined reached timing after the port. A dash
+means the fixture had no second blank line for the edit sequence.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| 0123, caption before a multiline table | 10.6 / 11.2 → 4.7 / 5.2 | 13.1 / 13.6 → 6.9 / 7.2 | 12.0 / 12.5 → 5.8 / 6.7 | 1.9 / 1.9 → 0.8 / 0.8 |
+| 0124, caption after a multiline table | 6.7 / 7.0 → 4.5 / 4.7 | 10.0 / 10.2 → 6.8 / 7.0 | 3.4 / 3.4 → 2.3 / 2.4 | 1.8 / 1.9 → 0.8 / 0.8 |
+| 0541, simple table in a blockquote | 3.4 / 3.6 → 2.1 / 2.3 | — | — | — |
+| 0199, nested native divs | 6.1 / 6.3 → 6.9 / 7.5 | 7.5 / 7.7 → 8.5 / 8.7 | 7.1 / 7.3 → 8.1 / 8.5 | 1.9 / 1.9 → 0.8 / 0.8 |
+| 0481, comment trailing prose in a fenced div | 3.5 / 3.6 → 3.0 / 3.1 | — | — | — |
+| 0495, unclosed div in a list item | 5.6 / 5.8 → 4.8 / 5.0 | — | — | — |
+| 0610, quoted div stops before the next list item | 5.6 / 5.8 → 5.5 / 5.7 | — | — | — |
+| 0611, comment trailing prose in a quoted item | 5.0 / 5.1 → 4.8 / 5.0 | — | — | — |
+
+For the nested div fixture, the planner took about 1 µs more than the incumbent
+for a full parse and for each region edit. The other four HTML fixtures had
+planner full-parse medians within 0.8 µs of the incumbent.
+
+### Pandoc HTML review follow-up
+
+Both release runs used the previous checkpoint's workloads, parser options,
+and logical CPU. Each cell gives median and p95 in microseconds, with
+incumbent timings on the left and planner timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 218.3 / 245.6 → 135.2 / 156.1 | 143.7 / 152.0 → 122.8 / 133.4 | 2.8 / 3.0 → 2.7 / 2.9 | 2.1 / 2.2 → 1.3 / 1.3 |
+| Pandoc manual | 5297.2 / 5410.6 → 2950.2 / 3059.6 | 1457.0 / 1500.7 → 1455.4 / 1504.2 | 46.5 / 50.8 → 46.4 / 50.9 | 3.8 / 4.6 → 3.0 / 3.4 |
+| Parser README | 19.0 / 19.5 → 10.7 / 11.0 | 17.3 / 17.8 → 12.3 / 13.0 | 10.3 / 10.7 → 7.2 / 7.5 | 1.5 / 1.6 → 0.8 / 0.9 |
+| Integrations | 165.0 / 173.9 → 102.5 / 109.2 | 96.0 / 104.8 → 83.3 / 89.0 | 44.8 / 49.3 → 38.4 / 42.6 | 2.5 / 2.8 → 1.2 / 1.4 |
+| Getting Started | 273.1 / 288.4 → 163.3 / 172.5 | 110.6 / 117.6 → 101.2 / 110.6 | 50.8 / 55.4 → 46.0 / 50.0 | 2.4 / 2.5 → 1.2 / 1.3 |
+| Performance | 1089.3 / 1133.0 → 936.8 / 967.8 | 212.9 / 231.3 → 198.0 / 217.5 | 109.0 / 118.3 → 98.7 / 107.2 | 3.0 / 3.3 → 1.5 / 1.6 |
+| Tables | 703.5 / 725.5 → 509.8 / 531.8 | 237.9 / 256.1 → 226.1 / 243.0 | 118.3 / 124.9 → 108.7 / 116.7 | 2.8 / 2.9 → 1.5 / 1.6 |
+| Math | 517.7 / 538.4 → 346.0 / 362.2 | 210.4 / 238.2 → 199.4 / 228.1 | 93.4 / 106.4 → 87.0 / 100.8 | 2.6 / 4.1 → 1.4 / 1.7 |
+| Math with grid tables disabled | 513.7 / 547.1 → 341.0 / 365.5 | 203.5 / 216.5 → 193.3 / 206.9 | 89.1 / 96.1 → 84.1 / 90.5 | 2.7 / 2.8 → 1.3 / 1.4 |
+
+Planner full-parse medians were 55–85% of incumbent medians before the
+fixes and 56–86% afterward. The ranges were 69–98% and 71–100% for
+line-start edits and 67–100% and 70–100% for typing edits.
+`large_authoring.qmd` failed CST or diagnostic preflight in both runs.
+
+The same eight Pandoc fixtures reached timing in both runs.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| 0123, caption before a multiline table | 10.6 / 12.9 → 4.7 / 5.5 | 13.1 / 13.6 → 6.9 / 7.2 | 11.9 / 12.3 → 5.8 / 6.7 | 1.8 / 1.9 → 0.8 / 0.8 |
+| 0124, caption after a multiline table | 6.7 / 7.0 → 4.5 / 4.6 | 10.2 / 10.8 → 6.9 / 7.6 | 3.5 / 3.5 → 2.4 / 2.5 | 1.8 / 1.9 → 0.8 / 0.9 |
+| 0541, simple table in a blockquote | 3.5 / 3.7 → 2.2 / 2.4 | — | — | — |
+| 0199, nested native divs | 6.1 / 6.3 → 7.0 / 7.4 | 7.8 / 8.0 → 8.8 / 9.7 | 7.4 / 7.5 → 8.4 / 9.1 | 1.9 / 1.9 → 0.8 / 0.8 |
+| 0481, comment trailing prose in a fenced div | 3.5 / 3.6 → 3.0 / 3.2 | — | — | — |
+| 0495, unclosed div in a list item | 5.5 / 5.9 → 5.0 / 5.2 | — | — | — |
+| 0610, quoted div stops before the next list item | 5.6 / 5.8 → 5.5 / 5.7 | — | — | — |
+| 0611, comment trailing prose in a quoted item | 5.1 / 5.3 → 4.9 / 5.1 | — | — | — |
+
+A separate release probe checked source round-trips for two quoted list
+items containing 20 HTML comments each. The case with blank-separated
+trailing prose took about 3.1 s in each engine before the fix. Afterward,
+a full parse took 72 µs in the incumbent and 90 µs in the planner. The
+case with a trailing ATX heading on every comment line went from about
+1.9 s to 48 µs and 61 µs, respectively.
+
+An apostrophe edit in prose after a closed div and 4,000 intervening
+paragraphs used the planner's token tier after the fix. Median and p95
+were 144 and 150 µs, compared with 1,061 and 1,084 µs for the previous
+fallback to a full parse.
+
+### Pandoc HTML second review follow-up
+
+Both release runs used the same documents, parser options, and logical CPU
+as the previous checkpoint. Each cell gives median and p95 in microseconds,
+with incumbent timings on the left and planner timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 221.2 / 233.7 → 135.4 / 143.0 | 142.9 / 163.3 → 123.4 / 137.1 | 2.7 / 3.3 → 2.6 / 3.0 | 2.2 / 2.3 → 1.2 / 1.4 |
+| Pandoc manual | 8647.8 / 10650.4 → 4561.3 / 5544.9 | 1466.2 / 1816.0 → 1454.5 / 1763.0 | 46.6 / 62.6 → 46.3 / 55.3 | 7.0 / 13.7 → 4.6 / 8.6 |
+| Parser README | 18.9 / 19.4 → 10.9 / 11.2 | 17.0 / 17.9 → 11.9 / 12.3 | 10.1 / 10.3 → 6.8 / 7.0 | 1.6 / 1.7 → 0.8 / 0.8 |
+| Integrations | 168.5 / 183.9 → 103.9 / 116.3 | 96.4 / 135.7 → 83.4 / 129.3 | 44.5 / 64.9 → 37.8 / 48.1 | 2.7 / 4.4 → 1.3 / 1.9 |
+| Getting Started | 285.1 / 297.6 → 167.9 / 180.4 | 111.7 / 118.7 → 100.4 / 106.8 | 51.0 / 56.1 → 44.1 / 48.6 | 2.5 / 2.6 → 1.2 / 1.3 |
+| Performance | 1088.7 / 1185.9 → 930.0 / 1024.4 | 209.4 / 226.7 → 194.3 / 214.2 | 104.8 / 116.3 → 94.3 / 102.6 | 3.2 / 3.5 → 1.5 / 1.7 |
+| Tables | 722.5 / 768.5 → 520.8 / 563.1 | 241.5 / 338.7 → 229.7 / 325.0 | 117.0 / 174.4 → 110.0 / 153.0 | 2.9 / 4.7 → 1.5 / 2.1 |
+| Math | 526.0 / 559.2 → 347.7 / 365.8 | 208.0 / 223.3 → 194.6 / 209.3 | 90.8 / 98.1 → 84.0 / 93.9 | 2.7 / 2.8 → 1.3 / 1.4 |
+| Math with grid tables disabled | 513.0 / 534.8 → 338.2 / 352.0 | 199.1 / 215.4 → 190.8 / 201.0 | 87.0 / 93.0 → 82.9 / 89.3 | 2.6 / 2.8 → 1.3 / 1.5 |
+
+Planner full-parse medians were 56–86% of incumbent medians before the
+fixes and 53–85% afterward. Line-start edit medians ranged from 71–100%
+before and 70–99% afterward. Typing medians ranged from 69–100% before
+and 67–99% afterward. `large_authoring.qmd` failed CST or diagnostics
+preflight in both runs.
+
+The same eight Pandoc fixtures reached timing in both runs.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| 0123, caption before a multiline table | 10.4 / 10.9 → 4.6 / 4.8 | 13.0 / 13.6 → 6.9 / 7.2 | 12.0 / 12.5 → 5.8 / 6.0 | 1.9 / 1.9 → 0.8 / 0.8 |
+| 0124, caption after a multiline table | 6.6 / 6.9 → 4.4 / 4.6 | 10.0 / 10.2 → 6.7 / 7.0 | 3.4 / 3.5 → 2.4 / 2.5 | 1.9 / 1.9 → 0.8 / 0.8 |
+| 0541, simple table in a blockquote | 3.4 / 3.6 → 2.2 / 2.3 | — | — | — |
+| 0199, nested native divs | 6.2 / 6.4 → 7.1 / 7.5 | 7.9 / 8.5 → 9.0 / 9.7 | 7.6 / 8.0 → 8.6 / 9.4 | 1.9 / 2.0 → 0.8 / 0.8 |
+| 0481, comment trailing prose in a fenced div | 3.6 / 3.7 → 3.1 / 3.2 | — | — | — |
+| 0495, unclosed div in a list item | 5.8 / 6.1 → 5.1 / 5.4 | — | — | — |
+| 0610, quoted div stops before the next list item | 5.7 / 5.8 → 5.6 / 5.9 | — | — | — |
+| 0611, comment trailing prose in a quoted item | 5.2 / 5.3 → 4.9 / 5.1 | — | — | — |
+
+Two release probes compared the code before and after the fixes. The edit
+inserted an apostrophe in prose after a fenced listing of repeated
+`<div` lines and a final `>`. It used cached reference labels and the
+planner's token tier in both runs. The parse probes checked source
+round-trips for quoted list items with repeated
+`<!--a--><div>x</div>` lines. Timings are median and p95 in microseconds.
+
+| Workload | Before | After |
+| --- | ---: | ---: |
+| Token edit after 4,000 code lines | 76,578.7 / 77,269.2 | 0.4 / 4.9 |
+| Token edit after 8,000 code lines | 311,774.7 / 376,238.4 | 0.4 / 1.4 |
+| 250 comment tails, incumbent | 97,046.4 / 162,619.2 | 882.3 / 932.5 |
+| 250 comment tails, planner | 97,934.2 / 103,245.9 | 988.9 / 1,053.9 |
+| 500 comment tails, incumbent | 411,603.3 / 482,748.6 | 1,778.5 / 1,784.8 |
+| 500 comment tails, planner | 398,624.8 / 666,382.3 | 1,962.7 / 2,296.4 |
+
+### Pandoc HTML third review follow-up
+
+Both release runs used the previous checkpoint's documents, parser options,
+and logical CPU. Each cell gives median and p95 in microseconds, with
+incumbent timings on the left and planner timings on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 391.3 / 424.6 → 235.9 / 261.1 | 238.6 / 254.4 → 200.7 / 216.8 | 4.3 / 5.0 → 4.3 / 4.9 | 3.5 / 4.0 → 1.9 / 2.2 |
+| Pandoc manual | 9196.8 / 9798.4 → 4763.1 / 5112.8 | 2306.9 / 2748.5 → 2245.7 / 2532.6 | 68.9 / 78.2 → 68.8 / 78.5 | 21.3 / 28.0 → 15.4 / 23.0 |
+| Parser README | 34.6 / 38.4 → 18.5 / 20.9 | 31.2 / 34.6 → 20.6 / 22.9 | 18.4 / 20.5 → 12.0 / 12.8 | 3.0 / 3.5 → 1.4 / 1.6 |
+| Integrations | 328.1 / 355.0 → 198.4 / 218.9 | 171.5 / 190.6 → 147.2 / 161.5 | 75.9 / 84.7 → 64.2 / 71.8 | 5.0 / 6.2 → 2.4 / 3.0 |
+| Getting Started | 315.3 / 462.6 → 186.6 / 257.9 | 127.9 / 187.6 → 112.8 / 172.2 | 55.9 / 84.8 → 50.1 / 75.0 | 2.7 / 4.6 → 1.3 / 2.1 |
+| Performance | 1164.2 / 1838.6 → 987.9 / 1429.7 | 227.2 / 355.2 → 216.9 / 324.1 | 116.5 / 185.3 → 106.9 / 164.8 | 3.5 / 5.7 → 1.6 / 2.5 |
+| Tables | 1156.2 / 1211.4 → 805.2 / 856.2 | 365.9 / 382.0 → 349.1 / 363.3 | 188.3 / 199.5 → 174.4 / 184.2 | 5.5 / 6.4 → 2.4 / 2.8 |
+| Math | 964.8 / 989.1 → 591.8 / 609.8 | 305.3 / 341.3 → 298.5 / 323.2 | 138.7 / 155.3 → 128.3 / 145.2 | 4.5 / 5.9 → 2.1 / 2.7 |
+| Math with grid tables disabled | 753.4 / 808.4 → 482.1 / 514.8 | 216.5 / 326.3 → 206.1 / 309.1 | 95.8 / 145.3 → 88.3 / 134.5 | 2.7 / 4.9 → 1.4 / 2.3 |
+
+Planner full-parse medians ranged from 52–83% of incumbent medians before
+the fixes and 52–85% afterward. Line-start edit medians ranged from 66–96%
+before and 66–98% afterward. Typing medians ranged from 65–101% before
+and 65–100% afterward. `large_authoring.qmd` failed CST or diagnostic
+preflight in both runs.
+
+The same eight Pandoc fixtures reached timing in both runs.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| 0123, caption before a multiline table | 17.6 / 19.4 → 7.9 / 8.6 | 13.8 / 14.4 → 7.3 / 8.0 | 12.6 / 12.9 → 6.1 / 6.9 | 1.9 / 2.0 → 0.8 / 0.8 |
+| 0124, caption after a multiline table | 7.0 / 7.2 → 4.6 / 4.8 | 10.6 / 10.9 → 7.1 / 7.6 | 3.6 / 3.7 → 2.5 / 2.6 | 2.0 / 2.0 → 0.8 / 0.9 |
+| 0541, simple table in a blockquote | 3.6 / 3.8 → 2.2 / 2.4 | — | — | — |
+| 0199, nested native divs | 6.4 / 6.6 → 7.4 / 8.2 | 8.2 / 8.5 → 9.4 / 10.4 | 7.7 / 7.9 → 8.9 / 9.8 | 1.9 / 2.0 → 0.8 / 0.9 |
+| 0481, comment trailing prose in a fenced div | 3.9 / 4.0 → 3.3 / 3.5 | — | — | — |
+| 0495, unclosed div in a list item | 6.0 / 6.3 → 6.2 / 6.5 | — | — | — |
+| 0610, quoted div stops before the next list item | 9.0 / 10.5 → 8.9 / 10.0 | — | — | — |
+| 0611, comment trailing prose in a quoted item | 10.0 / 11.0 → 9.3 / 10.0 | — | — | — |
+
+A separate release probe inserted an apostrophe in prose after an inline
+`<em>` tag and a fenced listing of 4,000 lines. Both builds used cached
+reference labels and reused the edited token. The first listing contained
+plain text, and the second contained repeated `<div` lines and a final
+`>`. The table gives median and p95 in microseconds.
+
+| Listing | Before | After |
+| --- | ---: | ---: |
+| Plain text | 529.87 / 555.91 | 4.31 / 4.56 |
+| HTML-looking code | 65.62 / 69.83 | 1.16 / 1.25 |

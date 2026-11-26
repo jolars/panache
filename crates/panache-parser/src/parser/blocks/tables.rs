@@ -39,6 +39,10 @@ pub(crate) trait LineView {
         FrameVerdict::Inside { rest: self.line(i) }
     }
 
+    fn starts_in_frame(&self, i: usize) -> bool {
+        self.frame_verdict(i).reaches_frame()
+    }
+
     /// Whether line `i` ends the enclosing container's line run — the
     /// second half of the container bound, for the boundary the frame
     /// verdict cannot see.
@@ -100,26 +104,30 @@ impl<'a, 'p> LineView for StrippedLines<'a, 'p> {
             self.prefix().resolve(self.raw()[i])
         }
     }
+    fn starts_in_frame(&self, i: usize) -> bool {
+        i == self.dispatch_pos()
+            || ContainerPrefix::strip_required_ops(self.raw()[i], self.prefix().ops()).is_some()
+    }
     fn ends_container_lines(&self, i: usize) -> bool {
         let prefix = self.prefix();
         (i > self.dispatch_pos()
-            && self.dispatch_override().is_some()
+            && self.requires_continuation_prefix()
             && ContainerPrefix::strip_required_ops(self.raw()[i], prefix.ops()).is_none())
-            || (prefix.div_closer_ends_lines() && line_is_fenced_div_closer(self.raw()[i]))
+            || div_closer_at(self, i)
             || note_marker_ends_lines(prefix, self.raw()[i])
-            || list_start_ends_lines(prefix, self.raw()[i])
+            || prefix.list_start_ends_line(self.raw()[i])
             || html_closer_ends_lines(prefix, self.raw()[i])
     }
     fn run_end_supplies_blank(&self, i: usize) -> bool {
         let prefix = self.prefix();
         let raw = self.raw()[i];
-        if prefix.div_closer_ends_lines() && line_is_fenced_div_closer(raw) {
+        if div_closer_at(self, i) {
             return prefix.div_closer_supplies_blank();
         }
         if note_marker_ends_lines(prefix, raw) {
             return true;
         }
-        if list_start_ends_lines(prefix, raw) {
+        if prefix.list_start_ends_line(raw) {
             return prefix.list_start_supplies_blank();
         }
         if html_closer_ends_lines(prefix, raw) {
@@ -127,6 +135,18 @@ impl<'a, 'p> LineView for StrippedLines<'a, 'p> {
         }
         true
     }
+}
+
+// A div can close in the source frame or after stripping table prefixes,
+// such as the quote marker in a blockquote containing the div.
+fn div_closer_at(window: &StrippedLines<'_, '_>, i: usize) -> bool {
+    let Some(indent) = window.prefix().div_closer_indent() else {
+        return false;
+    };
+    [window.raw()[i], window.line(i)].into_iter().any(|line| {
+        line_is_fenced_div_closer(line)
+            && super::super::utils::container_stack::leading_indent(line).0 <= indent
+    })
 }
 
 /// Pandoc's `noteBlock` stops collecting at a new note marker with at
@@ -185,47 +205,6 @@ pub(crate) fn html_closer_ends_lines(prefix: &ContainerPrefix, raw: &str) -> boo
     )
 }
 
-/// Pandoc collects a list item's continuation lines with
-/// `listContinuationLine`, which stops at a `listStart` reached by at
-/// most 3 spaces in the frame the list was parsed in — for a nested
-/// list, the enclosing item's content reparse, so the tolerance is 3
-/// columns past the start of the marker's ladder band (see
-/// `ContainerPrefix::list_start_band_start`). A three-way split, all
-/// verified against `pandoc -f markdown -t native`: a marker at or
-/// past the item's content column is nested-list content (the full
-/// resolve stays inside the frame); one past its band's tolerance but
-/// short of the content column is a lazy continuation; one within the
-/// tolerance ends the run.
-fn list_start_ends_lines(prefix: &ContainerPrefix, raw: &str) -> bool {
-    use super::super::utils::container_stack::leading_indent;
-    use super::container_prefix::StripOp;
-    use super::lists::{OpenListHint, try_parse_list_marker_with};
-
-    let Some(detect) = prefix.list_start_detect() else {
-        return false;
-    };
-    let Some(la_index) = prefix
-        .ops()
-        .iter()
-        .rposition(|op| matches!(op, StripOp::ListAdvance(_)))
-    else {
-        return false;
-    };
-    match prefix.resolve(raw) {
-        FrameVerdict::Dedented { op_index, .. } | FrameVerdict::FakedIndent { op_index, .. }
-            if op_index <= la_index => {}
-        _ => return false,
-    }
-    match prefix.without_innermost_list_advance().resolve(raw) {
-        FrameVerdict::Inside { rest } => {
-            let indent = leading_indent(rest).0;
-            indent <= prefix.list_start_band_start(indent) + 3
-                && try_parse_list_marker_with(rest, detect, OpenListHint::None).is_some()
-        }
-        _ => false,
-    }
-}
-
 /// A [`LineView`] over a [`StrippedLines`] window that strips *every* line —
 /// including the dispatch line — with the full container strip rather than
 /// the emission-safe line-0 strip. Grid-border detection needs this: a
@@ -235,7 +214,7 @@ fn list_start_ends_lines(prefix: &ContainerPrefix, raw: &str) -> bool {
 /// the window, which preserves the indent bytes. This reproduces the old
 /// grid path's `stripped[dispatch] = prefix.strip(...)` override, but
 /// lazily.
-pub(crate) struct UniformStripView<'s, 'a, 'p>(&'s StrippedLines<'a, 'p>);
+pub(crate) struct UniformStripView<'s, 'a, 'p>(pub(crate) &'s StrippedLines<'a, 'p>);
 
 impl<'s, 'a, 'p> LineView for UniformStripView<'s, 'a, 'p> {
     fn line(&self, i: usize) -> &str {
@@ -247,6 +226,12 @@ impl<'s, 'a, 'p> LineView for UniformStripView<'s, 'a, 'p> {
     }
     fn line_count(&self) -> usize {
         self.0.raw().len()
+    }
+    fn frame_verdict(&self, i: usize) -> FrameVerdict<'_> {
+        self.0.frame_verdict(i)
+    }
+    fn starts_in_frame(&self, i: usize) -> bool {
+        self.0.starts_in_frame(i)
     }
     fn ends_container_lines(&self, i: usize) -> bool {
         self.0.ends_container_lines(i)
@@ -656,61 +641,22 @@ fn find_caption_before_table(
     table_start: usize,
     dispatch: usize,
 ) -> Option<(usize, usize)> {
-    if table_start == 0 {
+    let mut end = table_start;
+    if end > dispatch && lines.line(end - 1).trim().is_empty() {
+        end -= 1;
+    }
+    if end <= dispatch
+        || !is_valid_caption_start_before_table(lines, dispatch)
+        || (dispatch > 0
+            && !lines.line(dispatch - 1).trim().is_empty()
+            && !line_is_fenced_div_fence(lines.line(dispatch - 1)))
+        || previous_nonblank_looks_like_table(lines, dispatch)
+        || (dispatch + 1..end)
+            .any(|i| lines.line(i).trim().is_empty() || lines.ends_container_lines(i))
+    {
         return None;
     }
-
-    let mut pos = table_start - 1;
-
-    if lines.line(pos).trim().is_empty() {
-        if pos == 0 {
-            return None;
-        }
-        pos -= 1;
-    }
-
-    let caption_end = pos + 1; // End is exclusive
-
-    let starts_its_block = |p: usize| {
-        p == 0 || lines.line(p - 1).trim().is_empty() || line_is_fenced_div_fence(lines.line(p - 1))
-    };
-
-    if !is_valid_caption_start_before_table(lines, pos) {
-        let mut scan_pos = pos;
-        while scan_pos > 0 {
-            scan_pos -= 1;
-            let line = lines.line(scan_pos);
-
-            if line.trim().is_empty() || lines.ends_container_lines(scan_pos) {
-                return None;
-            }
-
-            if is_valid_caption_start_before_table(lines, scan_pos) {
-                if scan_pos < dispatch {
-                    return None;
-                }
-                if !starts_its_block(scan_pos) {
-                    return None;
-                }
-                if previous_nonblank_looks_like_table(lines, scan_pos) {
-                    return None;
-                }
-                return Some((scan_pos, caption_end));
-            }
-        }
-        None
-    } else {
-        if pos < dispatch {
-            return None;
-        }
-        if !starts_its_block(pos) {
-            return None;
-        }
-        if previous_nonblank_looks_like_table(lines, pos) {
-            return None;
-        }
-        Some((pos, caption_end))
-    }
+    Some((dispatch, end))
 }
 
 fn previous_nonblank_looks_like_table(lines: &(impl LineView + ?Sized), pos: usize) -> bool {
@@ -974,227 +920,247 @@ fn determine_alignments(columns: &mut [Column], separator_line: &str, header_lin
     }
 }
 
-fn simple_table_bounds(window: &StrippedLines<'_, '_>) -> Option<(usize, usize, bool, bool)> {
-    let lines = window.raw();
-    let start_pos = window.pos();
-
-    if start_pos >= lines.len() {
-        return None;
-    }
-
-    let view = UniformStripView(window);
-
-    let gate_first = view.line(start_pos);
-    let separator_here = try_parse_table_separator(gate_first).is_some();
-    let separator_next = !separator_here
-        && start_pos + 1 < lines.len()
-        && !gate_first.trim().is_empty()
-        && try_parse_table_separator(view.line(start_pos + 1)).is_some();
-    let single_column_here =
-        !separator_here && !separator_next && parse_single_dash_run(gate_first).is_some();
-    if !separator_here && !separator_next && !single_column_here {
-        return None;
-    }
-
-    let (separator_pos, end_pos, has_closer) = if single_column_here {
-        let end_pos = find_single_column_table_end(&view, start_pos + 1)?;
-        (start_pos, end_pos, true)
-    } else {
-        let separator_pos = find_separator_line(&view, start_pos)?;
-        let headerless = separator_pos == start_pos;
-        let (end_pos, has_closer) = find_table_end(&view, separator_pos + 1, headerless)?;
-        (separator_pos, end_pos, has_closer)
-    };
-    (end_pos - separator_pos - 1 > usize::from(has_closer)).then_some((
-        separator_pos,
-        end_pos,
-        has_closer,
-        single_column_here,
-    ))
+enum DashRows {
+    Simple { separator: usize, has_closer: bool },
+    Multiline(Vec<MultilinePart>),
 }
 
-#[cfg(feature = "experimental-block-parser")]
-pub(in crate::parser) fn may_open_dash_table(first: &str, next: &str) -> bool {
-    is_multiline_border(first) || try_parse_table_separator(next).is_some()
+enum MultilinePart {
+    Row(Range<usize>, SyntaxKind),
+    Separator(usize),
+    Blank(usize),
 }
 
-#[cfg(feature = "experimental-block-parser")]
-pub(in crate::parser) fn is_dash_table_caption(
-    window: &StrippedLines<'_, '_>,
-    options: &ParserOptions,
-) -> bool {
-    let pos = window.pos();
-    let line = window.strip_at(pos);
-    if !options.extensions.table_captions
-        || !(options.extensions.simple_tables || options.extensions.multiline_tables)
-        || !is_bare_colon_caption_start(line)
-    {
-        return false;
-    }
+pub(crate) struct PreparedDashTable {
+    body: Range<usize>,
+    columns: Vec<Column>,
+    rows: DashRows,
+    caption_before: Option<(usize, usize)>,
+    caption_after: Option<(usize, usize)>,
+    pub(crate) lines_consumed: usize,
+}
 
-    let matches_table = |start, dispatch, trailing_caption: bool| {
-        let table = window.with_positions(start, dispatch);
-        let accepts_end = |end| {
-            !trailing_caption
-                || find_caption_after_table(window, end).is_some_and(|(start, _)| start == pos)
-        };
-        (options.extensions.simple_tables
-            && simple_table_bounds(&table).is_some_and(|(_, end, _, _)| accepts_end(end)))
-            || (options.extensions.multiline_tables
-                && valid_multiline_table_shape(&table)
-                    .is_some_and(|shape| accepts_end(shape.end_pos)))
-    };
-
-    if is_caption_followed_by_table(window, pos)
-        && let Some((_, caption_end)) = caption_range_starting_at(window, pos)
-    {
-        let start = (caption_end..window.line_count()).find(|&i| !window.line(i).trim().is_empty());
-        if start.is_some_and(|start| matches_table(start, pos, false)) {
-            return true;
+impl PreparedDashTable {
+    fn new(
+        body: Range<usize>,
+        columns: Vec<Column>,
+        rows: DashRows,
+        view: &impl LineView,
+        dispatch: usize,
+        captions: bool,
+    ) -> Self {
+        let caption_before = captions
+            .then(|| find_caption_before_table(view, body.start, dispatch))
+            .flatten();
+        let caption_after = (captions && caption_before.is_none())
+            .then(|| {
+                find_caption_after_table(view, body.end)
+                    .filter(|(start, _)| view.starts_in_frame(*start))
+            })
+            .flatten();
+        let start = caption_before.map_or(body.start, |(start, _)| start);
+        let end = caption_after.map_or(body.end, |(_, end)| end);
+        Self {
+            body,
+            columns,
+            rows,
+            caption_before,
+            caption_after,
+            lines_consumed: end - start,
         }
     }
 
-    if pos == 0
-        || !(window.line(pos - 1).trim().is_empty() || is_multiline_border(window.line(pos - 1)))
-    {
-        return false;
+    pub(crate) fn has_caption(&self) -> bool {
+        self.caption_before.is_some() || self.caption_after.is_some()
     }
-    let preceding_block = (0..pos)
-        .rev()
-        .skip_while(|&i| window.line(i).trim().is_empty())
-        .take_while(|&i| {
-            let line = window.line(i);
-            !line.trim().is_empty()
-                && !is_bare_colon_caption_start(line)
-                && !line_is_fenced_div_fence(line)
-        })
-        .last();
-    preceding_block.is_some_and(|start| matches_table(start, start, true))
+
+    pub(crate) fn emit(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        window: &StrippedLines<'_, '_>,
+        config: &ParserOptions,
+    ) {
+        let kind = match self.rows {
+            DashRows::Simple { .. } => SyntaxKind::SIMPLE_TABLE,
+            DashRows::Multiline(_) => SyntaxKind::MULTILINE_TABLE,
+        };
+        builder.start_node(kind.into());
+        if let Some((start, end)) = self.caption_before {
+            emit_table_caption(builder, window, start, end, config);
+            emit_caption_blank_lines(builder, window, end, self.body.start);
+        }
+
+        match &self.rows {
+            DashRows::Simple {
+                separator,
+                has_closer,
+            } => {
+                if self.body.start < *separator {
+                    emit_table_row(
+                        builder,
+                        window,
+                        self.body.start,
+                        &self.columns,
+                        SyntaxKind::TABLE_HEADER,
+                        config,
+                    );
+                }
+                emit_dash_separator(builder, window, *separator);
+                let rows_end = self.body.end - usize::from(*has_closer);
+                for i in (*separator + 1)..rows_end {
+                    emit_table_row(
+                        builder,
+                        window,
+                        i,
+                        &self.columns,
+                        SyntaxKind::TABLE_ROW,
+                        config,
+                    );
+                }
+                if *has_closer {
+                    emit_dash_separator(builder, window, rows_end);
+                }
+            }
+            DashRows::Multiline(parts) => {
+                for part in parts {
+                    match part {
+                        MultilinePart::Row(lines, kind) => {
+                            emit_multiline_table_row(
+                                builder,
+                                window,
+                                lines.clone(),
+                                &self.columns,
+                                *kind,
+                                config,
+                            );
+                        }
+                        MultilinePart::Separator(i) => emit_dash_separator(builder, window, *i),
+                        MultilinePart::Blank(i) => {
+                            builder.start_node(SyntaxKind::BLANK_LINE.into());
+                            let tail = window.emit_or_dispatch_tail(builder, *i);
+                            builder.token(SyntaxKind::BLANK_LINE.into(), tail);
+                            builder.finish_node();
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some((start, end)) = self.caption_after {
+            emit_caption_blank_lines(builder, window, self.body.end, start);
+            emit_table_caption(builder, window, start, end, config);
+        }
+        builder.finish_node();
+    }
 }
 
-#[cfg(feature = "experimental-block-parser")]
-pub(in crate::parser) fn opens_simple_table(window: &StrippedLines<'_, '_>) -> bool {
-    simple_table_bounds(window).is_some()
+fn emit_dash_separator(
+    builder: &mut GreenNodeBuilder<'static>,
+    window: &StrippedLines<'_, '_>,
+    pos: usize,
+) {
+    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
+    let tail = window.emit_or_dispatch_tail(builder, pos);
+    emit_separator_tokens(builder, tail);
+    builder.finish_node();
 }
 
 /// Try to parse a simple table starting at the given position.
-/// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_simple_table(
     window: &StrippedLines<'_, '_>,
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
-    let start_pos = window.pos();
-    let view = UniformStripView(window);
-    let (separator_pos, end_pos, has_closer, single_column_here) = simple_table_bounds(window)?;
-    let separator_line = view.line(separator_pos);
-    let mut columns = if single_column_here {
-        parse_single_dash_run(separator_line)?
-    } else {
-        try_parse_table_separator(separator_line)?
-    };
-
-    let has_header = separator_pos > start_pos;
-    let header_line = if has_header {
-        Some(view.line(separator_pos - 1))
-    } else {
-        None
-    };
-
-    determine_alignments(&mut columns, separator_line, header_line);
-
-    let caption_before = find_caption_before_table(&view, start_pos, window.dispatch_pos());
-
-    let caption_after = if caption_before.is_some() {
-        None
-    } else {
-        find_caption_after_table(&view, end_pos)
-    };
-
-    builder.start_node(SyntaxKind::SIMPLE_TABLE.into());
-
-    if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-        emit_caption_blank_lines(builder, window, cap_end, start_pos);
-    }
-
-    if has_header {
-        emit_table_row(
-            builder,
-            window,
-            separator_pos - 1,
-            &columns,
-            SyntaxKind::TABLE_HEADER,
-            config,
-        );
-    }
-
-    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-    let separator_tail = window.emit_or_dispatch_tail(builder, separator_pos);
-    emit_separator_tokens(builder, separator_tail);
-    builder.finish_node();
-
-    let rows_end = if has_closer { end_pos - 1 } else { end_pos };
-    for idx in (separator_pos + 1)..rows_end {
-        emit_table_row(
-            builder,
-            window,
-            idx,
-            &columns,
-            SyntaxKind::TABLE_ROW,
-            config,
-        );
-    }
-
-    if has_closer {
-        builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-        let closer_tail = window.emit_or_dispatch_tail(builder, end_pos - 1);
-        emit_separator_tokens(builder, closer_tail);
-        builder.finish_node();
-    }
-
-    if let Some((cap_start, cap_end)) = caption_after {
-        emit_caption_blank_lines(builder, window, end_pos, cap_start);
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-    }
-
-    builder.finish_node(); // SimpleTable
-
-    let table_start = if let Some((cap_start, _)) = caption_before {
-        cap_start
-    } else if has_header {
-        separator_pos - 1
-    } else {
-        separator_pos
-    };
-
-    let table_end = if let Some((_, cap_end)) = caption_after {
-        cap_end
-    } else {
-        end_pos
-    };
-
-    let lines_consumed = table_end - table_start;
-
-    Some(lines_consumed)
+    let table = prepare_simple_table(window, config.extensions.table_captions)?;
+    table.emit(builder, window, config);
+    Some(table.lines_consumed)
 }
 
-fn find_separator_line(lines: &(impl LineView + ?Sized), start_pos: usize) -> Option<usize> {
-    log::trace!("  find_separator_line from line {}", start_pos + 1);
-
-    log::trace!("    checking first line: {:?}", lines.line(start_pos));
-    if try_parse_table_separator(lines.line(start_pos)).is_some() {
-        log::trace!("    separator found at first line");
-        return Some(start_pos);
+fn prepare_simple_table(
+    window: &StrippedLines<'_, '_>,
+    captions: bool,
+) -> Option<PreparedDashTable> {
+    let start_pos = window.pos();
+    let view = UniformStripView(window);
+    if start_pos >= view.line_count() {
+        return None;
+    }
+    let first = view.line(start_pos);
+    let next_separator = || {
+        (start_pos + 1 < view.line_count() && !first.trim().is_empty())
+            .then(|| try_parse_table_separator(view.line(start_pos + 1)))
+            .flatten()
+    };
+    let (separator, mut columns, single_column) =
+        if let Some(columns) = try_parse_table_separator(first) {
+            (start_pos, columns, false)
+        } else if let Some(columns) = next_separator() {
+            (start_pos + 1, columns, false)
+        } else {
+            (start_pos, parse_single_dash_run(first)?, true)
+        };
+    let (end, has_closer) = if single_column {
+        (find_single_column_table_end(&view, separator + 1)?, true)
+    } else {
+        find_table_end(&view, separator + 1, separator == start_pos, captions)?
+    };
+    if end - separator - 1 <= usize::from(has_closer) {
+        return None;
     }
 
-    if start_pos + 1 < lines.line_count()
-        && !lines.line(start_pos).trim().is_empty()
-        && try_parse_table_separator(lines.line(start_pos + 1)).is_some()
+    let separator_line = view.line(separator);
+    let header = (separator > start_pos).then(|| view.line(start_pos));
+    determine_alignments(&mut columns, separator_line, header);
+    Some(PreparedDashTable::new(
+        start_pos..end,
+        columns,
+        DashRows::Simple {
+            separator,
+            has_closer,
+        },
+        &view,
+        window.dispatch_pos(),
+        captions,
+    ))
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum DashTableKind {
+    Multiline,
+    Simple,
+}
+
+pub(crate) fn prepare_dash_table_at(
+    window: &StrippedLines<'_, '_>,
+    options: &ParserOptions,
+    kind: DashTableKind,
+) -> Option<PreparedDashTable> {
+    let start = window.pos();
+    let first = window.detect_at(start);
+    let prepare = match kind {
+        DashTableKind::Multiline if options.extensions.multiline_tables => prepare_multiline_table,
+        DashTableKind::Simple if options.extensions.simple_tables => prepare_simple_table,
+        _ => return None,
+    };
+    if options.extensions.table_captions
+        && is_table_caption_start(first)
+        && is_caption_followed_by_table(&UniformStripView(window), start)
     {
-        return Some(start_pos + 1);
+        let view = UniformStripView(window);
+        let (_, end) = caption_range_starting_at(&view, start)?;
+        let body = end + usize::from(end < view.line_count() && view.line(end).trim().is_empty());
+        let table = prepare(&window.with_positions(body, start), true)?;
+        return (table.caption_before.is_some_and(|(pos, _)| pos == start)).then_some(table);
     }
-    None
+    if first.trim_start().starts_with('-')
+        || (matches!(kind, DashTableKind::Simple)
+            && start + 1 < window.line_count()
+            && window.detect_at(start + 1).trim_start().starts_with('-'))
+    {
+        prepare(window, options.extensions.table_captions)
+    } else {
+        None
+    }
 }
 
 /// Find where the table ends: a closing separator line, or (unless
@@ -1207,6 +1173,7 @@ fn find_table_end(
     lines: &(impl LineView + ?Sized),
     start_pos: usize,
     require_closer: bool,
+    captions: bool,
 ) -> Option<(usize, bool)> {
     let mut saw_row = false;
     for i in start_pos..lines.line_count() {
@@ -1219,7 +1186,10 @@ fn find_table_end(
         if try_parse_table_separator(lines.line(i)).is_some()
             && (i + 1 >= lines.line_count()
                 || lines.line(i + 1).trim().is_empty()
-                || lines.ends_container_lines(i + 1))
+                || lines.ends_container_lines(i + 1)
+                || (captions
+                    && lines.starts_in_frame(i + 1)
+                    && is_table_caption_start(lines.line(i + 1))))
         {
             if require_closer && !saw_row {
                 return None;
@@ -3218,7 +3188,7 @@ fn is_headerless_single_row_without_blank(
 
     for i in (row_start + 1)..row_end {
         let (content, _) = strip_newline(lines.line(i));
-        let prefix_end = last_col.start.min(content.len());
+        let prefix_end = column_offset_to_byte_index(content, last_col.start);
         if !content[..prefix_end].trim().is_empty() {
             return false;
         }
@@ -3255,10 +3225,10 @@ fn scan_multiline_table(
         return None;
     }
 
-    let opener_is_continuous = try_parse_multiline_separator(window.line(start_pos)).is_some();
+    let opener_is_continuous = try_parse_multiline_separator(window.detect_at(start_pos)).is_some();
 
     let headerless_columns = if is_column_sep_start {
-        try_parse_table_separator(window.line(start_pos))
+        try_parse_table_separator(window.detect_at(start_pos))
     } else {
         None
     };
@@ -3387,7 +3357,7 @@ fn multiline_table_shape(window: &StrippedLines<'_, '_>) -> Option<MultilineShap
         return None;
     }
 
-    let first_line = window.strip_at(start_pos);
+    let first_line = window.detect_at(start_pos);
 
     let is_continuous_start = try_parse_multiline_separator(first_line).is_some();
     let is_spaced_start = !is_continuous_start && is_column_separator(first_line);
@@ -3402,167 +3372,62 @@ fn multiline_table_shape(window: &StrippedLines<'_, '_>) -> Option<MultilineShap
     }
 }
 
-#[cfg(feature = "experimental-block-parser")]
-pub(in crate::parser) fn opens_multiline_table_shape(window: &StrippedLines<'_, '_>) -> bool {
-    valid_multiline_table_shape(window).is_some()
-}
-
-#[cfg(feature = "experimental-block-parser")]
-fn valid_multiline_table_shape(window: &StrippedLines<'_, '_>) -> Option<MultilineShape> {
-    multiline_table_shape(window).filter(|shape| {
-        let separator = window.line(shape.column_sep_pos);
-        try_parse_table_separator(separator).is_some() || parse_single_dash_run(separator).is_some()
-    })
-}
-
 /// Try to parse a multiline table starting at the given position.
-/// Returns the number of lines consumed if successful.
 pub(crate) fn try_parse_multiline_table(
     window: &StrippedLines<'_, '_>,
     builder: &mut GreenNodeBuilder<'static>,
     config: &ParserOptions,
 ) -> Option<usize> {
+    let table = prepare_multiline_table(window, config.extensions.table_captions)?;
+    table.emit(builder, window, config);
+    Some(table.lines_consumed)
+}
+
+fn prepare_multiline_table(
+    window: &StrippedLines<'_, '_>,
+    captions: bool,
+) -> Option<PreparedDashTable> {
     let start_pos = window.pos();
-    let shape = multiline_table_shape(window)?;
     let MultilineShape {
         end_pos,
         column_sep_pos,
         has_header,
-    } = shape;
+    } = multiline_table_shape(window)?;
+    let columns = try_parse_table_separator(window.detect_at(column_sep_pos))
+        .or_else(|| parse_single_dash_run(window.detect_at(column_sep_pos)))?;
 
-    let columns = try_parse_table_separator(window.line(column_sep_pos))
-        .or_else(|| parse_single_dash_run(window.line(column_sep_pos)))?;
-
-    let caption_before = find_caption_before_table(window, start_pos, window.dispatch_pos());
-
-    let caption_after = if caption_before.is_some() {
-        None
-    } else {
-        find_caption_after_table(window, end_pos)
-    };
-
-    builder.start_node(SyntaxKind::MULTILINE_TABLE.into());
-
-    if let Some((cap_start, cap_end)) = caption_before {
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-        emit_caption_blank_lines(builder, window, cap_end, start_pos);
-    }
-
-    builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-    let tail = window.emit_or_dispatch_tail(builder, start_pos);
-    emit_separator_tokens(builder, tail);
-    builder.finish_node();
-
-    let mut in_header = has_header;
-    let mut current_row_indices: Vec<usize> = Vec::new();
-
+    let mut parts = vec![MultilinePart::Separator(start_pos)];
+    let mut row_start = start_pos + 1;
     for i in (start_pos + 1)..end_pos {
         let line = window.line(i);
-        if i == column_sep_pos {
-            if !current_row_indices.is_empty() {
-                emit_multiline_table_row(
-                    builder,
-                    window,
-                    &current_row_indices,
-                    &columns,
-                    SyntaxKind::TABLE_HEADER,
-                    config,
-                );
-                current_row_indices.clear();
-            }
-
-            builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-            let tail = window.emit_or_dispatch_tail(builder, i);
-            emit_separator_tokens(builder, tail);
-            builder.finish_node();
-            in_header = false;
-            continue;
-        }
-
-        if is_multiline_border(line) {
-            if !current_row_indices.is_empty() {
-                let kind = if in_header {
-                    SyntaxKind::TABLE_HEADER
-                } else {
-                    SyntaxKind::TABLE_ROW
-                };
-                emit_multiline_table_row(
-                    builder,
-                    window,
-                    &current_row_indices,
-                    &columns,
-                    kind,
-                    config,
-                );
-                current_row_indices.clear();
-            }
-
-            builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
-            let tail = window.emit_or_dispatch_tail(builder, i);
-            emit_separator_tokens(builder, tail);
-            builder.finish_node();
-            continue;
-        }
-
-        if line.trim().is_empty() {
-            if !current_row_indices.is_empty() {
-                let kind = if in_header {
-                    SyntaxKind::TABLE_HEADER
-                } else {
-                    SyntaxKind::TABLE_ROW
-                };
-                emit_multiline_table_row(
-                    builder,
-                    window,
-                    &current_row_indices,
-                    &columns,
-                    kind,
-                    config,
-                );
-                current_row_indices.clear();
-            }
-
-            builder.start_node(SyntaxKind::BLANK_LINE.into());
-            let tail = window.emit_or_dispatch_tail(builder, i);
-            builder.token(SyntaxKind::BLANK_LINE.into(), tail);
-            builder.finish_node();
-            continue;
-        }
-
-        current_row_indices.push(i);
-    }
-
-    if !current_row_indices.is_empty() {
-        let kind = if in_header {
-            SyntaxKind::TABLE_HEADER
+        let boundary = if i == column_sep_pos || is_multiline_border(line) {
+            MultilinePart::Separator(i)
+        } else if line.trim().is_empty() {
+            MultilinePart::Blank(i)
         } else {
-            SyntaxKind::TABLE_ROW
+            continue;
         };
-        emit_multiline_table_row(
-            builder,
-            window,
-            &current_row_indices,
-            &columns,
-            kind,
-            config,
-        );
+        if row_start < i {
+            let kind = if has_header && i <= column_sep_pos {
+                SyntaxKind::TABLE_HEADER
+            } else {
+                SyntaxKind::TABLE_ROW
+            };
+            parts.push(MultilinePart::Row(row_start..i, kind));
+        }
+        parts.push(boundary);
+        row_start = i + 1;
     }
+    debug_assert_eq!(row_start, end_pos);
 
-    if let Some((cap_start, cap_end)) = caption_after {
-        emit_caption_blank_lines(builder, window, end_pos, cap_start);
-        emit_table_caption(builder, window, cap_start, cap_end, config);
-    }
-
-    builder.finish_node(); // MultilineTable
-
-    let table_start = caption_before.map(|(start, _)| start).unwrap_or(start_pos);
-    let table_end = if let Some((_, cap_end)) = caption_after {
-        cap_end
-    } else {
-        end_pos
-    };
-
-    Some(table_end - table_start)
+    Some(PreparedDashTable::new(
+        start_pos..end_pos,
+        columns,
+        DashRows::Multiline(parts),
+        window,
+        window.dispatch_pos(),
+        captions,
+    ))
 }
 
 fn extract_first_line_cell_contents(line: &str, columns: &[Column]) -> Vec<String> {
@@ -3602,19 +3467,15 @@ fn prefix_is_empty(prefix: &ContainerPrefix) -> bool {
 fn emit_multiline_table_row(
     builder: &mut GreenNodeBuilder<'static>,
     window: &StrippedLines<'_, '_>,
-    indices: &[usize],
+    lines: Range<usize>,
     columns: &[Column],
     kind: SyntaxKind,
     config: &ParserOptions,
 ) {
-    if indices.is_empty() {
-        return;
-    }
-
     builder.start_node(kind.into());
 
-    if columns.len() == 1 && indices.len() > 1 && prefix_is_empty(window.prefix()) {
-        let first = window.strip_at(indices[0]);
+    if columns.len() == 1 && lines.len() > 1 && prefix_is_empty(window.prefix()) {
+        let first = window.strip_at(lines.start);
         let (first_trimmed, _) = strip_newline(first);
         let cell_start = column_offset_to_byte_index(first_trimmed, columns[0].start);
         if cell_start > 0 {
@@ -3622,7 +3483,7 @@ fn emit_multiline_table_row(
         }
 
         let mut joined = String::from(&first[cell_start..]);
-        for &idx in &indices[1..] {
+        for idx in (lines.start + 1)..lines.end {
             joined.push_str(window.strip_at(idx));
         }
 
@@ -3636,7 +3497,7 @@ fn emit_multiline_table_row(
         return;
     }
 
-    let first_line = window.emit_or_dispatch_tail(builder, indices[0]);
+    let first_line = window.emit_or_dispatch_tail(builder, lines.start);
     let cell_contents = extract_first_line_cell_contents(first_line, columns);
     let (trimmed, newline_str) = strip_newline(first_line);
     let mut current_pos = 0;
@@ -3670,7 +3531,7 @@ fn emit_multiline_table_row(
         builder.token(SyntaxKind::NEWLINE.into(), newline_str);
     }
 
-    for &idx in &indices[1..] {
+    for idx in (lines.start + 1)..lines.end {
         let tail = window.emit_or_dispatch_tail(builder, idx);
         emit_line_tokens(builder, tail);
     }

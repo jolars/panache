@@ -137,6 +137,38 @@ fn pandoc_allowlist() {
     );
 }
 
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn experimental_pandoc_html_blocks() {
+    use panache_parser::parser::{experimental_block, parse_with_errors};
+
+    let options = ParserOptions {
+        flavor: Flavor::Quarto,
+        ..pandoc_options()
+    };
+    let allowed = read_id_file(&manifest_path(ALLOWLIST_REL));
+    for case in read_corpus(&manifest_path(CORPUS_REL))
+        .into_iter()
+        .filter(|case| case.slug.starts_with("html-block-") || matches!(case.id, 511 | 525..=527))
+    {
+        let (expected, expected_errors) = parse_with_errors(&case.markdown, Some(options.clone()));
+        let (actual, errors) = experimental_block::try_parse_with_errors(&case.markdown, &options)
+            .unwrap_or_else(|unsupported| panic!("{}: {unsupported:?}", case.slug));
+        assert_eq!(actual.to_string(), case.markdown, "{}", case.slug);
+        assert_eq!(actual.green(), expected.green(), "{}", case.slug);
+        assert_eq!(errors, expected_errors, "{}", case.slug);
+        if allowed.contains(&case.id) {
+            let native = to_pandoc_ast(&actual);
+            assert_eq!(
+                normalize_native(&native),
+                normalize_native(&case.expected_native),
+                "{}",
+                case.slug
+            );
+        }
+    }
+}
+
 #[test]
 #[ignore = "manual: run to generate triage report and seed/grow the allowlist"]
 fn pandoc_full_report() {

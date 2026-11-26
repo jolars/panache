@@ -800,6 +800,15 @@ pub(in crate::parser) fn emit_list_item(
     item: &ListItemEmissionInput<'_>,
     config: &ParserOptions,
 ) -> EmittedListItem {
+    emit_list_item_with_checkbox(builder, item, config, true)
+}
+
+pub(in crate::parser) fn emit_list_item_with_checkbox(
+    builder: &mut GreenNodeBuilder<'static>,
+    item: &ListItemEmissionInput<'_>,
+    config: &ParserOptions,
+    claim_task_checkbox: bool,
+) -> EmittedListItem {
     builder.start_node(SyntaxKind::LIST_ITEM.into());
 
     if item.indent_bytes > 0 {
@@ -839,7 +848,7 @@ pub(in crate::parser) fn emit_list_item(
     let mut has_task_checkbox = false;
     let text_to_buffer = if content_start < item.content.len() {
         let rest = &item.content[content_start..];
-        if is_task_checkbox(rest) {
+        if claim_task_checkbox && is_task_checkbox(rest) {
             has_task_checkbox = true;
             builder.token(SyntaxKind::TASK_CHECKBOX.into(), &rest[..3]);
             rest[3..].to_string()
@@ -1692,6 +1701,7 @@ pub(in crate::parser) fn start_nested_list(
     item: &ListItemEmissionInput<'_>,
     indent_to_emit: Option<&str>,
     config: &ParserOptions,
+    claim_task_checkbox: bool,
 ) -> ListItemFinish {
     if let Some(indent_str) = indent_to_emit {
         builder.token(SyntaxKind::WHITESPACE.into(), indent_str);
@@ -1704,7 +1714,7 @@ pub(in crate::parser) fn start_nested_list(
         has_blank_between_items: false,
     });
 
-    let emitted = emit_list_item(builder, item, config);
+    let emitted = emit_list_item_with_checkbox(builder, item, config, claim_task_checkbox);
     finish_list_item_with_optional_nested(
         containers,
         builder,
@@ -1814,7 +1824,17 @@ pub(in crate::parser) fn add_list_item(
     item: &ListItemEmissionInput<'_>,
     config: &ParserOptions,
 ) -> ListItemFinish {
-    let emitted = emit_list_item(builder, item, config);
+    add_list_item_with_checkbox(containers, builder, item, config, true)
+}
+
+pub(in crate::parser) fn add_list_item_with_checkbox(
+    containers: &mut ContainerStack,
+    builder: &mut GreenNodeBuilder<'static>,
+    item: &ListItemEmissionInput<'_>,
+    config: &ParserOptions,
+    claim_task_checkbox: bool,
+) -> ListItemFinish {
+    let emitted = emit_list_item_with_checkbox(builder, item, config, claim_task_checkbox);
 
     log::trace!(
         "add_list_item: content={:?}, text_to_buffer={:?}",

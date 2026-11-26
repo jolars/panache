@@ -1,0 +1,10 @@
+[ BulletList
+    [ [ BlockQuote
+          [ Para [ Str "Quote." ]
+          , RawBlock (Format "html") "<!--a-->"
+          , RawBlock (Format "html") "<!--b-->"
+          , Para [ Str "tail" , SoftBreak , Str "next" ]
+          ]
+      ]
+    ]
+]

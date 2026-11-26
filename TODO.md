@@ -277,9 +277,9 @@ timing. Compare the results with the previous checkpoint to spot regressions.
   lines that end each body, and pin the CST with Pandoc fixtures.
 - [x] Port grid tables, including nested content and compatibility-dependent
   cell compacting. Recheck the default Quarto benchmark documents.
-- [ ] Port Pandoc simple and multiline tables. Check caption placement and table
+- [x] Port Pandoc simple and multiline tables. Check caption placement and table
   boundaries inside containers against Pandoc-native fixtures.
-- [ ] Port Pandoc HTML blocks. Check raw HTML, Markdown inside HTML, and open
+- [x] Port Pandoc HTML blocks. Check raw HTML, Markdown inside HTML, and open
   and close tag boundaries inside lists and block quotes.
 - [ ] Port Pandoc line blocks, title blocks, and raw TeX blocks. Check each
   construct with its extension enabled and disabled.

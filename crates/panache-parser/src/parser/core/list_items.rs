@@ -1,6 +1,54 @@
 use super::*;
+use crate::parser::utils::list_item_buffer::ListItemBuffer;
 
 impl<'a> Parser<'a> {
+    fn dash_table_owns_checkbox(&self, item: &ListItemEmissionInput<'_>) -> bool {
+        let extensions = &self.config.extensions;
+        let start = item.indent_bytes + item.marker_len + item.spaces_after_bytes;
+        let tail = &item.content[start..];
+        if !extensions.simple_tables || !extensions.table_captions || !lists::is_task_checkbox(tail)
+        {
+            return false;
+        }
+
+        let content_col = lists::list_item_content_col(
+            item.indent_cols,
+            item.marker_len,
+            item.spaces_after_cols,
+            self.config,
+        );
+        let appended_item = Container::ListItem {
+            content_col,
+            buffer: ListItemBuffer::new(),
+            marker_only: false,
+            virtual_marker_space: item.virtual_marker_space,
+        };
+        let prefix = ContainerPrefix::from_stack_with_appended(
+            &self.containers.stack,
+            Some(&appended_item),
+            true,
+            self.config,
+        );
+        let window =
+            StrippedLines::new(&self.lines, self.pos, &prefix).with_table_dispatch(tail, "");
+        tables::prepare_dash_table_at(&window, self.config, tables::DashTableKind::Simple)
+            .is_some_and(|table| table.has_caption())
+    }
+
+    fn add_list_item_with_table_lookahead(
+        &mut self,
+        item: ListItemEmissionInput<'_>,
+    ) -> lists::ListItemFinish {
+        let claim_task_checkbox = !self.dash_table_owns_checkbox(&item);
+        lists::add_list_item_with_checkbox(
+            &mut self.containers,
+            &mut self.builder,
+            &item,
+            self.config,
+            claim_task_checkbox,
+        )
+    }
+
     pub(super) fn close_non_lazy_list_items(&mut self, line: &str) {
         if self.config.dialect != crate::options::Dialect::CommonMark
             || !matches!(
@@ -467,12 +515,15 @@ impl<'a> Parser<'a> {
         else {
             return None;
         };
-        buffer.sole_text_segment()?;
+        let buffered = buffer.sole_text_segment()?;
         let content_col = *content_col;
 
         let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config);
         debug_assert_eq!(prefix.list_content_col(), content_col);
+        let raw = self.lines[self.pos];
+        let tail = raw.strip_suffix(buffered).map(|head| &raw[head.len()..])?;
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+        let dash_window = window.with_table_dispatch(tail, "");
         if !tables::is_caption_followed_by_table(&window, self.pos) {
             return None;
         }
@@ -481,14 +532,28 @@ impl<'a> Parser<'a> {
         if self.config.extensions.grid_tables {
             consumed = tables::try_parse_grid_table(&window, &mut self.builder, self.config);
         }
-        if consumed.is_none() && self.config.extensions.multiline_tables {
-            consumed = tables::try_parse_multiline_table(&window, &mut self.builder, self.config);
+        if consumed.is_none()
+            && let Some(table) = tables::prepare_dash_table_at(
+                &dash_window,
+                self.config,
+                tables::DashTableKind::Multiline,
+            )
+        {
+            table.emit(&mut self.builder, &dash_window, self.config);
+            consumed = Some(table.lines_consumed);
         }
         if consumed.is_none() && self.config.extensions.pipe_tables {
             consumed = tables::try_parse_pipe_table(&window, &mut self.builder, self.config);
         }
-        if consumed.is_none() && self.config.extensions.simple_tables {
-            consumed = tables::try_parse_simple_table(&window, &mut self.builder, self.config);
+        if consumed.is_none()
+            && let Some(table) = tables::prepare_dash_table_at(
+                &dash_window,
+                self.config,
+                tables::DashTableKind::Simple,
+            )
+        {
+            table.emit(&mut self.builder, &dash_window, self.config);
+            consumed = Some(table.lines_consumed);
         }
         let consumed = consumed?;
 
@@ -539,34 +604,55 @@ impl<'a> Parser<'a> {
         else {
             return None;
         };
-        let first = buffer.sole_text_segment()?;
-        if !matches!(
-            first.trim_start().as_bytes().first(),
-            Some(b'|') | Some(b'+')
-        ) {
+        let buffered = buffer.sole_text_segment()?;
+        let first = buffered.trim_start();
+        let grid_or_pipe = first.starts_with(['|', '+']);
+        if !(grid_or_pipe
+            || self.config.extensions.multiline_tables && first.starts_with('-')
+            || self.config.extensions.simple_tables
+                && (first.starts_with('-')
+                    || self.lines.get(self.pos + 1).is_some_and(|line| {
+                        line.trim_start_matches([' ', '\t', '>']).starts_with('-')
+                    })))
+        {
             return None;
         }
         let content_col = *content_col;
 
         let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config);
         debug_assert_eq!(prefix.list_content_col(), content_col);
+        let raw = self.lines[self.pos];
+        let tail = raw.strip_suffix(buffered).map(|head| &raw[head.len()..])?;
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+        let dash_window = window.with_table_dispatch(tail, "");
 
         if tables::is_caption_followed_by_table(&window, self.pos) {
             return None;
         }
 
-        let mut probe = GreenNodeBuilder::new();
-        let _ = try_parse_any_table_kind(&window, &mut probe, self.config)?;
-        let probe_root = SyntaxNode::new_root(probe.finish());
-        let has_caption = probe_root
-            .children()
-            .any(|c| c.kind() == SyntaxKind::TABLE_CAPTION);
-        if !has_caption {
-            return None;
-        }
+        let consumed = if grid_or_pipe {
+            let mut probe = GreenNodeBuilder::new();
+            try_parse_any_table_kind(&window, &mut probe, self.config)?;
+            let probe_root = SyntaxNode::new_root(probe.finish());
+            if !probe_root
+                .children()
+                .any(|c| c.kind() == SyntaxKind::TABLE_CAPTION)
+            {
+                return None;
+            }
+            try_parse_any_table_kind(&window, &mut self.builder, self.config)?
+        } else {
+            let table = [
+                tables::DashTableKind::Multiline,
+                tables::DashTableKind::Simple,
+            ]
+            .into_iter()
+            .find_map(|kind| tables::prepare_dash_table_at(&dash_window, self.config, kind))
+            .filter(tables::PreparedDashTable::has_caption)?;
+            table.emit(&mut self.builder, &dash_window, self.config);
+            table.lines_consumed
+        };
 
-        let consumed = try_parse_any_table_kind(&window, &mut self.builder, self.config)?;
         if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
             buffer.clear();
         }
@@ -1375,12 +1461,7 @@ impl<'a> Parser<'a> {
                         );
                         lists::ListItemFinish::Done
                     } else {
-                        lists::add_list_item(
-                            &mut self.containers,
-                            &mut self.builder,
-                            &list_item,
-                            self.config,
-                        )
+                        self.add_list_item_with_table_lookahead(list_item)
                     };
                     if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
                         return extras;
@@ -1412,6 +1493,7 @@ impl<'a> Parser<'a> {
 
             self.emit_list_item_buffer_if_needed();
 
+            let claim_task_checkbox = !self.dash_table_owns_checkbox(&list_item);
             let finish = start_nested_list(
                 &mut self.containers,
                 &mut self.builder,
@@ -1419,6 +1501,7 @@ impl<'a> Parser<'a> {
                 &list_item,
                 indent_to_emit,
                 self.config,
+                claim_task_checkbox,
             );
             if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
                 return extras;
@@ -1470,12 +1553,7 @@ impl<'a> Parser<'a> {
                 );
                 lists::ListItemFinish::Done
             } else {
-                lists::add_list_item(
-                    &mut self.containers,
-                    &mut self.builder,
-                    &list_item,
-                    self.config,
-                )
+                self.add_list_item_with_table_lookahead(list_item)
             };
             if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
                 return extras;
@@ -1537,12 +1615,7 @@ impl<'a> Parser<'a> {
             );
             lists::ListItemFinish::Done
         } else {
-            lists::add_list_item(
-                &mut self.containers,
-                &mut self.builder,
-                &list_item,
-                self.config,
-            )
+            self.add_list_item_with_table_lookahead(list_item)
         };
         if let Some(extras) = self.maybe_open_custom_block_in_new_list_item() {
             return extras;

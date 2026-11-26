@@ -1,0 +1,26 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..44
+  HTML_BLOCK_RAW@0..8
+    HTML_BLOCK_TAG@0..8
+      TEXT@0..8 "<!--a-->"
+  CODE_BLOCK@8..36
+    CODE_FENCE_OPEN@8..22
+      CODE_FENCE_MARKER@8..11 "```"
+      CODE_INFO@11..21
+        CODE_LANGUAGE@11..21 "javascript"
+      NEWLINE@21..22 "\n"
+    CODE_CONTENT@22..32
+      NEWLINE@22..23 "\n"
+      TEXT@23..31 "let x=1;"
+      NEWLINE@31..32 "\n"
+    CODE_FENCE_CLOSE@32..36
+      CODE_FENCE_MARKER@32..35 "```"
+      NEWLINE@35..36 "\n"
+  BLANK_LINE@36..37
+    BLANK_LINE@36..37 "\n"
+  PARAGRAPH@37..44
+    TEXT@37..43 "After."
+    NEWLINE@43..44 "\n"

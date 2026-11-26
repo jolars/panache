@@ -758,9 +758,7 @@ fn shared_container_review_regressions() {
     }
     check("- Term\n  : def\n", &quarto);
     let input = "- a\n\n  ---\n  x\n  ---\n";
-    let gap = experimental_block::try_parse_with_errors(input, &quarto).unwrap_err();
-    assert_eq!(gap.construct, "simple table");
-    assert_eq!(gap.offset, input.find("---").unwrap());
+    check(input, &quarto);
 }
 
 #[test]
@@ -880,12 +878,10 @@ fn quarto_note_preserves_nested_block_diagnostics() {
 }
 
 #[test]
-fn quarto_body_reports_deferred_child_offset() {
+fn quarto_body_tables_preserve_nested_prefixes() {
     let options = ParserOptions::for_flavor(Flavor::Quarto);
     let input = include_str!("fixtures/cases/definition_body_table_nested_containers/input.md");
-    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
-    assert_eq!(gap.construct, "simple table");
-    assert_eq!(gap.offset, input.find("A    B").unwrap());
+    check(input, &options);
 }
 
 #[test]
@@ -981,27 +977,7 @@ fn quarto_deferred_body_blocks_preserve_openers() {
     let mut options = ParserOptions::for_flavor(Flavor::Quarto);
     options.extensions.tex_math_gfm = true;
     for (input, opener, expected) in [
-        (
-            ": Caption\n\nA    B\n--- ---\nx    y\n",
-            ": Caption",
-            "extended Pandoc block",
-        ),
-        (
-            "-------\nA    B\n--- ---\nx    y\n-------\n\n: Caption\n",
-            ": Caption",
-            "extended Pandoc block",
-        ),
-        (
-            "-------\nA    B\n--- ---\nx    y\n-------\n: Caption\n",
-            ": Caption",
-            "extended Pandoc block",
-        ),
         ("> | line\n> :   definition\n", "| line", "line block"),
-        (
-            "> <div>\n> :   content\n> </div>\n",
-            "<div>",
-            "Pandoc HTML block",
-        ),
         (
             "[^n]: note\n\n    ```math\n    x\n    ```\n",
             "```math",
@@ -1221,4 +1197,837 @@ fn pandoc_tilde_math_fence_does_not_interrupt_quoted_prose() {
     let mut options = ParserOptions::for_flavor(Flavor::Quarto);
     options.extensions.tex_math_gfm = true;
     check("> prose\n> ~~~math\n> x\n> ~~~\n", &options);
+}
+
+#[test]
+fn dash_table_fixtures_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        include_str!("fixtures/cases/adjacent_simple_then_pipe_table_captions/input.md"),
+        include_str!("fixtures/cases/definition_body_table_caption/input.md"),
+        include_str!("fixtures/cases/definition_body_table_nested_containers/input.md"),
+        include_str!("fixtures/cases/definition_body_table_no_caption/input.md"),
+        include_str!("fixtures/cases/issue_224_simple_table_short_header_losslessness/input.md"),
+        include_str!("fixtures/cases/issue_398_headerless_multiline_dash_closer/input.md"),
+        include_str!("fixtures/cases/list_item_simple_table_self_indent_pandoc/input.md"),
+        include_str!("fixtures/cases/multiline_table_basic/input.md"),
+        include_str!("fixtures/cases/multiline_table_blank_after_opener/input.md"),
+        include_str!("fixtures/cases/multiline_table_caption/input.md"),
+        include_str!("fixtures/cases/multiline_table_caption_after/input.md"),
+        include_str!("fixtures/cases/multiline_table_caption_in_blockquote/input.md"),
+        include_str!("fixtures/cases/multiline_table_headerless/input.md"),
+        include_str!("fixtures/cases/multiline_table_headerless_single_column/input.md"),
+        include_str!("fixtures/cases/multiline_table_headerless_single_column_doc_start/input.md"),
+        include_str!("fixtures/cases/multiline_table_headerless_single_column_no_closer/input.md"),
+        include_str!("fixtures/cases/multiline_table_in_div_stops_at_closer/input.md"),
+        include_str!("fixtures/cases/multiline_table_in_list_blockquote/input.md"),
+        include_str!("fixtures/cases/multiline_table_inline_formatting/input.md"),
+        include_str!("fixtures/cases/multiline_table_no_blank_rows/input.md"),
+        include_str!("fixtures/cases/multiline_table_single_col_code_fence/input.md"),
+        include_str!("fixtures/cases/multiline_table_single_row/input.md"),
+        include_str!("fixtures/cases/multiline_table_spaced_top_border/input.md"),
+        include_str!("fixtures/cases/multiline_table_stops_at_blockquote_blank/input.md"),
+        include_str!("fixtures/cases/multiline_table_two_dash_full_width/input.md"),
+        include_str!("fixtures/cases/multiline_table_two_dash_headerless_single_column/input.md"),
+        include_str!("fixtures/cases/simple_table/input.md"),
+        include_str!("fixtures/cases/simple_table_closer_before_div_closer/input.md"),
+        include_str!("fixtures/cases/simple_table_header_closer_requires_rows/input.md"),
+        include_str!("fixtures/cases/simple_table_header_with_closer/input.md"),
+        include_str!("fixtures/cases/simple_table_headerless_multi_column_no_closer/input.md"),
+        include_str!("fixtures/cases/simple_table_headerless_single_column/input.md"),
+        include_str!("fixtures/cases/simple_table_headerless_single_column_no_closer/input.md"),
+        include_str!("fixtures/cases/simple_table_in_div_stops_at_closer/input.md"),
+        include_str!("fixtures/cases/simple_table_in_footnote_stops_at_note_marker/input.md"),
+        include_str!("fixtures/cases/simple_table_in_list_blockquote/input.md"),
+        include_str!("fixtures/cases/simple_table_in_list_item_stops_at_sibling_marker/input.md"),
+        include_str!("fixtures/cases/simple_table_in_nested_item_stops_at_band_marker/input.md"),
+        include_str!("fixtures/cases/simple_table_stops_at_div_closer_in_quote/input.md"),
+        include_str!("fixtures/cases/simple_table_wide_cell/input.md"),
+        ": Caption\n\nA    B\n--- ---\nx    y\n",
+        "-------\nA    B\n--- ---\nx    y\n-------\n\n: Caption\n",
+        "-------\nA    B\n--- ---\nx    y\n-------\n: Caption\n",
+        "- item\n--- ---\nx    y\n",
+        "- A    B\n  --- ---\n  x    y\n",
+        "> ------\n> title\n----- ------\n> data\n> --------\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn dash_tables_match_pinned_pandoc_native() {
+    use panache_parser::{pandoc_ast::normalize_native, to_pandoc_ast_with_options};
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    macro_rules! check_native {
+        ($fixture:literal) => {{
+            let input = include_str!(concat!(
+                "fixtures/pandoc-conformance/corpus/",
+                $fixture,
+                "/input.md"
+            ));
+            let expected = include_str!(concat!(
+                "fixtures/pandoc-conformance/corpus/",
+                $fixture,
+                "/expected.native"
+            ));
+            let tree = check(input, &options);
+            assert_eq!(
+                normalize_native(&to_pandoc_ast_with_options(&tree, &options)),
+                normalize_native(expected),
+                "{}",
+                $fixture,
+            );
+        }};
+    }
+    check_native!("0123-imported-multiline_table_caption");
+    check_native!("0124-imported-multiline_table_caption_after");
+    check_native!("0490-block-simple-table-headerless-single-column");
+    check_native!("0541-block-blockquote-simple-table-aligns");
+}
+
+#[test]
+fn dash_tables_respect_extension_overrides() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let simple = "A   B\n--- ---\nx   y\n";
+    let multiline = "-------\nA   B\n--- ---\nx   y\n\nz   w\n-------\n";
+    for (input, kind) in [
+        (simple, SyntaxKind::SIMPLE_TABLE),
+        (multiline, SyntaxKind::MULTILINE_TABLE),
+    ] {
+        let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+        let contains_table = |options: &ParserOptions| {
+            check(input, options)
+                .descendants()
+                .any(|n| n.kind() == kind)
+        };
+        assert!(contains_table(&options));
+        match kind {
+            SyntaxKind::SIMPLE_TABLE => options.extensions.simple_tables = false,
+            _ => options.extensions.multiline_tables = false,
+        }
+        assert!(!contains_table(&options));
+    }
+
+    let mut options = ParserOptions::for_flavor(Flavor::CommonMark);
+    options.extensions.multiline_tables = true;
+    check(
+        include_str!("../../../tests/fixtures/cases/multiline_table_reference_commonmark/input.md"),
+        &options,
+    );
+}
+
+#[test]
+fn dash_table_edits_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for table in [
+        "Name   Year\n------ ----\nalpha  2026\n",
+        "-----------\nName   Year\n------ ----\nalpha  2026\n\nbeta   2027\n-----------\n",
+    ] {
+        let mut input = format!("# Intro\n\n{table}\n{}", "After.\n\n".repeat(60));
+        let mut tree = check(&input, &options);
+        for (old, new) in [("alpha", "gamma"), ("2026", "2028")] {
+            let offset = input.find(old).unwrap();
+            let edit = Edit {
+                range: offset..offset + old.len(),
+                insert: new.into(),
+            };
+            input = edit.apply(&input);
+            let result =
+                experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &input, &options)
+                    .expect("table cell edit can be spliced");
+            let expected = check(&input, &options);
+            assert_eq!(result.green, expected.green().to_owned());
+            assert!(result.errors.is_empty());
+            let updated = SyntaxNode::new_root(result.green);
+            assert!(std::ptr::eq(
+                tree.last_child().unwrap().green(),
+                updated.last_child().unwrap().green()
+            ));
+            tree = updated;
+        }
+    }
+}
+
+#[test]
+fn dash_table_respects_containing_blocks() {
+    use panache_parser::syntax::SyntaxKind;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (input, kind) in [
+        ("> # Heading\n> --- ---\n> x    y\n", SyntaxKind::HEADING),
+        (
+            "> ```text\n> --- ---\n> x    y\n> ```\n",
+            SyntaxKind::CODE_BLOCK,
+        ),
+        (
+            "[^n]: Table: Caption\n\n    A    B\n    --- ---\n    x    y\n\nOutside.\n",
+            SyntaxKind::TABLE_CAPTION,
+        ),
+        (
+            "[^n]: ---------\n    A    B\n    --- ---\n    x    y\n    ---------\n\nOutside.\n",
+            SyntaxKind::MULTILINE_TABLE,
+        ),
+    ] {
+        assert!(
+            check(input, &options)
+                .descendants()
+                .any(|node| node.kind() == kind)
+        );
+    }
+
+    for input in [
+        "- Table: Simple caption\n\n  A    B\n  --- ---\n  x    y\n\n- Next\n",
+        "> - : Multiline caption\n>\n>   --------\n>   A    B\n>   --- ---\n>   x    y\n>   --------\n>\n> - Next\n",
+        "- A    B\n  --- ---\n  x    y\n\n  : Trailing caption\n\n- Next\n",
+        "> + --------\n>   A    B\n>   --- ---\n>   x    y\n>   --------\n>\n>   : Trailing caption\n>\n> + Next\n",
+        "- Intro\n\n  A    B\n  --- ---\n  x    y\n\n  : Trailing caption\n\n- Next\n",
+    ] {
+        let tree = check(input, &options);
+        let caption = tree
+            .descendants()
+            .find(|node| node.kind() == SyntaxKind::TABLE_CAPTION)
+            .unwrap();
+        assert!(
+            caption
+                .ancestors()
+                .any(|node| node.kind() == SyntaxKind::LIST_ITEM),
+            "{input}\n{tree:#?}"
+        );
+    }
+
+    let input = "::: note\n\n- item\n\n  A    B\n  --- ---\n  x    y\n:::\n\nOutside.\n";
+    assert!(
+        !check(input, &options)
+            .descendants()
+            .any(|node| node.kind() == SyntaxKind::SIMPLE_TABLE)
+    );
+    for input in [
+        "> ::: note\n> A    B\n> --- ---\n> x    y\n> :::\n\nOutside.\n",
+        "> ::: note\n> --------\n> A    B\n> --- ---\n> x    y\n> --------\n>\n> : Caption\n> :::\n\nOutside.\n",
+    ] {
+        let tree = check(input, &options);
+        assert!(
+            tree.descendants()
+                .any(|node| node.kind() == SyntaxKind::DIV_FENCE_CLOSE)
+        );
+        assert!(tree.descendants().any(|node| matches!(
+            node.kind(),
+            SyntaxKind::SIMPLE_TABLE | SyntaxKind::MULTILINE_TABLE
+        )));
+    }
+}
+
+#[test]
+fn dash_table_review_container_regressions() {
+    use panache_parser::syntax::SyntaxKind as K;
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (input, kind, count) in [
+        (
+            "- > - A    B\n  >   --- ---\n  >   x    y\n  >\n  >   : Caption\n",
+            K::TABLE_CAPTION,
+            1,
+        ),
+        (
+            "10. Intro\n\n    > A    B\n    > --- ---\n    > x    y\n",
+            K::SIMPLE_TABLE,
+            1,
+        ),
+        (
+            "- > A    B\n  > --- ---\n  > x    y\n- sibling\n",
+            K::LIST_ITEM,
+            2,
+        ),
+        (
+            "[^n]: Text\n\n    A    B\n    --- ---\n    x    y\nOther\n\nSee [^n].\n",
+            K::TABLE_ROW,
+            2,
+        ),
+        (
+            "> ::: note\n> --------\n> A    B\n> --- ---\n> x    y\n>   :::\n> --------\n> :::\n",
+            K::MULTILINE_TABLE,
+            1,
+        ),
+        (
+            "10. Intro\n\n    --------\n    A    B\n    --- ---\n    x    y\n    --------\n",
+            K::MULTILINE_TABLE,
+            1,
+        ),
+        (
+            "10. Intro\n\n    Table: Caption\n\n    A    B\n    --- ---\n    x    y\n",
+            K::TABLE_CAPTION,
+            1,
+        ),
+        (
+            "> A    B\n> --- ---\n> x    y\n\n: Caption\n",
+            K::TABLE_CAPTION,
+            0,
+        ),
+        (
+            "A    B\n--- ---\nx    y\n--- ---\n: Caption\n",
+            K::TABLE_ROW,
+            1,
+        ),
+        (
+            "- <https://x.test>    B\n  ----------------- ---\n  x                 y\n\n  : Caption\n",
+            K::TABLE_CAPTION,
+            1,
+        ),
+        (
+            "- [x] A    B\n  --- ---\n  x    y\n\n  : Caption\n",
+            K::TABLE_CAPTION,
+            1,
+        ),
+    ] {
+        let tree = check(input, &options);
+        assert_eq!(
+            tree.descendants()
+                .filter(|node| node.kind() == kind)
+                .count(),
+            count,
+            "{input}\n{tree:#?}"
+        );
+    }
+
+    let task_header = check(
+        "- [x] A    B\n  --- ---\n  x    y\n\n  : Caption\n",
+        &options,
+    );
+    assert!(
+        task_header
+            .descendants()
+            .any(|node| node.kind() == K::TABLE_HEADER && node.to_string().starts_with("[x]"))
+    );
+    assert!(
+        !task_header
+            .descendants_with_tokens()
+            .any(|element| element.kind() == K::TASK_CHECKBOX)
+    );
+
+    let unicode = "* --- ---\n  A\n  abcé\n  --- ---\n";
+    assert_eq!(
+        parse_with_errors(unicode, Some(options.clone()))
+            .0
+            .to_string(),
+        unicode
+    );
+    assert_eq!(
+        experimental_block::try_parse_with_errors(unicode, &options)
+            .unwrap()
+            .0
+            .to_string(),
+        unicode
+    );
+
+    let mut disabled = options;
+    disabled.extensions.table_captions = false;
+    let tree = check("A    B\n--- ---\nx    y\n\nTable: Caption\n", &disabled);
+    assert!(
+        !tree
+            .descendants()
+            .any(|node| node.kind() == K::TABLE_CAPTION)
+    );
+}
+
+#[test]
+fn dash_table_review_incremental_regressions() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    use panache_parser::syntax::SyntaxKind as K;
+    for (body, anchor, insert, kind) in [
+        (
+            "--- ---\na   b\n\nc   d\n-------\n\n",
+            "-------",
+            "\n",
+            K::MULTILINE_TABLE,
+        ),
+        (
+            "A    B\n--- ---\nx    y\n\nOutside.\n\n",
+            "Outside.",
+            "Table: Caption\n",
+            K::TABLE_CAPTION,
+        ),
+    ] {
+        let input = format!("{body}{}", "Unrelated paragraph.\n\n".repeat(60));
+        let tree = check(&input, &options);
+        let start = input.find(anchor).unwrap();
+        let edit = Edit {
+            range: start..start,
+            insert: insert.into(),
+        };
+        let updated = edit.apply(&input);
+        let full = check(&updated, &options);
+        assert!(full.descendants().any(|node| node.kind() == kind));
+        let reparsed =
+            experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options);
+        if let Some(reparsed) = reparsed {
+            assert_eq!(reparsed.green, full.green().to_owned());
+            assert!(reparsed.errors.is_empty());
+        }
+    }
+}
+
+#[test]
+fn quarto_html_extension_overrides_preserve_cst() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let input = "<div id=\"note\">\n\n**Body**\n\n</div>\n\n<pre>\n**Raw**\n</pre>\n";
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let tree = check(input, &options);
+    assert!(
+        tree.descendants()
+            .any(|node| node.kind() == K::HTML_BLOCK_DIV)
+    );
+    assert!(
+        tree.descendants()
+            .any(|node| node.kind() == K::HTML_BLOCK_RAW)
+    );
+    assert_eq!(
+        tree.descendants()
+            .filter(|node| node.kind() == K::STRONG)
+            .count(),
+        1
+    );
+
+    let mut overridden = options.clone();
+    overridden.extensions.native_divs = false;
+    for markdown in [false, true] {
+        overridden.extensions.markdown_in_html_blocks = markdown;
+        assert!(
+            !check(input, &overridden)
+                .descendants()
+                .any(|node| node.kind() == K::HTML_BLOCK_DIV)
+        );
+    }
+
+    overridden.extensions.raw_html = false;
+    for input in [input, "> <div>**Body**</div>\n", "- <div>**Body**</div>\n"] {
+        assert!(!check(input, &overridden).descendants().any(|node| {
+            matches!(
+                node.kind(),
+                K::HTML_BLOCK | K::HTML_BLOCK_DIV | K::HTML_BLOCK_RAW
+            )
+        }));
+    }
+}
+
+#[test]
+fn quarto_html_container_boundaries_are_lossless() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        include_str!("fixtures/cases/html_block_comment_in_list_blockquote/input.md"),
+        "- > <!-- hi\n  > --> trailing\n  > text\n- next\n",
+        "- > <div>\n  > inside\n- next\n  </div>\n",
+        "- > prose\n  > <div>\n  > text\n  > </div>\n- next\n",
+        "> - prose\n>   <div>\n>   text\n>   </div>\n> - next\n",
+        "> - text\n>   \n>   <div>\n>   text\n>   </div>\n> - next\n",
+        "- <pre>\n  **raw**\n  </pre>\n- next\n",
+        "> <div>\n> **body**\n> </div>\n\nnext\n",
+    ] {
+        let tree = check(input, &options);
+        let block = tree
+            .descendants()
+            .find(|node| matches!(node.kind(), K::HTML_BLOCK_DIV | K::HTML_BLOCK_RAW))
+            .expect("a container owns the HTML block");
+        assert!(!block.to_string().contains("next"), "{input}");
+    }
+}
+
+#[test]
+fn quarto_html_edits_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let mut input = format!(
+        "# HTML\n\n> - <div id=\"a\">\n>   Body text here.\n>   </div>\n> - next\n\n{}",
+        "Distant paragraph.\n\n".repeat(60)
+    );
+    let mut tree = check(&input, &options);
+    for (before, after) in [
+        ("a\">", "b\">"),
+        ("Body text here.", "Body **text** here."),
+        (">   </div>\n", ""),
+        ("> - next\n", ">   </div>\n> - next\n"),
+    ] {
+        let start = input.find(before).unwrap();
+        let edit = Edit {
+            range: start..start + before.len(),
+            insert: after.into(),
+        };
+        input = edit.apply(&input);
+        let expected = check(&input, &options);
+        let result =
+            experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &input, &options);
+        if before == "Body text here." {
+            assert!(
+                result.is_some(),
+                "a local HTML-body edit should reuse the rest of the tree"
+            );
+        }
+        if let Some(result) = result {
+            assert_eq!(result.green, expected.green().to_owned());
+            assert!(result.errors.is_empty());
+        }
+        tree = expected;
+    }
+}
+
+#[test]
+fn quarto_html_edits_can_pair_across_a_reparse_region() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (prefix, insert, kind) in [
+        ("<div bad.name=x>\n\n", "</div>\n\n", K::HTML_BLOCK_RAW),
+        ("<hr\n\n", ">\n\n", K::HTML_BLOCK),
+    ] {
+        let input = format!("{prefix}{}", "More text.\n\n".repeat(60));
+        let tree = check(&input, &options);
+        assert!(!tree.descendants().any(|node| node.kind() == kind));
+        let start = input.rfind("More text.").unwrap();
+        let edit = Edit {
+            range: start..start,
+            insert: insert.into(),
+        };
+        let updated = edit.apply(&input);
+        let expected = check(&updated, &options);
+        assert!(expected.descendants().any(|node| node.kind() == kind));
+        assert!(
+            experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options)
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn quarto_html_review_container_regressions() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (input, expected_kind) in [
+        (
+            "- > Quote.\n  >\n  > ::: box\n  > <!-- a --> tail\n  > :::\n  > Outside\n",
+            K::DIV_FENCE_CLOSE,
+        ),
+        (
+            "- <div id=\"box\">hi</div>\n  more\n- after\n",
+            K::HTML_BLOCK_DIV,
+        ),
+        ("> <hr\n> :   Definition\n", K::DEFINITION_LIST),
+    ] {
+        let tree = check(input, &options);
+        assert!(
+            tree.descendants().any(|node| node.kind() == expected_kind),
+            "{tree:#?}"
+        );
+    }
+
+    let input = "- >\n  > <!--a--><!--b--> tail\n  > next\n";
+    let trees = [
+        parse_with_errors(input, Some(options.clone())).0,
+        experimental_block::try_parse_with_errors(input, &options)
+            .unwrap()
+            .0,
+    ];
+    for tree in trees {
+        assert_eq!(tree.to_string(), input);
+        assert_eq!(
+            tree.descendants()
+                .filter(|node| node.kind() == K::HTML_BLOCK_RAW)
+                .count(),
+            2
+        );
+        assert!(tree.descendants().any(|node| {
+            node.kind() == K::PARAGRAPH && node.to_string().contains(" tail\n  > next")
+        }));
+    }
+
+    let input = "Term\n\n:   > a\n    > <div\n    > id=x>\n    > </div>\n";
+    let (tree, errors) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+    assert!(errors.is_empty());
+    assert_eq!(tree.to_string(), input);
+    assert!(
+        tree.descendants_with_tokens()
+            .filter_map(|element| element.into_token())
+            .any(|token| token.kind() == K::ATTR_ID && token.text() == "x"),
+        "{tree:#?}"
+    );
+}
+
+#[test]
+fn quarto_html_comment_fusion_stays_local() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (tail, kind) in [
+        ("  > <!--a--> tail\n  > next\n  >\n", K::PARAGRAPH),
+        ("  > <!--a--> # Head\n", K::HEADING),
+    ] {
+        let input = format!("- > Quote.\n  >\n{}", tail.repeat(128));
+        let tree = check(&input, &options);
+        assert_eq!(
+            tree.descendants()
+                .filter(|node| node.kind() == K::HTML_BLOCK_RAW)
+                .count(),
+            128
+        );
+        assert_eq!(
+            tree.descendants()
+                .filter(|node| node.kind() == kind
+                    && node
+                        .prev_sibling()
+                        .is_some_and(|node| node.kind() == K::HTML_BLOCK_RAW))
+                .count(),
+            128
+        );
+    }
+}
+
+#[test]
+fn quarto_html_reparse_reuses_only_independent_prose() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "<div\n\nsome bad.name attribute\n>\n\nBody\n";
+    let tree = check(input, &options);
+    let start = input.find("bad.name").unwrap();
+    let edit = Edit {
+        range: start..start + "bad.name".len(),
+        insert: "goodname".into(),
+    };
+    let updated = edit.apply(input);
+    assert!(
+        check(&updated, &options)
+            .descendants()
+            .any(|node| node.kind() == K::HTML_BLOCK_DIV)
+    );
+    assert!(
+        experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options)
+            .is_none()
+    );
+
+    let input = format!(
+        "<div>closed</div>\n\n{}A person cant finish yet.\n",
+        "Earlier text.\n\n".repeat(60)
+    );
+    let tree = check(&input, &options);
+    let start = input.find("cant").unwrap() + 3;
+    let edit = Edit {
+        range: start..start,
+        insert: "'".into(),
+    };
+    let updated = edit.apply(&input);
+    let result =
+        experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options)
+            .expect("a closed tag cannot block token reuse in distant prose");
+    assert_eq!(result.strategy, ReparseStrategy::Token);
+    assert_eq!(result.green, check(&updated, &options).green().to_owned());
+}
+
+#[test]
+fn quarto_html_preserves_list_and_quote_boundaries() {
+    use panache_parser::{
+        pandoc_ast::normalize_native, syntax::SyntaxKind as K, to_pandoc_ast_with_options,
+    };
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+
+    let input = include_str!(
+        "fixtures/pandoc-conformance/corpus/0616-block-html-before-sibling-fenced-div/input.md"
+    );
+    let expected = include_str!(
+        "fixtures/pandoc-conformance/corpus/0616-block-html-before-sibling-fenced-div/expected.native"
+    );
+    for tree in [
+        parse_with_errors(input, Some(options.clone())).0,
+        experimental_block::try_parse_with_errors(input, &options)
+            .unwrap()
+            .0,
+    ] {
+        assert_eq!(tree.to_string(), input);
+        assert_eq!(
+            normalize_native(&to_pandoc_ast_with_options(&tree, &options)),
+            normalize_native(expected)
+        );
+        assert_eq!(
+            tree.descendants()
+                .filter(|node| node.kind() == K::FENCED_DIV)
+                .count(),
+            1
+        );
+    }
+
+    let input = "> - item\n  <div>body</div>\n";
+    let tree = experimental_block::try_parse_with_errors(input, &options)
+        .unwrap()
+        .0;
+    assert_eq!(tree.to_string(), input);
+    assert!(
+        tree.descendants()
+            .any(|node| node.kind() == K::HTML_BLOCK_DIV)
+    );
+
+    for (input, owner) in [
+        ("- <div>x</div>\nnext\n", K::LIST_ITEM),
+        ("> <div>x</div>\nnext\n", K::BLOCK_QUOTE),
+    ] {
+        let tree = experimental_block::try_parse_with_errors(input, &options)
+            .unwrap()
+            .0;
+        assert_eq!(tree.to_string(), input);
+        let container = tree
+            .descendants()
+            .find(|node| node.kind() == owner)
+            .unwrap();
+        assert!(container.children().any(|node| {
+            matches!(node.kind(), K::PARAGRAPH | K::PLAIN) && node.to_string() == "next\n"
+        }));
+    }
+}
+
+#[test]
+fn quarto_html_task_item_keeps_matched_tags_together() {
+    use panache_parser::{
+        pandoc_ast::normalize_native, syntax::SyntaxKind as K, to_pandoc_ast_with_options,
+    };
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "- [ ] <div>\n  **bold**\n  </div>\n";
+    let tree = experimental_block::try_parse_with_errors(input, &options)
+        .unwrap()
+        .0;
+    assert_eq!(tree.to_string(), input);
+    assert_eq!(
+        normalize_native(&to_pandoc_ast_with_options(&tree, &options)),
+        normalize_native(
+            r#"[ BulletList [[ Plain [Str "\9744"], Div ("", [], []) [Para [Strong [Str "bold"]]] ]] ]"#
+        )
+    );
+    assert!(
+        tree.descendants()
+            .any(|node| node.kind() == K::HTML_BLOCK_DIV
+                && node.to_string().starts_with("<div>")
+                && node.descendants().any(|node| node.kind() == K::STRONG))
+    );
+}
+
+#[test]
+fn quarto_html_comment_preserves_a_fence_with_blank_content() {
+    use panache_parser::syntax::SyntaxKind as K;
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "<!--a-->```javascript\n\nlet x=1;\n```\n\nAfter.\n";
+    let tree = check(input, &options);
+    let code = tree
+        .descendants()
+        .find(|node| node.kind() == K::CODE_BLOCK)
+        .unwrap();
+    assert_eq!(code.to_string(), "```javascript\n\nlet x=1;\n```\n");
+}
+
+#[test]
+fn quarto_html_comment_before_complete_tags_stays_local() {
+    use panache_parser::syntax::SyntaxKind as K;
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = format!(
+        "- > Intro.\n  >\n{}",
+        "  > <!--a--><div>x</div>\n".repeat(500)
+    );
+    let tree = check(&input, &options);
+    assert_eq!(
+        tree.descendants()
+            .filter(|node| node.kind() == K::HTML_BLOCK_DIV)
+            .count(),
+        500
+    );
+}
+
+#[test]
+fn quarto_html_looking_code_preserves_distant_token_reuse() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = format!(
+        "Inline <em>example</em>.\n\n```text\n{}>\n```\n\nA person cant finish yet.\n",
+        "<div\n".repeat(8000)
+    );
+    let tree = check(&input, &options);
+    let start = input.find("cant").unwrap() + 3;
+    let edit = Edit {
+        range: start..start,
+        insert: "'".into(),
+    };
+    let updated = edit.apply(&input);
+    let result =
+        experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &updated, &options)
+            .expect("HTML-looking code leaves the distant prose edit eligible for reuse");
+    assert_eq!(result.strategy, ReparseStrategy::Token);
+    assert_eq!(result.green, check(&updated, &options).green().to_owned());
+}
+
+#[test]
+fn quarto_html_comment_keeps_structural_tails_across_blank_lines() {
+    use panache_parser::syntax::SyntaxKind as K;
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+
+    for (tail, kind) in [
+        ("<pre>\n\n*raw*\n</pre>\n", K::HTML_BLOCK_RAW),
+        ("<div>\n\n*body*\n\n</div>\n", K::HTML_BLOCK_DIV),
+        ("::: note\n\n*body*\n\n:::\n", K::FENCED_DIV),
+        ("::: note\n\n```text\n:::\n```\n\n:::\n", K::FENCED_DIV),
+    ] {
+        let input = format!("<!-- note -->{tail}\nAfter.\n");
+        let tree = check(&input, &options);
+        assert!(
+            tree.children()
+                .any(|child| child.kind() == kind && child.text() == tail)
+        );
+    }
+
+    let input = "> <!-- note -->```text\n> line\n>";
+    for tree in [
+        parse_with_errors(input, Some(options.clone())).0,
+        experimental_block::try_parse_with_errors(input, &options)
+            .unwrap()
+            .0,
+    ] {
+        assert_eq!(tree.text(), input);
+    }
+}
+
+#[test]
+fn quarto_html_body_rejects_a_fragment_that_changes_source_bytes() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "- <div> > Quote\n   : Definition\n  </div>\n";
+    let (tree, _) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+    assert_eq!(tree.text(), input);
+}
+
+#[test]
+fn quarto_html_keeps_lazy_headings_in_lists_and_quotes() {
+    use panache_parser::{
+        pandoc_ast::normalize_native, syntax::SyntaxKind as K, to_pandoc_ast_with_options,
+    };
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (input, owner, expected) in [
+        (
+            "> <hr>\n# Heading\n",
+            K::BLOCK_QUOTE,
+            r#"[ BlockQuote [RawBlock (Format "html") "<hr>", Header 1 ("heading", [], []) [Str "Heading"]] ]"#,
+        ),
+        (
+            "- <div>x</div>\n# Heading\n- next\n",
+            K::LIST_ITEM,
+            r#"[ BulletList [[Div ("", [], []) [Plain [Str "x"]], Header 1 ("heading", [], []) [Str "Heading"]], [Plain [Str "next"]]] ]"#,
+        ),
+    ] {
+        let tree = experimental_block::try_parse_with_errors(input, &options)
+            .unwrap()
+            .0;
+        assert_eq!(tree.text(), input);
+        let heading = tree
+            .descendants()
+            .find(|node| node.kind() == K::HEADING)
+            .unwrap();
+        assert_eq!(heading.parent().unwrap().kind(), owner);
+        assert_eq!(
+            normalize_native(&to_pandoc_ast_with_options(&tree, &options)),
+            normalize_native(expected)
+        );
+    }
 }

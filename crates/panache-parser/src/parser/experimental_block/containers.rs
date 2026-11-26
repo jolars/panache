@@ -35,15 +35,14 @@ use super::super::blocks::jupyter::LookaheadCache;
 use super::super::blocks::line_blocks::try_parse_line_block_start;
 use super::super::blocks::lists::{
     ListItemEmissionInput, ListMarker, ListMarkerMatch, OpenListHint, OrderedMarker,
-    emit_list_item, is_task_checkbox, list_item_content_col, marker_start_number, markers_match,
-    try_parse_list_marker,
+    emit_list_item_with_checkbox, is_task_checkbox, list_item_content_col, marker_start_number,
+    markers_match, try_parse_list_marker,
 };
 use super::super::blocks::raw_blocks::can_start_raw_block;
 use super::super::blocks::reference_links::emit_footnote_marker;
 use super::super::blocks::tables::{
-    PreparedGridTable, PreparedPipeTable, is_table_caption_start, may_open_dash_table,
-    opens_multiline_table_shape, opens_simple_table, prepare_grid_table, prepare_pipe_table,
-    try_parse_pipe_separator,
+    DashTableKind, PreparedDashTable, PreparedGridTable, PreparedPipeTable, is_table_caption_start,
+    prepare_dash_table_at, prepare_grid_table, prepare_pipe_table, try_parse_pipe_separator,
 };
 use super::super::diagnostics::Diagnostics;
 use super::super::inlines::sink::{InjectedMarker, MarkerInjectingSink};
@@ -56,8 +55,9 @@ use super::super::utils::marker_utils::try_parse_blockquote_marker;
 use super::super::utils::text_buffer::ParagraphBuffer;
 use super::{
     HtmlBlockContext, HtmlBlockType, ReferenceSpans, SoftbreakFusion, emit_blank,
-    emit_buffered_paragraph, ends_at_blank_line, fence_enabled, is_closing_marker, is_quote_prose,
-    parse_html_block_with_wrapper, reference_definition_spans, try_parse_html_block_start,
+    emit_buffered_paragraph, ends_at_blank_line, fence_enabled, html, is_closing_marker,
+    is_quote_prose, parse_html_block_with_wrapper, reference_definition_spans,
+    try_parse_html_block_start,
 };
 use crate::options::{Dialect, ParserOptions};
 use crate::syntax::SyntaxKind as K;
@@ -69,7 +69,7 @@ pub(super) enum Event<'a> {
     Close,
     QuoteMarker(usize, bool),
     QuoteLinePrefix(usize, bool),
-    Item(&'a str, ListMarkerMatch),
+    Item(&'a str, ListMarkerMatch, bool),
     Paragraph(K, ParagraphBuffer, bool),
     Term(&'a str),
     DefinitionMarker(&'a str, char, &'a str),
@@ -77,6 +77,7 @@ pub(super) enum Event<'a> {
     Blank(&'a str),
     Newline(&'a str),
     Whitespace(&'a str),
+    LinePrefix(&'a str),
     Fence(Range<usize>, FenceInfo, ContainerPrefix, Option<&'a str>),
     PlannedFence(Range<usize>, FenceInfo, ContainerPrefix, &'a str, bool),
     BodyFence(Range<usize>, FenceInfo, ContainerPrefix, &'a str, &'a str),
@@ -88,6 +89,12 @@ pub(super) enum Event<'a> {
     Rule(&'a str),
     Setext(ParagraphBuffer, Vec<Prefix<'a>>, &'a str),
     GridTable(usize, ContainerPrefix, PreparedGridTable, &'a str, &'a str),
+    DashTable(
+        usize,
+        ContainerPrefix,
+        PreparedDashTable,
+        Option<(&'a str, &'a str)>,
+    ),
     PipeTable(usize, ContainerPrefix, PreparedPipeTable, bool),
     BodyPipeTable(
         Range<usize>,
@@ -98,6 +105,7 @@ pub(super) enum Event<'a> {
     ),
     Reference(Vec<Prefix<'a>>, PlannedReference<'a>),
     Html(Range<usize>, HtmlBlockType, ContainerPrefix, &'a str),
+    PandocHtml(html::PreparedHtml),
 }
 
 enum Frame {
@@ -151,6 +159,35 @@ impl<'a> Planner<'a> {
                 Prefix::Indent(indent) => self.events.push(Event::Whitespace(indent)),
             }
         }
+    }
+
+    fn push_dash_table(
+        &mut self,
+        window: StrippedLines<'a, '_>,
+        table: PreparedDashTable,
+        mut prefixes: Vec<Prefix<'a>>,
+        task_body: bool,
+    ) -> usize {
+        if task_body && let Some(Event::Item(_, _, claim_task_checkbox)) = self.events.last_mut() {
+            *claim_task_checkbox = false;
+        }
+        if window
+            .dispatch_override()
+            .is_some_and(|(_, indent)| !indent.is_empty())
+        {
+            while matches!(prefixes.last(), Some(Prefix::Indent(_))) {
+                prefixes.pop();
+            }
+        }
+        self.structural_prefixes(prefixes);
+        let consumed = table.lines_consumed;
+        self.events.push(Event::DashTable(
+            window.pos(),
+            window.prefix().clone(),
+            table,
+            window.dispatch_override(),
+        ));
+        consumed
     }
 
     fn interrupt_commonmark(
@@ -251,13 +288,17 @@ fn list_interrupts_quote_paragraph(
     }
 }
 
+fn owns_body_frame(frames: &[Frame]) -> bool {
+    matches!(
+        frames.last(),
+        Some(Frame::Item { .. } | Frame::Definition { .. } | Frame::Footnote)
+    )
+}
+
 fn deferred_pandoc_block(line: &str, options: &ParserOptions) -> Option<&'static str> {
     let content = line.trim_start_matches([' ', '\t']);
     let ext = &options.extensions;
     match content.as_bytes().first()? {
-        b'<' if ext.raw_html && try_parse_html_block_start(line, false).is_some() => {
-            Some("Pandoc HTML block")
-        }
         b'|' if ext.line_blocks && try_parse_line_block_start(line).is_some() => Some("line block"),
         b'$' if ext.tex_math_dollars && content.starts_with("$$") => Some("display math"),
         b'\\' if can_start_raw_block(content, options) => Some("raw TeX block"),
@@ -335,17 +376,29 @@ fn container_ops(frames: &[Frame]) -> Vec<StripOp> {
     ops
 }
 
-fn table_prefix(
+fn block_prefix(
     ops: &[StripOp],
     frames: &[Frame],
     marker_consumed: bool,
-    outer_div_open: bool,
+    outer_div_indent: Option<usize>,
     options: &ParserOptions,
 ) -> ContainerPrefix {
-    let in_div = outer_div_open
-        || frames
-            .iter()
-            .any(|frame| matches!(frame, Frame::Div { .. }));
+    let div = frames
+        .iter()
+        .rposition(|frame| matches!(frame, Frame::Div { .. }));
+    let div_indent = div
+        .and_then(|i| match frames[i] {
+            Frame::Div { indent } => Some(indent),
+            _ => None,
+        })
+        .or(outer_div_indent);
+    let inside_div = &frames[div.map_or(0, |index| index + 1)..];
+    let collects = inside_div
+        .iter()
+        .any(|frame| matches!(frame, Frame::Item { .. } | Frame::Definition { .. }));
+    let appends_blank = inside_div
+        .iter()
+        .any(|frame| matches!(frame, Frame::Quote | Frame::Footnote));
     let section = frames
         .iter()
         .rposition(|frame| matches!(frame, Frame::Quote) || body_column(frame).is_some());
@@ -356,7 +409,7 @@ fn table_prefix(
             _ => None,
         });
     ContainerPrefix::from_ops(ops, marker_consumed)
-        .with_div_closer_boundary(in_div)
+        .with_div_closer_boundary(div_indent, !collects || appends_blank)
         .with_list_start_boundary(options, columns)
 }
 
@@ -474,8 +527,12 @@ pub(super) fn plan<'a>(
     let mut blank_lookahead = (0, 0);
     let mut div_closed_by_list = false;
     let mut body_quote_run = false;
+    let mut after_item_html = false;
     'lines: while let Some(&line) = lines.get(pos) {
         let in_body_quote_run = std::mem::take(&mut body_quote_run);
+        let continues_item_html = std::mem::take(&mut after_item_html);
+        let after_html = !commonmark && matches!(planner.events.last(), Some(Event::PandocHtml(_)));
+        let mut lazy_html_opener = false;
         let mut remaining = line;
         let mut prefixes = Vec::new();
         let mut matched = 0;
@@ -930,12 +987,40 @@ pub(super) fn plan<'a>(
             let lazy_quote_line = in_body_quote_run
                 && matched + 1 == planner.frames.len()
                 && matches!(unmatched, Some(Frame::Quote));
-            if lazy_quote_line {
+            let lazy_html = !commonmark
+                && options.extensions.raw_html
+                && !planner.paragraph.is_empty()
+                && matches!(unmatched, Some(Frame::Quote | Frame::Item { .. }))
+                && remaining.trim_start().starts_with('<');
+            let lazy_html_interrupts = lazy_html
+                && html::detect(remaining.trim_start(), false).is_some_and(|kind| {
+                    let ops = container_ops(&planner.frames);
+                    let mut prefix = ContainerPrefix::from_ops(&ops, false);
+                    prefix.lazy_blockquote_gobble = true;
+                    html::valid_start(lines, pos, &prefix.without_innermost_list_advance(), &kind)
+                });
+            let continues_after_html = after_html
+                && sibling.is_none()
+                && matches!(unmatched, Some(Frame::Quote | Frame::Item { .. }));
+            if continues_after_html && try_parse_atx_heading(remaining).is_some() {
+                // Pandoc collects the unmarked heading in the same item or
+                // quote and dispatches it as a block in that frame.
+                matched = planner.frames.len();
+            } else if lazy_html_interrupts {
+                lazy_html_opener = true;
+                let content = remaining.trim_start_matches([' ', '\t']);
+                let indent = &remaining[..remaining.len() - content.len()];
+                remaining = content;
+                if !indent.is_empty() {
+                    prefixes.push(Prefix::Indent(indent));
+                }
+                matched = planner.frames.len();
+            } else if lazy_quote_line {
                 // The marked blank can be followed by an unmarked line run.
                 // Dispatch those lines inside the quote, including new blocks.
                 matched += 1;
                 body_quote_run = true;
-            } else if (!planner.paragraph.is_empty() || after_body_block)
+            } else if (!planner.paragraph.is_empty() || after_body_block || continues_after_html)
                 && !is_blank_line(remaining)
                 && !(in_body && options.extensions.fenced_divs && is_div_closing_fence(remaining))
                 && !(in_body && !note_quote && footnote_marker(remaining, options).is_some())
@@ -943,6 +1028,7 @@ pub(super) fn plan<'a>(
                     && try_parse_definition_marker(remaining).is_some()
                     && matches!(planner.frames.get(matched), Some(Frame::Definition { .. })))
                 && (is_quote_prose(remaining, options)
+                    || lazy_html
                     || (note_quote && footnote_marker(remaining, options).is_some())
                     || (matches!(unmatched, Some(Frame::Footnote))
                         && options.extensions.blank_before_header
@@ -1226,7 +1312,7 @@ pub(super) fn plan<'a>(
                     next.spaces_after_cols
                 };
                 let column = list_item_content_col(indent, next.marker_len, padding, options);
-                planner.events.push(Event::Item(item_line, next));
+                planner.events.push(Event::Item(item_line, next, true));
                 planner.frames.push(Frame::Item {
                     column,
                     empty_opener: is_blank_line(tail),
@@ -1279,6 +1365,18 @@ pub(super) fn plan<'a>(
                     && try_parse_horizontal_rule(remaining).is_none()
                     && !try_parse_fence_open(remaining, options.dialect)
                         .is_some_and(|fence| fence_enabled(&fence, options))
+                    && !(options.extensions.raw_html
+                        && html::detect(remaining, true).is_some_and(|kind| {
+                            let ops = container_ops(&planner.frames);
+                            let prefix = block_prefix(
+                                &ops,
+                                &planner.frames,
+                                opened_item,
+                                outer_div_indent,
+                                options,
+                            );
+                            html::valid_start(lines, pos, &prefix, &kind)
+                        }))
                     && deferred_pandoc_block(remaining, options)
                         .is_none_or(|construct| opened_body && construct == "line block")
                     && let Some(blanks) = definition_term(lines, pos, &planner.frames, options)
@@ -1345,11 +1443,6 @@ pub(super) fn plan<'a>(
         if planner.frames.is_empty() {
             return Err((remaining, "container opener"));
         }
-        if task_body {
-            planner.push_text(&remaining[3..], prefixes);
-            pos += 1;
-            continue;
-        }
         let quote_inside_list = commonmark
             && matches!(planner.frames.last(), Some(Frame::Quote))
             && planner
@@ -1364,7 +1457,158 @@ pub(super) fn plan<'a>(
             && !note_opener
             && matches!(planner.frames.last(), Some(Frame::Definition { .. }));
         let note_opener = note_opener && matches!(planner.frames.last(), Some(Frame::Footnote));
-        if !opener_as_text
+        let task_content = if task_body {
+            &remaining[3..]
+        } else {
+            remaining
+        };
+        let html_content = if task_body {
+            task_content.trim_start_matches([' ', '\t'])
+        } else {
+            task_content
+        };
+        if !commonmark
+            && !opener_as_text
+            && options.extensions.raw_html
+            && html_content.trim_start().starts_with('<')
+        {
+            let ops = container_ops(&planner.frames);
+            let in_list = ops.iter().any(|op| matches!(op, StripOp::ListAdvance(_)));
+            let quote_depth = ops
+                .iter()
+                .filter(|op| matches!(op, StripOp::BlockQuoteMarker))
+                .count();
+            let after_blank = planner.paragraph.is_empty()
+                && (!owns_body_frame(&planner.frames)
+                    || opened_item
+                    || opened_body
+                    || matches!(planner.events.last(), Some(Event::PandocHtml(_)))
+                    || pos == 0
+                    || is_blank_line(lines[pos - 1])
+                    || quote_tail(lines[pos - 1], quote_depth).is_some_and(is_blank_line));
+            if let Some(kind) = html::detect(html_content, after_blank)
+                && (!note_opener
+                    || !super::super::block_dispatcher::html_block_cannot_interrupt(
+                        &kind,
+                        html_content,
+                        true,
+                    ))
+            {
+                let mut prefix = block_prefix(
+                    &ops,
+                    &planner.frames,
+                    opened_item,
+                    outer_div_indent,
+                    options,
+                )
+                .with_note_boundary(
+                    planner
+                        .frames
+                        .iter()
+                        .position(|frame| matches!(frame, Frame::Footnote))
+                        .map(|i| container_ops(&planner.frames[..i]).len()),
+                );
+                prefix.lazy_blockquote_gobble = quote_depth > 0;
+                let in_div = outer_div_indent.is_some()
+                    || planner
+                        .frames
+                        .iter()
+                        .any(|frame| matches!(frame, Frame::Div { .. }));
+                let owns_indent = !lazy_html_opener
+                    && matches!(
+                        ops.last(),
+                        Some(StripOp::ListAdvance(_) | StripOp::ContentIndent(_))
+                    );
+                let indent = if owns_indent {
+                    trailing_prefix_indent(line, remaining, &prefixes)
+                } else {
+                    ""
+                };
+                let mode = if opened_item && owns_indent {
+                    Some(html::BodyHtml::ListItem)
+                } else if note_opener {
+                    Some(html::BodyHtml::FootnoteStart)
+                } else if definition_opener {
+                    Some(html::BodyHtml::DefinitionStart)
+                } else if matches!(ops.last(), Some(StripOp::ContentIndent(_)))
+                    && (!matches!(planner.frames.last(), Some(Frame::Footnote))
+                        || quote_depth > 0
+                        || after_blank)
+                {
+                    Some(html::BodyHtml::Indented)
+                } else {
+                    None
+                };
+                let block = if let Some(mode) = mode {
+                    html::prepare_body(
+                        StrippedLines::new(lines, pos, &prefix),
+                        html_content,
+                        indent,
+                        mode,
+                        in_body && pos > 0 && is_blank_line(lines[pos - 1]),
+                        options,
+                    )
+                } else {
+                    let fusion = if in_body {
+                        SoftbreakFusion::None
+                    } else if matches!(ops.last(), Some(StripOp::BlockQuoteMarker)) {
+                        SoftbreakFusion::ToBlockquoteEnd
+                    } else if in_list {
+                        SoftbreakFusion::None
+                    } else if in_div {
+                        SoftbreakFusion::ToFencedDivClose
+                    } else {
+                        SoftbreakFusion::ToDocEnd
+                    };
+                    html::prepare(
+                        StrippedLines::new(lines, pos, &prefix),
+                        kind,
+                        options,
+                        fusion,
+                        (!owns_indent).then_some(html_content),
+                    )
+                };
+                if let Some(block) = block {
+                    let interrupted = !planner.paragraph.is_empty();
+                    if interrupted {
+                        planner.paragraph_kind = K::PLAIN;
+                        if !in_body && (!in_list || !owns_indent) {
+                            planner.push_text("", std::mem::take(&mut prefixes));
+                        }
+                    }
+                    planner.flush();
+                    if owns_indent {
+                        while matches!(prefixes.last(), Some(Prefix::Indent(_))) {
+                            prefixes.pop();
+                        }
+                    }
+                    if in_list && (owns_indent || interrupted) {
+                        for prefix in prefixes {
+                            match prefix {
+                                Prefix::Quote(indent, space) => {
+                                    planner.events.push(Event::QuoteLinePrefix(indent, space));
+                                }
+                                Prefix::Indent(indent) => {
+                                    planner.events.push(Event::LinePrefix(indent));
+                                }
+                            }
+                        }
+                    } else {
+                        planner.structural_prefixes(prefixes);
+                    }
+                    if task_body {
+                        let padding = &task_content[..task_content.len() - html_content.len()];
+                        planner.events.push(Event::Whitespace(padding));
+                    }
+                    pos = block.end;
+                    after_item_html = opened_item && owns_indent;
+                    planner.events.push(Event::PandocHtml(block));
+                    continue;
+                }
+            }
+        }
+        if !task_body
+            && !opener_as_text
             && !definition_opener
             && options.extensions.grid_tables
             && planner.paragraph.is_empty()
@@ -1372,11 +1616,11 @@ pub(super) fn plan<'a>(
                 || (options.extensions.table_captions && is_table_caption_start(remaining)))
         {
             let ops = container_ops(&planner.frames);
-            let prefix = table_prefix(
+            let prefix = block_prefix(
                 &ops,
                 &planner.frames,
                 in_body || opened_item,
-                outer_div_indent.is_some(),
+                outer_div_indent,
                 options,
             );
             let takes_indent = in_body || matches!(ops.last(), Some(StripOp::ListAdvance(_)));
@@ -1386,7 +1630,7 @@ pub(super) fn plan<'a>(
                 ""
             };
             let mut window = StrippedLines::new(lines, pos, &prefix);
-            if in_body {
+            if !task_body && in_body {
                 window = window.with_dispatch_override(remaining, indent);
             }
             if window.detect_at(pos) == remaining
@@ -1407,6 +1651,56 @@ pub(super) fn plan<'a>(
                 continue;
             }
         }
+        let dash_prefix = (!opener_as_text
+            && !definition_opener
+            && planner.paragraph.is_empty()
+            && (options.extensions.multiline_tables || options.extensions.simple_tables)
+            && (remaining.trim_start().starts_with('-')
+                || (options.extensions.table_captions && is_table_caption_start(remaining))
+                || (options.extensions.simple_tables
+                    && lines.get(pos + 1).is_some_and(|next| {
+                        next.trim_start_matches([' ', '\t', '>']).starts_with('-')
+                    })))
+            && try_parse_atx_heading(remaining).is_none()
+            && !try_parse_fence_open(remaining, options.dialect)
+                .is_some_and(|fence| fence_enabled(&fence, options))
+            && (!options.extensions.fenced_divs || try_parse_div_fence_open(remaining).is_none())
+            && (!options.extensions.raw_html
+                || try_parse_html_block_start(remaining, commonmark).is_none()))
+        .then(|| {
+            block_prefix(
+                &container_ops(&planner.frames),
+                &planner.frames,
+                in_body || opened_item,
+                outer_div_indent,
+                options,
+            )
+            .with_note_boundary(
+                planner
+                    .frames
+                    .iter()
+                    .position(|frame| matches!(frame, Frame::Footnote))
+                    .map(|i| container_ops(&planner.frames[..i]).len()),
+            )
+        });
+        let dash_window = dash_prefix.as_ref().map(|prefix| {
+            let indent = if in_body || matches!(prefix.ops().last(), Some(StripOp::ListAdvance(_)))
+            {
+                trailing_prefix_indent(line, remaining, &prefixes)
+            } else {
+                ""
+            };
+            StrippedLines::new(lines, pos, prefix).with_table_dispatch(remaining, indent)
+        });
+        let on_list_marker =
+            opened_item && matches!(planner.frames.last(), Some(Frame::Item { .. }));
+        if let Some(window) = dash_window
+            && let Some(table) = prepare_dash_table_at(&window, options, DashTableKind::Multiline)
+            && (!on_list_marker || (options.extensions.table_captions && table.has_caption()))
+        {
+            pos += planner.push_dash_table(window, table, prefixes, task_body);
+            continue;
+        }
         if in_body
             && !definition_opener
             && options.extensions.pipe_tables
@@ -1415,13 +1709,7 @@ pub(super) fn plan<'a>(
                 || (options.extensions.table_captions && is_table_caption_start(remaining)))
         {
             let ops = container_ops(&planner.frames);
-            let prefix = table_prefix(
-                &ops,
-                &planner.frames,
-                true,
-                outer_div_indent.is_some(),
-                options,
-            );
+            let prefix = block_prefix(&ops, &planner.frames, true, outer_div_indent, options);
             let indent = trailing_prefix_indent(line, remaining, &prefixes);
             let window =
                 StrippedLines::new(lines, pos, &prefix).with_dispatch_override(remaining, indent);
@@ -1444,7 +1732,8 @@ pub(super) fn plan<'a>(
                 continue;
             }
         }
-        if !in_body
+        if !task_body
+            && !in_body
             && !commonmark
             && options.extensions.pipe_tables
             && planner.paragraph.is_empty()
@@ -1516,45 +1805,17 @@ pub(super) fn plan<'a>(
                 }
             }
         }
-        if !commonmark
-            && !opener_as_text
-            && planner.paragraph.is_empty()
-            && lines.get(pos + 1).is_some_and(|next| {
-                !is_blank_line(next)
-                    && (remaining.trim_start().starts_with('-')
-                        || (in_body && next.trim_start_matches([' ', '\t', '>']).starts_with('-')))
-            })
-            && (options.extensions.simple_tables || options.extensions.multiline_tables)
+        if let Some(window) = dash_window
+            && let Some(table) = prepare_dash_table_at(&window, options, DashTableKind::Simple)
+            && (!on_list_marker || (options.extensions.table_captions && table.has_caption()))
         {
-            let ops = container_ops(&planner.frames);
-            let prefix = ContainerPrefix::from_ops(&ops, opened_item);
-            let next = ContainerPrefix::strip_required_ops(lines[pos + 1], &ops);
-            let possible = next.is_some_and(|next| may_open_dash_table(remaining, next));
-            let window = if in_body {
-                StrippedLines::new(lines, pos, &prefix).with_dispatch_override(remaining, "")
-            } else if possible {
-                let end = pos
-                    + 1
-                    + lines[pos + 1..]
-                        .iter()
-                        .take_while(|raw| {
-                            is_blank_line(raw)
-                                || ContainerPrefix::strip_required_ops(raw, &ops).is_some()
-                        })
-                        .count();
-                StrippedLines::new(&lines[..end], pos, &prefix)
-            } else {
-                StrippedLines::new(lines, pos, &prefix)
-            };
-            if possible && options.extensions.simple_tables && opens_simple_table(&window) {
-                return Err((remaining.trim_start_matches([' ', '\t']), "simple table"));
-            }
-            if possible
-                && options.extensions.multiline_tables
-                && opens_multiline_table_shape(&window)
-            {
-                return Err((remaining.trim_start_matches([' ', '\t']), "multiline table"));
-            }
+            pos += planner.push_dash_table(window, table, prefixes, task_body);
+            continue;
+        }
+        if task_body {
+            planner.push_text(&remaining[3..], prefixes);
+            pos += 1;
+            continue;
         }
         if is_blank_line(remaining) {
             planner.flush();
@@ -1958,8 +2219,17 @@ pub(super) fn plan<'a>(
         {
             // Within a quoted list the incumbent retains list indentation in
             // the text after the quote marker.
-            if planner.paragraph.is_empty()
-                && (commonmark || matches!(planner.frames.last(), Some(Frame::Item { .. })))
+            let after_item_heading = !commonmark
+                && matches!(planner.frames.last(), Some(Frame::Item { .. }))
+                && matches!(
+                    planner.events.as_slice(),
+                    [.., Event::Item(..), Event::Atx(..)]
+                );
+            if !continues_item_html
+                && (after_item_heading
+                    || planner.paragraph.is_empty()
+                        && (commonmark
+                            || matches!(planner.frames.last(), Some(Frame::Item { .. }))))
                 && prefixes
                     .iter()
                     .all(|prefix| matches!(prefix, Prefix::Indent(_)))
@@ -1973,7 +2243,8 @@ pub(super) fn plan<'a>(
                     .sum::<usize>();
                 remaining = &line[line.len() - remaining.len() - bytes..];
                 prefixes.clear();
-            } else if matches!(planner.frames.last(), Some(Frame::Item { .. }))
+            } else if !continues_item_html
+                && matches!(planner.frames.last(), Some(Frame::Item { .. }))
                 && matches!(prefixes.last(), Some(Prefix::Indent(_)))
                 && (planner.paragraph.is_empty()
                     || prefixes.iter().any(|p| matches!(p, Prefix::Quote(..))))
@@ -2042,9 +2313,9 @@ pub(super) fn emit(
             Event::QuoteLinePrefix(indent, space) => {
                 emit_one_line_prefix_marker(builder, indent, space)
             }
-            Event::Item(line, marker) => {
+            Event::Item(line, marker, claim_task_checkbox) => {
                 let (indent_cols, indent_bytes) = leading_indent(line);
-                emit_list_item(
+                emit_list_item_with_checkbox(
                     builder,
                     &ListItemEmissionInput {
                         content: line,
@@ -2056,6 +2327,7 @@ pub(super) fn emit(
                         virtual_marker_space: marker.virtual_marker_space,
                     },
                     options,
+                    claim_task_checkbox,
                 );
             }
             Event::Paragraph(kind, buffer, suppress_footnote_refs) => {
@@ -2074,6 +2346,7 @@ pub(super) fn emit(
             Event::Blank(line) => emit_blank(builder, line),
             Event::Newline(line) => builder.token(K::NEWLINE.into(), line),
             Event::Whitespace(indent) => builder.token(K::WHITESPACE.into(), indent),
+            Event::LinePrefix(indent) => builder.token(K::LINE_PREFIX.into(), indent),
             Event::Fence(range, fence, prefix, first) => {
                 let window =
                     StrippedLines::new(&lines[..start + range.end], start + range.start, &prefix);
@@ -2165,6 +2438,13 @@ pub(super) fn emit(
                     .with_dispatch_override(tail, indent);
                 table.emit(builder, &window, options);
             }
+            Event::DashTable(pos, prefix, table, dispatch_override) => {
+                let mut window = StrippedLines::new(&lines[start..], pos, &prefix);
+                if let Some((tail, indent)) = dispatch_override {
+                    window = window.with_table_dispatch(tail, indent);
+                }
+                table.emit(builder, &window, options);
+            }
             Event::PipeTable(pos, prefix, table, inject_list_indent) => {
                 let window = StrippedLines::new(&lines[start..], pos, &prefix);
                 table.emit_with_row_prefix(builder, &window, options, inject_list_indent);
@@ -2187,6 +2467,7 @@ pub(super) fn emit(
                 sink.finish();
                 builder.finish_node();
             }
+            Event::PandocHtml(block) => block.emit(builder),
             Event::Html(range, kind, prefix, first) => {
                 let context = HtmlBlockContext {
                     prefix: &prefix,

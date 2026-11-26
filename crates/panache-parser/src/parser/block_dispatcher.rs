@@ -72,8 +72,8 @@ use super::blocks::reference_links::{
     try_parse_reference_definition_with_options,
 };
 use super::blocks::tables::{
-    is_caption_followed_by_table, try_parse_grid_table, try_parse_multiline_table,
-    try_parse_pipe_table, try_parse_simple_table,
+    UniformStripView, is_caption_followed_by_table, try_parse_grid_table,
+    try_parse_multiline_table, try_parse_pipe_table, try_parse_simple_table,
 };
 use super::inlines::svelte::{SvelteKind, emit_svelte_template, try_parse_svelte_template};
 use super::utils::attributes::{emit_div_info_node, parse_html_tag_attributes};
@@ -1270,7 +1270,7 @@ fn resolve_table_pos(
         return line_pos;
     }
     let window = StrippedLines::with_dispatch(raw, line_pos, line_pos, prefix);
-    if !is_caption_followed_by_table(&window, line_pos) {
+    if !is_caption_followed_by_table(&UniformStripView(&window), line_pos) {
         return line_pos;
     }
     let mut pos = line_pos + 1;
@@ -1914,6 +1914,7 @@ impl BlockParser for HtmlBlockParser {
         let content = lines.first();
         let prefix = lines.prefix();
         let line_pos = lines.pos();
+        let trailing_probe = lines.is_html_trailing_probe();
         let lines = lines.raw();
         let is_commonmark = ctx.config.dialect == crate::options::Dialect::CommonMark;
         let block_type = if let Some(bt) = payload.and_then(|p| p.downcast_ref::<HtmlBlockType>()) {
@@ -1941,10 +1942,15 @@ impl BlockParser for HtmlBlockParser {
         };
 
         let fusion =
-            if ctx.in_list || ctx.content_indent != 0 || ctx.myst_directive_closer.is_some() {
+            if trailing_probe || ctx.content_indent != 0 || ctx.myst_directive_closer.is_some() {
                 SoftbreakFusion::None
-            } else if ctx.blockquote_depth > 0 {
+            } else if matches!(
+                prefix.ops().last(),
+                Some(super::blocks::container_prefix::StripOp::BlockQuoteMarker)
+            ) {
                 SoftbreakFusion::ToBlockquoteEnd
+            } else if ctx.in_list {
+                SoftbreakFusion::None
             } else if !ctx.in_fenced_div {
                 SoftbreakFusion::ToDocEnd
             } else if ctx.config.extensions.fenced_divs {
@@ -2252,8 +2258,6 @@ impl BlockParser for FencedDivOpenParser {
         use crate::syntax::SyntaxKind;
 
         let first = lines.first();
-        let line_pos = lines.pos();
-        let lines = lines.raw();
 
         let div_fence = payload
             .and_then(|p| p.downcast_ref::<DivFenceInfo>())
@@ -2267,11 +2271,15 @@ impl BlockParser for FencedDivOpenParser {
 
         builder.start_node(SyntaxKind::FENCED_DIV.into());
 
-        emit_div_fence_open(
-            builder,
-            strip_n_blockquote_markers(lines[line_pos], ctx.blockquote_depth),
-            &div_fence,
-        );
+        let unquoted = strip_n_blockquote_markers(lines.raw()[lines.pos()], ctx.blockquote_depth);
+        let content = if unquoted.trim_start().starts_with(':') {
+            unquoted
+        } else {
+            // A marker-line dispatch can have a list marker before its quote.
+            // The window has already accounted for both markers.
+            first
+        };
+        emit_div_fence_open(builder, content, &div_fence);
 
         1
     }
