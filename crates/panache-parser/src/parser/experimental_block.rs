@@ -33,10 +33,7 @@ use super::blocks::html_blocks::{
 };
 use super::blocks::indented_code::parse_indented_code_block;
 use super::blocks::line_blocks::try_parse_line_block_start;
-use super::blocks::lists::{
-    ListMarkerMatch, OpenListHint, is_task_checkbox, list_item_content_col, marker_start_number,
-    markers_match, try_parse_list_marker,
-};
+use super::blocks::lists::{ListMarker, OpenListHint, marker_start_number, try_parse_list_marker};
 use super::blocks::metadata::{
     YamlContentOutcome, collect_yaml_content, emit_yaml_block, find_yaml_block_closing_pos,
     is_metadata_open_delim, prepare_yaml_content,
@@ -47,9 +44,7 @@ use super::blocks::tables::{
 };
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
-use super::utils::container_stack::{
-    byte_index_at_column, gobbled_indent_prefix_len, leading_indent,
-};
+use super::utils::container_stack::leading_indent;
 use super::utils::helpers::{is_blank_line, split_lines_inclusive};
 use super::utils::inline_emission::emit_inlines;
 use super::utils::text_buffer::ParagraphBuffer;
@@ -72,7 +67,6 @@ enum Block<'a> {
     Rule(usize),
     Reference(Range<usize>, ReferenceSpans),
     PipeTable(usize, PreparedPipeTable<'a>),
-    List(usize, Vec<ListItem>),
     Containers(usize, Vec<containers::Event<'a>>),
     IndentedCode(Range<usize>),
     Html(Range<usize>, HtmlBlockType),
@@ -80,13 +74,6 @@ enum Block<'a> {
     Metadata(usize, usize, YamlContentOutcome),
     OpenDiv(usize, DivFenceInfo),
     CloseDiv(Option<usize>),
-}
-
-struct ListItem {
-    lines: Range<usize>,
-    marker: ListMarkerMatch,
-    nested: Vec<ListItem>,
-    restricted_markers: Vec<usize>,
 }
 
 fn plain_container_text(text: &str) -> bool {
@@ -120,119 +107,6 @@ fn is_quote_prose(text: &str, options: &ParserOptions) -> bool {
         && plain_container_text(content)
         && try_parse_list_marker(text, options, OpenListHint::None).is_none()
         && !(content.starts_with('[') && content.contains("]:"))
-}
-
-fn list_marker_at(line: &str, indent: usize, options: &ParserOptions) -> Option<ListMarkerMatch> {
-    let (columns, bytes) = leading_indent(line);
-    (columns == indent && bytes == indent)
-        .then(|| try_parse_list_marker(&line[bytes..], options, OpenListHint::None))
-        .flatten()
-}
-
-fn plan_list(
-    lines: &[&str],
-    pos: &mut usize,
-    first: ListMarkerMatch,
-    indent: usize,
-    depth: usize,
-    options: &ParserOptions,
-) -> Option<Vec<ListItem>> {
-    if depth == 32 {
-        return None;
-    }
-    let mut items = Vec::new();
-    let mut marker = first;
-    loop {
-        let content_start = indent + marker.marker_len + marker.spaces_after_bytes;
-        let content_col =
-            list_item_content_col(indent, marker.marker_len, marker.spaces_after_cols, options);
-        let tail = &lines[*pos][content_start..];
-        if marker.virtual_marker_space
-            || is_blank_line(tail)
-            || (options.dialect == Dialect::CommonMark
-                && options.extensions.reference_links
-                && tail.trim_start().starts_with('[')
-                && (!tail.contains(']') || tail.contains("]:")))
-            || is_task_checkbox(tail)
-            || leading_indent(tail).0 >= 4
-            || !plain_container_text(tail)
-        {
-            return None;
-        }
-        let item_start = *pos;
-        *pos += 1;
-        let mut nested = Vec::new();
-        let mut restricted_markers = Vec::new();
-        while let Some(&line) = lines.get(*pos) {
-            let (columns, _) = leading_indent(line);
-            if is_blank_line(line) || columns < content_col {
-                break;
-            }
-            if let Some(marker) = list_marker_at(line, content_col, options) {
-                if options.dialect == Dialect::Pandoc
-                    && options.pandoc_compat.restricts_ordered_sublist_start()
-                    && marker_start_number(&marker.marker).is_some_and(|start| start != 1)
-                {
-                    restricted_markers.push(*pos);
-                    *pos += 1;
-                    continue;
-                }
-                if options.dialect == Dialect::CommonMark
-                    && marker_start_number(&marker.marker).is_some_and(|start| start != 1)
-                {
-                    *pos += 1;
-                    continue;
-                }
-                nested = plan_list(lines, pos, marker, content_col, depth + 1, options)?;
-                break;
-            }
-            if !restricted_markers.is_empty() {
-                return None;
-            }
-            if options.dialect == Dialect::CommonMark
-                && try_parse_setext_heading(
-                    &[tail, &line[byte_index_at_column(line, content_col)..]],
-                    0,
-                )
-                .is_some()
-            {
-                return None;
-            }
-            if columns >= content_col + 4 || !plain_container_text(line) {
-                return None;
-            }
-            *pos += 1;
-        }
-
-        let paragraph_end = nested.first().map_or(*pos, |first| first.lines.start);
-        let next_pos = *pos
-            + lines[*pos..]
-                .iter()
-                .take_while(|line| is_blank_line(line))
-                .count();
-        let next = lines
-            .get(next_pos)
-            .and_then(|line| list_marker_at(line, indent, options))
-            .filter(|next| markers_match(&marker.marker, &next.marker, options.dialect));
-        items.push(ListItem {
-            lines: item_start..paragraph_end,
-            marker,
-            nested,
-            restricted_markers,
-        });
-        if let Some(next) = next {
-            *pos = next_pos;
-            marker = next;
-            continue;
-        }
-        if let Some(line) = lines.get(next_pos) {
-            let (columns, _) = leading_indent(line);
-            if (next_pos == *pos && depth == 0) || columns > indent {
-                return None;
-            }
-        }
-        return Some(items);
-    }
 }
 
 fn source_span<'a>(input: &'a str, lines: &[&str], range: Range<usize>) -> &'a str {
@@ -370,6 +244,10 @@ fn plan<'a>(
             && indent < 4
             && options.extensions.pipe_tables
             && (content.contains('|') || is_table_caption_start(line))
+            && (commonmark
+                || !matches!(marker, Some(b'-' | b'+' | b'*'))
+                || !try_parse_list_marker(line, options, OpenListHint::None)
+                    .is_some_and(|marker| matches!(marker.marker, ListMarker::Bullet(_))))
             && let Some(table) = prepare_pipe_table(
                 &StrippedLines::new(lines, pos, &prefix),
                 options,
@@ -399,27 +277,21 @@ fn plan<'a>(
             && marker == Some(b'>')
             && (fresh || !options.extensions.blank_before_blockquote)
         {
-            plan_containers(input, lines, &mut pos, options, &mut blocks)?;
+            plan_containers(input, lines, &mut pos, options, jupyter_lines, &mut blocks)?;
             continue;
         } else if indent < 4
-            && (fresh || commonmark || options.extensions.lists_without_preceding_blankline)
-            && matches!(marker, Some(b'-' | b'+' | b'*' | b'0'..=b'9'))
+            && (fresh || commonmark)
+            && (matches!(marker, Some(b'-' | b'+' | b'*' | b'0'..=b'9'))
+                || options.extensions.fancy_lists
+                    && matches!(marker, Some(b'#' | b'(' | b'a'..=b'z' | b'A'..=b'Z'))
+                || options.extensions.example_lists && matches!(marker, Some(b'(' | b'@')))
             && let Some(first) = try_parse_list_marker(line, options, OpenListHint::None)
             && (fresh
                 || !commonmark
                 || (marker_start_number(&first.marker).is_none_or(|start| start == 1)
                     && !is_blank_line(&line[indent_bytes + first.marker_len..])))
         {
-            let start = pos;
-            if fresh
-                && indent_bytes == indent
-                && let Some(items) = plan_list(lines, &mut pos, first, indent, 0, options)
-            {
-                blocks.push(Block::List(indent, items));
-            } else {
-                pos = start;
-                plan_containers(input, lines, &mut pos, options, &mut blocks)?;
-            }
+            plan_containers(input, lines, &mut pos, options, jupyter_lines, &mut blocks)?;
             continue;
         } else if commonmark
             && options.extensions.raw_html
@@ -483,18 +355,18 @@ fn plan<'a>(
 
 fn plan_containers<'a>(
     input: &str,
-    lines: &[&'a str],
+    lines: &'a [&'a str],
     pos: &mut usize,
     options: &ParserOptions,
+    jupyter_lines: &'a OnceCell<Arc<super::blocks::jupyter::Lookahead>>,
     blocks: &mut Vec<Block<'a>>,
 ) -> Result<(), Unsupported> {
-    let (consumed, events) =
-        containers::plan(&lines[*pos..], options).map_err(|(unhandled, construct)| {
-            Unsupported {
-                offset: unhandled.as_ptr() as usize - input.as_ptr() as usize,
-                construct,
-            }
-        })?;
+    let (consumed, events) = containers::plan(&lines[*pos..], options, jupyter_lines).map_err(
+        |(unhandled, construct)| Unsupported {
+            offset: unhandled.as_ptr() as usize - input.as_ptr() as usize,
+            construct,
+        },
+    )?;
     blocks.push(Block::Containers(*pos, events));
     *pos += consumed;
     Ok(())
@@ -597,9 +469,6 @@ fn parse_at(
                 let window = StrippedLines::new(&lines, pos, &prefix);
                 table.emit(&mut builder, &window, options);
             }
-            Block::List(indent, items) => {
-                emit_list(&mut builder, &lines, items, indent, options);
-            }
             Block::Containers(start, events) => {
                 containers::emit(&mut builder, events, &lines, start, &diagnostics, options)
             }
@@ -676,71 +545,6 @@ fn emit_buffered_paragraph(
     builder.start_node(kind.into());
     paragraph.emit_with_inlines(builder, options, false);
     builder.finish_node();
-}
-
-fn emit_list(
-    builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
-    items: Vec<ListItem>,
-    indent: usize,
-    options: &ParserOptions,
-) -> usize {
-    builder.start_node(K::LIST.into());
-    let mut end = items[0].lines.start;
-    for item in items {
-        for line in &lines[end..item.lines.start] {
-            emit_blank(builder, line);
-        }
-        let line = lines[item.lines.start];
-        let marker = item.marker;
-        builder.start_node(K::LIST_ITEM.into());
-        if indent != 0 {
-            builder.token(K::WHITESPACE.into(), &line[..indent]);
-        }
-        let marker_end = indent + marker.marker_len;
-        builder.token(K::LIST_MARKER.into(), &line[indent..marker_end]);
-        let content_start = marker_end + marker.spaces_after_bytes;
-        builder.token(K::WHITESPACE.into(), &line[marker_end..content_start]);
-        let content_col =
-            list_item_content_col(indent, marker.marker_len, marker.spaces_after_cols, options);
-        let paragraph_end = item
-            .restricted_markers
-            .first()
-            .copied()
-            .unwrap_or(item.lines.end);
-        if paragraph_end == item.lines.start + 1 {
-            let text = &line[content_start..];
-            let kind = if paragraph_is_standalone_image(text, options) {
-                K::FIGURE
-            } else {
-                K::PLAIN
-            };
-            builder.start_node(kind.into());
-            emit_inlines(builder, text, options, false);
-            builder.finish_node();
-        } else {
-            let mut paragraph = ParagraphBuffer::new();
-            paragraph.push_text(&line[content_start..]);
-            for line in &lines[item.lines.start + 1..paragraph_end] {
-                let indent = gobbled_indent_prefix_len(line, content_col);
-                paragraph.push_indent(&line[..indent]);
-                paragraph.push_text(&line[indent..]);
-            }
-            emit_buffered_paragraph(builder, K::PLAIN, &paragraph, options);
-        }
-        for pos in item.restricted_markers {
-            builder.start_node(K::PLAIN.into());
-            emit_inlines(builder, lines[pos], options, false);
-            builder.finish_node();
-        }
-        end = item.lines.end;
-        if !item.nested.is_empty() {
-            end = emit_list(builder, lines, item.nested, content_col, options);
-        }
-        builder.finish_node();
-    }
-    builder.finish_node();
-    end
 }
 
 /// Splice an edit into a tree produced by the experimental engine.

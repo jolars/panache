@@ -12,7 +12,9 @@ use crate::parser::utils::attributes::{
 use crate::parser::utils::helpers::{emit_line_tokens, emit_separator_tokens, strip_newline};
 use crate::parser::utils::inline_emission;
 
-use super::container_prefix::{ContainerPrefix, FrameVerdict, StrippedLines, strip_list_indent};
+use super::container_prefix::{
+    ContainerPrefix, ContainerPrefixLine, FrameVerdict, StrippedLines, strip_list_indent,
+};
 use super::reference_links::try_parse_footnote_marker;
 
 /// Read-only indexed view over lines for table detection scans. Two
@@ -902,7 +904,21 @@ fn emit_table_caption(
 }
 
 fn emit_table_cell(builder: &mut impl InlineSink, cell_text: &str, config: &ParserOptions) {
+    emit_table_cell_with_prefix(builder, cell_text, config, None);
+}
+
+fn emit_table_cell_with_prefix(
+    builder: &mut impl InlineSink,
+    cell_text: &str,
+    config: &ParserOptions,
+    prefix: Option<&ContainerPrefixLine>,
+) {
     builder.start_node(SyntaxKind::TABLE_CELL.into());
+    if let Some(prefix) = prefix {
+        for token in prefix.token_texts() {
+            builder.token(SyntaxKind::LINE_PREFIX.into(), token);
+        }
+    }
 
     if !cell_text.is_empty() {
         inline_emission::emit_inlines(builder, cell_text, config, false);
@@ -954,16 +970,9 @@ fn determine_alignments(columns: &mut [Column], separator_line: &str, header_lin
     }
 }
 
-/// Try to parse a simple table starting at the given position.
-/// Returns the number of lines consumed if successful.
-pub(crate) fn try_parse_simple_table(
-    window: &StrippedLines<'_, '_>,
-    builder: &mut GreenNodeBuilder<'static>,
-    config: &ParserOptions,
-) -> Option<usize> {
+fn simple_table_bounds(window: &StrippedLines<'_, '_>) -> Option<(usize, usize, bool, bool)> {
     let lines = window.raw();
     let start_pos = window.pos();
-    log::trace!("try_parse_simple_table at line {}", start_pos + 1);
 
     if start_pos >= lines.len() {
         return None;
@@ -992,8 +1001,29 @@ pub(crate) fn try_parse_simple_table(
         let (end_pos, has_closer) = find_table_end(&view, separator_pos + 1, headerless)?;
         (separator_pos, end_pos, has_closer)
     };
-    log::trace!("  found separator at line {}", separator_pos + 1);
+    (end_pos - separator_pos - 1 > usize::from(has_closer)).then_some((
+        separator_pos,
+        end_pos,
+        has_closer,
+        single_column_here,
+    ))
+}
 
+#[cfg(feature = "experimental-block-parser")]
+pub(in crate::parser) fn opens_simple_table(window: &StrippedLines<'_, '_>) -> bool {
+    simple_table_bounds(window).is_some()
+}
+
+/// Try to parse a simple table starting at the given position.
+/// Returns the number of lines consumed if successful.
+pub(crate) fn try_parse_simple_table(
+    window: &StrippedLines<'_, '_>,
+    builder: &mut GreenNodeBuilder<'static>,
+    config: &ParserOptions,
+) -> Option<usize> {
+    let start_pos = window.pos();
+    let view = UniformStripView(window);
+    let (separator_pos, end_pos, has_closer, single_column_here) = simple_table_bounds(window)?;
     let separator_line = view.line(separator_pos);
     let mut columns = if single_column_here {
         parse_single_dash_run(separator_line)?
@@ -1009,12 +1039,6 @@ pub(crate) fn try_parse_simple_table(
     };
 
     determine_alignments(&mut columns, separator_line, header_line);
-
-    let data_rows = end_pos - separator_pos - 1 - usize::from(has_closer);
-
-    if data_rows == 0 {
-        return None;
-    }
 
     let caption_before = find_caption_before_table(&view, start_pos, window.dispatch_pos());
 
@@ -1448,12 +1472,20 @@ fn emit_pipe_table_row(
     row: &PipeTableRow<'_>,
     row_kind: SyntaxKind,
     config: &ParserOptions,
+    inject_list_indent: bool,
 ) {
     builder.start_node(row_kind.into());
 
+    if inject_list_indent && row.start != window.dispatch_pos() && row.end == row.start + 1 {
+        let (prefix, tail) = window.prefix().split_pieces(window.raw()[row.start]);
+        emit_pipe_table_row_content(builder, tail, config, Some(&prefix));
+        builder.finish_node();
+        return;
+    }
+
     let first = window.emit_or_dispatch_tail(builder, row.start);
     if row.end == row.start + 1 {
-        emit_pipe_table_row_content(builder, first, config);
+        emit_pipe_table_row_content(builder, first, config, None);
     } else {
         let row_indent = crate::parser::utils::container_stack::leading_indent(first).0;
         let mut text = first.to_owned();
@@ -1468,14 +1500,19 @@ fn emit_pipe_table_row(
             text.push_str(tail);
         }
         let mut sink = MarkerInjectingSink::new(builder, &markers);
-        emit_pipe_table_row_content(&mut sink, &text, config);
+        emit_pipe_table_row_content(&mut sink, &text, config, None);
         sink.finish();
     }
 
     builder.finish_node();
 }
 
-fn emit_pipe_table_row_content(builder: &mut impl InlineSink, line: &str, config: &ParserOptions) {
+fn emit_pipe_table_row_content(
+    builder: &mut impl InlineSink,
+    line: &str,
+    config: &ParserOptions,
+    mut prefix: Option<&ContainerPrefixLine>,
+) {
     let (line_without_newline, newline_str) = strip_newline(line);
     let trimmed = line_without_newline.trim();
 
@@ -1483,6 +1520,13 @@ fn emit_pipe_table_row_content(builder: &mut impl InlineSink, line: &str, config
     let cells = pipe_cell_ranges(trimmed, &pipe_positions);
 
     let leading_ws_len = line_without_newline.len() - line_without_newline.trim_start().len();
+    if (leading_ws_len > 0 || trimmed.starts_with('|'))
+        && let Some(prefix) = prefix.take()
+    {
+        for token in prefix.token_texts() {
+            builder.token(SyntaxKind::LINE_PREFIX.into(), token);
+        }
+    }
     if leading_ws_len > 0 {
         builder.token(
             SyntaxKind::WHITESPACE.into(),
@@ -1503,7 +1547,7 @@ fn emit_pipe_table_row_content(builder: &mut impl InlineSink, line: &str, config
             builder.token(SyntaxKind::WHITESPACE.into(), cell_leading_ws);
         }
 
-        emit_table_cell(builder, cell_content, config);
+        emit_table_cell_with_prefix(builder, cell_content, config, std::mem::take(&mut prefix));
 
         let cell_trailing_ws_start = cell_leading_ws.len() + cell_content.len();
         if cell_trailing_ws_start < cell_with_ws.len() {
@@ -1698,6 +1742,16 @@ impl PreparedPipeTable<'_> {
         window: &StrippedLines<'_, '_>,
         config: &ParserOptions,
     ) {
+        self.emit_with_row_prefix(builder, window, config, false);
+    }
+
+    pub(crate) fn emit_with_row_prefix(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        window: &StrippedLines<'_, '_>,
+        config: &ParserOptions,
+        inject_list_indent: bool,
+    ) {
         let Self {
             header,
             rows,
@@ -1715,7 +1769,14 @@ impl PreparedPipeTable<'_> {
             emit_caption_blank_lines(builder, window, *cap_end, *actual_start);
         }
 
-        emit_pipe_table_row(builder, window, header, SyntaxKind::TABLE_HEADER, config);
+        emit_pipe_table_row(
+            builder,
+            window,
+            header,
+            SyntaxKind::TABLE_HEADER,
+            config,
+            inject_list_indent,
+        );
 
         builder.start_node(SyntaxKind::TABLE_SEPARATOR.into());
         let separator_tail = window.emit_or_dispatch_tail(builder, *separator_pos);
@@ -1723,7 +1784,14 @@ impl PreparedPipeTable<'_> {
         builder.finish_node();
 
         for row in rows {
-            emit_pipe_table_row(builder, window, row, SyntaxKind::TABLE_ROW, config);
+            emit_pipe_table_row(
+                builder,
+                window,
+                row,
+                SyntaxKind::TABLE_ROW,
+                config,
+                inject_list_indent,
+            );
         }
 
         if let Some((cap_start, cap_end)) = caption_after {
@@ -3264,13 +3332,7 @@ fn scan_multiline_table(
     })
 }
 
-/// Try to parse a multiline table starting at the given position.
-/// Returns the number of lines consumed if successful.
-pub(crate) fn try_parse_multiline_table(
-    window: &StrippedLines<'_, '_>,
-    builder: &mut GreenNodeBuilder<'static>,
-    config: &ParserOptions,
-) -> Option<usize> {
+fn multiline_table_shape(window: &StrippedLines<'_, '_>) -> Option<MultilineShape> {
     let lines = window.raw();
     let start_pos = window.pos();
     if start_pos >= lines.len() {
@@ -3285,11 +3347,30 @@ pub(crate) fn try_parse_multiline_table(
         return None;
     }
 
-    let shape = match scan_multiline_table(window, true) {
-        Some(shape) => shape,
-        None if is_spaced_start => scan_multiline_table(window, false)?,
-        None => return None,
-    };
+    match scan_multiline_table(window, true) {
+        Some(shape) => Some(shape),
+        None if is_spaced_start => scan_multiline_table(window, false),
+        None => None,
+    }
+}
+
+#[cfg(feature = "experimental-block-parser")]
+pub(in crate::parser) fn opens_multiline_table_shape(window: &StrippedLines<'_, '_>) -> bool {
+    multiline_table_shape(window).is_some_and(|shape| {
+        let separator = window.line(shape.column_sep_pos);
+        try_parse_table_separator(separator).is_some() || parse_single_dash_run(separator).is_some()
+    })
+}
+
+/// Try to parse a multiline table starting at the given position.
+/// Returns the number of lines consumed if successful.
+pub(crate) fn try_parse_multiline_table(
+    window: &StrippedLines<'_, '_>,
+    builder: &mut GreenNodeBuilder<'static>,
+    config: &ParserOptions,
+) -> Option<usize> {
+    let start_pos = window.pos();
+    let shape = multiline_table_shape(window)?;
     let MultilineShape {
         end_pos,
         column_sep_pos,

@@ -269,7 +269,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
 - [x] Finish CommonMark list and block quote planning. Cover blank-line
   ownership, marker and indentation edge cases, lazy continuation, and
   interruption by core blocks. Pin newly supported spec examples.
-- [ ] Finish Pandoc list and block quote planning. Cover fancy and example
+- [x] Finish Pandoc list and block quote planning. Cover fancy and example
   markers, blank-line and indentation extensions, and
   compatibility-dependent sublists. Move simple lists onto the shared
   planner once both dialects preserve their existing CSTs.
@@ -322,6 +322,12 @@ timing. Compare the results with the previous checkpoint to spot regressions.
 ### Issues
 
 Note any known parser issues here.
+
+- [ ] Honor `lists-without-preceding-blankline` when a list interrupts prose.
+  With the extension enabled, both Panache engines keep `Intro` followed by
+  `- Item` in one paragraph, including when both lines have quote markers.
+  Pandoc 3.14 opens a list in both cases with
+  `pandoc -f markdown+lists_without_preceding_blankline -t native`.
 
 - [ ] Stop letting `pandoc_ast.rs` drift into a second-stage parser. Load-
   bearing byte-walkers (`split_html_block_by_tags`, `parse_pandoc_blocks`

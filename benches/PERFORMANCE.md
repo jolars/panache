@@ -246,3 +246,36 @@ at byte 155207. With default Quarto options, grid tables are still the
 first unsupported construct in the large authoring, tables, and math
 benchmarks. The math benchmark passes preflight with the checked-in
 configuration that disables grid tables.
+
+### Shared list and blockquote planner checkpoint
+
+On the AMD Ryzen 9 7900 with Rust 1.98.1, the release comparison reached
+timing for all six workloads that qualified at base revision `c39990bf`.
+The Pandoc manual also qualified under CommonMark. The table gives median
+and p95 in microseconds for each operation, with incumbent timings on the
+left of the arrow and experimental timings on the right.
+
+  | Workload                       | Full parse                        | Line-start edit                   | Typing edit                  | Whole-file replacement |
+  | ---                            | ---:                              | ---:                              | ---:                         | ---:                   |
+  | Project README                 |     223.5 / 255.7 → 134.9 / 150.8 |     136.4 / 149.6 → 116.0 / 124.2 |        2.7 / 3.0 → 2.6 / 2.8 |  2.0 / 2.2 → 1.1 / 1.2 |
+  | Pandoc manual                  | 5123.4 / 5254.0 → 2826.3 / 2920.9 | 1379.3 / 1414.4 → 1375.4 / 1404.2 |    43.6 / 48.7 → 44.3 / 52.2 |  3.7 / 5.2 → 2.9 / 3.4 |
+  | Parser README                  |          17.7 / 18.3 → 9.9 / 10.2 |         16.1 / 16.4 → 11.1 / 11.4 |        9.5 / 9.7 → 6.3 / 6.5 |  1.5 / 1.5 → 0.7 / 0.8 |
+  | Integrations                   |      158.8 / 164.7 → 97.1 / 102.8 |         90.2 / 97.5 → 77.7 / 83.6 |    41.6 / 45.8 → 35.0 / 38.6 |  2.5 / 2.6 → 1.1 / 1.2 |
+  | Getting Started                |     260.1 / 276.7 → 149.3 / 160.4 |       102.5 / 109.3 → 93.4 / 99.9 |    45.9 / 50.6 → 41.4 / 47.2 |  2.3 / 2.4 → 1.1 / 1.2 |
+  | Performance                    |   1055.6 / 1075.0 → 898.1 / 920.9 |     199.2 / 212.5 → 185.4 / 193.5 |  101.2 / 107.3 → 91.4 / 97.2 |  2.7 / 2.9 → 1.3 / 1.4 |
+  | Math with grid tables disabled |     484.0 / 505.5 → 314.2 / 328.0 |     190.4 / 200.1 → 180.9 / 190.6 |    83.1 / 89.5 → 77.6 / 82.9 |  2.5 / 2.6 → 1.2 / 1.3 |
+
+Across the six comparable workloads, the experimental full-parse medians
+were 56–85% of the incumbent medians, versus 54–85% at the base revision.
+The experimental line-start edit medians were 69–95% of the incumbent
+medians, versus 72–95% at the base revision.
+
+With default Quarto options, `large_authoring.qmd`, `tables.qmd`, and
+`math.qmd` stopped at grid tables at bytes 990, 3539, and 28452,
+respectively.
+
+In release scaling checks, increasing repeated quoted pipe tables from
+4,000 to 16,000 increased median parse time from 6.4 ms to 26.2 ms.
+Increasing consecutive blank lines inside a list from 16,000 to 32,000
+increased the median from 1.0 ms to 2.0 ms. These checks measured the
+experimental parser over 15 samples per input.

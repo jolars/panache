@@ -506,16 +506,22 @@ fn commonmark_fence_on_quoted_list_marker_line() {
 }
 
 #[test]
-fn experimental_parser_declines_unimplemented_container_forms() {
-    for (flavor, input) in [
-        (Flavor::Quarto, "- [x] done\n"),
-        (Flavor::Quarto, "- > foo\n  \tcode\n"),
+fn quarto_task_items_and_tabbed_continuations_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    check("- [x] done\n", &options);
+    check("- > foo\n  \tcode\n", &options);
+}
+
+#[test]
+fn quarto_fancy_and_example_lists_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        include_str!("fixtures/cases/lists_fancy/input.md"),
+        include_str!("fixtures/cases/lists_example_reset/input.md"),
+        include_str!("fixtures/cases/list_restricted_marker_outdent/input.md"),
+        "a. First\n\ni. Ninth\nj. Tenth\n",
     ] {
-        let options = ParserOptions::for_flavor(flavor);
-        assert!(
-            experimental_block::try_parse_with_errors(input, &options).is_err(),
-            "{input:?}"
-        );
+        check(input, &options);
     }
 }
 
@@ -524,7 +530,7 @@ fn four_space_rule_uses_configured_list_content_column() {
     let mut options = ParserOptions::for_flavor(Flavor::Quarto);
     options.extensions.four_space_rule = true;
     check("- first\n    - child\n", &options);
-    assert!(experimental_block::try_parse_with_errors("- first\n  - second\n", &options).is_err());
+    check("- first\n  - second\n", &options);
 }
 
 #[test]
@@ -597,4 +603,167 @@ fn commonmark_quoted_heading_preserves_paragraph_prefix() {
         "> note\n> # title\n",
         &ParserOptions::for_flavor(Flavor::CommonMark),
     );
+}
+
+#[test]
+fn quarto_list_and_quote_options_preserve_cst() {
+    use panache_parser::PandocCompat;
+
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    for compat in [
+        PandocCompat::V3_9,
+        PandocCompat::V3_10,
+        PandocCompat::V3_11,
+        PandocCompat::Latest,
+    ] {
+        options.pandoc_compat = compat;
+        for input in [
+            "- Outer\n  > 2. Child\n",
+            "> 2. First\n> 3. Second\n",
+            "- Outer\n\n  2. Child\n",
+            "(@first) First\n(2@second) Second\n(@third) Third\n",
+        ] {
+            check(input, &options);
+        }
+    }
+    for enabled in [false, true] {
+        options.extensions.fancy_lists = enabled;
+        options.extensions.example_lists = enabled;
+        options.extensions.lists_without_preceding_blankline = enabled;
+        for input in [
+            "a. First\nb. Second\n",
+            "(@first) First\n",
+            "Intro\n- Item\n",
+            "> Intro\n> - Item\n",
+            "> Intro\n- Item\n",
+        ] {
+            check(input, &options);
+        }
+    }
+}
+
+#[test]
+fn quarto_chained_container_edits_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let mut text = format!(
+        "# Intro\n\n> - item\n>   a. child\n>   b. sibling\n\n{}",
+        "Unaffected prose.\n\n".repeat(60)
+    );
+    let mut tree = check(&text, &options);
+    let mut splices = 0;
+    for (old, new) in [
+        ("a. child", "1. child"),
+        (">   b. sibling", ">\n>   b. sibling"),
+    ] {
+        let start = text.find(old).unwrap();
+        let edit = Edit {
+            range: start..start + old.len(),
+            insert: new.into(),
+        };
+        text = edit.apply(&text);
+        let expected = check(&text, &options);
+        if let Some(result) =
+            experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &text, &options)
+        {
+            let updated = SyntaxNode::new_root(result.green);
+            assert_eq!(updated.green(), expected.green());
+            assert!(result.errors.is_empty());
+            assert!(std::ptr::eq(
+                tree.last_child().unwrap().green(),
+                updated.last_child().unwrap().green()
+            ));
+            tree = updated;
+            splices += 1;
+        } else {
+            tree = expected;
+        }
+    }
+    assert!(splices > 0);
+}
+
+#[test]
+fn quarto_list_and_quote_boundaries_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "- item\n\n  second paragraph\n- sibling\n",
+        "- item\n\n- second\n  continued\n",
+        "-\n- content\n",
+        "-\n  ordinary\n",
+        include_str!("fixtures/cases/list_item_table_under_bare_marker/input.md"),
+        "> - first\n>\n> - second\n",
+        "> - first\n>   continuation\n",
+        "- ` `\n  lazy",
+        "- ```\n  code\n  ```\n",
+        "> Title\n> =====\n",
+        "> [id]: /x\n> [use][id]\n",
+        "- a | b\n  --|--\n  x | y\n",
+        include_str!("fixtures/cases/list_item_pipe_table_caption_after_pandoc/input.md"),
+        include_str!("fixtures/cases/list_item_pipe_table_caption_before/input.md"),
+        include_str!("fixtures/cases/list_item_pipe_table_continuation_blank_pandoc/input.md"),
+        "> ::: note\n> text\n> :::\n",
+        include_str!("fixtures/cases/list_item_fenced_div_marker_line_pandoc/input.md"),
+        include_str!("fixtures/cases/blockquote_list_no_marker_continues_pandoc/input.md"),
+        include_str!("fixtures/cases/lists_wrapping_nested/input.md"),
+        include_str!("fixtures/cases/lists_nested/input.md"),
+        include_str!("fixtures/cases/quoted_item_nested_quote_after_blank/input.md"),
+        include_str!("fixtures/cases/blockquote_list_blockquote/input.md"),
+        include_str!("fixtures/cases/blockquote_indented_code_continuation/input.md"),
+        include_str!(
+            "fixtures/cases/list_item_indented_code_marker_line_partial_overflow/input.md"
+        ),
+        include_str!("fixtures/cases/blockquote_lazy_fence_body_deindents_pandoc/input.md"),
+        include_str!("fixtures/cases/list_item_overindented_fence_is_lazy_pandoc/input.md"),
+        include_str!(
+            "fixtures/cases/blockquote_lazy_tilde_fence_ends_quoted_list_item_pandoc/input.md"
+        ),
+        include_str!("fixtures/cases/blockquote_lazy_fence_ends_quoted_list_item_pandoc/input.md"),
+        "> text\n> ***\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn quarto_reports_deferred_blocks_at_their_source_offset() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "> - +---+\n>   | a |\n>   +---+\n";
+    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
+    assert_eq!(gap.construct, "grid table");
+    assert_eq!(gap.offset, input.find('+').unwrap());
+}
+
+#[test]
+fn shared_container_review_regressions() {
+    let commonmark = ParserOptions::for_flavor(Flavor::CommonMark);
+    let quarto = ParserOptions::for_flavor(Flavor::Quarto);
+    for options in [&commonmark, &quarto] {
+        check("- # Zoo\n\talpha\n", options);
+    }
+    check("> - a\n>\n>\n", &commonmark);
+    for input in [
+        "- a\n***\n- b\n",
+        "- a\n# Heading\n- b\n",
+        "- a\n> quote\n- b\n",
+        "- [x]: /url\n",
+        "- a\n  | prose\n",
+        "> a\n> | prose\n",
+        "- a\n    ====\n",
+        "- > 2. a\n",
+        "- - a\n\n    b\n",
+        "- a\n\n  # h\n",
+        "- ::: note\n  - a\n  :::\n",
+        "> > a | b\n> ---|---\n",
+        "> a | b\n> ---|---\n> - x | y\n",
+        "> - a | b\n>   ---|---\n>   x | y\n",
+    ] {
+        check(input, &quarto);
+    }
+    for (input, construct, opener) in [
+        ("- Term\n  : def\n", "definition list", ":"),
+        ("- a\n\n  ---\n  x\n  ---\n", "simple table", "---"),
+    ] {
+        let gap = experimental_block::try_parse_with_errors(input, &quarto).unwrap_err();
+        assert_eq!(gap.construct, construct);
+        assert_eq!(gap.offset, input.find(opener).unwrap());
+    }
 }

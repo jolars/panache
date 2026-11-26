@@ -2293,8 +2293,19 @@ impl BlockParser for FencedDivOpenParser {
 pub(crate) struct FencedDivCloseParser;
 
 pub(super) fn emit_div_fence_close(builder: &mut GreenNodeBuilder<'static>, line_no_bq: &str) {
+    emit_div_fence_close_with_prefix(builder, line_no_bq, "");
+}
+
+pub(super) fn emit_div_fence_close_with_prefix(
+    builder: &mut GreenNodeBuilder<'static>,
+    line_no_bq: &str,
+    prefix: &str,
+) {
     use crate::syntax::SyntaxKind;
     builder.start_node(SyntaxKind::DIV_FENCE_CLOSE.into());
+    if !prefix.is_empty() {
+        builder.token(SyntaxKind::LINE_PREFIX.into(), prefix);
+    }
 
     let trimmed = line_no_bq.trim_start();
 
