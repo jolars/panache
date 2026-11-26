@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.37.0](https://github.com/jolars/panache/compare/panache-parser-v0.36.0...panache-parser-v0.37.0) (2026-11-26)
+
+### Features
+
+- add VitePress Markdown flavor ([`fe76596`](https://github.com/jolars/panache/commit/fe76596ecee10185a6d322f197d6eeeea9ed30d3))
+
+### Bug Fixes
+
+- **formatter:** don't wrap @label. or @label) to a line start (#641) ([`c1561f0`](https://github.com/jolars/panache/commit/c1561f055d2976a422fed78ff249f2377fffbaaa)), refs [#641](https://github.com/jolars/panache/issues/641)
+- **parser:** keep dedented markers in nested lists ([`6287ec1`](https://github.com/jolars/panache/commit/6287ec1d32537cbb55e9d6ba718be63277656c61)), fixes [#635](https://github.com/jolars/panache/issues/635)
+- stop bare URIs at footnote markers ([`799feae`](https://github.com/jolars/panache/commit/799feae12b1172dbe90d73c50bc22a5598cee8fd)), fixes [#634](https://github.com/jolars/panache/issues/634)
+- stop inline math at invalid dollar delimiters ([`7f5f76d`](https://github.com/jolars/panache/commit/7f5f76d1c36c8b255725e4640cdad4339205055c)), fixes [#632](https://github.com/jolars/panache/issues/632)
+
 ## [0.36.0](https://github.com/jolars/panache/compare/panache-parser-v0.35.0...panache-parser-v0.36.0) (2026-11-17)
 
 ### Features

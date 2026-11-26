@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.31.0](https://github.com/jolars/panache/compare/panache-formatter-v0.30.0...panache-formatter-v0.31.0) (2026-11-26)
+
+### Features
+
+- add VitePress Markdown flavor ([`fe76596`](https://github.com/jolars/panache/commit/fe76596ecee10185a6d322f197d6eeeea9ed30d3))
+
+### Bug Fixes
+
+- **formatter:** keep a table after a list flush left (#640) ([`72f89ce`](https://github.com/jolars/panache/commit/72f89ce5378780a6955368170b25be31d30edb6e)), refs [#640](https://github.com/jolars/panache/issues/640)
+- **formatter:** don't wrap @label. or @label) to a line start (#641) ([`c1561f0`](https://github.com/jolars/panache/commit/c1561f055d2976a422fed78ff249f2377fffbaaa)), refs [#641](https://github.com/jolars/panache/issues/641)
+
+### Dependencies
+
+- updated crates/panache-parser to v0.37.0
+
 ## [0.30.0](https://github.com/jolars/panache/compare/panache-formatter-v0.29.0...panache-formatter-v0.30.0) (2026-11-17)
 
 ### Features
