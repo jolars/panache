@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.20.0](https://github.com/jolars/panache/compare/v3.19.0...v3.20.0) (2026-11-26)
+
+### Features
+
+- add VitePress Markdown flavor ([`fe76596`](https://github.com/jolars/panache/commit/fe76596ecee10185a6d322f197d6eeeea9ed30d3))
+
+### Bug Fixes
+
+- **formatter:** keep a table after a list flush left (#640) ([`72f89ce`](https://github.com/jolars/panache/commit/72f89ce5378780a6955368170b25be31d30edb6e)), refs [#640](https://github.com/jolars/panache/issues/640)
+- **formatter:** don't wrap @label. or @label) to a line start (#641) ([`c1561f0`](https://github.com/jolars/panache/commit/c1561f055d2976a422fed78ff249f2377fffbaaa)), refs [#641](https://github.com/jolars/panache/issues/641)
+- **linter:** preserve Arity project config discovery ([`fb57e2f`](https://github.com/jolars/panache/commit/fb57e2f653b371e782f717f70b5f707cb181b4af))
+- discover `jarl.toml` from the document path ([`cdb138d`](https://github.com/jolars/panache/commit/cdb138d5373c9e66df4fbc7b85364c67b56cad6f)), fixes [#639](https://github.com/jolars/panache/issues/639)
+- **parser:** keep dedented markers in nested lists ([`6287ec1`](https://github.com/jolars/panache/commit/6287ec1d32537cbb55e9d6ba718be63277656c61)), fixes [#635](https://github.com/jolars/panache/issues/635)
+- stop bare URIs at footnote markers ([`799feae`](https://github.com/jolars/panache/commit/799feae12b1172dbe90d73c50bc22a5598cee8fd)), fixes [#634](https://github.com/jolars/panache/issues/634)
+- stop inline math at invalid dollar delimiters ([`7f5f76d`](https://github.com/jolars/panache/commit/7f5f76d1c36c8b255725e4640cdad4339205055c)), fixes [#632](https://github.com/jolars/panache/issues/632)
+
+### Dependencies
+
+- updated crates/panache-formatter to v0.31.0
+- updated crates/panache-parser to v0.37.0
+
 ## [3.19.0](https://github.com/jolars/panache/compare/v3.18.0...v3.19.0) (2026-11-17)
 
 ### Highlights
