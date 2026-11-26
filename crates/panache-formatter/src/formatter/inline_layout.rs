@@ -244,6 +244,8 @@ pub(super) enum WrapStrategy {
 #[derive(Clone, Copy, Default)]
 struct LineStartPolicy {
     avoid_unsafe_line_start: bool,
+    avoid_example_list_line_start: bool,
+    example_list_resets: bool,
     avoid_blockquote_line_start: bool,
     avoid_definition_marker_line_start: bool,
     /// Avoid starting a wrapped line with an ATX heading (`#`) or setext/thematic
@@ -324,6 +326,12 @@ impl WrapStrategy {
             Self::ParagraphSentence | Self::ListSentence => NodeWrapOptions::sentence(),
             Self::ParagraphSemantic | Self::ListSemantic => NodeWrapOptions::semantic(),
         };
+        options.line_start.avoid_example_list_line_start = config.parser_extensions.example_lists
+            && (matches!(
+                self,
+                Self::ListReflow | Self::ListSentence | Self::ListSemantic
+            ) || config.parser_extensions.lists_without_preceding_blankline);
+        options.line_start.example_list_resets = config.parser.supports_example_list_resets();
         options.line_start.avoid_tilde_fence_line_start =
             config.dialect() == Dialect::CommonMark && config.parser_extensions.fenced_code_blocks;
         options.line_start.avoid_definition_marker_line_start =
@@ -336,8 +344,9 @@ fn is_unsafe_block_line_start_piece(piece: &str) -> bool {
     piece.starts_with('>')
 }
 
-fn is_example_list_marker_piece(piece: &str) -> bool {
-    ExampleListMarker::parse(piece).is_some()
+fn is_example_list_marker_piece(piece: &str, allow_reset: bool) -> bool {
+    (allow_reset || piece.trim_start_matches('(').starts_with('@'))
+        && ExampleListMarker::parse(piece).is_some()
 }
 
 fn is_decimal_ordered_list_marker_piece(piece: &str) -> bool {
@@ -434,8 +443,7 @@ fn is_fancy_paren_alpha_or_roman_marker_piece(piece: &str) -> bool {
 }
 
 fn is_unsafe_list_line_start_piece(piece: &str) -> bool {
-    is_example_list_marker_piece(piece)
-        || is_decimal_ordered_list_marker_piece(piece)
+    is_decimal_ordered_list_marker_piece(piece)
         || is_fancy_alpha_marker_piece(piece)
         || is_fancy_roman_marker_piece(piece)
         || is_fancy_paren_decimal_marker_piece(piece)
@@ -514,6 +522,8 @@ impl<'a> StreamingCoreSink<'a> {
         (self.line_start.avoid_definition_marker_line_start && is_definition_marker_piece(text))
             || (self.line_start.avoid_blockquote_line_start
                 && is_unsafe_block_line_start_piece(text))
+            || (self.line_start.avoid_example_list_line_start
+                && is_example_list_marker_piece(text, self.line_start.example_list_resets))
             || (self.line_start.avoid_unsafe_line_start && is_unsafe_list_line_start_piece(text))
             || (self.line_start.avoid_heading_line_start
                 && (is_atx_heading_marker_piece(text) || is_setext_or_thematic_marker_piece(text)))
@@ -1766,10 +1776,14 @@ mod tests {
 
     #[test]
     fn unsafe_line_start_rule_matches_ambiguous_markers() {
-        assert!(is_example_list_marker_piece("(@foo-bar-123)"));
-        assert!(is_example_list_marker_piece("(1@foo-bar-123)"));
-        assert!(is_example_list_marker_piece("(0@)"));
-        assert!(is_unsafe_list_line_start_piece("(@foo-bar-123)"));
+        assert!(is_example_list_marker_piece("(@foo-bar-123)", true));
+        assert!(is_example_list_marker_piece("(1@foo-bar-123)", true));
+        assert!(is_example_list_marker_piece("(0@)", true));
+        assert!(is_example_list_marker_piece("@fig-scatter.", true));
+        assert!(is_example_list_marker_piece("@user)", true));
+        assert!(is_example_list_marker_piece("@.", true));
+        assert!(!is_example_list_marker_piece("@fig-scatter", true));
+        assert!(!is_example_list_marker_piece("@fig-scatter,", true));
         assert!(is_decimal_ordered_list_marker_piece("2018."));
         assert!(is_decimal_ordered_list_marker_piece("2)"));
         assert!(is_fancy_alpha_marker_piece("a."));

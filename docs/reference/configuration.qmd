@@ -507,6 +507,9 @@ quarto = "1.9"
     start number, as do sibling items continuing a list that is already open. Set
     `pandoc = "3.9"` if you author for an older Pandoc.
 
+    The `example-lists` extension accepts `(@label)`, `@label.`, and `@label)` as
+    example list markers.
+
     Pandoc 3.11 adds `(1@label)` to reset the example-list counter. With the
     `example-lists` extension enabled, targets `3.11`, `3.12`, and `latest`
     recognize the reset, preserve its marker during formatting, and resolve

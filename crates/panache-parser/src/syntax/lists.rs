@@ -17,7 +17,11 @@ pub struct ExampleListMarker<'a> {
 
 impl<'a> ExampleListMarker<'a> {
     pub fn parse(text: &'a str) -> Option<Self> {
-        let body = text.strip_prefix('(')?.strip_suffix(')')?;
+        let (body, prefix_len) = if let Some(inner) = text.strip_prefix('(') {
+            (inner.strip_suffix(')')?, 1)
+        } else {
+            (text.strip_suffix(['.', ')'])?, 0)
+        };
         let (number, label) = body.split_once('@')?;
         if !number.bytes().all(|byte| byte.is_ascii_digit()) {
             return None;
@@ -39,7 +43,7 @@ impl<'a> ExampleListMarker<'a> {
         Some(Self {
             start_number: number.parse().ok(),
             label,
-            label_offset: number.len() + 2,
+            label_offset: prefix_len + number.len() + 1,
         })
     }
 }

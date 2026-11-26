@@ -1359,6 +1359,7 @@ golden_test_cases!(
     lists_bullet,
     lists_code,
     lists_example,
+    lists_example_delimiters,
     lists_example_reset,
     lists_example_reset_3_10,
     lists_example_reset_disabled,
