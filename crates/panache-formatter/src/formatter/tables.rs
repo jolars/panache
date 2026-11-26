@@ -6,8 +6,8 @@ use crate::formatter::inline::{collapse_spaces, format_inline_node_with_spacing}
 use crate::formatter::inline_layout::{byte_index_at_column, expand_tabs_from_column};
 use crate::formatter::sentence_wrap::{ResolvedProfile, SentenceProfileCache, split_sentence_text};
 use crate::syntax::{
-    AstNode, GridTable, PipeTable, SyntaxKind, SyntaxNode, SyntaxToken, TableAlignment, TableCell,
-    TableRowNode, text_without_line_prefixes,
+    AstNode, GridTable, List, PipeTable, SyntaxKind, SyntaxNode, SyntaxToken, TableAlignment,
+    TableCell, TableRowNode, text_without_line_prefixes,
 };
 use panache_parser::analyze_grid;
 use panache_parser::grid_layout::{grid_char_width, grid_column_slice, grid_display_width};
@@ -78,8 +78,7 @@ impl Formatter {
 /// border. See `format_grid_table`.
 const TABLE_BLOCK_INDENT: usize = 2;
 
-/// `table_indent` for a top-level table, or 0 right after a list: an indent up
-/// to the item's content column would move the table into the last list item.
+/// Use the configured indent unless it would move the table into the last list item.
 fn top_level_table_indent(node: &SyntaxNode, config: &FormatContext) -> usize {
     let mut prev = node.prev_sibling_or_token();
     while let Some(element) = &prev {
@@ -89,21 +88,48 @@ fn top_level_table_indent(node: &SyntaxNode, config: &FormatContext) -> usize {
             break;
         }
     }
-    if prev.is_some_and(|element| element.kind() == SyntaxKind::LIST) {
+    let Some(list) = prev.and_then(NodeOrToken::into_node).and_then(List::cast) else {
+        return config.table_indent;
+    };
+    let Some(last_item) = list.items().last() else {
+        return config.table_indent;
+    };
+    let continuation_indent = Formatter::calculate_list_item_content_indent(
+        last_item.syntax(),
+        Formatter::calculate_max_marker_width(list.syntax()),
+        config.parser_extensions.four_space_rule,
+        config.tab_width,
+    );
+    if config.table_indent >= continuation_indent {
         0
     } else {
         config.table_indent
     }
 }
 
-/// Block indent of a simple or multiline table, which adds `table_indent` to
-/// its container's indent.
-fn simple_table_indent(node: &SyntaxNode, config: &FormatContext, indent: usize) -> usize {
-    if indent == 0 {
+fn indent_simple_or_multiline_table(
+    block: &str,
+    node: &SyntaxNode,
+    config: &FormatContext,
+    indent: usize,
+) -> String {
+    let mut block_indent = if indent == 0 {
         top_level_table_indent(node, config)
     } else {
         config.table_indent + indent
+    };
+
+    // One leading space keeps a three-dash opening border from starting YAML metadata.
+    if block_indent == 0
+        && config.parser_extensions.yaml_metadata_block
+        && block
+            .lines()
+            .next()
+            .is_some_and(|line| line.trim_end() == "---")
+    {
+        block_indent = 1;
     }
+    indent_table_block(block, block_indent)
 }
 
 fn indent_table_block(block: &str, indent: usize) -> String {
@@ -1897,7 +1923,7 @@ fn format_simple_table(
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output, simple_table_indent(node, config, indent))
+    indent_simple_or_multiline_table(&output, node, config, indent)
 }
 
 fn extract_multiline_columns(separator: &SyntaxNode) -> Vec<(usize, usize)> {
@@ -2261,7 +2287,7 @@ fn format_multiline_table(
                     .any(|line| line.trim_end().width() > end.saturating_sub(start))
             })
     }) {
-        return indent_table_block(&raw_table, simple_table_indent(node, config, indent));
+        return indent_simple_or_multiline_table(&raw_table, node, config, indent);
     }
 
     let base_offset = table_data
@@ -2425,7 +2451,7 @@ fn format_multiline_table(
         output.push_str(&formatted_caption);
         output.push('\n');
     }
-    indent_table_block(&output, simple_table_indent(node, config, indent))
+    indent_simple_or_multiline_table(&output, node, config, indent)
 }
 
 #[cfg(test)]
