@@ -55,6 +55,7 @@ pub(crate) enum OrderedMarker {
     Example {
         start_number: Option<usize>,
         label: Option<String>,
+        style: ListDelimiter,
     },
 }
 
@@ -355,12 +356,21 @@ pub(crate) fn try_parse_list_marker_with(
     }
 
     if detect.example_lists
-        && trimmed.starts_with('(')
-        && let Some(marker_end) = trimmed.find(')')
-        && let Some(example) = ExampleListMarker::parse(&trimmed[..=marker_end])
-        && (detect.example_list_resets || trimmed.starts_with("(@"))
+        && (trimmed.starts_with(['(', '@'])
+            || (detect.example_list_resets
+                && trimmed.as_bytes().first().is_some_and(u8::is_ascii_digit)))
+        && let Some(marker) = trimmed.split_ascii_whitespace().next()
+        && let Some(example) = ExampleListMarker::parse(marker)
+        && (detect.example_list_resets || marker.trim_start_matches('(').starts_with('@'))
     {
-        let marker_len = marker_end + 1;
+        let marker_len = marker.len();
+        let style = if marker.starts_with('(') {
+            ListDelimiter::Parens
+        } else if marker.ends_with('.') {
+            ListDelimiter::Period
+        } else {
+            ListDelimiter::RightParen
+        };
         let after_marker = &trimmed[marker_len..];
         if after_marker.starts_with(' ')
             || after_marker.starts_with('\t')
@@ -372,6 +382,7 @@ pub(crate) fn try_parse_list_marker_with(
                 marker: ListMarker::Ordered(OrderedMarker::Example {
                     start_number: example.start_number,
                     label: (!example.label.is_empty()).then(|| example.label.to_string()),
+                    style,
                 }),
                 marker_len,
                 spaces_after_cols,
@@ -748,9 +759,9 @@ pub(crate) fn markers_match(a: &ListMarker, b: &ListMarker, dialect: crate::Dial
             ListMarker::Ordered(OrderedMarker::UpperRoman { style: s2, .. }),
         ) => s1 == s2,
         (
-            ListMarker::Ordered(OrderedMarker::Example { .. }),
-            ListMarker::Ordered(OrderedMarker::Example { .. }),
-        ) => true, // All example list items match each other
+            ListMarker::Ordered(OrderedMarker::Example { style: s1, .. }),
+            ListMarker::Ordered(OrderedMarker::Example { style: s2, .. }),
+        ) => s1 == s2,
         _ => false,
     }
 }

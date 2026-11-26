@@ -1,0 +1,45 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..89
+  LIST@0..34
+    LIST_ITEM@0..34
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      PLAIN@2..9
+        TEXT@2..8 "Before"
+        NEWLINE@8..9 "\n"
+      LIST@9..34
+        LIST_ITEM@9..34
+          WHITESPACE@9..11 "  "
+          LIST_MARKER@11..19 "@period."
+          WHITESPACE@19..20 " "
+          PLAIN@20..34
+            TEXT@20..33 "First example"
+            NEWLINE@33..34 "\n"
+  BLANK_LINE@34..35
+    BLANK_LINE@34..35 "\n"
+  BLOCK_QUOTE@35..60
+    BLOCK_QUOTE_MARKER@35..36 ">"
+    WHITESPACE@36..37 " "
+    LIST@37..60
+      LIST_ITEM@37..60
+        LIST_MARKER@37..44 "@paren)"
+        WHITESPACE@44..45 " "
+        PLAIN@45..60
+          TEXT@45..59 "Quoted example"
+          NEWLINE@59..60 "\n"
+  BLANK_LINE@60..61
+    BLANK_LINE@60..61 "\n"
+  PARAGRAPH@61..89
+    TEXT@61..66 "See ("
+    CITATION@66..73
+      CITATION_MARKER@66..67 "@"
+      CITATION_KEY@67..73 "period"
+    TEXT@73..80 ") and ("
+    CITATION@80..86
+      CITATION_MARKER@80..81 "@"
+      CITATION_KEY@81..86 "paren"
+    TEXT@86..88 ")."
+    NEWLINE@88..89 "\n"
