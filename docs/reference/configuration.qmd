@@ -850,9 +850,11 @@ table-indent = 2
 It accepts an integer from 0 to 3 and defaults to 2. Set it to 0 to keep tables
 flush at column 0 (matching Pandoc's pipe-table writers).
 
-Grid tables are the exception: they always stay flush at column 0 regardless of
-this setting, because Pandoc only recognizes a grid table whose `+---+` border
-starts at column 0.
+Grid tables always start at column 0 because Pandoc requires the `+---+` border
+there. A table following a list starts at column 0 if the configured indent
+would move the table into the last list item. When YAML metadata is enabled, a
+table whose opening border consists of exactly three dashes keeps at least one
+leading space.
 
 This setting affects only top-level tables. A table nested inside a list item or
 other container still honors the container's content indentation.
