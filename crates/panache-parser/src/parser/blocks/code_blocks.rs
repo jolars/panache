@@ -8,7 +8,7 @@ use rowan::{GreenNodeBuilder, TextRange};
 
 use super::blockquotes::{count_blockquote_markers, strip_n_blockquote_markers};
 use super::container_prefix::{
-    StrippedLines, advance_emitted_marker_columns, content_line_prefix_tail,
+    ContainerPrefix, StrippedLines, advance_emitted_marker_columns, content_line_prefix_tail,
 };
 use super::myst_directives::DirectiveCloser;
 use crate::options::{Dialect, Flavor};
@@ -1338,9 +1338,71 @@ pub(crate) fn parse_fenced_math_block(
     let list_content_col = prefix.list_content_col();
     let bq_outer = bq_outer_of_list(prefix);
 
+    let mut current_pos = start_pos + 1;
+    let mut found_closing = false;
+
+    while current_pos < lines.len() {
+        let line = lines[current_pos];
+
+        if dialect == Dialect::CommonMark {
+            if ContainerPrefix::strip_required_ops(line, prefix.ops()).is_none() {
+                break;
+            }
+        } else {
+            let probe = if bq_outer {
+                line
+            } else {
+                strip_list_indent(line, list_content_col)
+            };
+            let (line_bq_depth, _) = count_blockquote_markers(probe);
+            if line_bq_depth < bq_depth && line.trim().is_empty() {
+                break;
+            }
+        }
+
+        let inner_stripped = window.peek_prefix_at(current_pos);
+        current_pos += 1;
+        if is_closing_fence(inner_stripped, &fence) {
+            found_closing = true;
+            break;
+        }
+    }
+
+    emit_planned_fenced_math_block(
+        builder,
+        window,
+        &fence,
+        first_line_override,
+        current_pos,
+        found_closing,
+    );
+    current_pos
+}
+
+/// Emit a math fence whose continuation and closing lines have been planned.
+pub(crate) fn emit_planned_fenced_math_block(
+    builder: &mut GreenNodeBuilder<'static>,
+    window: &StrippedLines<'_, '_>,
+    fence: &FenceInfo,
+    first_line_override: Option<&str>,
+    end: usize,
+    found_closing: bool,
+) {
     builder.start_node(SyntaxKind::DISPLAY_MATH.into());
 
-    let first_trimmed = prepare_fence_open_line(builder, window, first_line_override);
+    let first_trimmed = if first_line_override.is_some() {
+        prepare_fence_open_line(builder, window, first_line_override)
+    } else {
+        let tail = window.emit_or_dispatch_tail(builder, window.pos());
+        let trimmed = strip_leading_spaces(tail);
+        if tail.len() != trimmed.len() {
+            builder.token(
+                SyntaxKind::WHITESPACE.into(),
+                &tail[..tail.len() - trimmed.len()],
+            );
+        }
+        trimmed
+    };
     let (opening_without_newline, opening_newline) = strip_newline(first_trimmed);
     builder.token(
         SyntaxKind::DISPLAY_MATH_MARKER.into(),
@@ -1350,49 +1412,22 @@ pub(crate) fn parse_fenced_math_block(
         builder.token(SyntaxKind::NEWLINE.into(), opening_newline);
     }
 
-    let mut current_pos = start_pos + 1;
-    let mut content_lines: Vec<&str> = Vec::new();
-    let mut found_closing = false;
-
-    while current_pos < lines.len() {
-        let line = lines[current_pos];
-
-        let probe = if bq_outer {
-            line
-        } else {
-            strip_list_indent(line, list_content_col)
-        };
-        let (line_bq_depth, _) = count_blockquote_markers(probe);
-        let gobbled_lazily = dialect == Dialect::Pandoc && bq_depth > 0 && !line.trim().is_empty();
-        if line_bq_depth < bq_depth && !gobbled_lazily {
-            break;
+    // Keep contiguous math text together, but emit each container prefix
+    // between the text of the preceding line and the text it prefixes.
+    let mut content = String::new();
+    for pos in window.pos() + 1..end - usize::from(found_closing) {
+        if window.peek_prefix_at(pos).len() != window.raw()[pos].len() && !content.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), &content);
+            content.clear();
         }
-
-        let inner_stripped = window.peek_prefix_at(current_pos);
-
-        if is_closing_fence(inner_stripped, &fence) {
-            found_closing = true;
-            current_pos += 1;
-            break;
-        }
-
-        content_lines.push(line);
-        current_pos += 1;
+        content.push_str(window.emit_prefix_at(builder, pos));
     }
-
-    if !content_lines.is_empty() {
-        let mut content = String::new();
-        for k in 0..content_lines.len() {
-            let after_indent = window.emit_prefix_at(builder, start_pos + 1 + k);
-            let (line_without_newline, newline_str) = strip_newline(after_indent);
-            content.push_str(line_without_newline);
-            content.push_str(newline_str);
-        }
+    if !content.is_empty() {
         builder.token(SyntaxKind::TEXT.into(), &content);
     }
 
     if found_closing {
-        let closing_stripped = window.emit_prefix_at(builder, current_pos - 1);
+        let closing_stripped = window.emit_prefix_at(builder, end - 1);
         let (closing_without_newline, newline_str) = strip_newline(closing_stripped);
         let closing_trimmed_start = strip_leading_spaces(closing_without_newline);
         let leading_ws_len = closing_without_newline.len() - closing_trimmed_start.len();
@@ -1421,7 +1456,6 @@ pub(crate) fn parse_fenced_math_block(
     }
 
     builder.finish_node(); // DisplayMath
-    current_pos
 }
 
 #[cfg(test)]

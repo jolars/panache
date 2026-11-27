@@ -176,29 +176,7 @@ pub(crate) fn raw_tex_environment_end(window: &StrippedLines<'_, '_>, name: &str
     window.raw().len()
 }
 
-#[cfg(feature = "experimental-block-parser")]
-pub(crate) fn has_unclosed_inline_math_environment<'a>(
-    lines: impl IntoIterator<Item = &'a str>,
-) -> bool {
-    let mut closer: Option<String> = None;
-    for line in lines {
-        if let Some(end_marker) = &closer {
-            if tex_line_has_closer(line, end_marker) {
-                closer = None;
-            }
-        } else if let Some(name) =
-            extract_environment_name(line).filter(|name| is_inline_math_environment(name))
-        {
-            let end_marker = format!("\\end{{{name}}}");
-            if !tex_line_has_closer(line, &end_marker) {
-                closer = Some(end_marker);
-            }
-        }
-    }
-    closer.is_some()
-}
-
-fn tex_line_has_closer(mut line: &str, closer: &str) -> bool {
+pub(super) fn tex_line_has_closer(mut line: &str, closer: &str) -> bool {
     while let Some(index) = line.find(['\\', '%']) {
         let command = &line[index..];
         if command.starts_with('%') {

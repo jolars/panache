@@ -18,7 +18,8 @@ use super::block_dispatcher::{
     emit_div_fence_close, emit_div_fence_open, emit_reference_definition_lines, fence_enabled,
 };
 use super::blocks::code_blocks::{
-    FenceInfo, is_closing_fence, is_gfm_math_fence, parse_fenced_code_block, try_parse_fence_open,
+    FenceInfo, emit_planned_fenced_math_block, is_closing_fence, is_gfm_math_fence,
+    parse_fenced_code_block, try_parse_fence_open,
 };
 use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
 use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
@@ -39,6 +40,9 @@ use super::blocks::metadata::{
     find_yaml_block_closing_pos, is_metadata_open_delim, pandoc_title_block_end,
     prepare_yaml_content,
 };
+use super::blocks::paragraphs::{
+    JupyterMathLookahead, update_display_math_state, update_inline_math_environments,
+};
 use super::blocks::raw_blocks::{self, emit_raw_tex_block};
 use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
 use super::blocks::tables::{
@@ -47,8 +51,8 @@ use super::blocks::tables::{
 };
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
-use super::utils::container_stack::leading_indent;
-use super::utils::helpers::{is_blank_line, split_lines_inclusive};
+use super::utils::container_stack::{OpenDisplayMath, leading_indent};
+use super::utils::helpers::{is_blank_line, split_lines_inclusive, trim_end_newlines};
 use super::utils::inline_emission::emit_inlines;
 use super::utils::text_buffer::ParagraphBuffer;
 use super::{
@@ -76,7 +80,7 @@ enum Block<'a> {
     IndentedCode(Range<usize>),
     Html(Range<usize>, HtmlBlockType),
     PandocHtml(html::PreparedHtml),
-    Code(Range<usize>, FenceInfo),
+    Code(Range<usize>, FenceInfo, bool),
     Metadata(usize, usize, YamlContentOutcome),
     PandocTitle(usize),
     Lines(usize, PreparedLineBlock),
@@ -91,7 +95,6 @@ fn plain_container_text(text: &str) -> bool {
         && (!body.starts_with('*') || body.starts_with("**") && !body.starts_with("***"))
         && !body.starts_with("```")
         && !body.starts_with("~~~")
-        && !body.starts_with("$$")
 }
 
 fn is_quote_prose(text: &str, options: &ParserOptions) -> bool {
@@ -125,6 +128,56 @@ fn source_span<'a>(input: &'a str, lines: &[&str], range: Range<usize>) -> &'a s
     &input[first..end]
 }
 
+#[derive(Default)]
+struct ParagraphMath {
+    display: Option<OpenDisplayMath>,
+    environments: Vec<String>,
+    jupyter_end: Option<usize>,
+    lines: usize,
+}
+
+impl ParagraphMath {
+    fn update(&mut self, line: &str, options: &ParserOptions, paragraph: bool) {
+        self.lines += 1;
+        let line = trim_end_newlines(line);
+        update_display_math_state(line, &mut self.display, options);
+        if paragraph && options.extensions.raw_tex && !options.extensions.tex_math_jupyter {
+            update_inline_math_environments(line, &mut self.environments);
+        }
+    }
+
+    fn clear(&mut self) {
+        self.display = None;
+        self.environments.clear();
+        self.jupyter_end = None;
+        self.lines = 0;
+    }
+
+    fn jupyter_continues(
+        &mut self,
+        pos: usize,
+        content: &str,
+        closing_line: impl FnOnce() -> Option<usize>,
+    ) -> bool {
+        if is_blank_line(content) {
+            self.clear();
+            return false;
+        }
+        if self.jupyter_end.is_none_or(|end| end < pos) {
+            self.jupyter_end = closing_line();
+        }
+        if self.jupyter_end.is_none() {
+            self.clear();
+        }
+        self.jupyter_end.is_some()
+    }
+
+    fn holds(&self, content: &str, options: &ParserOptions) -> bool {
+        !options.extensions.tex_math_jupyter
+            && (!self.environments.is_empty() || self.display.is_some() && !is_blank_line(content))
+    }
+}
+
 fn push_paragraph(blocks: &mut Vec<Block<'_>>, pos: usize) {
     if let Some(Block::Paragraph(range, _)) = blocks.last_mut() {
         range.end = pos + 1;
@@ -143,17 +196,21 @@ fn plan<'a>(
     let prefix = ContainerPrefix::from_ops(&[], false);
     let mut blocks = Vec::new();
     let mut divs = Vec::new();
+    let mut math = ParagraphMath::default();
+    let mut jupyter_math = None::<JupyterMathLookahead>;
     let mut pos = 0;
     let commonmark = options.dialect == Dialect::CommonMark;
     while let Some(&line) = lines.get(pos) {
         let paragraph = matches!(blocks.last(), Some(Block::Paragraph(..)));
         let fresh = !paragraph;
+        if fresh {
+            math.clear();
+            jupyter_math = None;
+        }
         let at_start = pos == 0 && origin == ParseOrigin::Document;
         let (indent, indent_bytes) = leading_indent(line);
         let content = &line[indent_bytes..];
         let marker = content.as_bytes().first().copied();
-        let offset = line.as_ptr() as usize - input.as_ptr() as usize;
-        let unsupported = |construct| Unsupported { offset, construct };
         let div_prefix = divs
             .last()
             .map(|&indent| prefix.clone().with_div_closer_boundary(Some(indent), true));
@@ -170,7 +227,36 @@ fn plan<'a>(
                 && try_parse_list_marker(line, options, OpenListHint::None).is_none()
         };
 
-        if is_blank_line(line) {
+        let jupyter_continuation = if matches!(math.display, Some(OpenDisplayMath::Jupyter))
+            && let Some(Block::Paragraph(range, _)) = blocks.last()
+        {
+            math.jupyter_continues(pos, line, || {
+                if jupyter_math
+                    .as_ref()
+                    .is_none_or(|lookahead| !lookahead.contains(pos, &prefix))
+                {
+                    jupyter_math = Some(JupyterMathLookahead::new(
+                        source_span(input, lines, range.clone()).to_string(),
+                        pos,
+                        &prefix,
+                        lines[pos..].iter().copied(),
+                    ));
+                }
+                jupyter_math.as_mut()?.closing_line(pos)
+            })
+        } else {
+            false
+        };
+
+        if jupyter_continuation
+            || math.holds(line, options)
+                && !(matches!(blocks.last(), Some(Block::Paragraph(range, _)) if commonmark || range.len() == 1)
+                    && try_parse_setext_heading(lines, pos - 1).is_some())
+                && (marker != Some(b'>') || options.extensions.blank_before_blockquote)
+        {
+            push_paragraph(&mut blocks, pos);
+            math.update(line, options, true);
+        } else if is_blank_line(line) {
             blocks.push(Block::Blank(pos));
         } else if at_start
             && options.extensions.pandoc_title_block
@@ -195,19 +281,17 @@ fn plan<'a>(
             && fence_enabled(&fence, options)
             && (commonmark || fresh || (fence.fence_char != '~' && indent == 0))
         {
-            if options.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
-                return Err(unsupported("fenced math"));
-            }
             let close = lines[pos + 1..]
                 .iter()
                 .position(|line| is_closing_fence(line, &fence));
             if close.is_some() || commonmark {
                 let end = close.map_or(lines.len(), |close| pos + close + 2);
-                blocks.push(Block::Code(pos..end, fence));
+                blocks.push(Block::Code(pos..end, fence, close.is_some()));
                 pos = end;
                 continue;
             }
             push_paragraph(&mut blocks, pos);
+            math.update(line, options, true);
         } else if options.extensions.fenced_divs
             && marker == Some(b':')
             && divs.last().is_some_and(|open| indent <= *open)
@@ -424,13 +508,6 @@ fn plan<'a>(
             && let Some(end) = {
                 let window = StrippedLines::new(lines, pos, table_prefix);
                 if let Some(env) = raw_blocks::raw_tex_environment(line) {
-                    if let Some(Block::Paragraph(range, _)) = blocks.last()
-                        && raw_blocks::has_unclosed_inline_math_environment(
-                            lines[range.clone()].iter().copied(),
-                        )
-                    {
-                        return Err(unsupported("nested inline math environment"));
-                    }
                     Some(raw_blocks::raw_tex_environment_end(&window, env))
                 } else if fresh && raw_blocks::can_start_raw_command(line) {
                     Some(raw_blocks::raw_tex_commands_end(&window))
@@ -453,8 +530,6 @@ fn plan<'a>(
             blocks.push(Block::Lines(pos, block));
             pos = end;
             continue;
-        } else if !commonmark && options.extensions.tex_math_dollars && content.starts_with("$$") {
-            return Err(unsupported("display math"));
         } else if !commonmark
             && fresh
             && marker == Some(b'[')
@@ -483,6 +558,7 @@ fn plan<'a>(
             continue;
         } else {
             push_paragraph(&mut blocks, pos);
+            math.update(line, options, true);
         }
         pos += 1;
     }
@@ -640,17 +716,28 @@ fn parse_at(
                 );
             }
             Block::PandocHtml(block) => block.emit(&mut builder),
-            Block::Code(range, fence) => {
+            Block::Code(range, fence, closed) => {
                 let window = StrippedLines::new(&lines[..range.end], range.start, &prefix);
-                parse_fenced_code_block(
-                    &mut builder,
-                    &window,
-                    fence,
-                    None,
-                    &diagnostics,
-                    options.flavor,
-                    None,
-                );
+                if options.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
+                    emit_planned_fenced_math_block(
+                        &mut builder,
+                        &window,
+                        &fence,
+                        None,
+                        range.end,
+                        closed,
+                    );
+                } else {
+                    parse_fenced_code_block(
+                        &mut builder,
+                        &window,
+                        fence,
+                        None,
+                        &diagnostics,
+                        options.flavor,
+                        None,
+                    );
+                }
             }
             Block::Metadata(start, end, outcome) => {
                 emit_yaml_block(&lines, start, end, &mut builder, &diagnostics, &outcome);

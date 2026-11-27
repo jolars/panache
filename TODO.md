@@ -283,7 +283,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
   and close tag boundaries inside lists and block quotes.
 - [x] Port Pandoc line blocks, title blocks, and raw TeX blocks. Check each
   construct with its extension enabled and disabled.
-- [ ] Port display math and fenced math. Check block boundaries, lossless
+- [x] Port display math and fenced math. Check block boundaries, lossless
   emission, and diagnostics across the dialects that support them.
 - [ ] Enable the Pandoc, R Markdown, and MultiMarkdown flavors in the
   replacement. Check their flavor defaults and port any remaining

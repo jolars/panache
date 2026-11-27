@@ -43,7 +43,11 @@ fn scan_bracket_delimiters(
     while i < bytes.len() {
         match state {
             None => {
-                if double && bytes[i..].starts_with(br"\\[") {
+                if bytes[i] == b'`' {
+                    let run = bytes[i..].iter().take_while(|&&byte| byte == b'`').count();
+                    i += crate::parser::inlines::code_spans::try_parse_code_span(&line[i..])
+                        .map_or(run, |(len, ..)| len);
+                } else if double && bytes[i..].starts_with(br"\\[") {
                     state = Some(OpenDisplayMath::DoubleBrackets);
                     i += 3;
                 } else if single && bytes[i..].starts_with(br"\[") {
@@ -119,9 +123,9 @@ pub(in crate::parser) fn update_display_math_state(
                 scan_bracket_delimiters(line_no_newline, *open_display_math, config);
         }
         None => {
-            let trimmed = line_no_newline.trim();
-            if let Some((run_len, rest)) = dollar_run(trimmed)
-                && rest.is_empty()
+            if config.extensions.tex_math_dollars
+                && let Some((run_len, rest)) = dollar_run(line_no_newline.trim_start())
+                && rest.trim_end().is_empty()
             {
                 *open_display_math = Some(OpenDisplayMath::Dollars(run_len));
             } else {
@@ -310,21 +314,26 @@ pub(in crate::parser) fn append_paragraph_line_gobbling(
 
         let line_no_newline = trim_end_newlines(line);
         update_display_math_state(line_no_newline, open_display_math, config);
-        if !config.extensions.tex_math_jupyter
-            && let Some(env_name) = extract_environment_name(line_no_newline)
-            && is_inline_math_environment(env_name)
-        {
-            open_inline_math_envs.push(env_name.to_string());
-            return;
+        if config.extensions.raw_tex && !config.extensions.tex_math_jupyter {
+            update_inline_math_environments(line_no_newline, open_inline_math_envs);
         }
+    }
+}
 
-        if let Some(end_name) = extract_end_environment_name(line_no_newline)
-            && open_inline_math_envs
-                .last()
-                .is_some_and(|open| open == end_name)
-        {
-            open_inline_math_envs.pop();
+pub(in crate::parser) fn update_inline_math_environments(
+    line: &str,
+    open_inline_math_envs: &mut Vec<String>,
+) {
+    if let Some(env_name) = extract_environment_name(line)
+        && is_inline_math_environment(env_name)
+    {
+        if !super::raw_blocks::tex_line_has_closer(line, &format!(r"\end{{{env_name}}}")) {
+            open_inline_math_envs.push(env_name.to_string());
         }
+    } else if let Some(open) = open_inline_math_envs.last()
+        && extract_end_environment_name(line) == Some(open.as_str())
+    {
+        open_inline_math_envs.pop();
     }
 }
 

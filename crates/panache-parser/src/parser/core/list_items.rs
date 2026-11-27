@@ -368,7 +368,8 @@ impl<'a> Parser<'a> {
             true,
             self.config.dialect,
         );
-        let window = StrippedLines::new(&self.lines, self.pos, &prefix);
+        let window =
+            StrippedLines::new(&self.lines, self.pos, &prefix).with_dispatch_tail(&text_owned, "");
         let myst_directive_closer = self.innermost_myst_directive_closer();
         let new_pos = code_blocks::parse_fenced_code_block(
             &mut self.builder,

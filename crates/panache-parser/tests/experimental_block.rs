@@ -5,8 +5,8 @@ use panache_parser::{Flavor, ParserOptions, SyntaxNode};
 
 fn check(input: &str, options: &ParserOptions) -> SyntaxNode {
     let (expected, errors) = parse_with_errors(input, Some(options.clone()));
-    let (actual, actual_errors) =
-        experimental_block::try_parse_with_errors(input, options).unwrap();
+    let (actual, actual_errors) = experimental_block::try_parse_with_errors(input, options)
+        .unwrap_or_else(|error| panic!("{input}\n{error:?}"));
     assert_eq!(actual.to_string(), input, "expected {expected:#?}");
     assert_eq!(
         actual.green(),
@@ -973,14 +973,14 @@ fn quarto_wrapped_body_table_captions() {
 }
 
 #[test]
-fn quarto_deferred_body_blocks_preserve_openers() {
+fn quarto_fenced_math_in_note_preserves_openers() {
     let mut options = ParserOptions::for_flavor(Flavor::Quarto);
     options.extensions.tex_math_gfm = true;
     let input = "[^n]: note\n\n    ```math\n    x\n    ```\n";
-    let gap = experimental_block::try_parse_with_errors(input, &options).expect_err(input);
-    assert_eq!(
-        (gap.offset, gap.construct),
-        (input.find("```math").unwrap(), "fenced math")
+    let tree = check(input, &options);
+    assert!(
+        tree.descendants()
+            .any(|node| node.kind() == panache_parser::syntax::SyntaxKind::DISPLAY_MATH)
     );
 }
 
@@ -2145,6 +2145,10 @@ fn pandoc_special_blocks_match_pinned_pandoc_native() {
     check_native!("0130-imported-pandoc_title_block");
     check_native!("0141-imported-raw_tex_commands");
     check_native!("0095-imported-latex_environment");
+    check_native!("0047-imported-display_math");
+    check_native!("0048-imported-display_math_blank_line_termination");
+    check_native!("0049-imported-display_math_escaped_dollar");
+    check_native!("0050-imported-display_math_trailing_text");
 
     let quoted = "> \\begin{tabular}{c}\n> x\n> \\end{tabular}\n";
     let tree = check(quoted, &options);
@@ -2257,10 +2261,281 @@ fn bare_verse_does_not_absorb_indented_content() {
 }
 
 #[test]
-fn planner_defers_raw_environment_inside_open_inline_math() {
+fn planner_keeps_raw_environment_inside_open_inline_math() {
     let options = ParserOptions::for_flavor(Flavor::Quarto);
     let input = "\\begin{equation}\n\\begin{bmatrix}1\\end{bmatrix}\n\\end{equation}\n";
-    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
-    assert_eq!(gap.offset, "\\begin{equation}\n".len());
-    assert_eq!(gap.construct, "nested inline math environment");
+    let tree = check(input, &options);
+    assert!(
+        tree.descendants()
+            .all(|node| node.kind() != panache_parser::syntax::SyntaxKind::TEX_BLOCK)
+    );
+}
+
+#[test]
+fn display_math_preserves_block_boundaries_and_diagnostics() {
+    use panache_parser::syntax::{SyntaxKind as K, math::math_diagnostics};
+
+    for flavor in [Flavor::Quarto, Flavor::CommonMark] {
+        let mut options = ParserOptions::for_flavor(flavor);
+        options.extensions.blank_before_header = false;
+        for (opener, closer) in [("$$", "$$"), (r"\[", r"\]"), (r"\\[", r"\\]")] {
+            options.extensions.tex_math_dollars = opener == "$$";
+            options.extensions.tex_math_single_backslash = opener == r"\[";
+            options.extensions.tex_math_double_backslash = opener == r"\\[";
+            for (before, prefix) in [("", ""), ("> ", "> "), ("- ", "  ")] {
+                let input = format!(
+                    "{before}{opener}\r\n{prefix}# TeX content }}\r\n{prefix}{closer}\r\n\r\n# Heading\r\n"
+                );
+                let tree = check(&input, &options);
+                let (expected, _) = parse_with_errors(&input, Some(options.clone()));
+                assert!(
+                    tree.descendants()
+                        .any(|node| node.kind() == K::DISPLAY_MATH)
+                );
+                assert_eq!(tree.children().last().unwrap().kind(), K::HEADING);
+                let diagnostics = math_diagnostics(&tree);
+                assert!(!diagnostics.is_empty());
+                assert_eq!(diagnostics, math_diagnostics(&expected));
+            }
+        }
+        options.extensions.tex_math_double_backslash = false;
+        let tree = check("$$\n# Heading\n", &options);
+        assert_eq!(tree.last_child().unwrap().kind(), K::HEADING);
+    }
+}
+
+#[test]
+fn display_math_fixtures_preserve_cst() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_single_backslash = true;
+    for input in [
+        include_str!("fixtures/cases/display_math/input.md"),
+        include_str!("fixtures/cases/display_math_blank_line_termination/input.md"),
+        include_str!("fixtures/cases/display_math_escaped_dollar/input.md"),
+        include_str!("fixtures/cases/display_math_long_dollar_runs/input.md"),
+        include_str!("fixtures/cases/display_math_trailing_text/input.md"),
+        include_str!("fixtures/cases/dollar_display_math_in_list_item/input.md"),
+        include_str!("fixtures/cases/bracket_display_math_in_list_item_pandoc/input.md"),
+        include_str!("fixtures/cases/bracket_display_math_pandoc/input.md"),
+        include_str!("fixtures/cases/blockquote_marker_in_display_math_multiline/input.md"),
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn fenced_math_uses_the_planned_fence_boundary() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    for flavor in [Flavor::Quarto, Flavor::CommonMark] {
+        let mut options = ParserOptions::for_flavor(flavor);
+        for enabled in [false, true] {
+            options.extensions.tex_math_gfm = enabled;
+            for input in [
+                "``` math\r\nx\r\n\r\ny\r\n```\r\n\r\nend\r\n",
+                "> ```math\n> x\n> y\n> ```\n\nend\n",
+                "- item\n\n  ```math\n  x\n  y\n  ```\n- end\n",
+            ] {
+                let tree = check(input, &options);
+                let kind = if enabled {
+                    K::DISPLAY_MATH
+                } else {
+                    K::CODE_BLOCK
+                };
+                assert!(tree.descendants().any(|node| node.kind() == kind));
+            }
+            if flavor == Flavor::CommonMark || enabled {
+                check(
+                    include_str!("fixtures/cases/fenced_math_in_list_blockquote/input.md"),
+                    &options,
+                );
+            }
+            // A fence directly on the item marker uses the incumbent's code path.
+            let tree = check("- ```math\n  x\n  ```\n", &options);
+            assert!(tree.descendants().any(|node| node.kind() == K::CODE_BLOCK));
+        }
+    }
+}
+
+#[test]
+fn fenced_math_respects_quote_boundaries() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    for flavor in [Flavor::CommonMark, Flavor::Quarto] {
+        let mut options = ParserOptions::for_flavor(flavor);
+        options.extensions.tex_math_gfm = true;
+        let input = "> ~~~math\n> a\n> b\n\n# Heading\n";
+        let tree = check(input, &options);
+        assert_eq!(
+            tree.descendants()
+                .any(|node| node.kind() == K::DISPLAY_MATH),
+            flavor == Flavor::CommonMark
+        );
+        assert_eq!(tree.last_child().unwrap().kind(), K::HEADING);
+    }
+}
+
+#[test]
+fn jupyter_math_override_protects_only_verified_spans() {
+    for flavor in [Flavor::CommonMark, Flavor::Quarto] {
+        let mut options = ParserOptions::for_flavor(flavor);
+        options.extensions.tex_math_jupyter = true;
+        options.extensions.blank_before_header = false;
+        for input in [
+            "$$\n> 1\n$$\n# Heading\n",
+            "Costs $5.\n> quote\n",
+            "> $$\n> > 1\n> $$\n\n# Heading\n",
+            "- $$\n  # TeX content\n  $$\n- next\n",
+            "$$\n> 1\n$$\n---\n",
+        ] {
+            check(input, &options);
+        }
+    }
+}
+
+#[test]
+fn display_math_stays_with_its_container() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.blank_before_header = false;
+    options.extensions.tex_math_single_backslash = true;
+    for input in [
+        "- $$\n  \\begin{aligned}\n  x &= y \\\\\n  \\end{aligned}\n  $$\n- sibling\n",
+        "> - $$\n>   x &= y\n>   $$\n> - sibling\n",
+        "- > $$\n  > x &= y\n  > $$\n- sibling\n",
+        "::: note\n$$\nx + y\n$$\n:::\n# Title\n",
+        "[^n]: note\n\n    $$\n    x + y\n    $$\n\n# Title\n",
+        "Term\n:   note\n\n    $$\n    x + y\n    $$\n\n# Title\n",
+        "Before \\[x +\n1. y\\]\n# Title\n",
+        "$$\nx\n\n# Title\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn math_edits_preserve_full_parse_equivalence() {
+    for (flavor, math, original) in [
+        (Flavor::Quarto, "$$\n{x}\n$$", "{x}"),
+        (Flavor::CommonMark, "```math\n{x}\n```", "{x}"),
+    ] {
+        let mut options = ParserOptions::for_flavor(flavor);
+        options.extensions.tex_math_gfm = true;
+        let mut input = format!("# Before\n\n{math}\n\n{}", "After.\n\n".repeat(60));
+        let mut tree = check(&input, &options);
+        for (from, to) in [(original, r"\frac{1}{"), (r"\frac{1}{", r"\frac{1}{2}")] {
+            let start = input.find(from).unwrap();
+            let edit = Edit {
+                range: start..start + from.len(),
+                insert: to.to_owned(),
+            };
+            input = edit.apply(&input);
+            let updated =
+                experimental_block::reparse(&tree.green().to_owned(), &[], &edit, &input, &options)
+                    .expect("isolated math edit should splice");
+            tree = check(&input, &options);
+            assert_eq!(&*updated.green, tree.green());
+            assert!(updated.errors.is_empty());
+        }
+    }
+}
+
+#[test]
+fn unfinished_math_fence_stops_at_a_commonmark_list_exit() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let mut options = ParserOptions::for_flavor(Flavor::CommonMark);
+    options.extensions.tex_math_gfm = true;
+    let input = "- item\n\n  ```math\n  x\n\nOutside.\n";
+    let tree = check(input, &options);
+    assert_eq!(tree.last_child().unwrap().kind(), K::PARAGRAPH);
+}
+
+#[test]
+fn pandoc_fenced_math_preserves_mixed_container_prefixes() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_gfm = true;
+    for input in [
+        "> - > ```math\n>   > x\n>   > y\n>   > ```\n",
+        "Term\n:   ```math\n    x\n    y\n    ```\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn reviewed_math_boundaries_preserve_cst() {
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_gfm = true;
+    for input in [
+        "- > prose\n  >\n  > ```math\n  > x\n  > ```\n",
+        "::: note\n> $$\n> x\n:::\n\nOutside\n",
+        "- item\n\n  ```math\nx\n  ```\n",
+        "[^n]: note\n\n    ```math\n    x\n\n```\noutside\n```\n",
+        "> ```math\n> x\n> ```\n# Heading\n",
+        "$$\n===\n",
+    ] {
+        check(input, &options);
+    }
+    let mut options = ParserOptions::for_flavor(Flavor::CommonMark);
+    options.extensions.tex_math_dollars = true;
+    check("$$\n===\n", &options);
+    check("> - $$\n>   x\n>   $$\n", &options);
+}
+
+#[test]
+fn reviewed_nested_math_and_heading_boundaries_preserve_cst() {
+    let mut options = ParserOptions::for_flavor(Flavor::CommonMark);
+    options.extensions.tex_math_gfm = true;
+    options.extensions.tex_math_dollars = true;
+    for input in [
+        "- > -  ```math\n  >   - y\n  >     ```\n",
+        "Preamble\n$$\n---\n$$\n",
+        "> Preamble\n> $$\n> ---\n> $$\n",
+        "- $$\n  - }\n  $$\n",
+    ] {
+        check(input, &options);
+    }
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_gfm = true;
+    options.extensions.tex_math_single_backslash = true;
+    options.extensions.blank_before_header = false;
+    for input in [
+        "> - ```math\n>   x\n>   ```\n",
+        "- > ```math\n  > x\n  y\n  > ```\n",
+        "> \\[\n> x\n# Outside\n",
+        "Term\n:   ```math\n    x\ny\n    ```\n",
+        "[^n]: note\n\n    ```math\n    x\ny\n    ```\n",
+        "Term\n:   text\n\n    \\begin{equation}\n    \\begin{bmatrix}1\\end{bmatrix}\n    \\end{equation}\n",
+    ] {
+        check(input, &options);
+    }
+    options.extensions.tex_math_jupyter = true;
+    check("Term\n:   $$\n    # Heading }\n    $$\n", &options);
+}
+
+#[test]
+fn reviewed_math_extensions_and_boundaries_preserve_cst() {
+    let mut options = ParserOptions::for_flavor(Flavor::CommonMark);
+    check("\\begin{equation}\n\n# Heading\n", &options);
+    options.extensions.tex_math_dollars = true;
+    check("> $$\n> ===\n", &options);
+
+    let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+    options.extensions.tex_math_single_backslash = true;
+    options.extensions.tex_math_gfm = true;
+    options.extensions.blank_before_header = false;
+    for input in [
+        "\\begin{equation} x \\end{equation}\n\n# Heading\n",
+        "`\\[`\n# Heading\n",
+        "> \\[\n<div>text</div>\n",
+        "- $$\n  ===\n  }\n  $$\n",
+        "> prose\n>  ```math\n> x\n> ```\n",
+        "> - > ```math\n>   > x\n```\n",
+        "[^n]: note\n\n    - ```math\n      x\n      ```\n",
+    ] {
+        check(input, &options);
+    }
+
+    let input = format!("> $$\n> x\n{}> $$\n", "> ---\n".repeat(20_000));
+    check(&input, &options);
 }

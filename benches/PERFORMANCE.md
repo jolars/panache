@@ -476,20 +476,20 @@ reached timing. The latter four failed preflight before the port. A dash
 marks a fixture with fewer than two blank lines, which leaves the edit
 benchmark without an edit location.
 
-| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
-| --- | ---: | ---: | ---: | ---: |
-| 0123, caption before a multiline table | 19.1 / 21.6 → 8.4 / 9.6 | 22.6 / 23.7 → 12.3 / 13.6 | 20.9 / 23.1 → 10.1 / 11.2 | 4.0 / 4.3 → 1.7 / 1.8 |
-| 0124, caption after a multiline table | 11.6 / 13.2 → 7.6 / 8.7 | 18.2 / 20.3 → 12.2 / 13.8 | 6.6 / 7.4 → 4.3 / 4.9 | 3.8 / 4.3 → 1.5 / 1.8 |
-| 0541, simple table in a blockquote | 6.3 / 7.2 → 3.9 / 4.6 | — | — | — |
-| 0199, nested native divs | 11.1 / 11.5 → 12.7 / 13.1 | 14.2 / 15.8 → 16.1 / 18.2 | 13.4 / 14.9 → 15.3 / 17.3 | 3.9 / 4.2 → 1.7 / 1.9 |
-| 0481, comment trailing prose in a fenced div | 7.2 / 7.5 → 6.2 / 6.4 | — | — | — |
-| 0495, unclosed div in a list item | 12.0 / 12.4 → 10.7 / 11.1 | — | — | — |
-| 0610, quoted div stops before the next list item | 12.8 / 13.3 → 11.3 / 12.0 | — | — | — |
-| 0611, comment trailing prose in a quoted item | 11.7 / 12.3 → 10.6 / 11.0 | — | — | — |
-| 0098, line blocks | 5.0 / 5.1 → 2.3 / 2.5 | — | — | — |
-| 0130, title block | 21.3 / 21.8 → 7.5 / 8.2 | 25.0 / 29.7 → 12.4 / 13.6 | 1.3 / 1.5 → 1.2 / 1.5 | 4.2 / 4.7 → 1.8 / 2.1 |
-| 0141, raw TeX commands | 12.0 / 12.6 → 4.2 / 4.6 | 12.8 / 14.6 → 7.4 / 8.4 | 0.8 / 0.9 → 0.9 / 1.0 | 3.9 / 4.4 → 1.8 / 2.0 |
-| 0095, LaTeX environment | 8.7 / 11.4 → 4.2 / 5.6 | 13.1 / 14.8 → 8.1 / 9.1 | 1.3 / 1.4 → 1.2 / 1.4 | 3.9 / 4.3 → 1.8 / 2.0 |
+  | Workload                                         | Full parse                | Line-start edit           | Typing edit               | Whole-file replacement |
+  | ---                                              | ---:                      | ---:                      | ---:                      | ---:                   |
+  | 0123, caption before a multiline table           |   19.1 / 21.6 → 8.4 / 9.6 | 22.6 / 23.7 → 12.3 / 13.6 | 20.9 / 23.1 → 10.1 / 11.2 |  4.0 / 4.3 → 1.7 / 1.8 |
+  | 0124, caption after a multiline table            |   11.6 / 13.2 → 7.6 / 8.7 | 18.2 / 20.3 → 12.2 / 13.8 |     6.6 / 7.4 → 4.3 / 4.9 |  3.8 / 4.3 → 1.5 / 1.8 |
+  | 0541, simple table in a blockquote               |     6.3 / 7.2 → 3.9 / 4.6 |                         — |                         — |                      — |
+  | 0199, nested native divs                         | 11.1 / 11.5 → 12.7 / 13.1 | 14.2 / 15.8 → 16.1 / 18.2 | 13.4 / 14.9 → 15.3 / 17.3 |  3.9 / 4.2 → 1.7 / 1.9 |
+  | 0481, comment trailing prose in a fenced div     |     7.2 / 7.5 → 6.2 / 6.4 |                         — |                         — |                      — |
+  | 0495, unclosed div in a list item                | 12.0 / 12.4 → 10.7 / 11.1 |                         — |                         — |                      — |
+  | 0610, quoted div stops before the next list item | 12.8 / 13.3 → 11.3 / 12.0 |                         — |                         — |                      — |
+  | 0611, comment trailing prose in a quoted item    | 11.7 / 12.3 → 10.6 / 11.0 |                         — |                         — |                      — |
+  | 0098, line blocks                                |     5.0 / 5.1 → 2.3 / 2.5 |                         — |                         — |                      — |
+  | 0130, title block                                |   21.3 / 21.8 → 7.5 / 8.2 | 25.0 / 29.7 → 12.4 / 13.6 |     1.3 / 1.5 → 1.2 / 1.5 |  4.2 / 4.7 → 1.8 / 2.1 |
+  | 0141, raw TeX commands                           |   12.0 / 12.6 → 4.2 / 4.6 |   12.8 / 14.6 → 7.4 / 8.4 |     0.8 / 0.9 → 0.9 / 1.0 |  3.9 / 4.4 → 1.8 / 2.0 |
+  | 0095, LaTeX environment                          |    8.7 / 11.4 → 4.2 / 5.6 |   13.1 / 14.8 → 8.1 / 9.1 |     1.3 / 1.4 → 1.2 / 1.4 |  3.9 / 4.3 → 1.8 / 2.0 |
 
 Across the nine shared document workloads, the planner's full-parse
 medians went from 53–82% of the incumbent's to 55–83%. Line-start edit
@@ -500,3 +500,83 @@ or diagnostic mismatch excluded `large_authoring.qmd` in both runs.
 A separate run with `line-blocks`, `pandoc-title-block`, and `raw-tex`
 disabled in the resolved Quarto config passed source, CST, and diagnostic
 preflight for all four fixtures added at this checkpoint.
+
+### Display and fenced math checkpoint
+
+Both release builds ran on logical CPU 4 of the Intel Core Ultra 7 155U
+with Rust 1.98.1. The comparison used baseline revision `81e4f00e` and
+the same documents and resolved options as the previous checkpoint.
+Each cell gives the median and p95 in microseconds from the second run,
+with the incumbent on the left and the planner on the right.
+
+  | Workload                       | Full parse                          | Line-start edit                   | Typing edit                   | Whole-file replacement    |
+  | ---                            | ---:                                | ---:                              | ---:                          | ---:                      |
+  | Project README                 |       617.5 / 663.4 → 371.8 / 411.2 |     318.2 / 342.3 → 267.4 / 285.5 |         7.6 / 8.4 → 7.4 / 8.1 |     6.4 / 7.3 → 3.8 / 4.2 |
+  | Pandoc manual                  | 14006.9 / 14620.7 → 8170.2 / 8712.9 | 3506.2 / 3810.0 → 3274.8 / 3737.8 | 120.5 / 137.3 → 120.4 / 136.5 | 31.9 / 38.3 → 25.3 / 31.6 |
+  | Parser README                  |           47.0 / 51.1 → 26.0 / 28.1 |         40.4 / 48.1 → 26.3 / 30.8 |     24.5 / 28.2 → 15.1 / 17.5 |     4.4 / 5.1 → 2.0 / 2.3 |
+  | Integrations                   |       499.0 / 525.8 → 301.6 / 328.8 |     242.1 / 276.6 → 205.0 / 236.2 |  110.2 / 126.4 → 89.7 / 108.7 |    8.8 / 10.0 → 4.4 / 5.3 |
+  | Getting Started                |       796.4 / 867.6 → 454.6 / 497.1 |     252.0 / 282.1 → 226.7 / 249.5 |  111.4 / 128.6 → 99.2 / 115.7 |     7.4 / 8.4 → 3.7 / 4.4 |
+  | Performance                    |   2746.7 / 3038.7 → 2245.9 / 2500.4 |     503.2 / 579.1 → 460.0 / 537.5 | 261.3 / 301.0 → 228.6 / 269.0 |   10.9 / 12.7 → 5.7 / 7.2 |
+  | Tables                         |   2005.1 / 2308.7 → 1447.0 / 1669.1 |     560.6 / 615.6 → 527.0 / 587.9 | 275.0 / 318.0 → 252.9 / 285.8 |   10.5 / 12.5 → 5.4 / 6.4 |
+  | Math                           |    1485.9 / 1678.0 → 934.5 / 1059.7 |     486.2 / 560.8 → 458.6 / 530.7 | 216.2 / 250.2 → 200.3 / 235.2 |    8.8 / 10.4 → 4.9 / 5.9 |
+  | Math with grid tables disabled |    1555.2 / 1755.5 → 968.5 / 1115.5 |     482.2 / 580.5 → 450.2 / 537.3 | 213.8 / 253.9 → 194.8 / 231.7 |    9.0 / 10.5 → 5.1 / 6.0 |
+
+All 12 previously timed Pandoc fixtures still reached timing. Four new
+display-math fixtures reached timing under Quarto defaults, as did the
+quoted-list fence fixture under CommonMark with `tex-math-gfm` enabled.
+The baseline planner declined all five math fixtures. A dash marks a
+fixture with fewer than two blank lines for the edit sequence.
+
+  | Workload                     | Full parse                | Line-start edit           | Typing edit               | Whole-file replacement |
+  | ---                          | ---:                      | ---:                      | ---:                      | ---:                   |
+  | 0123                         | 26.8 / 28.7 → 11.6 / 13.4 | 38.4 / 45.1 → 19.6 / 23.6 | 35.2 / 39.4 → 16.4 / 18.4 |  7.8 / 9.2 → 3.2 / 3.7 |
+  | 0124                         | 17.4 / 18.4 → 11.3 / 12.7 | 26.5 / 30.0 → 16.8 / 19.0 |   10.0 / 10.9 → 6.3 / 7.0 |  5.8 / 6.3 → 2.4 / 2.7 |
+  | 0541                         |     9.0 / 9.7 → 5.5 / 6.1 |                         — |                         — |                      — |
+  | 0199                         | 17.2 / 17.9 → 19.7 / 21.6 | 24.0 / 26.0 → 26.9 / 29.2 | 22.7 / 23.8 → 25.7 / 27.3 |  6.7 / 7.2 → 3.1 / 3.5 |
+  | 0481                         | 12.2 / 14.7 → 10.7 / 13.3 |                         — |                         — |                      — |
+  | 0495                         | 17.5 / 19.9 → 15.9 / 18.1 |                         — |                         — |                      — |
+  | 0610                         | 18.4 / 22.8 → 17.0 / 19.2 |                         — |                         — |                      — |
+  | 0611                         | 17.3 / 18.5 → 15.9 / 17.2 |                         — |                         — |                      — |
+  | 0098                         |     7.2 / 7.7 → 3.4 / 3.8 |                         — |                         — |                      — |
+  | 0130                         | 28.9 / 31.8 → 10.5 / 11.9 | 33.9 / 35.2 → 15.8 / 16.8 |     1.7 / 1.9 → 1.6 / 1.8 |  5.9 / 6.3 → 2.6 / 2.8 |
+  | 0141                         |   19.4 / 20.8 → 6.8 / 7.5 | 20.7 / 24.4 → 11.2 / 12.6 |     1.3 / 1.6 → 1.4 / 1.6 |  6.3 / 7.4 → 3.0 / 3.4 |
+  | 0095                         |   13.4 / 15.6 → 6.3 / 7.9 | 19.5 / 21.8 → 11.8 / 12.6 |     1.9 / 2.1 → 1.9 / 2.1 |  5.9 / 6.5 → 2.8 / 3.1 |
+  | 0047                         | 44.5 / 53.3 → 18.6 / 22.6 | 44.7 / 55.4 → 24.5 / 27.6 |     1.7 / 2.1 → 1.8 / 2.1 |  6.6 / 7.7 → 3.2 / 4.0 |
+  | 0048                         | 24.1 / 26.9 → 10.4 / 12.1 | 23.8 / 28.7 → 14.3 / 16.4 | 22.4 / 27.7 → 13.0 / 15.6 |  5.7 / 6.5 → 2.5 / 2.9 |
+  | 0049                         | 35.3 / 39.5 → 18.4 / 20.5 | 33.0 / 38.2 → 21.4 / 24.9 |     1.4 / 1.6 → 1.4 / 1.6 |  6.0 / 6.8 → 2.8 / 3.2 |
+  | 0050                         |   10.0 / 10.6 → 5.2 / 5.7 |                         — |                         — |                      — |
+  | Fenced math in a quoted list |     4.7 / 5.3 → 4.1 / 4.6 |                         — |                         — |                      — |
+
+Across the nine shared document workloads in the second run, planner
+full-parse medians went from 54–82% of the incumbent's to 55–82%.
+Line-start edits went from 63–94% to 65–94%, typing edits from 61–100%
+to 62–100%, and whole-file replacement from 42–78% to 45–79%.
+Absolute timings varied between runs. On `tables.qmd`, the planner's
+full-parse median rose from 64–68% of the incumbent's to 71–72% across
+both runs. The two `math.qmd` configurations stayed within about one
+percentage point of baseline. `large_authoring.qmd` failed CST or
+diagnostic preflight in both builds.
+
+After the math boundary fixes from review, all 26 timed workloads still
+passed preflight. The existing mismatch for `large_authoring.qmd` remained.
+Across the nine shared documents, planner medians were 55–85% of the
+incumbent's for full parses, 65–95% for line-start edits, 61–99% for typing
+edits, and 43–76% for whole-file replacement.
+
+After the second review, the same 26 workloads reached timing. Across the
+nine shared documents, planner medians were 56–86% of the incumbent's
+for full parses, 65–99% for line-start edits, 62–99% for typing edits,
+and 45–78% for whole-file replacement. The existing preflight mismatch
+for `large_authoring.qmd` remained.
+
+After the third review, the same 26 workloads reached timing. Across the
+nine shared documents, planner medians were 56–83% of the incumbent's
+for full parses, 66–98% for line-start edits, 63–100% for typing edits,
+and 43–73% for whole-file replacement. The existing preflight mismatch
+for `large_authoring.qmd` remained.
+
+A separate Quarto scaling check placed 10,000 and 20,000 Setext-like
+lines inside quoted display math. The planner's full-parse median and p95
+were 9.54 / 10.08 ms and 18.66 / 20.16 ms. The incumbent measured
+10.55 / 11.14 ms and 20.63 / 22.31 ms. The two engines passed source,
+CST, and diagnostic preflight on both inputs.

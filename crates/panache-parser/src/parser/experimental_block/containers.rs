@@ -14,8 +14,8 @@ use super::super::block_dispatcher::{
 };
 use super::super::blocks::blockquotes::{emit_one_blockquote_marker, emit_one_line_prefix_marker};
 use super::super::blocks::code_blocks::{
-    FenceInfo, emit_planned_fenced_code_block, is_closing_fence, is_gfm_math_fence,
-    parse_fenced_code_block, try_parse_fence_open,
+    FenceInfo, emit_planned_fenced_code_block, emit_planned_fenced_math_block, is_closing_fence,
+    is_gfm_math_fence, parse_fenced_code_block, try_parse_fence_open,
 };
 use super::super::blocks::container_prefix::{
     ContainerPrefix, ContainerPrefixLine, ContainerPrefixState, StripOp, StrippedLines,
@@ -49,15 +49,15 @@ use super::super::blocks::tables::{
 use super::super::diagnostics::Diagnostics;
 use super::super::inlines::sink::{InjectedMarker, MarkerInjectingSink};
 use super::super::utils::container_stack::{
-    FOOTNOTE_INDENT_COLUMNS, byte_index_at_column, gobbled_indent_prefix_len, leading_indent,
-    leading_indent_from,
+    FOOTNOTE_INDENT_COLUMNS, OpenDisplayMath, byte_index_at_column, gobbled_indent_prefix_len,
+    leading_indent, leading_indent_from,
 };
 use super::super::utils::helpers::is_blank_line;
 use super::super::utils::list_item_buffer::graft_node;
 use super::super::utils::marker_utils::{count_blockquote_markers, try_parse_blockquote_marker};
 use super::super::utils::text_buffer::ParagraphBuffer;
 use super::{
-    HtmlBlockContext, HtmlBlockType, ReferenceSpans, SoftbreakFusion, emit_blank,
+    HtmlBlockContext, HtmlBlockType, ParagraphMath, ReferenceSpans, SoftbreakFusion, emit_blank,
     emit_buffered_paragraph, ends_at_blank_line, fence_enabled, html, is_closing_marker,
     is_quote_prose, parse_html_block_with_wrapper, reference_definition_spans,
     try_parse_html_block_start,
@@ -81,9 +81,29 @@ pub(super) enum Event<'a> {
     Newline(&'a str),
     Whitespace(&'a str),
     LinePrefix(&'a str),
-    Fence(Range<usize>, FenceInfo, ContainerPrefix, Option<&'a str>),
-    PlannedFence(Range<usize>, FenceInfo, ContainerPrefix, &'a str, bool),
-    BodyFence(Range<usize>, FenceInfo, ContainerPrefix, &'a str, &'a str),
+    Fence(
+        Range<usize>,
+        FenceInfo,
+        ContainerPrefix,
+        Option<&'a str>,
+        bool,
+    ),
+    PlannedFence(
+        Range<usize>,
+        FenceInfo,
+        ContainerPrefix,
+        &'a str,
+        bool,
+        bool,
+    ),
+    BodyFence(
+        Range<usize>,
+        FenceInfo,
+        ContainerPrefix,
+        &'a str,
+        &'a str,
+        bool,
+    ),
     IndentedCode(Range<usize>, usize, usize, Option<&'a str>),
     PlannedIndentedCode(Vec<(&'a str, &'a str)>),
     OpenDiv(&'a str, DivFenceInfo),
@@ -135,15 +155,18 @@ pub(super) enum Prefix<'a> {
     Indent(&'a str),
 }
 
-struct Planner<'a> {
+struct Planner<'a, 'o> {
+    options: &'o ParserOptions,
+    math: ParagraphMath,
     frames: Vec<Frame>,
     events: Vec<Event<'a>>,
     paragraph: ParagraphBuffer,
     paragraph_kind: K,
 }
 
-impl<'a> Planner<'a> {
+impl<'a> Planner<'a, '_> {
     fn flush(&mut self) {
+        self.math.clear();
         if !self.paragraph.is_empty() {
             self.events.push(Event::Paragraph(
                 self.paragraph_kind,
@@ -259,6 +282,18 @@ impl<'a> Planner<'a> {
             }
         }
         self.paragraph.push_text(remaining);
+        if !remaining.is_empty() {
+            let loose_definition = matches!(self.frames.last(), Some(Frame::Definition { .. }))
+                && matches!(self.events.last(), Some(Event::Blank(_)));
+            self.math.update(
+                remaining,
+                self.options,
+                self.paragraph_kind == K::PARAGRAPH || loose_definition,
+            );
+            if loose_definition && !self.math.environments.is_empty() {
+                self.paragraph_kind = K::PARAGRAPH;
+            }
+        }
     }
 }
 
@@ -328,10 +363,6 @@ fn can_start_body_block(frames: &[Frame], lines: &[&str], pos: usize) -> bool {
             let (depth, tail) = count_blockquote_markers(lines[pos - 1]);
             depth > 0 && is_blank_line(tail)
         })
-}
-
-fn is_deferred_display_math(line: &str, options: &ParserOptions) -> bool {
-    options.extensions.tex_math_dollars && line.trim_start_matches([' ', '\t']).starts_with("$$")
 }
 
 fn quote_tail(mut line: &str, depth: usize) -> Option<&str> {
@@ -544,6 +575,8 @@ pub(super) fn plan<'a>(
         return Ok((0, Vec::new()));
     }
     let mut planner = Planner {
+        options,
+        math: ParagraphMath::default(),
         frames: Vec::new(),
         events: Vec::new(),
         paragraph: ParagraphBuffer::new(),
@@ -557,6 +590,27 @@ pub(super) fn plan<'a>(
     let mut body_quote_run = false;
     let mut after_item_html = false;
     'lines: while let Some(&line) = lines.get(pos) {
+        if matches!(planner.math.display, Some(OpenDisplayMath::Jupyter))
+            && !matches!(planner.frames.last(), Some(Frame::Definition { .. }))
+        {
+            let ops = container_ops(&planner.frames);
+            let mut prefix = ContainerPrefix::from_ops(&ops, false);
+            prefix.lazy_blockquote_gobble = !commonmark && prefix.bq_depth() > 0;
+            let (held, content) = prefix.split_pieces(line);
+            if planner.math.jupyter_continues(pos, content, || {
+                planner
+                    .paragraph
+                    .jupyter_math_closing_line(pos, &prefix, &lines[pos..])
+            }) {
+                for text in held.token_texts() {
+                    planner.paragraph.push_indent(text);
+                }
+                planner.push_text(content, Vec::new());
+                pos += 1;
+                continue;
+            }
+        }
+
         let in_body_quote_run = std::mem::take(&mut body_quote_run);
         let continues_item_html = std::mem::take(&mut after_item_html);
         let after_html = !commonmark && matches!(planner.events.last(), Some(Event::PandocHtml(_)));
@@ -564,7 +618,17 @@ pub(super) fn plan<'a>(
             && matches!(
                 planner.events.last(),
                 Some(Event::LineBlock(..) | Event::RawTex(..))
-            );
+            )
+            || !commonmark
+                && options.extensions.tex_math_gfm
+                && match planner.events.last() {
+                    Some(
+                        Event::Fence(_, fence, _, None, _)
+                        | Event::PlannedFence(_, fence, _, _, _, true)
+                        | Event::BodyFence(_, fence, _, _, _, true),
+                    ) => is_gfm_math_fence(fence),
+                    _ => false,
+                };
         let mut lazy_html_opener = false;
         let mut remaining = line;
         let mut prefixes = Vec::new();
@@ -663,6 +727,50 @@ pub(super) fn plan<'a>(
                 }
             }
             matched += 1;
+        }
+
+        if sibling.is_none()
+            && planner.math.holds(remaining, options)
+            && !(options.extensions.fenced_divs
+                && is_div_closing_fence(remaining)
+                && (outer_div_indent.is_some_and(|indent| leading_indent(line).0 <= indent
+                    && remaining.len() == line.len())
+                    || planner.frames[..matched].iter().any(|frame| {
+                        matches!(frame, Frame::Div { indent } if leading_indent(remaining).0 <= *indent)
+                    })))
+            && !(try_parse_setext_heading(&["text\n", remaining], 0).is_some()
+                && (commonmark || (planner.math.lines == 1 && planner.paragraph_kind == K::PARAGRAPH)))
+            && (matched == planner.frames.len()
+                || !commonmark
+                    && planner.frames[matched..]
+                        .iter()
+                        .all(|frame| matches!(frame, Frame::Quote | Frame::Item { .. })))
+            && !(matched < planner.frames.len()
+                && !options.extensions.blank_before_header
+                && try_parse_atx_heading(remaining).is_some())
+            && !(commonmark && marker(remaining, options).is_some_and(|next| {
+                let (_, indent) = leading_indent(remaining);
+                list_interrupts_quote_paragraph(&next, &remaining[indent + next.marker_len..], options)
+            }))
+            && !(matched < planner.frames.len()
+                && options.extensions.raw_html
+                && html::detect(remaining.trim_start(), false).is_some())
+            && (quote_prefix(remaining).is_none() || options.extensions.blank_before_blockquote)
+        {
+            if planner.paragraph_kind == K::PLAIN
+                && planner
+                    .frames
+                    .last()
+                    .is_some_and(|frame| matches!(frame, Frame::Item { .. }))
+                && prefixes
+                    .iter()
+                    .any(|part| matches!(part, Prefix::Quote(..)))
+            {
+                remaining = restore_trailing_indent(line, remaining, &mut prefixes);
+            }
+            planner.push_text(remaining, prefixes);
+            pos += 1;
+            continue;
         }
 
         let in_body = planner
@@ -995,12 +1103,15 @@ pub(super) fn plan<'a>(
                             planner.events.push(Event::Whitespace(&remaining[..bytes]));
                         }
                         let end = pos + close + 2;
+                        let math_fence =
+                            options.extensions.tex_math_gfm && is_gfm_math_fence(&fence);
                         planner.events.push(Event::PlannedFence(
                             pos..end,
                             fence,
                             prefix,
                             first,
                             true,
+                            math_fence,
                         ));
                         pos = end;
                         continue;
@@ -1425,7 +1536,6 @@ pub(super) fn plan<'a>(
                         || !options.extensions.line_blocks
                         || try_parse_line_block_start(remaining).is_none())
                     && !raw_blocks::can_start_raw_block(remaining, options)
-                    && !is_deferred_display_math(remaining, options)
                     && let Some(blanks) = definition_term(lines, pos, &planner.frames, options)
                 {
                     let term = restore_trailing_indent(line, remaining, &mut prefixes);
@@ -1998,27 +2108,125 @@ pub(super) fn plan<'a>(
             if !commonmark
                 && !planner.paragraph.is_empty()
                 && (fence.fence_char == '~'
-                    || (planner.paragraph_kind == K::PLAIN && leading_indent(remaining).0 > 0))
+                    || (fence.info_string.is_empty()
+                        && fence.fence_char == '`'
+                        && planner
+                            .paragraph
+                            .pending_code_span_openers()
+                            .contains(&fence.fence_count))
+                    || (leading_indent(remaining).0 > 0
+                        && (planner.paragraph_kind == K::PLAIN
+                            || options.extensions.tex_math_gfm && is_gfm_math_fence(&fence))))
             {
                 planner.push_text(remaining, prefixes);
                 pos += 1;
                 continue;
             }
-            if options.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
-                return Err((remaining.trim_start_matches([' ', '\t']), "fenced math"));
+            let direct_item =
+                opened_item && matches!(planner.frames.last(), Some(Frame::Item { .. }));
+            let math_info = options.extensions.tex_math_gfm && is_gfm_math_fence(&fence);
+            let math_fence = math_info && !direct_item;
+            if math_info
+                && direct_item
+                && (in_body || opaque_block_columns(&planner.frames, true).is_none())
+                && let Some(Frame::Item { column, .. }) = planner.frames.last()
+            {
+                let depth = planner
+                    .frames
+                    .iter()
+                    .filter(|frame| matches!(frame, Frame::Quote))
+                    .count();
+                let prefix = ContainerPrefix::from_scalars(
+                    depth,
+                    *column,
+                    depth > 0,
+                    0,
+                    true,
+                    options.dialect,
+                );
+                let mut end = pos + 1;
+                let mut closed = false;
+                for &raw in &lines[end..] {
+                    if count_blockquote_markers(raw).0 < depth && (commonmark || is_blank_line(raw))
+                    {
+                        break;
+                    }
+                    end += 1;
+                    if is_closing_fence(prefix.strip(raw), &fence) {
+                        closed = true;
+                        break;
+                    }
+                }
+                planner.flush();
+                planner.structural_prefixes(prefixes);
+                planner.events.push(Event::Fence(
+                    pos..end,
+                    fence,
+                    prefix,
+                    Some(remaining),
+                    closed,
+                ));
+                pos = end;
+                continue;
             }
             if in_body {
                 let ops = container_ops(&planner.frames);
                 let prefix = ContainerPrefix::from_ops(&ops, true);
                 let mut end = pos + 1;
                 let mut closed = false;
+                let mut blank_seen = false;
                 for raw in &lines[end..] {
                     let tail = ContainerPrefix::strip_required_ops(raw, &ops).or_else(|| {
-                        if !matches!(planner.frames.last(), Some(Frame::Footnote)) {
+                        if math_fence && !blank_seen {
+                            return Some(prefix.strip(raw));
+                        }
+                        if (math_fence && blank_seen)
+                            || !matches!(planner.frames.last(), Some(Frame::Footnote))
+                        {
                             return None;
                         }
                         let tail = ContainerPrefix::strip_required_ops(raw, &ops[..ops.len() - 1])?;
                         is_closing_fence(tail, &fence).then_some(tail)
+                    });
+                    let Some(tail) = tail else { break };
+                    blank_seen = is_blank_line(tail);
+                    end += 1;
+                    if is_closing_fence(tail, &fence) {
+                        closed = true;
+                        break;
+                    }
+                }
+                if !closed {
+                    if math_fence {
+                        planner.push_text(remaining, prefixes);
+                        pos += 1;
+                        continue;
+                    }
+                    return Err((remaining, "nested fenced code"));
+                }
+                planner.flush();
+                let first = restore_trailing_indent(line, remaining, &mut prefixes);
+                let indent = &first[..first.len() - remaining.len()];
+                planner.structural_prefixes(prefixes);
+                planner.events.push(Event::BodyFence(
+                    pos..end,
+                    fence,
+                    prefix,
+                    remaining,
+                    indent,
+                    math_fence,
+                ));
+                pos = end;
+                continue;
+            }
+            if (commonmark || math_fence) && opaque_block_columns(&planner.frames, true).is_none() {
+                let mut ops = container_ops(&planner.frames);
+                let mut end = pos + 1;
+                let mut closed = false;
+                for raw in &lines[end..] {
+                    let tail = ContainerPrefix::strip_required_ops(raw, &ops).or_else(|| {
+                        (!commonmark && math_fence && !is_blank_line(raw))
+                            .then(|| raw.trim_start_matches([' ', '\t']))
                     });
                     let Some(tail) = tail else { break };
                     end += 1;
@@ -2027,54 +2235,44 @@ pub(super) fn plan<'a>(
                         break;
                     }
                 }
-                if !closed {
-                    return Err((remaining, "nested fenced code"));
-                }
-                planner.flush();
-                let first = restore_trailing_indent(line, remaining, &mut prefixes);
-                let indent = &first[..first.len() - remaining.len()];
-                planner.structural_prefixes(prefixes);
-                planner
-                    .events
-                    .push(Event::BodyFence(pos..end, fence, prefix, remaining, indent));
-                pos = end;
-                continue;
-            }
-            if commonmark && opaque_block_columns(&planner.frames, true).is_none() {
-                let mut ops = container_ops(&planner.frames);
-                let mut end = pos + 1;
-                let mut closed = false;
-                for raw in &lines[end..] {
-                    let Some(tail) = ContainerPrefix::strip_required_ops(raw, &ops) else {
-                        break;
-                    };
-                    end += 1;
-                    if is_closing_fence(tail, &fence) {
-                        closed = true;
-                        break;
+                if !closed && !commonmark {
+                    if planner.paragraph.is_empty()
+                        && matches!(planner.frames.last(), Some(Frame::Quote))
+                    {
+                        planner.structural_prefixes(std::mem::take(&mut prefixes));
                     }
+                    planner.push_text(remaining, prefixes);
+                    pos += 1;
+                    continue;
                 }
                 // The existing CST owns a short initial indent as part of
                 // the first quote marker on fenced-code body lines.
-                if matches!(
-                    ops.as_slice(),
-                    [StripOp::ListAdvance(_), StripOp::BlockQuoteMarker, ..]
-                ) && lines[pos + 1..end]
-                    .iter()
-                    .all(|raw| quote_prefix(raw).is_some())
+                if !math_fence
+                    && matches!(
+                        ops.as_slice(),
+                        [StripOp::ListAdvance(_), StripOp::BlockQuoteMarker, ..]
+                    )
+                    && lines[pos + 1..end]
+                        .iter()
+                        .all(|raw| quote_prefix(raw).is_some())
                 {
                     ops.remove(0);
                 }
                 let prefix = ContainerPrefix::from_ops(&ops, true);
                 let first = planner.interrupt_commonmark(line, remaining, prefixes);
-                planner
-                    .events
-                    .push(Event::PlannedFence(pos..end, fence, prefix, first, closed));
+                planner.events.push(Event::PlannedFence(
+                    pos..end,
+                    fence,
+                    prefix,
+                    first,
+                    closed,
+                    math_fence,
+                ));
                 pos = end;
                 continue;
             }
             let (quote_depth, column, quotes_first) =
-                opaque_block_columns(&planner.frames, commonmark)
+                opaque_block_columns(&planner.frames, commonmark || math_fence)
                     .ok_or((remaining, "nested fenced code"))?;
             let prefix = ContainerPrefix::from_scalars(
                 quote_depth,
@@ -2086,9 +2284,18 @@ pub(super) fn plan<'a>(
             );
             let mut end = pos + 1;
             let mut closed = false;
+            let mut exit = super::super::blocks::code_blocks::ContainerExitScan::new(column);
             for &raw in &lines[end..] {
                 let tail = if !commonmark && quote_depth > 0 && column == 0 {
                     (!is_blank_line(raw)).then(|| prefix.strip(raw))
+                } else if math_fence && !commonmark {
+                    let inner = if quotes_first {
+                        quote_tail(raw, quote_depth).unwrap_or(raw)
+                    } else {
+                        raw
+                    };
+                    (!(quote_depth > 0 && is_blank_line(raw)) && !exit.exits(inner))
+                        .then(|| prefix.strip(raw))
                 } else if quotes_first {
                     quote_tail(raw, quote_depth).and_then(|line| list_tail(line, column))
                 } else {
@@ -2102,15 +2309,30 @@ pub(super) fn plan<'a>(
                 }
             }
             if !closed && !commonmark {
+                if math_fence {
+                    if planner.paragraph.is_empty()
+                        && matches!(planner.frames.last(), Some(Frame::Quote))
+                    {
+                        planner.structural_prefixes(std::mem::take(&mut prefixes));
+                    }
+                    planner.push_text(remaining, prefixes);
+                    pos += 1;
+                    continue;
+                }
                 return Err((remaining, "nested fenced code"));
             }
-            if commonmark && quote_depth > 0 && !quotes_first {
+            if (commonmark || math_fence) && quote_depth > 0 && !quotes_first {
                 let first = planner.interrupt_commonmark(line, remaining, prefixes);
                 let mut prefix = prefix;
                 prefix.list_marker_consumed_on_line_0 = true;
-                planner
-                    .events
-                    .push(Event::PlannedFence(pos..end, fence, prefix, first, closed));
+                planner.events.push(Event::PlannedFence(
+                    pos..end,
+                    fence,
+                    prefix,
+                    first,
+                    closed,
+                    math_fence,
+                ));
                 pos = end;
                 continue;
             }
@@ -2138,12 +2360,14 @@ pub(super) fn plan<'a>(
                 fence,
                 prefix,
                 opened_item.then_some(remaining),
+                closed,
             ));
             pos = end;
             continue;
         } else if !note_opener
             && (!matches!(planner.frames.last(), Some(Frame::Definition { .. }))
                 || opened_body
+                || matches!(planner.math.display, Some(OpenDisplayMath::Jupyter))
                 || leading_indent(line).0 < 4
                 || (pos > 0 && is_blank_line(lines[pos - 1])))
             && let Some(level) = try_parse_atx_heading(remaining)
@@ -2169,8 +2393,12 @@ pub(super) fn plan<'a>(
                 let heading = if commonmark {
                     planner.interrupt_commonmark(line, remaining, prefixes)
                 } else {
+                    let after_jupyter_definition =
+                        matches!(planner.math.display, Some(OpenDisplayMath::Jupyter))
+                            && matches!(planner.frames.last(), Some(Frame::Definition { .. }));
                     planner.flush();
-                    let heading = if matches!(planner.frames.last(), Some(Frame::Footnote))
+                    let heading = if after_jupyter_definition
+                        || matches!(planner.frames.last(), Some(Frame::Footnote))
                         || (matches!(planner.frames.last(), Some(Frame::Definition { .. }))
                             && pos > 0
                             && is_blank_line(lines[pos - 1]))
@@ -2194,12 +2422,24 @@ pub(super) fn plan<'a>(
             && (commonmark || planner.paragraph.get_text_for_parsing().lines().count() == 1)
             && !planner.paragraph.get_text_for_parsing().trim().is_empty()
         {
-            let underline = restore_trailing_indent(line, remaining, &mut prefixes);
-            planner.events.push(Event::Setext(
-                std::mem::take(&mut planner.paragraph),
-                prefixes,
-                underline,
-            ));
+            let mut buffer = std::mem::take(&mut planner.paragraph);
+            let underline = if commonmark
+                && planner.math.lines > 1
+                && planner.math.holds(remaining, options)
+                && matches!(planner.frames.last(), Some(Frame::Quote))
+            {
+                let raw = buffer.raw_text();
+                buffer = ParagraphBuffer::new();
+                buffer.push_text(&raw);
+                prefixes.clear();
+                line
+            } else {
+                restore_trailing_indent(line, remaining, &mut prefixes)
+            };
+            planner.math.clear();
+            planner
+                .events
+                .push(Event::Setext(buffer, prefixes, underline));
         } else if !definition_opener && try_parse_horizontal_rule(remaining).is_some() {
             if !commonmark && !opened_item && !opened_body && !planner.paragraph.is_empty() {
                 planner.push_text(remaining, prefixes);
@@ -2305,13 +2545,6 @@ pub(super) fn plan<'a>(
                     None => window,
                 };
                 if let Some(env) = raw_blocks::raw_tex_environment(remaining) {
-                    if !planner.paragraph.is_empty()
-                        && raw_blocks::has_unclosed_inline_math_environment(
-                            planner.paragraph.get_text_for_parsing().lines(),
-                        )
-                    {
-                        return Err((remaining, "nested inline math environment"));
-                    }
                     Some((
                         raw_blocks::raw_tex_environment_end(&window, env),
                         prefix,
@@ -2375,8 +2608,6 @@ pub(super) fn plan<'a>(
                 .push(Event::LineBlock(pos, prefix, block, remaining, indent));
             pos = end;
             continue;
-        } else if !commonmark && !opener_as_text && is_deferred_display_math(remaining, options) {
-            return Err((remaining.trim_start_matches([' ', '\t']), "display math"));
         } else if opener_as_text
             || (!commonmark && leading_indent(remaining).0 < 4)
             || (leading_indent(remaining).0 >= 4
@@ -2523,45 +2754,84 @@ pub(super) fn emit(
             Event::Newline(line) => builder.token(K::NEWLINE.into(), line),
             Event::Whitespace(indent) => builder.token(K::WHITESPACE.into(), indent),
             Event::LinePrefix(indent) => builder.token(K::LINE_PREFIX.into(), indent),
-            Event::Fence(range, fence, prefix, first) => {
+            Event::Fence(range, fence, prefix, first, closed) => {
                 let window =
                     StrippedLines::new(&lines[..start + range.end], start + range.start, &prefix);
-                parse_fenced_code_block(
-                    builder,
-                    &window,
-                    fence,
-                    first,
-                    diagnostics,
-                    options.flavor,
-                    None,
-                );
+                // The incumbent's direct list-marker path emits ordinary code.
+                if first.is_none() && options.extensions.tex_math_gfm && is_gfm_math_fence(&fence) {
+                    emit_planned_fenced_math_block(
+                        builder,
+                        &window,
+                        &fence,
+                        first,
+                        start + range.end,
+                        closed,
+                    );
+                } else {
+                    let window = if let Some(first) = first {
+                        window.with_dispatch_override(first, "")
+                    } else {
+                        window
+                    };
+                    parse_fenced_code_block(
+                        builder,
+                        &window,
+                        fence,
+                        first,
+                        diagnostics,
+                        options.flavor,
+                        None,
+                    );
+                }
             }
-            Event::PlannedFence(range, fence, prefix, first, closed) => {
+            Event::PlannedFence(range, fence, prefix, first, closed, math_fence) => {
                 let window =
                     StrippedLines::new(&lines[..start + range.end], start + range.start, &prefix);
-                emit_planned_fenced_code_block(
-                    builder,
-                    &window,
-                    fence,
-                    first,
-                    diagnostics,
-                    options.flavor,
-                    closed,
-                );
+                if math_fence {
+                    emit_planned_fenced_math_block(
+                        builder,
+                        &window.with_dispatch_override(first, ""),
+                        &fence,
+                        None,
+                        start + range.end,
+                        closed,
+                    );
+                } else {
+                    emit_planned_fenced_code_block(
+                        builder,
+                        &window,
+                        fence,
+                        first,
+                        diagnostics,
+                        options.flavor,
+                        closed,
+                    );
+                }
             }
-            Event::BodyFence(range, fence, prefix, tail, indent) => {
+            Event::BodyFence(range, fence, prefix, tail, indent, math_fence) => {
                 let window =
                     StrippedLines::new(&lines[..start + range.end], start + range.start, &prefix)
                         .with_dispatch_override(tail, indent);
-                emit_planned_fenced_code_block(
-                    builder,
-                    &window,
-                    fence,
-                    tail,
-                    diagnostics,
-                    options.flavor,
-                    true,
-                );
+                if math_fence {
+                    emit_planned_fenced_math_block(
+                        builder,
+                        &window,
+                        &fence,
+                        Some(tail),
+                        start + range.end,
+                        true,
+                    );
+                } else {
+                    emit_planned_fenced_code_block(
+                        builder,
+                        &window,
+                        fence,
+                        tail,
+                        diagnostics,
+                        options.flavor,
+                        true,
+                    );
+                }
             }
             Event::IndentedCode(range, quotes, column, first) => {
                 parse_indented_code_block_with_first(

@@ -2,15 +2,15 @@
 source: crates/panache-parser/tests/golden_parser_cases.rs
 expression: cst_output
 ---
-DOCUMENT@0..26
-  LIST@0..26
-    LIST_ITEM@0..26
+DOCUMENT@0..32
+  LIST@0..32
+    LIST_ITEM@0..32
       LIST_MARKER@0..1 "-"
       WHITESPACE@1..2 " "
-      BLOCK_QUOTE@2..26
+      BLOCK_QUOTE@2..32
         BLOCK_QUOTE_MARKER@2..3 ">"
         WHITESPACE@3..4 " "
-        DISPLAY_MATH@4..26
+        DISPLAY_MATH@4..32
           DISPLAY_MATH_MARKER@4..11 "```math"
           NEWLINE@11..12 "\n"
           LINE_PREFIX@12..14 "  "
@@ -20,5 +20,9 @@ DOCUMENT@0..26
           LINE_PREFIX@18..20 "  "
           LINE_PREFIX@20..21 ">"
           LINE_PREFIX@21..22 " "
-          DISPLAY_MATH_MARKER@22..25 "```"
-          NEWLINE@25..26 "\n"
+          TEXT@22..24 "y\n"
+          LINE_PREFIX@24..26 "  "
+          LINE_PREFIX@26..27 ">"
+          LINE_PREFIX@27..28 " "
+          DISPLAY_MATH_MARKER@28..31 "```"
+          NEWLINE@31..32 "\n"
