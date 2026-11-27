@@ -26,7 +26,12 @@ fn stats(mut samples: Vec<Duration>) -> (f64, f64) {
 enum ComparisonFlavor {
     #[value(name = "commonmark")]
     CommonMark,
+    Pandoc,
     Quarto,
+    #[value(name = "rmarkdown")]
+    RMarkdown,
+    #[value(name = "multimarkdown")]
+    MultiMarkdown,
 }
 
 #[derive(Parser)]
@@ -53,7 +58,10 @@ fn main() -> std::io::Result<()> {
     let args = Args::parse();
     let flavor = args.flavor.map(|value| match value {
         ComparisonFlavor::CommonMark => Flavor::CommonMark,
+        ComparisonFlavor::Pandoc => Flavor::Pandoc,
         ComparisonFlavor::Quarto => Flavor::Quarto,
+        ComparisonFlavor::RMarkdown => Flavor::RMarkdown,
+        ComparisonFlavor::MultiMarkdown => Flavor::MultiMarkdown,
     });
     for file in &args.files {
         let options = load_options(file, args.config.as_deref(), flavor)?;

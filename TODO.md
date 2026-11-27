@@ -285,7 +285,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
   construct with its extension enabled and disabled.
 - [x] Port display math and fenced math. Check block boundaries, lossless
   emission, and diagnostics across the dialects that support them.
-- [ ] Enable the Pandoc, R Markdown, and MultiMarkdown flavors in the
+- [x] Enable the Pandoc, R Markdown, and MultiMarkdown flavors in the
   replacement. Check their flavor defaults and port any remaining
   flavor-specific metadata or block rules.
 - [ ] Enable GFM and Jupyter. Cover alerts, task items, and notebook-specific

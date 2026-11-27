@@ -303,89 +303,35 @@ pub(crate) fn emit_pandoc_title_block(lines: &[&str], builder: &mut GreenNodeBui
     builder.finish_node();
 }
 
-fn mmd_key_value(line: &str) -> Option<(String, String)> {
+fn mmd_key_value(line: &str) -> Option<(&str, &str)> {
     let (key, value) = line.split_once(':')?;
-    let key_trimmed = key.trim();
-    if key_trimmed.is_empty() {
-        return None;
-    }
-    Some((key_trimmed.to_string(), value.trim().to_string()))
+    (!key.trim().is_empty()).then(|| (key.trim(), value.trim()))
 }
 
-/// Try to parse a MultiMarkdown title block starting at the beginning of document.
-/// Returns the new position after the block if successful, None otherwise.
-///
-/// A MultiMarkdown title block:
-/// - Must be at document start (pos == 0)
-/// - Contains one or more `Key: Value` lines
-/// - The first field value must be non-empty
-/// - Continuation lines start with leading space or tab
-/// - Terminates with a blank line
-pub(crate) fn try_parse_mmd_title_block(
-    lines: &[&str],
-    pos: usize,
-    builder: &mut GreenNodeBuilder<'static>,
-) -> Option<usize> {
-    if pos != 0 || lines.is_empty() {
+/// Return the end of a MultiMarkdown title block, including its required blank line.
+/// Callers must check that the block starts at the beginning of the document.
+pub(crate) fn mmd_title_block_end(lines: &[&str]) -> Option<usize> {
+    let (_, value) = mmd_key_value(lines.first()?)?;
+    if value.is_empty() {
         return None;
     }
-
-    let mut current_pos = pos;
-
-    let first = lines[current_pos];
-    let (_first_key, first_value) = mmd_key_value(first)?;
-    if first_value.is_empty() {
-        return None;
-    }
-
-    builder.start_node(SyntaxKind::MMD_TITLE_BLOCK.into());
-
-    while current_pos < lines.len() {
-        let line = lines[current_pos];
-
+    for (index, line) in lines.iter().enumerate().skip(1) {
         if line.trim().is_empty() {
-            break;
+            return Some(index + 1);
         }
-
-        if mmd_key_value(line).is_none() {
-            builder.finish_node();
+        if !line.starts_with([' ', '\t']) && mmd_key_value(line).is_none() {
             return None;
         }
+    }
+    None
+}
 
+pub(crate) fn emit_mmd_title_block(lines: &[&str], builder: &mut GreenNodeBuilder<'static>) {
+    builder.start_node(SyntaxKind::MMD_TITLE_BLOCK.into());
+    for line in lines {
         emit_line_tokens(builder, line);
-        current_pos += 1;
-
-        while current_pos < lines.len() {
-            let cont_line = lines[current_pos];
-            if cont_line.trim().is_empty() {
-                break;
-            }
-
-            let trimmed = cont_line.trim_start();
-            if mmd_key_value(trimmed).is_some() {
-                break;
-            }
-
-            if cont_line.starts_with(' ') || cont_line.starts_with('\t') {
-                emit_line_tokens(builder, cont_line);
-                current_pos += 1;
-            } else {
-                builder.finish_node();
-                return None;
-            }
-        }
     }
-
-    if current_pos >= lines.len() || !lines[current_pos].trim().is_empty() {
-        builder.finish_node();
-        return None;
-    }
-
-    emit_line_tokens(builder, lines[current_pos]);
-    current_pos += 1;
-
-    builder.finish_node(); // MMD_TITLE_BLOCK
-    Some(current_pos)
+    builder.finish_node();
 }
 
 #[cfg(test)]
@@ -657,8 +603,7 @@ mod tests {
     #[test]
     fn test_mmd_title_simple() {
         let lines = vec!["Title: My Title", "Author: Jane Doe", "", "Content"];
-        let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_mmd_title_block(&lines, 0, &mut builder);
+        let result = mmd_title_block_end(&lines);
         assert_eq!(result, Some(3));
     }
 
@@ -672,32 +617,21 @@ mod tests {
             "",
             "Body",
         ];
-        let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_mmd_title_block(&lines, 0, &mut builder);
+        let result = mmd_title_block_end(&lines);
         assert_eq!(result, Some(5));
     }
 
     #[test]
     fn test_mmd_title_requires_non_empty_first_value() {
         let lines = vec!["Title:", "Author: Jane Doe", "", "Body"];
-        let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_mmd_title_block(&lines, 0, &mut builder);
+        let result = mmd_title_block_end(&lines);
         assert_eq!(result, None);
     }
 
     #[test]
     fn test_mmd_title_requires_trailing_blank_line() {
         let lines = vec!["Title: My Title", "Author: Jane Doe"];
-        let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_mmd_title_block(&lines, 0, &mut builder);
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_mmd_title_not_at_start() {
-        let lines = vec!["Body", "Title: My Title", ""];
-        let mut builder = GreenNodeBuilder::new();
-        let result = try_parse_mmd_title_block(&lines, 1, &mut builder);
+        let result = mmd_title_block_end(&lines);
         assert_eq!(result, None);
     }
 

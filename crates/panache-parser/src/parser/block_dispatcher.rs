@@ -53,8 +53,8 @@ use super::blocks::lists::{
     try_parse_list_marker,
 };
 use super::blocks::metadata::{
-    YamlContentOutcome, collect_yaml_content, emit_yaml_block, find_yaml_block_closing_pos,
-    is_metadata_open_delim, prepare_yaml_content, try_parse_mmd_title_block,
+    YamlContentOutcome, collect_yaml_content, emit_mmd_title_block, emit_yaml_block,
+    find_yaml_block_closing_pos, is_metadata_open_delim, mmd_title_block_end, prepare_yaml_content,
     try_parse_pandoc_title_block, try_parse_yaml_block,
 };
 use super::blocks::myst_directives::{
@@ -488,12 +488,8 @@ impl BlockParser for MmdTitleBlockParser {
             return None;
         }
 
-        let first = lines.first();
-        if first.trim().is_empty() || !first.contains(':') {
-            return None;
-        }
-
-        Some((BlockDetectionResult::Yes, None))
+        let end = mmd_title_block_end(lines.raw())?;
+        Some((BlockDetectionResult::Yes, Some(Box::new(end))))
     }
 
     fn parse_prepared(
@@ -501,12 +497,13 @@ impl BlockParser for MmdTitleBlockParser {
         _ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &StrippedLines<'_, '_>,
-        _payload: Option<&dyn Any>,
+        payload: Option<&dyn Any>,
     ) -> usize {
-        let line_pos = lines.pos();
-        let lines = lines.raw();
-        let new_pos = try_parse_mmd_title_block(lines, line_pos, builder).unwrap_or(line_pos + 1);
-        new_pos - line_pos
+        let end = *payload
+            .and_then(|payload| payload.downcast_ref::<usize>())
+            .expect("MultiMarkdown title detection provides its end");
+        emit_mmd_title_block(&lines.raw()[..end], builder);
+        end
     }
 
     fn name(&self) -> &'static str {

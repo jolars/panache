@@ -1,6 +1,7 @@
 #![cfg(feature = "experimental-block-parser")]
 
 use panache_parser::parser::{Edit, ReparseStrategy, experimental_block, parse_with_errors};
+use panache_parser::syntax::SyntaxKind as K;
 use panache_parser::{Flavor, ParserOptions, SyntaxNode};
 
 fn check(input: &str, options: &ParserOptions) -> SyntaxNode {
@@ -48,8 +49,94 @@ fn quarto_slice_preserves_cst_and_yaml_diagnostics() {
 }
 
 #[test]
+fn pandoc_and_rmarkdown_use_their_own_chunk_and_yaml_defaults() {
+    let input = "---\ntitle: First\ntitle: Second\n---\n\n```{r}\n#| label: [\nprint(1)\n```\n";
+    for (flavor, executable) in [(Flavor::Pandoc, false), (Flavor::RMarkdown, true)] {
+        let options = ParserOptions::for_flavor(flavor);
+        let tree = check(input, &options);
+        assert_eq!(tree.first_child().unwrap().kind(), K::YAML_METADATA);
+        assert_eq!(
+            tree.children().any(|node| node.kind() == K::CODE_BLOCK),
+            executable
+        );
+        let (_, errors) = experimental_block::try_parse_with_errors(input, &options).unwrap();
+        assert_eq!(errors.len(), if executable { 2 } else { 0 });
+
+        let tree = check("% Title\n% Author\n\nProse.\n", &options);
+        assert_eq!(tree.first_child().unwrap().kind(), K::PANDOC_TITLE_BLOCK);
+    }
+}
+
+#[test]
+fn multimarkdown_plans_only_complete_document_title_blocks() {
+    let mut options = ParserOptions::for_flavor(Flavor::MultiMarkdown);
+    let input = include_str!("fixtures/cases/mmd_title_block/input.md");
+    let tree = check(input, &options);
+    assert_eq!(tree.first_child().unwrap().kind(), K::MMD_TITLE_BLOCK);
+
+    for input in [
+        "Title: example\nAuthor: A\nordinary prose\n\nNext.\n",
+        "Title: example\n  continuation\n",
+        "Title:\nAuthor: A\n\nBody.\n",
+        "\nTitle: example\n\nBody.\n",
+        "> Intro.\n>\n> Title: example\n> Author: A\n\nBody.\n",
+        "Intro.\n\nTitle: example\n\nBody.\n",
+        "---\ntitle: Example\n---\n",
+    ] {
+        let tree = check(input, &options);
+        assert!(
+            !tree
+                .descendants()
+                .any(|node| matches!(node.kind(), K::MMD_TITLE_BLOCK | K::YAML_METADATA)),
+            "{input:?}"
+        );
+    }
+    options.extensions.mmd_title_block = false;
+    assert_eq!(
+        check(input, &options).first_child().unwrap().kind(),
+        K::PARAGRAPH
+    );
+}
+
+#[test]
+fn multimarkdown_reference_attributes_follow_the_definition() {
+    let mut options = ParserOptions::for_flavor(Flavor::MultiMarkdown);
+    let input = include_str!("fixtures/cases/mmd_link_attributes/input.md");
+    for (input, expected_end) in [
+        (input, "id=myId class=\"myClass1 myClass2\"\n"),
+        (
+            "- Item\n\n  [link]: /example \"Title\" width=20\n    height=25\n    More prose.\n",
+            "height=25\n",
+        ),
+        (
+            "Intro.\n\n> [link]: /example \"Title\" width=20\n>   height=25\n",
+            "width=20\n",
+        ),
+    ] {
+        let tree = check(input, &options);
+        let definition = tree
+            .descendants()
+            .find(|node| node.kind() == K::REFERENCE_DEFINITION)
+            .unwrap();
+        assert!(definition.text().to_string().ends_with(expected_end));
+    }
+    options.extensions.mmd_link_attributes = false;
+    assert!(
+        !check(input, &options)
+            .descendants()
+            .any(|node| node.kind() == K::REFERENCE_DEFINITION)
+    );
+}
+
+#[test]
 fn structural_reparse_reuses_both_sides_across_edits() {
-    for flavor in [Flavor::CommonMark, Flavor::Quarto] {
+    for flavor in [
+        Flavor::CommonMark,
+        Flavor::Quarto,
+        Flavor::Pandoc,
+        Flavor::RMarkdown,
+        Flavor::MultiMarkdown,
+    ] {
         let options = ParserOptions::for_flavor(flavor);
         let mut text = format!(
             "# Intro\n\nUnaffected before.\n\nOriginal text.\n\n{}",

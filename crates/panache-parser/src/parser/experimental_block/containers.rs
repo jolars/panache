@@ -41,7 +41,9 @@ use super::super::blocks::lists::{
     markers_match, try_parse_list_marker,
 };
 use super::super::blocks::raw_blocks::{self, emit_raw_tex_block};
-use super::super::blocks::reference_links::emit_footnote_marker;
+use super::super::blocks::reference_links::{
+    emit_footnote_marker, line_is_mmd_link_attribute_continuation,
+};
 use super::super::blocks::tables::{
     DashTableKind, PreparedDashTable, PreparedGridTable, PreparedPipeTable, is_table_caption_start,
     prepare_dash_table_at, prepare_grid_table, prepare_pipe_table, try_parse_pipe_separator,
@@ -511,26 +513,35 @@ fn plan_reference<'a>(
     first: &'a str,
     following: &[&'a str],
     frames: &[Frame],
-    dialect: Dialect,
+    options: &ParserOptions,
 ) -> Option<PlannedReference<'a>> {
     let ops = container_ops(frames);
     let quoted = ops.contains(&StripOp::BlockQuoteMarker);
+    let strict_eol = !options.extensions.mmd_link_attributes;
+    let spans_for = |text| reference_definition_spans(text, strict_eol, options.dialect, false);
     let continuation = |raw: &'a str| -> Option<&'a str> {
         let tail = ContainerPrefix::strip_required_ops(raw, &ops)?;
         (!is_blank_line(tail)).then_some(if quoted { tail } else { raw })
     };
 
     // A complete first line can extend only with a title on the next line.
-    if let Some(spans) = reference_definition_spans(first, true, dialect, false)
-        && (spans.title.is_some()
-            || following
-                .first()
-                .and_then(|raw| continuation(raw))
-                .is_none_or(|tail| {
-                    !tail
-                        .trim_start_matches([' ', '\t'])
-                        .starts_with(['"', '\'', '('])
-                }))
+    // The Pandoc dispatcher only reads the first line of a quoted definition.
+    let single_line = quoted && options.dialect == Dialect::Pandoc;
+    if let Some(spans) = spans_for(first)
+        && (single_line
+            || (spans.title.is_some()
+                || following
+                    .first()
+                    .and_then(|raw| continuation(raw))
+                    .is_none_or(|tail| {
+                        !tail
+                            .trim_start_matches([' ', '\t'])
+                            .starts_with(['"', '\'', '('])
+                    }))
+                && (strict_eol
+                    || following.first().is_none_or(|raw| {
+                        continuation(raw).is_none() || !line_is_mmd_link_attribute_continuation(raw)
+                    })))
     {
         return Some(PlannedReference {
             source: Cow::Borrowed(first),
@@ -538,6 +549,9 @@ fn plan_reference<'a>(
             markers: Vec::new(),
             consumed_lines: 1,
         });
+    }
+    if single_line {
+        return None;
     }
 
     let mut source = first.to_owned();
@@ -552,8 +566,14 @@ fn plan_reference<'a>(
         }
         source.push_str(tail);
     }
-    let spans = reference_definition_spans(&source, true, dialect, false)?;
-    let consumed_lines = starts.partition_point(|&start| start < spans.consumed);
+    let spans = spans_for(&source)?;
+    let mut consumed_lines = starts.partition_point(|&start| start < spans.consumed);
+    if !strict_eol {
+        consumed_lines += following[consumed_lines - 1..starts.len() - 1]
+            .iter()
+            .take_while(|raw| line_is_mmd_link_attribute_continuation(raw))
+            .count();
+    }
     let end = starts.get(consumed_lines).copied().unwrap_or(source.len());
     source.truncate(end);
     markers.retain(|&(offset, _)| offset < end);
@@ -2469,12 +2489,8 @@ pub(super) fn plan<'a>(
             && planner.paragraph.is_empty()
             && remaining.trim_start().starts_with('[')
             && !remaining.trim_start().starts_with("[^")
-            && let Some(reference) = plan_reference(
-                remaining,
-                &lines[pos + 1..],
-                &planner.frames,
-                options.dialect,
-            )
+            && let Some(reference) =
+                plan_reference(remaining, &lines[pos + 1..], &planner.frames, options)
         {
             let indent_start = prefixes
                 .iter()

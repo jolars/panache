@@ -1,8 +1,8 @@
 //! Experimental block planning followed by lossless CST emission.
 //!
-//! The implementation covers a subset of the CommonMark and Quarto flavors
-//! with resolved extension settings. Compare the result with the incumbent parser before using a
-//! document as a benchmark workload.
+//! The implementation uses resolved extension settings for CommonMark, Pandoc,
+//! Quarto, R Markdown, and MultiMarkdown. Compare the result with the incumbent
+//! parser before using a document as a benchmark workload.
 
 mod containers;
 mod html;
@@ -36,15 +36,17 @@ use super::blocks::indented_code::parse_indented_code_block;
 use super::blocks::line_blocks::{PreparedLineBlock, is_bare_marker, try_parse_line_block_start};
 use super::blocks::lists::{ListMarker, OpenListHint, marker_start_number, try_parse_list_marker};
 use super::blocks::metadata::{
-    YamlContentOutcome, collect_yaml_content, emit_pandoc_title_block, emit_yaml_block,
-    find_yaml_block_closing_pos, is_metadata_open_delim, pandoc_title_block_end,
-    prepare_yaml_content,
+    YamlContentOutcome, collect_yaml_content, emit_mmd_title_block, emit_pandoc_title_block,
+    emit_yaml_block, find_yaml_block_closing_pos, is_metadata_open_delim, mmd_title_block_end,
+    pandoc_title_block_end, prepare_yaml_content,
 };
 use super::blocks::paragraphs::{
     JupyterMathLookahead, update_display_math_state, update_inline_math_environments,
 };
 use super::blocks::raw_blocks::{self, emit_raw_tex_block};
-use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
+use super::blocks::reference_links::{
+    ReferenceSpans, line_is_mmd_link_attribute_continuation, reference_definition_spans,
+};
 use super::blocks::tables::{
     DashTableKind, PreparedDashTable, PreparedGridTable, PreparedPipeTable, is_table_caption_start,
     prepare_dash_table_at, prepare_grid_table, prepare_pipe_table,
@@ -83,6 +85,7 @@ enum Block<'a> {
     Code(Range<usize>, FenceInfo, bool),
     Metadata(usize, usize, YamlContentOutcome),
     PandocTitle(usize),
+    MmdTitle(usize),
     Lines(usize, PreparedLineBlock),
     RawTex(Range<usize>),
     OpenDiv(usize, DivFenceInfo),
@@ -265,6 +268,13 @@ fn plan<'a>(
             blocks.push(Block::PandocTitle(end));
             pos = end;
             continue;
+        } else if at_start
+            && options.extensions.mmd_title_block
+            && let Some(end) = mmd_title_block_end(lines)
+        {
+            blocks.push(Block::MmdTitle(end));
+            pos = end;
+            continue;
         } else if options.extensions.yaml_metadata_block
             && is_metadata_open_delim(line)
             && (at_start || (!commonmark && fresh))
@@ -335,7 +345,7 @@ fn plan<'a>(
                             .take_while(|line| !is_blank_line(line))
                             .count(),
                 ),
-                true,
+                !options.extensions.mmd_link_attributes,
                 options.dialect,
                 false,
             )
@@ -345,6 +355,12 @@ fn plan<'a>(
             while bytes < spans.consumed {
                 bytes += lines[end].len();
                 end += 1;
+            }
+            if options.extensions.mmd_link_attributes {
+                end += lines[end..]
+                    .iter()
+                    .take_while(|line| line_is_mmd_link_attribute_continuation(line))
+                    .count();
             }
             blocks.push(Block::Reference(pos..end, spans));
             pos = end;
@@ -602,8 +618,14 @@ fn parse_at(
     options: &ParserOptions,
     origin: ParseOrigin,
 ) -> Result<(SyntaxNode, Vec<SyntaxError>), Unsupported> {
-    if !matches!(options.flavor, Flavor::CommonMark | Flavor::Quarto)
-        || options.dialect != Dialect::for_flavor(options.flavor)
+    if !matches!(
+        options.flavor,
+        Flavor::CommonMark
+            | Flavor::Pandoc
+            | Flavor::Quarto
+            | Flavor::RMarkdown
+            | Flavor::MultiMarkdown
+    ) || options.dialect != Dialect::for_flavor(options.flavor)
     {
         return Err(Unsupported {
             offset: 0,
@@ -743,6 +765,7 @@ fn parse_at(
                 emit_yaml_block(&lines, start, end, &mut builder, &diagnostics, &outcome);
             }
             Block::PandocTitle(end) => emit_pandoc_title_block(&lines[..end], &mut builder),
+            Block::MmdTitle(end) => emit_mmd_title_block(&lines[..end], &mut builder),
             Block::Lines(pos, block) => {
                 block.emit(
                     &StrippedLines::new(&lines, pos, &prefix),

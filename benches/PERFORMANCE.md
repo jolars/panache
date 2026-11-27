@@ -580,3 +580,78 @@ lines inside quoted display math. The planner's full-parse median and p95
 were 9.54 / 10.08 ms and 18.66 / 20.16 ms. The incumbent measured
 10.55 / 11.14 ms and 20.63 / 22.31 ms. The two engines passed source,
 CST, and diagnostic preflight on both inputs.
+
+### Pandoc, R Markdown, and MultiMarkdown checkpoint
+
+Both release builds ran on logical CPU 4 of the Intel Core Ultra 7 155U
+with Rust 1.98.1. The comparison reran the display and fenced math
+workloads with the same files and resolved options at baseline `f3e31594`
+and with the three flavors enabled. Each cell gives the median and p95
+in microseconds, with the incumbent on the left and the planner on the
+right. A dash marks a fixture with fewer than two blank lines for the
+edit sequence.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| Project README | 487.6 / 514.5 → 291.4 / 311.1 | 239.7 / 272.5 → 205.7 / 230.5 | 5.5 / 6.2 → 5.4 / 6.2 | 4.7 / 5.3 → 2.8 / 3.2 |
+| Pandoc manual | 9312.4 / 10256.5 → 5294.2 / 5917.8 | 2088.3 / 2293.2 → 2057.7 / 2276.2 | 84.0 / 94.8 → 85.6 / 95.9 | 9.4 / 12.3 → 7.4 / 8.6 |
+| Parser README | 33.3 / 36.6 → 18.6 / 19.5 | 28.8 / 32.2 → 19.0 / 21.2 | 17.5 / 19.4 → 11.0 / 11.9 | 3.1 / 3.4 → 1.4 / 1.6 |
+| Integrations | 349.7 / 394.7 → 215.0 / 243.5 | 164.7 / 187.0 → 139.4 / 161.0 | 75.3 / 86.5 → 61.8 / 70.2 | 5.8 / 6.6 → 2.9 / 3.4 |
+| Getting Started | 581.2 / 644.0 → 328.6 / 368.8 | 185.2 / 211.0 → 170.6 / 189.2 | 82.0 / 98.3 → 77.1 / 86.3 | 5.1 / 5.8 → 2.7 / 3.0 |
+| Performance | 2083.6 / 2135.5 → 1717.2 / 1762.8 | 344.1 / 360.6 → 319.5 / 332.8 | 178.7 / 188.2 → 157.8 / 165.3 | 6.4 / 7.3 → 3.1 / 3.5 |
+| Tables | 1345.2 / 1486.0 → 879.5 / 969.3 | 390.8 / 405.3 → 366.4 / 383.3 | 193.3 / 209.2 → 176.0 / 189.7 | 6.4 / 7.2 → 3.2 / 3.5 |
+| Math | 974.2 / 1084.6 → 607.8 / 685.3 | 319.9 / 360.4 → 304.2 / 345.7 | 140.8 / 163.5 → 130.4 / 146.3 | 5.4 / 6.2 → 2.7 / 3.2 |
+| Math with grid tables disabled | 949.4 / 1060.9 → 600.4 / 674.9 | 316.6 / 360.3 → 304.3 / 342.7 | 139.2 / 161.1 → 131.8 / 148.2 | 5.4 / 6.1 → 2.8 / 3.2 |
+| 0123 | 18.6 / 21.1 → 8.2 / 9.3 | 22.4 / 25.4 → 11.7 / 13.1 | 20.7 / 23.4 → 9.9 / 11.2 | 4.2 / 4.9 → 1.8 / 2.0 |
+| 0124 | 11.5 / 11.9 → 7.6 / 7.9 | 18.2 / 20.4 → 11.7 / 13.3 | 7.0 / 7.8 → 4.5 / 5.0 | 3.8 / 4.3 → 1.5 / 1.8 |
+| 0541 | 6.4 / 7.0 → 3.9 / 4.2 | — | — | — |
+| 0199 | 11.3 / 11.6 → 13.1 / 13.6 | 14.8 / 15.1 → 16.5 / 17.7 | 14.0 / 14.3 → 15.7 / 17.0 | 4.1 / 4.2 → 1.7 / 1.8 |
+| 0481 | 7.6 / 8.3 → 6.5 / 7.4 | — | — | — |
+| 0495 | 11.8 / 14.3 → 11.2 / 13.4 | — | — | — |
+| 0610 | 12.6 / 17.1 → 11.9 / 16.6 | — | — | — |
+| 0611 | 11.7 / 12.2 → 10.6 / 11.3 | — | — | — |
+| 0098 | 4.8 / 5.0 → 2.3 / 2.5 | — | — | — |
+| 0130 | 19.0 / 19.3 → 6.9 / 7.2 | 22.5 / 25.6 → 11.1 / 12.0 | 1.2 / 1.3 → 1.2 / 1.3 | 3.8 / 4.3 → 1.7 / 1.9 |
+| 0141 | 11.8 / 12.0 → 4.3 / 4.5 | 12.8 / 14.2 → 7.3 / 8.0 | 0.9 / 1.0 → 0.9 / 1.0 | 3.8 / 4.0 → 1.9 / 2.1 |
+| 0095 | 8.7 / 9.0 → 4.2 / 4.4 | 13.4 / 14.9 → 8.2 / 9.1 | 1.3 / 1.5 → 1.3 / 1.5 | 3.9 / 4.3 → 1.8 / 2.0 |
+| 0047 | 27.6 / 28.3 → 12.2 / 12.9 | 27.8 / 28.3 → 15.8 / 16.4 | 1.1 / 1.2 → 1.1 / 1.2 | 4.1 / 4.3 → 2.0 / 2.2 |
+| 0048 | 15.1 / 17.0 → 6.7 / 7.7 | 15.7 / 16.1 → 9.7 / 10.1 | 14.6 / 15.0 → 8.8 / 9.1 | 3.7 / 3.8 → 1.7 / 1.7 |
+| 0049 | 20.2 / 23.5 → 11.2 / 12.8 | 23.0 / 27.1 → 15.4 / 18.3 | 0.9 / 1.1 → 0.9 / 1.0 | 4.1 / 4.8 → 1.9 / 2.2 |
+| 0050 | 6.8 / 6.9 → 3.6 / 3.8 | — | — | — |
+| fenced_math_in_list_blockquote | 3.5 / 4.0 → 2.9 / 3.5 | — | — | — |
+
+All 26 workloads that reached timing at the baseline still reached timing.
+Across the nine shared documents, planner full-parse medians stayed at
+56–82% of the incumbent's. Line-start edit medians went from 65–100% to
+66–99%, typing medians from 62–101% to 63–102%, and whole-file replacement
+medians from 42–77% to 45–79%. The existing CST or diagnostic mismatch
+excluded `large_authoring.qmd` in both runs.
+
+The following fixtures passed preflight with the newly enabled flavor
+defaults. Numbered fixtures come from the Pandoc conformance corpus.
+The other fixtures come from the parser golden suite.
+
+| Flavor | Fixture | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Pandoc | 0098 | 5.2 / 8.6 → 2.5 / 4.3 | — | — | — |
+| Pandoc | 0130 | 21.2 / 21.9 → 7.8 / 8.4 | 25.1 / 25.7 → 12.2 / 12.8 | 1.3 / 1.4 → 1.2 / 1.3 | 4.3 / 4.5 → 1.9 / 2.1 |
+| Pandoc | 0141 | 12.0 / 16.1 → 4.4 / 5.9 | 12.6 / 14.3 → 7.2 / 8.1 | 0.9 / 1.0 → 1.0 / 1.1 | 3.9 / 4.3 → 1.9 / 2.1 |
+| R Markdown | bookdown | 34.6 / 39.2 → 16.9 / 17.7 | 30.7 / 32.4 → 18.2 / 19.5 | 28.7 / 31.1 → 15.8 / 16.7 | 4.1 / 4.2 → 1.8 / 1.9 |
+| R Markdown | bookdown_math_labels_host | 35.3 / 40.4 → 20.9 / 23.9 | 35.7 / 39.1 → 22.3 / 24.4 | 1.2 / 1.3 → 1.2 / 1.4 | 5.0 / 5.3 → 2.3 / 2.5 |
+| R Markdown | bookdown_math_labels_nested | 19.9 / 23.1 → 11.0 / 12.9 | 16.8 / 17.1 → 12.1 / 12.5 | 15.2 / 15.7 → 10.0 / 10.3 | 4.0 / 4.1 → 1.7 / 1.8 |
+| R Markdown | display_math_content_on_fence_line | 27.3 / 30.0 → 13.7 / 15.6 | 29.3 / 30.2 → 17.8 / 18.2 | 1.1 / 1.2 → 1.1 / 1.2 | 4.2 / 4.3 → 1.9 / 2.0 |
+| R Markdown | issue_186_list_blockquote_lazy_idempotency | 31.6 / 34.8 → 14.4 / 15.4 | 35.9 / 40.6 → 19.0 / 21.8 | 1.1 / 1.3 → 1.1 / 1.2 | 4.8 / 5.3 → 2.2 / 2.5 |
+| R Markdown | issue_195_blockquote_lazy_continuation_shape | 31.7 / 33.7 → 16.2 / 17.7 | — | — | — |
+| R Markdown | issue_314_advance_columns_multibyte | 10.2 / 10.5 → 5.6 / 5.9 | 8.6 / 9.8 → 5.4 / 6.2 | 0.8 / 0.9 → 0.8 / 0.9 | 4.2 / 4.8 → 1.9 / 2.2 |
+| R Markdown | rmarkdown_math | 34.2 / 40.0 → 22.9 / 27.8 | 37.1 / 41.3 → 28.0 / 31.4 | 33.3 / 37.4 → 23.6 / 27.0 | 4.1 / 4.6 → 1.8 / 2.0 |
+| R Markdown | unresolved_reference_intraword_underscore_pandoc | 6.5 / 6.8 → 4.9 / 5.3 | — | — | — |
+| MultiMarkdown | mmd_title_block | 3.4 / 3.6 → 1.9 / 2.0 | — | — | — |
+| MultiMarkdown | mmd_link_attributes | 7.5 / 8.5 → 4.5 / 5.0 | — | — | — |
+| MultiMarkdown | mmd_header_identifiers | 3.4 / 3.5 → 2.0 / 2.2 | — | — | — |
+| MultiMarkdown | atx_interrupts_paragraph_multimarkdown | 4.2 / 4.7 → 1.6 / 1.8 | — | — | — |
+
+The formatter fixture `issue_609_chunk_option_expressions_rmarkdown`
+passed the original parse comparison and failed parity on the line-start
+edit. The edit turns a chunk opener into an inline code span opener.
+The planner treats the span's closing backticks as a new fence. The
+baseline also failed on that edit with Quarto defaults.
