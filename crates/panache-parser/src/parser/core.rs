@@ -1019,6 +1019,16 @@ impl<'a> Parser<'a> {
 
             while self.containers.depth() > levels_to_keep {
                 match self.containers.last() {
+                    Some(Container::FencedDiv { .. })
+                        if self
+                            .containers
+                            .stack
+                            .iter()
+                            .rposition(|container| matches!(container, Container::ListItem { .. }))
+                            .is_some_and(|owner| owner >= levels_to_keep) =>
+                    {
+                        self.close_containers_to(self.containers.depth() - 1);
+                    }
                     Some(Container::ListItem { .. }) => {
                         log::trace!(
                             "Closing ListItem at blank line (levels_to_keep={} < depth={})",

@@ -11,7 +11,7 @@
 //! The marker-injection logic mirrors the lossless reconstruction rules:
 //! a leaf token is split when a marker falls in its interior, and a marker
 //! whose offset coincides with a node boundary is emitted *outside* the node
-//! (before `start_node`) so it never nests inside e.g. an `EMPHASIS_MARKER`.
+//! by default. List-buffer grafting places the marker at the first token.
 
 use crate::parser::utils::helpers::space_run;
 use crate::syntax::SyntaxKind;
@@ -77,6 +77,7 @@ pub(crate) struct MarkerInjectingSink<'a, 'b> {
     idx: usize,
     /// Bytes of source text emitted so far.
     offset: usize,
+    markers_before_node: bool,
 }
 
 impl<'a, 'b> MarkerInjectingSink<'a, 'b> {
@@ -89,7 +90,15 @@ impl<'a, 'b> MarkerInjectingSink<'a, 'b> {
             marker_positions,
             idx: 0,
             offset: 0,
+            markers_before_node: true,
         }
+    }
+
+    /// Match the list buffer's grafting order by inserting each prefix before
+    /// the first source token on its line, inside any nodes already opened.
+    pub(crate) fn with_markers_at_tokens(mut self) -> Self {
+        self.markers_before_node = false;
+        self
     }
 
     fn emit_markers_at_current(&mut self) {
@@ -164,7 +173,9 @@ impl InlineSink for MarkerInjectingSink<'_, '_> {
     }
 
     fn start_node(&mut self, kind: rowan::SyntaxKind) {
-        self.emit_markers_at_current();
+        if self.markers_before_node {
+            self.emit_markers_at_current();
+        }
         self.inner.start_node(kind);
     }
 

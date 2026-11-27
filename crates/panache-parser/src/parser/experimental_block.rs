@@ -53,6 +53,7 @@ use super::blocks::tables::{
 };
 use super::core::ParseOrigin;
 use super::diagnostics::Diagnostics;
+use super::inlines::code_spans::pending_code_span_openers;
 use super::utils::container_stack::{OpenDisplayMath, leading_indent};
 use super::utils::helpers::{is_blank_line, split_lines_inclusive, trim_end_newlines};
 use super::utils::inline_emission::emit_inlines;
@@ -291,6 +292,18 @@ fn plan<'a>(
             && fence_enabled(&fence, options)
             && (commonmark || fresh || (fence.fence_char != '~' && indent == 0))
         {
+            if !commonmark
+                && fence.fence_char == '`'
+                && fence.info_string.trim().is_empty()
+                && let Some(Block::Paragraph(range, _)) = blocks.last()
+                && pending_code_span_openers(source_span(input, lines, range.clone()))
+                    .contains(&fence.fence_count)
+            {
+                push_paragraph(&mut blocks, pos);
+                math.update(line, options, true);
+                pos += 1;
+                continue;
+            }
             let close = lines[pos + 1..]
                 .iter()
                 .position(|line| is_closing_fence(line, &fence));
@@ -805,6 +818,7 @@ fn emit_buffered_paragraph(
     paragraph: &ParagraphBuffer,
     options: &ParserOptions,
     suppress_footnote_refs: bool,
+    markers_at_tokens: bool,
 ) {
     let kind = if options.extensions.implicit_figures
         && paragraph_is_standalone_image(&paragraph.get_text_for_parsing(), options)
@@ -814,7 +828,12 @@ fn emit_buffered_paragraph(
         kind
     };
     builder.start_node(kind.into());
-    paragraph.emit_with_inlines(builder, options, suppress_footnote_refs);
+    paragraph.emit_inlines_with_prefixes(
+        builder,
+        options,
+        suppress_footnote_refs,
+        markers_at_tokens,
+    );
     builder.finish_node();
 }
 

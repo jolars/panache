@@ -129,6 +129,50 @@ fn multimarkdown_reference_attributes_follow_the_definition() {
 }
 
 #[test]
+fn pandoc_family_code_span_closer_does_not_open_a_fence() {
+    let input = "Edited prose ```{r example}\n1 + 1\n```\n\n```{r next}\n2 + 2\n```\n";
+    for flavor in [Flavor::RMarkdown, Flavor::Quarto] {
+        let tree = check(input, &ParserOptions::for_flavor(flavor));
+        assert_eq!(
+            tree.children().map(|node| node.kind()).collect::<Vec<_>>(),
+            [K::PARAGRAPH, K::BLANK_LINE, K::CODE_BLOCK]
+        );
+        assert!(tree.descendants().any(|node| node.kind() == K::INLINE_CODE));
+    }
+}
+
+#[test]
+fn quarto_fenced_div_in_nested_list_preserves_link_prefixes() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for link in ["<https://example.com>", "[example](https://example.com)"] {
+        let input = format!("- - First cell\n  - ::: second\n    {link}\n    :::\n");
+        check(&input, &options);
+    }
+}
+
+#[test]
+fn quarto_fenced_div_in_nested_list_keeps_blank_separated_child_divs() {
+    let input = "- - First cell\n  - ::: second\n\n    ::: child\n    Body.\n    :::\n\n    :::\n";
+    let tree = check(input, &ParserOptions::for_flavor(Flavor::Quarto));
+    let parent = tree
+        .descendants()
+        .find(|node| node.kind() == K::FENCED_DIV)
+        .unwrap();
+    assert!(parent.children().any(|node| node.kind() == K::FENCED_DIV));
+}
+
+#[test]
+fn quarto_fenced_div_ends_when_its_list_item_ends_at_a_blank() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for body in ["", "  ::: child\n  Body.\n  :::\n\n"] {
+        let input = format!("- ::: parent\n\n{body}Outside.\n");
+        let tree = check(&input, &options);
+        assert_eq!(tree.last_child().unwrap().kind(), K::PARAGRAPH);
+        assert_eq!(tree.last_child().unwrap().text().to_string(), "Outside.\n");
+    }
+}
+
+#[test]
 fn structural_reparse_reuses_both_sides_across_edits() {
     for flavor in [
         Flavor::CommonMark,

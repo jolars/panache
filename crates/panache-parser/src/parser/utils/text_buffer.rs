@@ -274,6 +274,16 @@ impl ParagraphBuffer {
         config: &ParserOptions,
         suppress_footnote_refs: bool,
     ) {
+        self.emit_inlines_with_prefixes(builder, config, suppress_footnote_refs, false);
+    }
+
+    pub(crate) fn emit_inlines_with_prefixes(
+        &self,
+        builder: &mut GreenNodeBuilder<'static>,
+        config: &ParserOptions,
+        suppress_footnote_refs: bool,
+        markers_at_tokens: bool,
+    ) {
         let text = self.get_text_for_parsing();
         if text.is_empty() && self.segments.is_empty() {
             return;
@@ -284,13 +294,12 @@ impl ParagraphBuffer {
         if marker_positions.is_empty() {
             inline_emission::emit_inlines(builder, &text, config, suppress_footnote_refs);
         } else {
-            self.emit_with_markers(
-                builder,
-                &text,
-                &marker_positions,
-                config,
-                suppress_footnote_refs,
-            );
+            let mut sink = MarkerInjectingSink::new(builder, &marker_positions);
+            if markers_at_tokens {
+                sink = sink.with_markers_at_tokens();
+            }
+            inline_emission::emit_inlines(&mut sink, &text, config, suppress_footnote_refs);
+            sink.finish();
         }
     }
 
@@ -378,19 +387,6 @@ impl ParagraphBuffer {
         let markers = self.get_marker_positions();
         let mut sink = MarkerInjectingSink::new(builder, &markers);
         crate::parser::blocks::headings::emit_setext_heading_text(&mut sink, &text, config);
-        sink.finish();
-    }
-
-    fn emit_with_markers(
-        &self,
-        builder: &mut GreenNodeBuilder<'static>,
-        text: &str,
-        marker_positions: &[(usize, InjectedMarker<'_>)],
-        config: &ParserOptions,
-        suppress_footnote_refs: bool,
-    ) {
-        let mut sink = MarkerInjectingSink::new(builder, marker_positions);
-        inline_emission::emit_inlines(&mut sink, text, config, suppress_footnote_refs);
         sink.finish();
     }
 

@@ -75,7 +75,7 @@ pub(super) enum Event<'a> {
     QuoteMarker(usize, bool),
     QuoteLinePrefix(usize, bool),
     Item(&'a str, ListMarkerMatch, bool),
-    Paragraph(K, ParagraphBuffer, bool),
+    Paragraph(K, ParagraphBuffer, bool, bool),
     Term(&'a str),
     DefinitionMarker(&'a str, char, &'a str),
     FootnoteMarker(&'a str, String, &'a str),
@@ -147,9 +147,18 @@ enum Frame {
     Definition { column: usize },
     Footnote,
     Quote,
-    Div { indent: usize },
+    Div { indent: usize, source: DivSource },
     List { marker: ListMarker, indent: usize },
     Item { column: usize, empty_opener: bool },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DivSource {
+    Ordinary,
+    // The incumbent reparses the list buffer and restores prefixes at tokens.
+    BufferedListItem,
+    // A blank after the item marker makes the incumbent open the div directly.
+    ListItem,
 }
 
 pub(super) enum Prefix<'a> {
@@ -176,7 +185,15 @@ impl<'a> Planner<'a, '_> {
                 self.frames
                     .iter()
                     .any(|frame| matches!(frame, Frame::Footnote)),
+                self.div_source() == DivSource::BufferedListItem,
             ));
+        }
+    }
+
+    fn div_source(&self) -> DivSource {
+        match self.frames.last() {
+            Some(Frame::Div { source, .. }) => *source,
+            _ => DivSource::Ordinary,
         }
     }
 
@@ -449,7 +466,7 @@ fn block_prefix(
         .rposition(|frame| matches!(frame, Frame::Div { .. }));
     let div_indent = div
         .and_then(|i| match frames[i] {
-            Frame::Div { indent } => Some(indent),
+            Frame::Div { indent, .. } => Some(indent),
             _ => None,
         })
         .or(outer_div_indent);
@@ -756,7 +773,7 @@ pub(super) fn plan<'a>(
                 && (outer_div_indent.is_some_and(|indent| leading_indent(line).0 <= indent
                     && remaining.len() == line.len())
                     || planner.frames[..matched].iter().any(|frame| {
-                        matches!(frame, Frame::Div { indent } if leading_indent(remaining).0 <= *indent)
+                        matches!(frame, Frame::Div { indent, .. } if leading_indent(remaining).0 <= *indent)
                     })))
             && !(try_parse_setext_heading(&["text\n", remaining], 0).is_some()
                 && (commonmark || (planner.math.lines == 1 && planner.paragraph_kind == K::PARAGRAPH)))
@@ -898,7 +915,7 @@ pub(super) fn plan<'a>(
             && remaining.trim_start_matches(' ').starts_with(':')
             && is_div_closing_fence(remaining)
             && let Some(depth) = planner.frames[..matched].iter().rposition(|frame| {
-                matches!(frame, Frame::Div { indent } if leading_indent(remaining).0 <= *indent)
+                matches!(frame, Frame::Div { indent, .. } if leading_indent(remaining).0 <= *indent)
             })
         {
             let unstripped = restore_trailing_indent(line, remaining, &mut prefixes);
@@ -909,8 +926,11 @@ pub(super) fn plan<'a>(
                 planner.push_text("", prefixes);
             }
             planner.close_to(depth + 1);
+            let source = planner.div_source();
             planner.frames.pop();
-            if planner.frames.last().is_some_and(|frame| body_column(frame).is_some()) {
+            if source == DivSource::ListItem
+                || planner.frames.last().is_some_and(|frame| body_column(frame).is_some())
+            {
                 planner.events.push(Event::CloseDiv(unstripped, ""));
             } else {
                 planner.events.push(Event::CloseDiv(remaining, indent));
@@ -2040,10 +2060,26 @@ pub(super) fn plan<'a>(
             && remaining.trim_start_matches(' ').starts_with(':')
             && let Some(fence) = try_parse_div_fence_open(remaining)
         {
-            let opener = if planner
-                .frames
-                .last()
-                .is_some_and(|frame| body_column(frame).is_some())
+            let parent_source = planner.div_source();
+            let source = if opened_item
+                && !planner
+                    .frames
+                    .iter()
+                    .any(|frame| matches!(frame, Frame::Quote))
+            {
+                if lines.get(pos + 1).is_some_and(|line| is_blank_line(line)) {
+                    DivSource::ListItem
+                } else {
+                    DivSource::BufferedListItem
+                }
+            } else {
+                parent_source
+            };
+            let opener = if parent_source == DivSource::ListItem
+                || planner
+                    .frames
+                    .last()
+                    .is_some_and(|frame| body_column(frame).is_some())
             {
                 restore_trailing_indent(line, remaining, &mut prefixes)
             } else {
@@ -2053,6 +2089,7 @@ pub(super) fn plan<'a>(
             planner.events.push(Event::OpenDiv(opener, fence));
             planner.frames.push(Frame::Div {
                 indent: leading_indent(remaining).0,
+                source,
             });
         } else if !opener_as_text
             && planner.paragraph.is_empty()
@@ -2670,6 +2707,9 @@ pub(super) fn plan<'a>(
             {
                 remaining = &line[line.len() - remaining.len() - indent.len()..];
             }
+            if planner.div_source() == DivSource::ListItem {
+                remaining = restore_trailing_indent(line, remaining, &mut prefixes);
+            }
             if matches!(
                 prefixes.as_slice(),
                 [Prefix::Indent(_), Prefix::Indent(_), ..]
@@ -2753,8 +2793,15 @@ pub(super) fn emit(
                     claim_task_checkbox,
                 );
             }
-            Event::Paragraph(kind, buffer, suppress_footnote_refs) => {
-                emit_buffered_paragraph(builder, kind, &buffer, options, suppress_footnote_refs);
+            Event::Paragraph(kind, buffer, suppress_footnote_refs, markers_at_tokens) => {
+                emit_buffered_paragraph(
+                    builder,
+                    kind,
+                    &buffer,
+                    options,
+                    suppress_footnote_refs,
+                    markers_at_tokens,
+                );
             }
             Event::Term(line) => emit_term(builder, line, None, options),
             Event::DefinitionMarker(indent, marker, padding) => {

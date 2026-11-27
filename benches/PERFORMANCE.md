@@ -655,3 +655,24 @@ passed the original parse comparison and failed parity on the line-start
 edit. The edit turns a chunk opener into an inline code span opener.
 The planner treats the span's closing backticks as a new fence. The
 baseline also failed on that edit with Quarto defaults.
+
+### Inline code and nested fenced div checkpoint
+
+Both release builds ran on logical CPU 4 of the Intel Core Ultra 7 155U
+with Rust 1.98.1. The comparison reran the same files and resolved
+options at baseline `7f781174` and after the fixes. All 42 previously
+timed workloads and both previously excluded workloads passed preflight,
+including the chained edits where the document had enough blank lines.
+
+Across the nine previously timed documents, planner full-parse medians
+went from 56–83% to 55–83% of the incumbent's. Line-start edit medians
+went from 66–97% to 66–98%, typing medians from 62–97% to 64–97%, and
+whole-file replacement medians from 44–72% to 45–76%.
+
+Each cell gives the median and p95 in microseconds, with the incumbent
+on the left and the planner on the right.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| `large_authoring.qmd` | 1172.6 / 1272.3 → 734.2 / 781.7 | 348.1 / 393.5 → 337.3 / 380.8 | 7.8 / 9.4 → 7.8 / 9.3 | 5.8 / 6.9 → 3.1 / 3.7 |
+| `issue_609_chunk_option_expressions_rmarkdown` | 24.8 / 25.6 → 20.8 / 21.7 | 30.3 / 31.4 → 24.4 / 25.3 | 1.1 / 1.2 → 1.1 / 1.2 | 4.9 / 5.2 → 2.5 / 2.6 |

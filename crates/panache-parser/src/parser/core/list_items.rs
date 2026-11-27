@@ -174,6 +174,9 @@ impl<'a> Parser<'a> {
 
     /// The list item buffers its marker-line content before ordinary block dispatch.
     pub(super) fn maybe_open_custom_block_in_new_list_item(&mut self) -> Option<usize> {
+        if self.maybe_open_fenced_div_in_new_list_item().is_some() {
+            return Some(0);
+        }
         if self.config.extensions.vitepress_containers
             && self.maybe_open_vitepress_in_new_list_item().is_some()
         {
@@ -212,6 +215,37 @@ impl<'a> Parser<'a> {
             return Some(0);
         }
         self.maybe_open_hugo_in_new_list_item()
+    }
+
+    fn maybe_open_fenced_div_in_new_list_item(&mut self) -> Option<()> {
+        // The list buffer is flushed at a blank line. Keep a marker-line
+        // div open on the stack when its body starts after that blank.
+        if !self.config.extensions.fenced_divs
+            || !self
+                .lines
+                .get(self.pos + 1)
+                .is_some_and(|line| is_blank_line(line))
+            || self.current_blockquote_depth() != 0
+        {
+            return None;
+        }
+        let Some(Container::ListItem {
+            buffer,
+            content_col,
+            ..
+        }) = self.containers.stack.last_mut()
+        else {
+            return None;
+        };
+        let first = buffer.sole_text_segment()?;
+        let fence = super::fenced_divs::try_parse_div_fence_open(first)?;
+        let open_indent_cols = *content_col + leading_indent(first).0;
+        self.builder.start_node(SyntaxKind::FENCED_DIV.into());
+        super::super::block_dispatcher::emit_div_fence_open(&mut self.builder, first, &fence);
+        buffer.clear();
+        self.containers
+            .push(Container::FencedDiv { open_indent_cols });
+        Some(())
     }
 
     fn maybe_open_vitepress_in_new_list_item(&mut self) -> Option<()> {
