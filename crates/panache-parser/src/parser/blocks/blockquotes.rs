@@ -12,6 +12,56 @@ pub(crate) use crate::parser::utils::marker_utils::{
     count_blockquote_markers, try_parse_blockquote_marker,
 };
 
+pub(in crate::parser) const GITHUB_ALERT_MARKERS: [&str; 5] = [
+    "[!TIP]",
+    "[!WARNING]",
+    "[!IMPORTANT]",
+    "[!CAUTION]",
+    "[!NOTE]",
+];
+
+pub(in crate::parser) fn github_alert_marker_len(content: &str) -> Option<usize> {
+    GITHUB_ALERT_MARKERS
+        .into_iter()
+        .find(|marker| *marker == content.trim_end())
+        .map(str::len)
+}
+
+pub(in crate::parser) fn emit_alert_header(
+    builder: &mut GreenNodeBuilder<'static>,
+    line: &str,
+    newline: &str,
+    indent: &str,
+    marker_len: usize,
+) {
+    builder.start_node(SyntaxKind::ALERT.into());
+    let header = line.trim_start();
+    let leading = &line[..line.len() - header.len()];
+    for whitespace in [indent, leading] {
+        if !whitespace.is_empty() {
+            builder.token(SyntaxKind::WHITESPACE.into(), whitespace);
+        }
+    }
+    let (marker, remainder) = header.split_at(marker_len);
+    builder.token(SyntaxKind::ALERT_MARKER.into(), marker);
+    let title_and_padding = remainder.trim_start();
+    let gap = &remainder[..remainder.len() - title_and_padding.len()];
+    let title = title_and_padding.trim_end();
+    if !gap.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), gap);
+    }
+    if !title.is_empty() {
+        builder.token(SyntaxKind::ALERT_TITLE.into(), title);
+    }
+    let trailing = &title_and_padding[title.len()..];
+    if !trailing.is_empty() {
+        builder.token(SyntaxKind::WHITESPACE.into(), trailing);
+    }
+    if !newline.is_empty() {
+        builder.token(SyntaxKind::NEWLINE.into(), newline);
+    }
+}
+
 /// Check if we need a blank line before starting a new blockquote.
 /// Returns true if a blockquote can start here.
 ///

@@ -1,0 +1,65 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..145
+  LIST@0..89
+    LIST_ITEM@0..33
+      LIST_MARKER@0..1 "-"
+      WHITESPACE@1..2 " "
+      TASK_CHECKBOX@2..5 "[ ]"
+      PLAIN@5..33
+        TEXT@5..20 " Paragraph task"
+        NEWLINE@20..21 "\n"
+        LINE_PREFIX@21..23 "  "
+        TEXT@23..32 "continued"
+        NEWLINE@32..33 "\n"
+    LIST_ITEM@33..59
+      LIST_MARKER@33..34 "-"
+      WHITESPACE@34..35 " "
+      TASK_CHECKBOX@35..38 "[x]"
+      PLAIN@38..59
+        TEXT@38..58 " # Heading-like text"
+        NEWLINE@58..59 "\n"
+    LIST_ITEM@59..83
+      LIST_MARKER@59..60 "-"
+      WHITESPACE@60..61 " "
+      TASK_CHECKBOX@61..64 "[X]"
+      PLAIN@64..83
+        TEXT@64..82 " > Quote-like text"
+        NEWLINE@82..83 "\n"
+    LIST_ITEM@83..89
+      LIST_MARKER@83..84 "-"
+      WHITESPACE@84..85 " "
+      PLAIN@85..89
+        TEXT@85..88 "[ ]"
+        NEWLINE@88..89 "\n"
+  BLANK_LINE@89..90
+    BLANK_LINE@89..90 "\n"
+  BLOCK_QUOTE@90..135
+    BLOCK_QUOTE_MARKER@90..91 ">"
+    WHITESPACE@91..92 " "
+    LIST@92..135
+      LIST_ITEM@92..135
+        LIST_MARKER@92..94 "1."
+        WHITESPACE@94..95 " "
+        TASK_CHECKBOX@95..98 "[x]"
+        PLAIN@98..112
+          TEXT@98..111 " Ordered task"
+          NEWLINE@111..112 "\n"
+        LINE_PREFIX@112..113 ">"
+        LINE_PREFIX@113..114 " "
+        LIST@114..135
+          LIST_ITEM@114..135
+            WHITESPACE@114..117 "   "
+            LIST_MARKER@117..118 "-"
+            WHITESPACE@118..119 " "
+            TASK_CHECKBOX@119..122 "[ ]"
+            PLAIN@122..135
+              TEXT@122..134 " Nested task"
+              NEWLINE@134..135 "\n"
+  BLANK_LINE@135..136
+    BLANK_LINE@135..136 "\n"
+  PARAGRAPH@136..145
+    TEXT@136..144 "Outside."
+    NEWLINE@144..145 "\n"

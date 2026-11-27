@@ -676,3 +676,88 @@ on the left and the planner on the right.
 | --- | ---: | ---: | ---: | ---: |
 | `large_authoring.qmd` | 1172.6 / 1272.3 → 734.2 / 781.7 | 348.1 / 393.5 → 337.3 / 380.8 | 7.8 / 9.4 → 7.8 / 9.3 | 5.8 / 6.9 → 3.1 / 3.7 |
 | `issue_609_chunk_option_expressions_rmarkdown` | 24.8 / 25.6 → 20.8 / 21.7 | 30.3 / 31.4 → 24.4 / 25.3 | 1.1 / 1.2 → 1.1 / 1.2 | 4.9 / 5.2 → 2.5 / 2.6 |
+
+### GFM and Jupyter checkpoint
+
+Both release builds ran on logical CPU 4 of the Intel Core Ultra 7 155U
+with Rust 1.98.1. All 44 workloads from the inline code and nested fenced
+div checkpoint passed source, CST, and diagnostic parity at baseline
+`dde1282b` and with GFM and Jupyter enabled. The nine focused fixtures
+also passed with their checked-in parser options. The baseline rejected
+both flavors before timing. The comparison checked each chained edit on
+fixtures with enough blank lines to run the edit sequence.
+
+Across the ten shared documents, the planner took the following
+percentages of the incumbent’s time.
+
+| Operation | Median, baseline → current | p95, baseline → current |
+| --- | ---: | ---: |
+| Full parse | 55–83% → 57–83% | 56–82% → 54–83% |
+| Line-start edit | 65–98% → 67–99% | 61–99% → 65–97% |
+| Typing edit | 62–101% → 63–100% | 61–101% → 61–98% |
+| Whole-file replacement | 42–75% → 47–80% | 44–87% → 45–78% |
+
+Timings are in microseconds. Each cell shows median and p95 for the
+incumbent on the left and the planner on the right. A dash marks
+a fixture with fewer than two blank lines for the edit sequence.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| `README.md` | 445.8 / 501.9 → 268.5 / 302.7 | 249.9 / 269.8 → 213.6 / 231.8 | 5.9 / 6.3 → 5.6 / 5.9 | 4.7 / 5.1 → 2.8 / 3.0 |
+| `benches/documents/pandoc_manual.md` | 9152.3 / 10016.0 → 5294.0 / 5778.6 | 2079.9 / 2397.2 → 2065.9 / 2304.3 | 84.0 / 98.7 → 84.2 / 96.3 | 9.1 / 18.5 → 7.3 / 14.5 |
+| `crates/panache-parser/README.md` | 32.6 / 36.1 → 18.8 / 19.5 | 28.4 / 30.1 → 18.9 / 19.7 | 17.2 / 19.1 → 10.9 / 11.6 | 3.0 / 3.3 → 1.4 / 1.5 |
+| `docs/guide/integrations.qmd` | 349.6 / 394.7 → 216.3 / 244.9 | 166.5 / 186.4 → 140.3 / 158.2 | 75.3 / 88.2 → 62.5 / 71.1 | 5.4 / 6.2 → 2.7 / 3.0 |
+| `docs/getting-started.qmd` | 565.8 / 639.3 → 320.0 / 364.0 | 178.1 / 196.7 → 161.2 / 181.9 | 79.0 / 88.7 → 70.8 / 79.6 | 4.8 / 5.3 → 2.4 / 2.6 |
+| `docs/guide/performance.qmd` | 1854.9 / 2064.5 → 1543.9 / 1707.8 | 316.6 / 356.0 → 293.8 / 332.3 | 163.7 / 186.0 → 145.4 / 166.7 | 5.8 / 6.9 → 2.8 / 3.3 |
+| `benches/documents/large_authoring.qmd` | 1118.7 / 1175.0 → 691.5 / 740.5 | 346.8 / 390.4 → 330.2 / 373.6 | 8.0 / 9.1 → 7.8 / 8.9 | 5.7 / 6.6 → 3.0 / 3.5 |
+| `benches/documents/tables.qmd` | 1366.1 / 1487.2 → 896.8 / 974.9 | 358.0 / 403.7 → 338.1 / 379.5 | 176.1 / 204.3 → 163.9 / 185.1 | 5.7 / 6.6 → 2.9 / 3.4 |
+| `benches/documents/math.qmd` | 961.6 / 1084.9 → 609.5 / 685.5 | 317.7 / 355.2 → 303.6 / 343.7 | 139.9 / 161.6 → 130.3 / 148.3 | 5.2 / 5.9 → 2.6 / 2.9 |
+| `benches/documents/math.qmd (grid tables disabled)` | 999.6 / 1075.8 → 627.6 / 675.2 | 317.5 / 357.5 → 300.3 / 335.2 | 142.4 / 159.5 → 128.5 / 148.2 | 5.3 / 6.0 → 2.6 / 3.0 |
+| `Quarto 0123` | 18.5 / 20.3 → 8.1 / 9.0 | 22.8 / 25.6 → 11.9 / 13.5 | 20.8 / 23.6 → 9.9 / 11.7 | 4.0 / 4.6 → 1.6 / 1.9 |
+| `Quarto 0124` | 11.6 / 13.3 → 7.6 / 8.7 | 18.2 / 21.2 → 11.8 / 14.3 | 6.7 / 7.5 → 4.4 / 5.1 | 3.7 / 4.4 → 1.5 / 1.7 |
+| `Quarto 0541` | 6.3 / 6.7 → 3.8 / 4.2 | — | — | — |
+| `Quarto 0199` | 11.5 / 12.1 → 13.3 / 13.8 | 14.8 / 16.9 → 16.5 / 18.1 | 14.0 / 16.1 → 15.8 / 17.4 | 3.8 / 4.2 → 1.6 / 1.7 |
+| `Quarto 0481` | 7.2 / 7.9 → 6.2 / 6.9 | — | — | — |
+| `Quarto 0495` | 11.8 / 12.3 → 11.0 / 11.6 | — | — | — |
+| `Quarto 0610` | 12.8 / 13.2 → 12.0 / 12.5 | — | — | — |
+| `Quarto 0611` | 11.5 / 11.9 → 10.9 / 11.5 | — | — | — |
+| `Quarto 0098` | 4.9 / 5.1 → 2.4 / 2.5 | — | — | — |
+| `Quarto 0130` | 19.0 / 19.6 → 7.1 / 7.7 | 22.4 / 23.3 → 11.0 / 11.5 | 1.1 / 1.2 → 1.1 / 1.1 | 3.9 / 4.1 → 1.7 / 1.8 |
+| `Quarto 0141` | 12.3 / 12.6 → 4.6 / 4.8 | 12.9 / 13.1 → 7.4 / 7.7 | 0.8 / 0.9 → 0.9 / 1.0 | 3.9 / 4.1 → 1.8 / 2.0 |
+| `Quarto 0095` | 8.8 / 9.0 → 4.2 / 4.5 | 13.3 / 14.9 → 8.3 / 9.3 | 1.3 / 1.4 → 1.3 / 1.4 | 4.0 / 4.5 → 1.8 / 2.1 |
+| `Quarto 0047` | 31.5 / 32.7 → 13.9 / 14.6 | 28.3 / 31.9 → 16.0 / 18.4 | 1.1 / 1.3 → 1.1 / 1.3 | 4.1 / 4.6 → 2.0 / 2.4 |
+| `Quarto 0048` | 15.3 / 16.4 → 6.8 / 7.3 | 15.7 / 17.7 → 9.6 / 10.7 | 14.6 / 15.9 → 8.6 / 9.4 | 3.6 / 3.9 → 1.5 / 1.6 |
+| `Quarto 0049` | 20.5 / 24.1 → 11.4 / 13.7 | 22.8 / 24.1 → 15.5 / 16.4 | 0.9 / 0.9 → 0.9 / 1.0 | 4.0 / 4.2 → 1.8 / 2.0 |
+| `Quarto 0050` | 7.0 / 8.0 → 3.9 / 4.3 | — | — | — |
+| `fenced_math_in_list_blockquote` | 3.6 / 3.9 → 3.1 / 3.4 | — | — | — |
+| `Pandoc 0098` | 5.4 / 5.8 → 2.4 / 2.8 | — | — | — |
+| `Pandoc 0130` | 20.9 / 21.6 → 7.7 / 8.5 | 22.5 / 25.5 → 11.0 / 12.6 | 1.1 / 1.3 → 1.1 / 1.2 | 3.9 / 4.5 → 1.7 / 2.0 |
+| `Pandoc 0141` | 12.1 / 12.4 → 4.5 / 4.7 | 12.7 / 13.6 → 7.3 / 8.1 | 0.8 / 0.9 → 0.9 / 1.0 | 4.0 / 4.4 → 1.9 / 2.0 |
+| `bookdown` | 35.0 / 38.7 → 16.8 / 18.8 | 30.7 / 34.7 → 18.0 / 20.4 | 28.6 / 32.3 → 15.4 / 17.4 | 3.9 / 4.4 → 1.7 / 2.0 |
+| `bookdown_math_labels_host` | 39.0 / 41.7 → 23.1 / 24.9 | 35.9 / 40.8 → 22.7 / 25.4 | 1.2 / 1.4 → 1.1 / 1.3 | 4.9 / 5.5 → 2.3 / 2.5 |
+| `bookdown_math_labels_nested` | 20.1 / 22.7 → 11.3 / 13.9 | 16.6 / 18.4 → 12.1 / 12.8 | 15.1 / 16.5 → 9.8 / 10.4 | 3.9 / 4.2 → 1.7 / 1.9 |
+| `display_math_content_on_fence_line` | 27.8 / 31.4 → 13.7 / 15.4 | 29.3 / 32.8 → 17.7 / 19.5 | 1.0 / 1.1 → 1.0 / 1.1 | 4.1 / 4.6 → 1.9 / 2.1 |
+| `issue_186_list_blockquote_lazy_idempotency` | 32.1 / 36.2 → 15.2 / 17.4 | 35.5 / 36.4 → 19.3 / 20.7 | 1.1 / 1.2 → 1.0 / 1.1 | 4.6 / 4.9 → 2.1 / 2.3 |
+| `issue_195_blockquote_lazy_continuation_shape` | 29.4 / 31.7 → 15.4 / 16.7 | — | — | — |
+| `issue_314_advance_columns_multibyte` | 9.3 / 9.6 → 5.3 / 5.5 | 8.6 / 10.6 → 5.6 / 6.3 | 0.8 / 0.9 → 0.7 / 0.8 | 4.1 / 5.0 → 1.9 / 2.1 |
+| `rmarkdown_math` | 34.4 / 38.1 → 22.6 / 25.6 | 38.0 / 44.4 → 28.3 / 32.2 | 34.2 / 39.2 → 24.1 / 27.4 | 4.1 / 4.7 → 1.8 / 2.1 |
+| `unresolved_reference_intraword_underscore_pandoc` | 7.3 / 7.5 → 5.3 / 5.7 | — | — | — |
+| `issue_609_chunk_option_expressions_rmarkdown` | 25.6 / 26.9 → 21.1 / 22.0 | 30.5 / 31.5 → 24.5 / 25.5 | 1.1 / 1.1 → 1.0 / 1.1 | 4.8 / 5.1 → 2.4 / 2.6 |
+| `mmd_title_block` | 3.4 / 3.5 → 1.8 / 1.9 | — | — | — |
+| `mmd_link_attributes` | 7.4 / 8.4 → 4.4 / 5.1 | — | — | — |
+| `mmd_header_identifiers` | 3.2 / 3.4 → 2.0 / 2.1 | — | — | — |
+| `atx_interrupts_paragraph_multimarkdown` | 4.1 / 4.3 → 1.7 / 1.8 | — | — | — |
+
+Focused fixtures from the parser golden suite.
+
+| Workload | Full parse | Line-start edit | Typing edit | Whole-file replacement |
+| --- | ---: | ---: | ---: | ---: |
+| `gfm_alert_block_boundaries` | 16.8 / 17.8 → 10.3 / 11.0 | 10.1 / 10.8 → 7.7 / 8.4 | 8.0 / 8.4 → 5.8 / 6.1 | 3.9 / 4.2 → 2.0 / 2.1 |
+| `gfm_task_block_boundaries` | 22.8 / 23.9 → 12.5 / 13.9 | 7.1 / 7.7 → 5.6 / 6.0 | 1.8 / 1.9 → 1.6 / 1.8 | 4.5 / 4.9 → 2.1 / 2.3 |
+| `html_block_div_footnote_body_gfm` | 7.7 / 8.1 → 5.8 / 6.1 | — | — | — |
+| `jupyter_markdown` | 39.6 / 44.2 → 28.1 / 29.5 | 42.0 / 44.4 → 33.0 / 35.4 | 2.2 / 2.5 → 2.1 / 2.4 | 5.2 / 5.7 → 3.0 / 3.4 |
+| `jupyter_math_block_precedence` | 38.7 / 41.0 → 29.5 / 32.2 | 30.6 / 31.8 → 25.7 / 26.6 | 1.9 / 2.0 → 1.8 / 1.9 | 5.3 / 5.5 → 2.9 / 3.1 |
+| `jupyter_math_headings` | 51.9 / 56.4 → 38.9 / 40.7 | 53.3 / 60.7 → 40.6 / 46.5 | 49.5 / 56.2 → 37.1 / 42.1 | 4.4 / 5.1 → 2.4 / 2.8 |
+| `jupyter_math_multiline_tables` | 82.9 / 89.5 → 47.9 / 50.8 | 50.8 / 57.7 → 32.7 / 37.0 | 41.6 / 46.6 → 23.5 / 26.6 | 5.2 / 5.9 → 2.8 / 3.2 |
+| `jupyter_math_setext` | 31.0 / 33.5 → 23.2 / 25.1 | 31.8 / 33.8 → 26.4 / 27.5 | 28.7 / 31.3 → 23.1 / 23.9 | 4.6 / 4.8 → 2.5 / 2.7 |
+| `jupyter_math_setext_blank_before_header` | 6.3 / 6.8 → 3.6 / 4.0 | — | — | — |

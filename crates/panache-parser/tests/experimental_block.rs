@@ -36,6 +36,37 @@ fn commonmark_core_slice_preserves_cst() {
 }
 
 #[test]
+fn gfm_alerts_close_at_their_quote_boundary() {
+    let options = ParserOptions::for_flavor(Flavor::Gfm);
+    for input in [
+        "> [!NOTE]\n> # Heading\n> - Item\n> - More\n>\n> After.\n",
+        "> [!NOTE]\n> > Deeper\n> >\n> > More\n> Back.\n",
+        "> [!NOTE]\n> > [!TIP]\n> > Plain nested text.\n",
+        "> > [!WARNING]\n> > Body.\n>\n> Outer quote.\n",
+        "> [!NOTE]\n> - Item\n>\n>   Second paragraph.\n",
+        "> [!TIP]\n> ```math\n> x + y\n> ```\n",
+        "> [!TIP]\n>     code\n",
+        "> [!CAUTION]\r\n> Body.\r\n\r\nOutside.",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn gfm_footnote_bodies_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Gfm);
+    for input in [
+        "[^one]: First line\n    indented continuation\n    \n    another paragraph\n\nOutside.[^one]\n",
+        "[^one]: First\n[^two]: Second\n\nOutside.[^one][^two]\n",
+        "> [^one]: Body.\n>     continued\n\nOutside.[^one]\n",
+        "[^one]:\n    Body.\n\nOutside.[^one]\n",
+        "[^one]:\n    > [!NOTE]\n    > Body.\n    >\n    > More.\n\nOutside.[^one]\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
 fn quarto_slice_preserves_cst_and_yaml_diagnostics() {
     let options = ParserOptions::for_flavor(Flavor::Quarto);
     for input in [

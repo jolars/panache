@@ -15,8 +15,9 @@ use crate::parser::utils::text_buffer::ParagraphBuffer;
 
 pub(crate) fn prepare_jupyter_heading(
     lines: &super::container_prefix::StrippedLines<'_, '_>,
+    buffered_list_item: bool,
 ) -> Option<(ParagraphBuffer, usize)> {
-    let first = lines.first();
+    let first = lines.strip_at(lines.pos());
     if !crate::parser::inlines::math::pending_jupyter_math(first) {
         return None;
     }
@@ -29,8 +30,18 @@ pub(crate) fn prepare_jupyter_heading(
     buffer.push_text(first);
     for i in 1..count {
         let raw = lines.raw_at(i);
-        let tail = lines.peek_prefix_at(lines.pos() + i);
-        buffer.push_indent(&raw[..raw.len() - tail.len()]);
+        let tail = if buffered_list_item {
+            // The list buffer keeps the quote and list prefix tokens separate.
+            let (prefix, tail) = lines.prefix().split_pieces(raw);
+            for text in prefix.token_texts() {
+                buffer.push_indent(text);
+            }
+            tail
+        } else {
+            let tail = lines.peek_prefix_at(lines.pos() + i);
+            buffer.push_indent(&raw[..raw.len() - tail.len()]);
+            tail
+        };
         buffer.push_text(tail);
     }
     Some((buffer, count))

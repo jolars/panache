@@ -32,6 +32,8 @@ enum ComparisonFlavor {
     RMarkdown,
     #[value(name = "multimarkdown")]
     MultiMarkdown,
+    Gfm,
+    Jupyter,
 }
 
 #[derive(Parser)]
@@ -62,6 +64,8 @@ fn main() -> std::io::Result<()> {
         ComparisonFlavor::Quarto => Flavor::Quarto,
         ComparisonFlavor::RMarkdown => Flavor::RMarkdown,
         ComparisonFlavor::MultiMarkdown => Flavor::MultiMarkdown,
+        ComparisonFlavor::Gfm => Flavor::Gfm,
+        ComparisonFlavor::Jupyter => Flavor::Jupyter,
     });
     for file in &args.files {
         let options = load_options(file, args.config.as_deref(), flavor)?;

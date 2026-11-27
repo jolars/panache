@@ -67,14 +67,6 @@ use definition_list_protocol::{
     BufferedBodyBlock, emit_definition_plain_or_heading, first_content_line_term_lookahead,
 };
 
-const GITHUB_ALERT_MARKERS: [&str; 5] = [
-    "[!TIP]",
-    "[!WARNING]",
-    "[!IMPORTANT]",
-    "[!CAUTION]",
-    "[!NOTE]",
-];
-
 /// Result of dispatching a line without advancing `self.pos`.
 #[must_use]
 #[derive(Debug, Clone, Copy)]
@@ -1967,7 +1959,7 @@ impl<'a> Parser<'a> {
             && (self.config.flavor != Flavor::VitePress
                 || self.vitepress_alert_preamble_quote().is_some())
         {
-            Self::emit_alert_header(
+            blockquotes::emit_alert_header(
                 &mut self.builder,
                 line,
                 newline,

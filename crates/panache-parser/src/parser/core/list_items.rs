@@ -192,7 +192,7 @@ impl<'a> Parser<'a> {
             && let Some(marker_len) = self.alert_marker_from_content(first, line.trim_start())
         {
             // Retain the list item as the owner of the following body lines.
-            Self::emit_alert_header(&mut self.builder, line, newline, "", marker_len);
+            blockquotes::emit_alert_header(&mut self.builder, line, newline, "", marker_len);
             self.builder.finish_node();
             if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
                 buffer.clear();

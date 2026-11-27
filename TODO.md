@@ -288,7 +288,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
 - [x] Enable the Pandoc, R Markdown, and MultiMarkdown flavors in the
   replacement. Check their flavor defaults and port any remaining
   flavor-specific metadata or block rules.
-- [ ] Enable GFM and Jupyter. Cover alerts, task items, and notebook-specific
+- [x] Enable GFM and Jupyter. Cover alerts, task items, and notebook-specific
   block handling with focused parity fixtures.
 - [ ] Enable Hugo and mdsvex. Cover block shortcodes and Svelte blocks with
   their respective flavor fixtures.

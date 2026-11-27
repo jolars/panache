@@ -378,7 +378,7 @@ impl BlockParser for AtxHeadingParser {
             None
         };
         let math = if ctx.config.extensions.tex_math_jupyter {
-            super::blocks::headings::prepare_jupyter_heading(lines)
+            super::blocks::headings::prepare_jupyter_heading(lines, false)
         } else {
             None
         };

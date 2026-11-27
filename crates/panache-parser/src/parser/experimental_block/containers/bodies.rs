@@ -130,6 +130,7 @@ pub(super) fn body_blank_depth(
                 }
             }
             Frame::Div { .. } => keep = index + 1,
+            Frame::Alert => {}
             _ => {
                 let column = body_column(frame).unwrap();
                 let minimum = if matches!(frame, Frame::Definition { .. })

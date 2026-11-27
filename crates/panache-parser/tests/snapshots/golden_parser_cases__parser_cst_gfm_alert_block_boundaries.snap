@@ -1,0 +1,72 @@
+---
+source: crates/panache-parser/tests/golden_parser_cases.rs
+expression: cst_output
+---
+DOCUMENT@0..160
+  BLOCK_QUOTE@0..118
+    BLOCK_QUOTE_MARKER@0..1 ">"
+    WHITESPACE@1..2 " "
+    ALERT@2..50
+      ALERT_MARKER@2..9 "[!NOTE]"
+      WHITESPACE@9..11 "  "
+      NEWLINE@11..12 "\n"
+      BLOCK_QUOTE_MARKER@12..13 ">"
+      WHITESPACE@13..14 " "
+      PARAGRAPH@14..50
+        TEXT@14..30 "First paragraph."
+        NEWLINE@30..31 "\n"
+        TEXT@31..49 "Lazy continuation."
+        NEWLINE@49..50 "\n"
+    BLOCK_QUOTE_MARKER@50..51 ">"
+    BLANK_LINE@51..52
+      BLANK_LINE@51..52 "\n"
+    BLOCK_QUOTE_MARKER@52..53 ">"
+    WHITESPACE@53..54 " "
+    LIST@54..74
+      LIST_ITEM@54..74
+        LIST_MARKER@54..55 "-"
+        WHITESPACE@55..56 " "
+        PLAIN@56..74
+          TEXT@56..73 "Item in the alert"
+          NEWLINE@73..74 "\n"
+    BLOCK_QUOTE_MARKER@74..75 ">"
+    BLANK_LINE@75..76
+      BLANK_LINE@75..76 "\n"
+    BLOCK_QUOTE_MARKER@76..77 ">"
+    WHITESPACE@77..78 " "
+    BLOCK_QUOTE@78..118
+      BLOCK_QUOTE_MARKER@78..79 ">"
+      WHITESPACE@79..80 " "
+      ALERT@80..118
+        ALERT_MARKER@80..90 "[!WARNING]"
+        NEWLINE@90..91 "\n"
+        BLOCK_QUOTE_MARKER@91..92 ">"
+        WHITESPACE@92..93 " "
+        BLOCK_QUOTE_MARKER@93..94 ">"
+        WHITESPACE@94..95 " "
+        PARAGRAPH@95..118
+          TEXT@95..117 "Ordinary nested quote."
+          NEWLINE@117..118 "\n"
+  BLANK_LINE@118..119
+    BLANK_LINE@118..119 "\n"
+  PARAGRAPH@119..128
+    TEXT@119..127 "Outside."
+    NEWLINE@127..128 "\n"
+  BLANK_LINE@128..129
+    BLANK_LINE@128..129 "\n"
+  LIST@129..160
+    LIST_ITEM@129..160
+      LIST_MARKER@129..130 "-"
+      WHITESPACE@130..131 " "
+      BLOCK_QUOTE@131..160
+        BLOCK_QUOTE_MARKER@131..132 ">"
+        WHITESPACE@132..133 " "
+        ALERT@133..160
+          ALERT_MARKER@133..139 "[!TIP]"
+          NEWLINE@139..140 "\n"
+          WHITESPACE@140..142 "  "
+          BLOCK_QUOTE_MARKER@142..143 ">"
+          WHITESPACE@143..144 " "
+          PARAGRAPH@144..160
+            TEXT@144..159 "In a list item."
+            NEWLINE@159..160 "\n"

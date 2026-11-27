@@ -140,6 +140,46 @@ fn run_golden_case(case_name: &str) {
     insta::assert_snapshot!(format!("parser_cst_{}", case_name), cst_output);
 }
 
+#[cfg(feature = "experimental-block-parser")]
+#[test]
+fn gfm_and_jupyter_block_planner_parity() {
+    use panache_parser::parser::{experimental_block, parse_with_errors};
+
+    let cases = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cases");
+    let mut failures = Vec::new();
+    for entry in fs::read_dir(cases).unwrap() {
+        let dir = entry.unwrap().path();
+        let Some(options) = load_test_parser_options(&dir) else {
+            continue;
+        };
+        if !matches!(options.flavor, Flavor::Gfm | Flavor::Jupyter) {
+            continue;
+        }
+        let input = fs::read_to_string(find_file_with_extension(&dir, "input").unwrap()).unwrap();
+        let (expected, errors) = parse_with_errors(&input, Some(options.clone()));
+        match experimental_block::try_parse_with_errors(&input, &options) {
+            Ok((actual, actual_errors))
+                if actual.to_string() == input
+                    && actual.green() == expected.green()
+                    && actual_errors == errors => {}
+            Ok((actual, actual_errors)) => {
+                eprintln!(
+                    "{dir:?}\nactual {actual:#?} {actual_errors:?}\nexpected {expected:#?} {errors:?}"
+                );
+                failures.push(dir);
+            }
+            Err(error) => {
+                eprintln!("{dir:?}: {error:?}");
+                failures.push(dir);
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "block planner differences in {failures:?}"
+    );
+}
+
 #[test]
 fn myst_html_blocks_stop_at_directive_closers() {
     use panache_parser::syntax::{AstNode, MystDirective, SyntaxKind};
@@ -611,6 +651,8 @@ golden_test_cases!(
     jupyter_math_environment_continuations,
     jupyter_math_braced_dollars,
     jupyter_math_headings,
+    gfm_alert_block_boundaries,
+    gfm_task_block_boundaries,
     jupyter_math_multiline_tables,
     jupyter_math_setext,
     jupyter_math_unmatched_dollars,

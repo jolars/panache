@@ -1,8 +1,8 @@
 //! Experimental block planning followed by lossless CST emission.
 //!
 //! The implementation uses resolved extension settings for CommonMark, Pandoc,
-//! Quarto, R Markdown, and MultiMarkdown. Compare the result with the incumbent
-//! parser before using a document as a benchmark workload.
+//! Quarto, R Markdown, MultiMarkdown, GFM, and Jupyter. Compare the result with
+//! the incumbent parser before using a document as a benchmark workload.
 
 mod containers;
 mod html;
@@ -25,7 +25,8 @@ use super::blocks::container_prefix::{ContainerPrefix, StrippedLines};
 use super::blocks::fenced_divs::{DivFenceInfo, is_div_closing_fence, try_parse_div_fence_open};
 use super::blocks::figures::paragraph_is_standalone_image;
 use super::blocks::headings::{
-    emit_atx_heading, emit_setext_heading_body, try_parse_atx_heading, try_parse_setext_heading,
+    emit_atx_heading, emit_setext_heading_body, prepare_jupyter_heading, try_parse_atx_heading,
+    try_parse_setext_heading,
 };
 use super::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
 use super::blocks::html_blocks::{
@@ -73,6 +74,7 @@ enum Block<'a> {
     Blank(usize),
     Paragraph(Range<usize>, K),
     Atx(usize, usize),
+    JupyterAtx(ParagraphBuffer, usize),
     Setext(Range<usize>, usize),
     Rule(usize),
     Reference(Range<usize>, ReferenceSpans),
@@ -333,6 +335,10 @@ fn plan<'a>(
         } else if matches!(marker, Some(b'=' | b'-'))
             && let Some(Block::Paragraph(range, _)) = blocks.last_mut()
             && (commonmark || range.len() == 1)
+            && !(options.extensions.tex_math_jupyter
+                && options.extensions.blank_before_header
+                && range.start > 0
+                && !is_blank_line(lines[range.start - 1]))
             && try_parse_setext_heading(lines, pos - 1).is_some()
         {
             let range = range.clone();
@@ -342,6 +348,16 @@ fn plan<'a>(
             && (fresh || !options.extensions.blank_before_header)
             && let Some(level) = try_parse_atx_heading(line)
         {
+            if options.extensions.tex_math_jupyter
+                && let Some((heading, consumed)) = prepare_jupyter_heading(
+                    &StrippedLines::new(lines, pos, &prefix).with_jupyter_lookahead(jupyter_lines),
+                    false,
+                )
+            {
+                blocks.push(Block::JupyterAtx(heading, level));
+                pos += consumed;
+                continue;
+            }
             blocks.push(Block::Atx(pos, level));
         } else if fresh
             && indent < 4
@@ -426,7 +442,10 @@ fn plan<'a>(
         } else if fresh
             && indent < 4
             && options.extensions.pipe_tables
-            && (content.contains('|') || is_table_caption_start(line))
+            && (content.contains('|')
+                || is_table_caption_start(line)
+                || (options.extensions.tex_math_jupyter
+                    && super::inlines::math::pending_jupyter_math(line)))
             && (commonmark
                 || !matches!(marker, Some(b'-' | b'+' | b'*'))
                 || !try_parse_list_marker(line, options, OpenListHint::None)
@@ -571,9 +590,8 @@ fn plan<'a>(
             blocks.push(Block::Setext(pos..pos + 1, pos + 1));
             pos += 2;
             continue;
-        } else if !commonmark
-            && (containers::footnote_marker(line, options).is_some()
-                || (fresh && containers::root_definition_term(lines, pos, options)))
+        } else if containers::footnote_marker(line, options).is_some()
+            || (!commonmark && fresh && containers::root_definition_term(lines, pos, options))
         {
             plan_containers(
                 input,
@@ -638,6 +656,8 @@ fn parse_at(
             | Flavor::Quarto
             | Flavor::RMarkdown
             | Flavor::MultiMarkdown
+            | Flavor::Gfm
+            | Flavor::Jupyter
     ) || options.dialect != Dialect::for_flavor(options.flavor)
     {
         return Err(Unsupported {
@@ -698,6 +718,9 @@ fn parse_at(
                 builder.finish_node();
             }
             Block::Atx(pos, level) => emit_atx_heading(&mut builder, lines[pos], level, options),
+            Block::JupyterAtx(heading, level) => {
+                heading.emit_atx_heading(&mut builder, level, options);
+            }
             Block::Setext(range, underline) => {
                 builder.start_node(K::HEADING.into());
                 emit_setext_heading_body(

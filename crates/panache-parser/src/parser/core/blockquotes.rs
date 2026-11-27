@@ -163,10 +163,7 @@ impl<'a> Parser<'a> {
 
     pub(super) fn alert_marker_from_content(&self, line: &str, content: &str) -> Option<usize> {
         if self.config.flavor != Flavor::VitePress {
-            return GITHUB_ALERT_MARKERS
-                .into_iter()
-                .find(|marker| *marker == content.trim_end())
-                .map(str::len);
+            return blockquotes::github_alert_marker_len(content);
         }
 
         let rest = content.strip_prefix("[!")?;
@@ -175,46 +172,11 @@ impl<'a> Parser<'a> {
             return None;
         }
         let (name, _) = rest.split_once(']')?;
-        GITHUB_ALERT_MARKERS
+        blockquotes::GITHUB_ALERT_MARKERS
             .into_iter()
             .chain(["[!INFO]", "[!DANGER]"])
             .any(|marker| marker[2..marker.len() - 1].eq_ignore_ascii_case(name))
             .then_some(name.len() + 3)
-    }
-
-    pub(super) fn emit_alert_header(
-        builder: &mut GreenNodeBuilder<'static>,
-        line: &str,
-        newline: &str,
-        indent: &str,
-        marker_len: usize,
-    ) {
-        builder.start_node(SyntaxKind::ALERT.into());
-        let header = line.trim_start();
-        let leading = &line[..line.len() - header.len()];
-        for whitespace in [indent, leading] {
-            if !whitespace.is_empty() {
-                builder.token(SyntaxKind::WHITESPACE.into(), whitespace);
-            }
-        }
-        let (marker, remainder) = header.split_at(marker_len);
-        builder.token(SyntaxKind::ALERT_MARKER.into(), marker);
-        let title_and_padding = remainder.trim_start();
-        let gap = &remainder[..remainder.len() - title_and_padding.len()];
-        let title = title_and_padding.trim_end();
-        if !gap.is_empty() {
-            builder.token(SyntaxKind::WHITESPACE.into(), gap);
-        }
-        if !title.is_empty() {
-            builder.token(SyntaxKind::ALERT_TITLE.into(), title);
-        }
-        let trailing = &title_and_padding[title.len()..];
-        if !trailing.is_empty() {
-            builder.token(SyntaxKind::WHITESPACE.into(), trailing);
-        }
-        if !newline.is_empty() {
-            builder.token(SyntaxKind::NEWLINE.into(), newline);
-        }
     }
 
     pub(super) fn blockquote_marker_info(
