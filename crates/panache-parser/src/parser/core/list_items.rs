@@ -30,7 +30,7 @@ impl<'a> Parser<'a> {
             self.config,
         );
         let window =
-            StrippedLines::new(&self.lines, self.pos, &prefix).with_table_dispatch(tail, "");
+            StrippedLines::new(&self.lines, self.pos, &prefix).with_dispatch_tail(tail, "");
         tables::prepare_dash_table_at(&window, self.config, tables::DashTableKind::Simple)
             .is_some_and(|table| table.has_caption())
     }
@@ -446,26 +446,16 @@ impl<'a> Parser<'a> {
         if !self.config.extensions.line_blocks {
             return None;
         }
-        let Some(Container::ListItem {
-            content_col,
-            buffer,
-            ..
-        }) = self.containers.stack.last()
-        else {
+        let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last() else {
             return None;
         };
-        try_parse_line_block_start(buffer.sole_text_segment()?)?;
-        let content_col = *content_col;
-        let bq_depth = self.current_blockquote_depth();
-
-        let prefix = ContainerPrefix::from_scalars(
-            bq_depth,
-            content_col,
-            bq_depth > 0,
-            0,
-            true,
-            self.config.dialect,
-        );
+        let first = buffer.sole_text_segment()?;
+        try_parse_line_block_start(first)?;
+        let source = self.lines[self.pos];
+        let first = source
+            .strip_suffix(first)
+            .map(|head| &source[head.len()..])?;
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, true, self.config);
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
 
         if self.config.extensions.pipe_tables {
@@ -478,6 +468,7 @@ impl<'a> Parser<'a> {
         if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
             buffer.clear();
         }
+        let window = window.with_dispatch_tail(first, "");
         let new_pos = parse_line_block(&window, &mut self.builder, self.config);
         Some(new_pos.saturating_sub(self.pos).saturating_sub(1))
     }
@@ -523,7 +514,7 @@ impl<'a> Parser<'a> {
         let raw = self.lines[self.pos];
         let tail = raw.strip_suffix(buffered).map(|head| &raw[head.len()..])?;
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
-        let dash_window = window.with_table_dispatch(tail, "");
+        let dash_window = window.with_dispatch_tail(tail, "");
         if !tables::is_caption_followed_by_table(&window, self.pos) {
             return None;
         }
@@ -624,7 +615,7 @@ impl<'a> Parser<'a> {
         let raw = self.lines[self.pos];
         let tail = raw.strip_suffix(buffered).map(|head| &raw[head.len()..])?;
         let window = StrippedLines::new(&self.lines, self.pos, &prefix);
-        let dash_window = window.with_table_dispatch(tail, "");
+        let dash_window = window.with_dispatch_tail(tail, "");
 
         if tables::is_caption_followed_by_table(&window, self.pos) {
             return None;
@@ -1069,7 +1060,7 @@ impl<'a> Parser<'a> {
         else {
             return None;
         };
-        let text_line = buffer.sole_text_segment()?;
+        let text_line = buffer.sole_heading_text()?;
         if buffer.buffered_line_count() != 1 {
             return None;
         }
@@ -1091,20 +1082,12 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let text_owned = text_line.to_string();
-        let markers = buffer.trailing_blockquote_markers();
+        let heading = buffer.to_paragraph_buffer(&[]);
         if let Some(Container::ListItem { buffer, .. }) = self.containers.stack.last_mut() {
             buffer.clear();
         }
         self.builder.start_node(SyntaxKind::HEADING.into());
-        emit_setext_heading_text(&mut self.builder, &text_owned, self.config);
-        for (leading_spaces, has_trailing_space) in markers {
-            blockquotes::emit_one_line_prefix_marker(
-                &mut self.builder,
-                leading_spaces,
-                has_trailing_space,
-            );
-        }
+        heading.emit_setext_heading_text(&mut self.builder, self.config);
         emit_setext_underline(&mut self.builder, content);
         self.builder.finish_node();
         Some(LineDispatch::consumed(1))

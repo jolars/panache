@@ -107,6 +107,11 @@ impl Formatter {
                     self.output
                         .push_str(&super::smart::smart_token_text(&tok, &self.config));
                 }
+                NodeOrToken::Token(tok)
+                    if tok.kind() == SyntaxKind::ESCAPED_CHAR && tok.text() == r"\|" =>
+                {
+                    self.output.push_str(tok.text());
+                }
                 NodeOrToken::Token(tok) if tok.kind() == SyntaxKind::NEWLINE => {
                     self.output.push('\n');
                 }
@@ -115,6 +120,10 @@ impl Formatter {
                 }
                 _ => {}
             }
+        }
+        if self.config.parser_extensions.line_blocks && self.output[term_start..].trim_end() == "|"
+        {
+            self.output.insert(term_start, '\\');
         }
         self.guard_dash_block_marker(term_start, node, indent);
     }
@@ -1547,7 +1556,11 @@ impl Formatter {
                         && sentence_lines.is_none()
                         && content_node.is_none()
                         && !has_only_empty_nested_list;
-                    let prev_kind = child.prev_sibling().map(|s| s.kind());
+                    let prev_kind = child
+                        .siblings(rowan::Direction::Prev)
+                        .skip(1)
+                        .find(|sibling| sibling.kind() != SyntaxKind::BLANK_LINE)
+                        .map(|sibling| sibling.kind());
                     let is_first_real_child = !matches!(
                         prev_kind,
                         Some(SyntaxKind::PLAIN)
@@ -1558,6 +1571,7 @@ impl Formatter {
                             | Some(SyntaxKind::BLOCK_QUOTE)
                             | Some(SyntaxKind::LIST)
                             | Some(SyntaxKind::HORIZONTAL_RULE)
+                            | Some(SyntaxKind::LINE_BLOCK)
                             | Some(SyntaxKind::HTML_BLOCK)
                             | Some(SyntaxKind::HTML_BLOCK_RAW)
                             | Some(SyntaxKind::HTML_BLOCK_DIV)

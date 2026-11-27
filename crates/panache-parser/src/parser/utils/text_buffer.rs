@@ -307,6 +307,14 @@ impl ParagraphBuffer {
         sink.finish();
     }
 
+    pub(crate) fn emit_horizontal_rule(&self, builder: &mut GreenNodeBuilder<'static>) {
+        let text = self.get_text_for_parsing();
+        let markers = self.get_marker_positions();
+        let mut sink = MarkerInjectingSink::new(builder, &markers);
+        crate::parser::blocks::horizontal_rules::emit_horizontal_rule(&mut sink, &text);
+        sink.finish();
+    }
+
     /// Buffered container content must hold a heading's opaque multiline
     /// constructs together, just as ordinary block dispatch does.
     pub(crate) fn try_emit_multiline_heading(

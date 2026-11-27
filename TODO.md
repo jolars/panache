@@ -281,7 +281,7 @@ timing. Compare the results with the previous checkpoint to spot regressions.
   boundaries inside containers against Pandoc-native fixtures.
 - [x] Port Pandoc HTML blocks. Check raw HTML, Markdown inside HTML, and open
   and close tag boundaries inside lists and block quotes.
-- [ ] Port Pandoc line blocks, title blocks, and raw TeX blocks. Check each
+- [x] Port Pandoc line blocks, title blocks, and raw TeX blocks. Check each
   construct with its extension enabled and disabled.
 - [ ] Port display math and fenced math. Check block boundaries, lossless
   emission, and diagnostics across the dialects that support them.

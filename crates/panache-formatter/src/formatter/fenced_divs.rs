@@ -122,7 +122,13 @@ impl Formatter {
             .iter()
             .rev()
             .find(|child| child.kind() != SyntaxKind::BLANK_LINE)
-            .is_some_and(|child| child.kind() == SyntaxKind::HORIZONTAL_RULE)
+            .is_some_and(|child| {
+                child.kind() == SyntaxKind::HORIZONTAL_RULE
+                    && !child
+                        .prev_sibling()
+                        .as_ref()
+                        .is_some_and(super::blocks::line_block_in_list_div)
+            })
             && self.output.ends_with('\n')
             && !self.output.ends_with("\n\n")
         {

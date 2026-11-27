@@ -9,7 +9,7 @@ use crate::parser::blocks::container_prefix::{
 };
 use crate::parser::blocks::figures::paragraph_is_standalone_image;
 use crate::parser::blocks::headings::{emit_atx_heading, try_parse_atx_heading};
-use crate::parser::blocks::horizontal_rules::{emit_horizontal_rule, try_parse_horizontal_rule};
+use crate::parser::blocks::horizontal_rules::try_parse_horizontal_rule;
 use crate::parser::blocks::html_blocks::{
     HtmlBlockType, count_tag_balance, is_pandoc_matched_pair_tag, try_parse_html_block_start,
 };
@@ -228,22 +228,13 @@ impl ListItemBuffer {
             .then_some(text)
     }
 
-    /// The structural blockquote-marker segments buffered after the leading
-    /// text segment, in push order. A consumer that re-emits the buffered
-    /// line itself (rather than draining the buffer) reads these back out
-    /// before `clear()` and re-injects them, keeping the parse lossless.
-    pub(crate) fn trailing_blockquote_markers(&self) -> Vec<(usize, bool)> {
-        self.segments
-            .iter()
-            .skip(1)
-            .filter_map(|s| match s {
-                ListItemContent::BlockquoteMarker {
-                    leading_spaces,
-                    has_trailing_space,
-                } => Some((*leading_spaces, *has_trailing_space)),
-                ListItemContent::Text(_) | ListItemContent::Prefix(_) => None,
-            })
-            .collect()
+    pub(crate) fn sole_heading_text(&self) -> Option<&str> {
+        let mut text = self.segments.iter().filter_map(|segment| match segment {
+            ListItemContent::Text(text) => Some(text.as_str()),
+            _ => None,
+        });
+        let first = text.next()?;
+        text.next().is_none().then_some(first)
     }
 
     fn blockquote_prefixes(&self) -> Vec<String> {
@@ -569,11 +560,12 @@ impl ListItemBuffer {
             {
                 let detect_line = &line[item_indent_prefix_len(line, gobble)..];
                 if let Some(level) = try_parse_atx_heading(detect_line) {
-                    emit_atx_heading(builder, &text, level, config);
+                    self.to_paragraph_buffer(&[])
+                        .emit_atx_heading(builder, level, config);
                     return;
                 }
                 if try_parse_horizontal_rule(detect_line).is_some() {
-                    emit_horizontal_rule(builder, &text);
+                    self.to_paragraph_buffer(&[]).emit_horizontal_rule(builder);
                     return;
                 }
             }
@@ -927,19 +919,13 @@ pub(crate) fn graft_html_block_lift(
         return false;
     }
 
-    let multi_child_trailing = if children.len() == 1 {
-        false
-    } else if children.len() == 2
-        && matches!(
-            first.kind(),
-            SyntaxKind::HTML_BLOCK | SyntaxKind::HTML_BLOCK_RAW | SyntaxKind::HTML_BLOCK_DIV
-        )
-        && children[1].kind() == SyntaxKind::PARAGRAPH
-    {
-        true
-    } else {
-        return false;
-    };
+    let trailing = &children[1..];
+    match trailing {
+        [] => {}
+        [paragraph] if paragraph.kind() == SyntaxKind::PARAGRAPH => {}
+        [line_block, ..] if line_block.kind() == SyntaxKind::LINE_BLOCK => {}
+        _ => return false,
+    }
 
     if first.kind() == SyntaxKind::HTML_BLOCK_DIV {
         let html_block_tag_count = first
@@ -958,16 +944,13 @@ pub(crate) fn graft_html_block_lift(
     }
 
     let mut prefix_state = ContainerPrefixState::new(prefix_lines);
-    if multi_child_trailing {
-        graft_node(builder, first, &mut prefix_state);
-        let trailing_kind = if use_paragraph {
-            SyntaxKind::PARAGRAPH
+    graft_node(builder, first, &mut prefix_state);
+    for block in trailing {
+        if !use_paragraph && block.kind() == SyntaxKind::PARAGRAPH {
+            graft_node_retag_root(builder, block, &mut prefix_state, SyntaxKind::PLAIN);
         } else {
-            SyntaxKind::PLAIN
-        };
-        graft_node_retag_root(builder, &children[1], &mut prefix_state, trailing_kind);
-    } else {
-        graft_node(builder, first, &mut prefix_state);
+            graft_node(builder, block, &mut prefix_state);
+        }
     }
     true
 }
@@ -1130,7 +1113,7 @@ fn strip_list_item_indent_from(
     (stripped, prefixes)
 }
 
-fn graft_node(
+pub(crate) fn graft_node(
     builder: &mut GreenNodeBuilder<'static>,
     node: &SyntaxNode,
     prefix: &mut Option<ContainerPrefixState>,

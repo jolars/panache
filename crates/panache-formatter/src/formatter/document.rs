@@ -24,8 +24,12 @@ impl Formatter {
 
     pub(super) fn format_heading_block(&mut self, node: &SyntaxNode, indent: usize) {
         log::trace!("Formatting heading");
-        if let Some(previous) = node.prev_sibling()
-            && is_block_element(previous.kind())
+        let previous = node.prev_sibling();
+        let follows_line_block_in_list_div = previous
+            .as_ref()
+            .is_some_and(super::blocks::line_block_in_list_div);
+        if !follows_line_block_in_list_div
+            && previous.is_some_and(|previous| is_block_element(previous.kind()))
             && !self.output.is_empty()
             && self.output.ends_with('\n')
             && !self.output.ends_with("\n\n")
@@ -37,7 +41,8 @@ impl Formatter {
         self.output.push_str(&self.format_heading(node, indent));
         self.output.push('\n');
 
-        if let Some(next) = node.next_sibling()
+        if !follows_line_block_in_list_div
+            && let Some(next) = node.next_sibling()
             && (is_block_element(next.kind()) || next.kind() == SyntaxKind::HEADING)
             && !(self.config.formatter_extensions.blank_before_header
                 && self.paragraph_starts_with_atx_heading_candidate(&next))
@@ -48,16 +53,31 @@ impl Formatter {
     }
 
     pub(super) fn format_horizontal_rule(&mut self, node: &SyntaxNode, indent: usize) {
-        if !self.output.is_empty() && self.output.ends_with('\n') && !self.output.ends_with("\n\n")
+        let follows_line_block_in_list_div = node
+            .prev_sibling()
+            .as_ref()
+            .is_some_and(super::blocks::line_block_in_list_div);
+        if !follows_line_block_in_list_div
+            && !self.output.is_empty()
+            && self.output.ends_with('\n')
+            && !self.output.ends_with("\n\n")
         {
             self.output.push('\n');
         }
         self.output.push_str(&" ".repeat(indent));
+        let rule = self.horizontal_rule_text(self.config.line_width.saturating_sub(indent));
+        // A dashed rule touches the previous line here and would become its
+        // Setext underline if the list div cannot take a blank separator.
         self.output
-            .push_str(&self.horizontal_rule_text(self.config.line_width.saturating_sub(indent)));
+            .push_str(if follows_line_block_in_list_div && rule.starts_with('-') {
+                "* * *"
+            } else {
+                &rule
+            });
         self.output.push('\n');
 
-        if let Some(next) = node.next_sibling()
+        if !follows_line_block_in_list_div
+            && let Some(next) = node.next_sibling()
             && is_block_element(next.kind())
             && !self.output.ends_with("\n\n")
         {

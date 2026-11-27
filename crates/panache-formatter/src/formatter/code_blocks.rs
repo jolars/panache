@@ -63,6 +63,17 @@ impl Formatter {
                 strip_content_columns,
                 true,
             );
+        } else if node
+            .parent()
+            .is_some_and(|parent| parent.kind() == SyntaxKind::LIST_ITEM)
+            && node
+                .prev_sibling()
+                .is_some_and(|previous| previous.kind() == SyntaxKind::LINE_BLOCK)
+            && node
+                .children()
+                .any(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN)
+        {
+            self.format_container_code_block(node, &" ".repeat(indent), indent, true, None, false);
         } else {
             self.format_code_block(node);
         }

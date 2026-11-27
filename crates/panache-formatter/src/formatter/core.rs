@@ -851,12 +851,17 @@ impl Formatter {
                 });
                 let reindent = continues_container
                     .then(|| (self.container_content_offset(node), indent))
-                    .filter(|(from, to)| from != to);
+                    .filter(|(from, to)| {
+                        from != to
+                            || node
+                                .prev_sibling()
+                                .is_some_and(|prev| prev.kind() == SyntaxKind::LINE_BLOCK)
+                    });
                 self.format_html_block_reindented(node, reindent)
             }
             SyntaxKind::COMMENT => self.format_comment(node),
             SyntaxKind::LATEX_COMMAND => self.format_latex_command(node),
-            SyntaxKind::TEX_BLOCK => self.format_tex_block(node),
+            SyntaxKind::TEX_BLOCK => self.format_tex_block(node, indent),
 
             SyntaxKind::BLOCK_QUOTE => self.format_block_quote(node, indent),
 

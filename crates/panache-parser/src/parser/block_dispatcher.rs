@@ -47,7 +47,7 @@ use super::blocks::indented_code::{
     vitepress_indented_code_start,
 };
 use super::blocks::latex_envs::LatexEnvInfo;
-use super::blocks::line_blocks::{parse_line_block, try_parse_line_block_start};
+use super::blocks::line_blocks::{is_bare_marker, parse_line_block, try_parse_line_block_start};
 use super::blocks::lists::{
     ListDelimiter, ListMarker, OrderedMarker, is_content_nested_bullet_marker,
     try_parse_list_marker,
@@ -65,7 +65,6 @@ use super::blocks::myst_targets::{
     BlockBreak, Target, is_comment_line, try_parse_block_break, try_parse_target,
 };
 use super::blocks::raw_blocks;
-use super::blocks::raw_blocks::extract_environment_name;
 use super::blocks::reference_links::{
     ReferenceSpans, emit_footnote_marker, line_is_mmd_link_attribute_continuation,
     reference_definition_spans, try_parse_footnote_marker,
@@ -1993,21 +1992,13 @@ impl BlockParser for LatexEnvironmentParser {
             return None;
         }
 
-        let env_name = extract_environment_name(lines.first())?.to_string();
-        let env_info = LatexEnvInfo { env_name };
-
-        use super::blocks::raw_blocks::is_inline_math_environment;
-        if is_inline_math_environment(&env_info.env_name) {
-            return None;
-        }
-
+        let env_name = raw_blocks::raw_tex_environment(lines.first())?.to_owned();
         let detection = if ctx.has_blank_before || ctx.at_document_start {
             BlockDetectionResult::Yes
         } else {
             BlockDetectionResult::YesCanInterrupt
         };
-
-        Some((detection, Some(Box::new(env_info))))
+        Some((detection, Some(Box::new(LatexEnvInfo { env_name }))))
     }
 
     fn parse_prepared(
@@ -2017,52 +2008,15 @@ impl BlockParser for LatexEnvironmentParser {
         lines: &StrippedLines<'_, '_>,
         payload: Option<&dyn Any>,
     ) -> usize {
-        use crate::syntax::SyntaxKind;
-
-        let content = lines.first();
-        let line_pos = lines.pos();
-        let lines = lines.raw();
-
-        let env_info = if let Some(info) = payload.and_then(|p| p.downcast_ref::<LatexEnvInfo>()) {
-            info.clone()
-        } else {
-            let env_name = extract_environment_name(content)
-                .expect("LaTeX env info should exist")
-                .to_string();
-            LatexEnvInfo { env_name }
-        };
-
-        builder.start_node(SyntaxKind::TEX_BLOCK.into());
-
-        let mut current_pos = line_pos;
-        let end_marker = format!("\\end{{{}}}", env_info.env_name);
-        let mut first_line = true;
-
-        while current_pos < lines.len() {
-            let line = lines[current_pos];
-
-            if !first_line {
-                builder.token(SyntaxKind::NEWLINE.into(), "\n");
-            }
-            first_line = false;
-
-            let content = trim_end_newlines(line);
-            builder.token(SyntaxKind::TEXT.into(), content);
-
-            current_pos += 1;
-
-            if line.trim_start().starts_with(&end_marker) {
-                break;
-            }
-        }
-
-        if current_pos > line_pos {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
-        }
-
-        builder.finish_node(); // TEX_BLOCK
-
-        current_pos - line_pos
+        let name =
+            if let Some(info) = payload.and_then(|value| value.downcast_ref::<LatexEnvInfo>()) {
+                &info.env_name
+            } else {
+                raw_blocks::raw_tex_environment(lines.first()).expect("LaTeX environment opener")
+            };
+        let end = raw_blocks::raw_tex_environment_end(lines, name);
+        raw_blocks::emit_raw_tex_block(builder, lines, end);
+        end - lines.pos()
     }
 
     fn name(&self) -> &'static str {
@@ -2078,31 +2032,25 @@ impl BlockParser for RawTexBlockParser {
         ctx: &BlockContext,
         lines: &StrippedLines<'_, '_>,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        if !ctx.config.extensions.raw_tex {
+        if !ctx.config.extensions.raw_tex
+            || (!ctx.has_blank_before && !ctx.at_document_start)
+            || !raw_blocks::can_start_raw_command(lines.first())
+        {
             return None;
         }
-
-        if !ctx.has_blank_before && !ctx.at_document_start {
-            return None;
-        }
-
-        if !raw_blocks::can_start_raw_block(lines.first(), ctx.config) {
-            return None;
-        }
-
         Some((BlockDetectionResult::Yes, None))
     }
 
     fn parse_prepared(
         &self,
-        ctx: &BlockContext,
+        _ctx: &BlockContext,
         builder: &mut GreenNodeBuilder<'static>,
         lines: &StrippedLines<'_, '_>,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        let line_pos = lines.pos();
-        let lines = lines.raw();
-        raw_blocks::parse_raw_tex_block(builder, lines, line_pos, ctx.blockquote_depth)
+        let end = raw_blocks::raw_tex_commands_end(lines);
+        raw_blocks::emit_raw_tex_block(builder, lines, end);
+        end - lines.pos()
     }
 
     fn name(&self) -> &'static str {
@@ -2118,14 +2066,27 @@ impl BlockParser for LineBlockParser {
         ctx: &BlockContext,
         lines: &StrippedLines<'_, '_>,
     ) -> Option<(BlockDetectionResult, Option<Box<dyn Any>>)> {
-        let content = lines.first();
-        if !ctx.config.extensions.line_blocks {
+        if !ctx.config.extensions.line_blocks || (!ctx.has_blank_before && !ctx.at_document_start) {
             return None;
         }
 
-        try_parse_line_block_start(content)?;
+        let content = lines.first();
+        if try_parse_line_block_start(content).is_none() {
+            // Ordinary dispatch leaves the last list indent in the first line
+            // for emission. A bare marker must reach the item's content column.
+            let trimmed = content.trim_start_matches([' ', '\t']);
+            if !matches!(trimmed, "|" | "|\n" | "|\r\n") {
+                return None;
+            }
+            let tail = ContainerPrefix::strip_required_ops(lines.raw_at(0), lines.prefix().ops())?;
+            try_parse_line_block_start(tail)?;
+        }
 
-        if !ctx.has_blank_before && !ctx.at_document_start {
+        if !content.starts_with('|')
+            && lines.pos() > 0
+            && is_bare_marker(lines.prefix().strip(lines.raw()[lines.pos() - 1]))
+            && !lines.first_unconditional().starts_with('|')
+        {
             return None;
         }
 
@@ -2388,13 +2349,16 @@ impl BlockParser for FencedDivCloseParser {
         lines: &StrippedLines<'_, '_>,
         _payload: Option<&dyn Any>,
     ) -> usize {
-        let line_pos = lines.pos();
-        let lines = lines.raw();
-
-        emit_div_fence_close(
-            builder,
-            strip_n_blockquote_markers(lines[line_pos], ctx.blockquote_depth),
-        );
+        let raw = lines.raw_at(0);
+        let tail = if ctx.blockquote_depth == 0 {
+            raw
+        } else {
+            lines
+                .prefix()
+                .strip_through_last_quote(raw)
+                .unwrap_or_else(|| strip_n_blockquote_markers(raw, ctx.blockquote_depth))
+        };
+        emit_div_fence_close(builder, tail);
 
         1
     }
@@ -3118,6 +3082,20 @@ impl BlockParser for IndentedCodeBlockParser {
         let line_pos = lines.pos();
         let in_vitepress_frame = ctx.config.flavor == crate::options::Flavor::VitePress;
         let vitepress_indented = in_vitepress_frame && vitepress_indented_code_start(lines);
+        let indented = if in_vitepress_frame {
+            vitepress_indented
+        } else {
+            let list_content_col = ctx.list_indent_info.map_or(0, |list| list.content_col);
+            leading_indent(content).0 >= list_content_col + 4 && is_indented_code_line(content)
+        };
+        if !indented {
+            return None;
+        }
+
+        let follows_bare_verse = ctx.config.extensions.line_blocks
+            && !ctx.list_item_content_open
+            && line_pos > 0
+            && strip_newline(lines.prefix().strip(lines.raw()[line_pos - 1])).0 == "|";
         let lines = lines.raw();
         let allow_marker_only = ctx.in_marker_only_list_item;
         let allow = if allow_marker_only {
@@ -3131,7 +3109,8 @@ impl BlockParser for IndentedCodeBlockParser {
         } else {
             ctx.has_blank_before_strict
                 || (!ctx.paragraph_open
-                    && (prev_line_is_terminal_one_liner(lines, line_pos, ctx.blockquote_depth)
+                    && (follows_bare_verse
+                        || prev_line_is_terminal_one_liner(lines, line_pos, ctx.blockquote_depth)
                         || (!ctx.list_item_content_open
                             && prev_line_closed_a_fence(
                                 lines,
@@ -3141,16 +3120,6 @@ impl BlockParser for IndentedCodeBlockParser {
                             ))))
         };
         if !allow {
-            return None;
-        }
-
-        let indented = if in_vitepress_frame {
-            vitepress_indented
-        } else {
-            let list_content_col = ctx.list_indent_info.map_or(0, |list| list.content_col);
-            leading_indent(content).0 >= list_content_col + 4 && is_indented_code_line(content)
-        };
-        if !indented {
             return None;
         }
 

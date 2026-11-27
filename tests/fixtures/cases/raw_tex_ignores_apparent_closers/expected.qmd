@@ -1,0 +1,7 @@
+\begin{center}% \end{center}
+body
+\end{center}
+
+\begin{center}\verb|\end{center}|
+body
+\end{center}

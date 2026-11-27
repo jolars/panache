@@ -32,12 +32,14 @@ use super::blocks::html_blocks::{
     parse_html_block_with_wrapper, try_parse_html_block_start,
 };
 use super::blocks::indented_code::parse_indented_code_block;
-use super::blocks::line_blocks::try_parse_line_block_start;
+use super::blocks::line_blocks::{PreparedLineBlock, is_bare_marker, try_parse_line_block_start};
 use super::blocks::lists::{ListMarker, OpenListHint, marker_start_number, try_parse_list_marker};
 use super::blocks::metadata::{
-    YamlContentOutcome, collect_yaml_content, emit_yaml_block, find_yaml_block_closing_pos,
-    is_metadata_open_delim, prepare_yaml_content,
+    YamlContentOutcome, collect_yaml_content, emit_pandoc_title_block, emit_yaml_block,
+    find_yaml_block_closing_pos, is_metadata_open_delim, pandoc_title_block_end,
+    prepare_yaml_content,
 };
+use super::blocks::raw_blocks::{self, emit_raw_tex_block};
 use super::blocks::reference_links::{ReferenceSpans, reference_definition_spans};
 use super::blocks::tables::{
     DashTableKind, PreparedDashTable, PreparedGridTable, PreparedPipeTable, is_table_caption_start,
@@ -76,6 +78,9 @@ enum Block<'a> {
     PandocHtml(html::PreparedHtml),
     Code(Range<usize>, FenceInfo),
     Metadata(usize, usize, YamlContentOutcome),
+    PandocTitle(usize),
+    Lines(usize, PreparedLineBlock),
+    RawTex(Range<usize>),
     OpenDiv(usize, DivFenceInfo),
     CloseDiv(Option<usize>),
 }
@@ -167,6 +172,13 @@ fn plan<'a>(
 
         if is_blank_line(line) {
             blocks.push(Block::Blank(pos));
+        } else if at_start
+            && options.extensions.pandoc_title_block
+            && let Some(end) = pandoc_title_block_end(lines)
+        {
+            blocks.push(Block::PandocTitle(end));
+            pos = end;
+            continue;
         } else if options.extensions.yaml_metadata_block
             && is_metadata_open_delim(line)
             && (at_start || (!commonmark && fresh))
@@ -407,18 +419,42 @@ fn plan<'a>(
             blocks.push(Block::Html(pos..end, kind));
             pos = end;
             continue;
+        } else if marker == Some(b'\\')
+            && options.extensions.raw_tex
+            && let Some(end) = {
+                let window = StrippedLines::new(lines, pos, table_prefix);
+                if let Some(env) = raw_blocks::raw_tex_environment(line) {
+                    if let Some(Block::Paragraph(range, _)) = blocks.last()
+                        && raw_blocks::has_unclosed_inline_math_environment(
+                            lines[range.clone()].iter().copied(),
+                        )
+                    {
+                        return Err(unsupported("nested inline math environment"));
+                    }
+                    Some(raw_blocks::raw_tex_environment_end(&window, env))
+                } else if fresh && raw_blocks::can_start_raw_command(line) {
+                    Some(raw_blocks::raw_tex_commands_end(&window))
+                } else {
+                    None
+                }
+            }
+        {
+            blocks.push(Block::RawTex(pos..end));
+            pos = end;
+            continue;
         } else if options.extensions.line_blocks
             && fresh
             && marker == Some(b'|')
             && try_parse_line_block_start(line).is_some()
+            && (indent_bytes == 0 || pos == 0 || !is_bare_marker(lines[pos - 1]))
         {
-            return Err(unsupported("line block"));
-        } else if !commonmark
-            && ((options.extensions.pandoc_title_block && marker == Some(b'%'))
-                || (options.extensions.raw_tex && marker == Some(b'\\'))
-                || (options.extensions.tex_math_dollars && content.starts_with("$$")))
-        {
-            return Err(unsupported("extended Pandoc block"));
+            let block = PreparedLineBlock::new(&StrippedLines::new(lines, pos, &prefix));
+            let end = block.end(pos);
+            blocks.push(Block::Lines(pos, block));
+            pos = end;
+            continue;
+        } else if !commonmark && options.extensions.tex_math_dollars && content.starts_with("$$") {
+            return Err(unsupported("display math"));
         } else if !commonmark
             && fresh
             && marker == Some(b'[')
@@ -618,6 +654,18 @@ fn parse_at(
             }
             Block::Metadata(start, end, outcome) => {
                 emit_yaml_block(&lines, start, end, &mut builder, &diagnostics, &outcome);
+            }
+            Block::PandocTitle(end) => emit_pandoc_title_block(&lines[..end], &mut builder),
+            Block::Lines(pos, block) => {
+                block.emit(
+                    &StrippedLines::new(&lines, pos, &prefix),
+                    &mut builder,
+                    options,
+                );
+            }
+            Block::RawTex(range) => {
+                let window = StrippedLines::new(&lines, range.start, &prefix);
+                emit_raw_tex_block(&mut builder, &window, range.end);
             }
             Block::OpenDiv(pos, fence) => {
                 builder.start_node(K::FENCED_DIV.into());

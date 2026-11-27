@@ -1,7 +1,7 @@
 //! Horizontal rule parsing utilities.
 
+use crate::parser::inlines::sink::InlineSink;
 use crate::syntax::SyntaxKind;
-use rowan::GreenNodeBuilder;
 
 use crate::parser::utils::helpers::strip_newline;
 
@@ -52,7 +52,7 @@ pub fn try_parse_horizontal_rule(line: &str) -> Option<char> {
 }
 
 /// Emit a horizontal rule node to the builder.
-pub(crate) fn emit_horizontal_rule(builder: &mut GreenNodeBuilder<'static>, line: &str) {
+pub(crate) fn emit_horizontal_rule(builder: &mut impl InlineSink, line: &str) {
     builder.start_node(SyntaxKind::HORIZONTAL_RULE.into());
 
     let (line_without_newline, newline_str) = strip_newline(line);

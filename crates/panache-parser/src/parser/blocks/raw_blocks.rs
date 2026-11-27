@@ -15,9 +15,12 @@
 //! - Only enabled when `raw_tex` extension is active
 
 use crate::options::ParserOptions;
-use crate::parser::utils::helpers::trim_end_newlines;
+use crate::parser::utils::helpers::{is_blank_line, strip_newline};
 use crate::syntax::SyntaxKind;
 use rowan::GreenNodeBuilder;
+
+use super::container_prefix::{ContainerPrefix, StrippedLines, emit_blockquote_prefix_tokens};
+use super::tables::LineView;
 
 /// Inline math environments from Pandoc (parsed as RawInline in Para).
 /// These should NOT be parsed as block-level environments.
@@ -79,25 +82,24 @@ pub fn extract_environment_name(line: &str) -> Option<&str> {
     Some(env_name)
 }
 
-/// Check if content could start a raw TeX block.
-///
-/// Requirements:
-/// - `raw_tex` extension must be enabled
-/// - Line must start with backslash followed by a letter
-/// - If it's a `\begin{env}`, the environment must NOT be an inline math env
+/// Check whether a line can start a raw TeX block with these options.
 pub fn can_start_raw_block(content: &str, config: &ParserOptions) -> bool {
-    if !config.extensions.raw_tex {
-        return false;
-    }
-
-    if let Some(env_name) = extract_environment_name(content) {
-        if is_inline_math_environment(env_name) {
-            return false;
+    config.extensions.raw_tex
+        && match extract_environment_name(content) {
+            Some(name) => !is_inline_math_environment(name),
+            None => is_latex_command_line(content),
         }
-        return true;
-    }
+}
 
-    is_latex_command_line(content)
+/// Check whether a command can start a raw TeX block. Environment openers
+/// have their own dispatch rule.
+pub(crate) fn can_start_raw_command(content: &str) -> bool {
+    is_latex_command_line(content) && extract_environment_name(content).is_none()
+}
+
+/// Non-math environments can interrupt a paragraph.
+pub(crate) fn raw_tex_environment(content: &str) -> Option<&str> {
+    extract_environment_name(content).filter(|name| !is_inline_math_environment(name))
 }
 
 fn is_latex_command_line(line: &str) -> bool {
@@ -120,104 +122,173 @@ fn is_latex_command_line(line: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Parse a raw TeX block from lines array.
-///
-/// Collects one or more consecutive lines of LaTeX commands into a single
-/// TEX_BLOCK node, stopping at blank lines or non-LaTeX content.
-///
-/// Returns the number of lines consumed.
+/// End of the command run, including lines inside a braced argument.
+pub(crate) fn raw_tex_commands_end(window: &StrippedLines<'_, '_>) -> usize {
+    let start = window.pos();
+    let quoted = window.prefix().bq_depth() > 0;
+    let mut brace_depth = 0;
+
+    for (pos, &line) in window.raw().iter().enumerate().skip(start) {
+        if pos > start && raw_tex_ends_at_boundary(window, pos) {
+            return pos;
+        }
+        let tail = if pos == start {
+            raw_tex_first(window)
+        } else {
+            window.prefix().strip_available_quote_prefix(line)
+        };
+        if pos > start && brace_depth == 0 && (quoted || !is_latex_command_line(tail)) {
+            return pos;
+        }
+        brace_depth = (brace_depth + brace_delta(tail)).max(0);
+    }
+    window.raw().len()
+}
+
+fn raw_tex_ends_at_boundary(window: &StrippedLines<'_, '_>, pos: usize) -> bool {
+    window.ends_container_lines(pos)
+        || (window.prefix().bq_depth() > 0 && is_blank_line(window.raw()[pos]))
+        || (is_blank_line(window.raw()[pos - 1]) && !window.starts_in_frame(pos))
+}
+
+pub(crate) fn raw_tex_environment_end(window: &StrippedLines<'_, '_>, name: &str) -> usize {
+    let end_marker = format!(r"\end{{{name}}}");
+    let first = raw_tex_first(window).trim_start();
+    if first
+        .strip_prefix(r"\begin{")
+        .and_then(|rest| rest.get(name.len() + 1..))
+        .is_some_and(|body| tex_line_has_closer(body, &end_marker))
+    {
+        return window.pos() + 1;
+    }
+
+    for (pos, &line) in window.raw().iter().enumerate().skip(window.pos() + 1) {
+        if raw_tex_ends_at_boundary(window, pos) {
+            return pos;
+        }
+        if tex_line_has_closer(
+            window.prefix().strip_available_quote_prefix(line),
+            &end_marker,
+        ) {
+            return pos + 1;
+        }
+    }
+    window.raw().len()
+}
+
+#[cfg(feature = "experimental-block-parser")]
+pub(crate) fn has_unclosed_inline_math_environment<'a>(
+    lines: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let mut closer: Option<String> = None;
+    for line in lines {
+        if let Some(end_marker) = &closer {
+            if tex_line_has_closer(line, end_marker) {
+                closer = None;
+            }
+        } else if let Some(name) =
+            extract_environment_name(line).filter(|name| is_inline_math_environment(name))
+        {
+            let end_marker = format!("\\end{{{name}}}");
+            if !tex_line_has_closer(line, &end_marker) {
+                closer = Some(end_marker);
+            }
+        }
+    }
+    closer.is_some()
+}
+
+fn tex_line_has_closer(mut line: &str, closer: &str) -> bool {
+    while let Some(index) = line.find(['\\', '%']) {
+        let command = &line[index..];
+        if command.starts_with('%') {
+            return false;
+        }
+        if command.starts_with(closer) {
+            return true;
+        }
+        if let Some(rest) = command.strip_prefix(r"\verb")
+            && !rest.starts_with(|ch: char| ch.is_ascii_alphabetic())
+        {
+            let rest = rest.strip_prefix('*').unwrap_or(rest);
+            let Some(delimiter) = rest.chars().next().filter(|ch| !ch.is_whitespace()) else {
+                return false;
+            };
+            let Some((_, tail)) = rest[delimiter.len_utf8()..].split_once(delimiter) else {
+                return false;
+            };
+            line = tail;
+        } else {
+            let rest = &command[1..];
+            let command_end = rest.chars().next().map_or(0, char::len_utf8);
+            line = &rest[command_end..];
+        }
+    }
+    false
+}
+
+fn raw_tex_first<'a>(window: &StrippedLines<'a, '_>) -> &'a str {
+    if let Some((tail, _)) = window.dispatch_override() {
+        return tail;
+    }
+    let raw = window.raw_at(0);
+    window
+        .prefix()
+        .strip_through_last_quote(raw)
+        .unwrap_or_else(|| window.first())
+}
+
+pub(crate) fn emit_raw_tex_block(
+    builder: &mut GreenNodeBuilder<'static>,
+    window: &StrippedLines<'_, '_>,
+    end: usize,
+) {
+    builder.start_node(SyntaxKind::TEX_BLOCK.into());
+    for (pos, &line) in window.raw().iter().enumerate().take(end).skip(window.pos()) {
+        let tail = if pos == window.pos() {
+            if let Some((_, indent)) = window.dispatch_override()
+                && !indent.is_empty()
+            {
+                builder.token(SyntaxKind::LINE_PREFIX.into(), indent);
+            }
+            raw_tex_first(window)
+        } else if window.requires_continuation_prefix() {
+            window.emit_prefix_at(builder, pos)
+        } else {
+            let tail = window.prefix().strip_available_quote_prefix(line);
+            emit_blockquote_prefix_tokens(builder, &line[..line.len() - tail.len()]);
+            tail
+        };
+        let (content, newline) = strip_newline(tail);
+        if !content.is_empty() {
+            builder.token(SyntaxKind::TEXT.into(), content);
+        }
+        if !newline.is_empty() {
+            builder.token(SyntaxKind::NEWLINE.into(), newline);
+        }
+    }
+    builder.finish_node();
+}
+
+/// Parse a raw TeX block and return the number of source lines consumed.
 pub fn parse_raw_tex_block(
     builder: &mut GreenNodeBuilder<'static>,
     lines: &[&str],
     start_pos: usize,
     blockquote_depth: usize,
 ) -> usize {
-    log::trace!("Starting raw TeX block at line {}", start_pos);
-
-    builder.start_node(SyntaxKind::TEX_BLOCK.into());
-
-    let first_line = lines[start_pos];
-    let first_line_inner = crate::parser::blocks::blockquotes::strip_n_blockquote_markers(
-        first_line,
-        blockquote_depth,
-    );
-    if !is_latex_command_line(first_line_inner)
-        && extract_environment_name(first_line_inner).is_none()
-    {
-        builder.finish_node();
-        log::trace!("Finished raw TeX block, consumed 0 lines");
-        return 0;
-    }
-
-    let lines_consumed = if let Some(env_name) = extract_environment_name(first_line_inner) {
-        parse_tex_environment_lines(builder, lines, start_pos, env_name, blockquote_depth)
+    let prefix = ContainerPrefix::bq_only(blockquote_depth);
+    let window = StrippedLines::new(lines, start_pos, &prefix);
+    let first = window.first();
+    let end = if let Some(name) = extract_environment_name(first) {
+        raw_tex_environment_end(&window, name)
+    } else if is_latex_command_line(first) {
+        raw_tex_commands_end(&window)
     } else {
-        parse_tex_command_lines(builder, lines, start_pos, blockquote_depth)
+        start_pos
     };
-
-    builder.finish_node(); // TEX_BLOCK
-
-    log::trace!("Finished raw TeX block, consumed {} lines", lines_consumed);
-    lines_consumed
-}
-
-fn parse_tex_command_lines(
-    builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
-    start_pos: usize,
-    blockquote_depth: usize,
-) -> usize {
-    let mut lines_consumed = 0;
-    let mut first_line = true;
-    let mut brace_depth: i32 = 0;
-    let mut started_braced_command = false;
-
-    for line in &lines[start_pos..] {
-        let inner =
-            crate::parser::blocks::blockquotes::strip_n_blockquote_markers(line, blockquote_depth);
-        if !first_line && brace_depth == 0 {
-            if inner.trim().is_empty() {
-                break;
-            }
-
-            if !is_latex_command_line(inner) {
-                break;
-            }
-
-            if blockquote_depth > 0 {
-                break;
-            }
-        }
-
-        log::trace!("  Raw block line: {:?}", inner);
-
-        if !first_line {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
-        }
-        first_line = false;
-
-        let content = trim_end_newlines(inner);
-        builder.token(SyntaxKind::TEXT.into(), content);
-
-        lines_consumed += 1;
-        brace_depth += brace_delta(content);
-        if brace_depth < 0 {
-            brace_depth = 0;
-        }
-        if first_line && brace_depth > 0 {
-            started_braced_command = true;
-        }
-        if started_braced_command && brace_depth == 0 {
-            break;
-        }
-        first_line = false;
-    }
-
-    if lines_consumed > 0 && !lines[start_pos + lines_consumed - 1].trim_end().is_empty() {
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
-    }
-
-    lines_consumed
+    emit_raw_tex_block(builder, &window, end);
+    end - start_pos
 }
 
 fn brace_delta(text: &str) -> i32 {
@@ -245,44 +316,6 @@ fn brace_delta(text: &str) -> i32 {
     }
 
     delta
-}
-
-fn parse_tex_environment_lines(
-    builder: &mut GreenNodeBuilder<'static>,
-    lines: &[&str],
-    start_pos: usize,
-    env_name: &str,
-    blockquote_depth: usize,
-) -> usize {
-    let mut lines_consumed = 0;
-    let mut first_line = true;
-    let end_marker = format!("\\end{{{}}}", env_name);
-
-    for line in &lines[start_pos..] {
-        let inner =
-            crate::parser::blocks::blockquotes::strip_n_blockquote_markers(line, blockquote_depth);
-        log::trace!("  Environment line: {:?}", inner);
-
-        if !first_line {
-            builder.token(SyntaxKind::NEWLINE.into(), "\n");
-        }
-        first_line = false;
-
-        let content = trim_end_newlines(inner);
-        builder.token(SyntaxKind::TEXT.into(), content);
-
-        lines_consumed += 1;
-
-        if inner.trim_start().starts_with(&end_marker) {
-            break;
-        }
-    }
-
-    if lines_consumed > 0 {
-        builder.token(SyntaxKind::NEWLINE.into(), "\n");
-    }
-
-    lines_consumed
 }
 
 #[cfg(test)]

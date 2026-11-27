@@ -150,6 +150,13 @@ impl Formatter {
                     self.output.push('\n');
                 }
                 SyntaxKind::HORIZONTAL_RULE => {
+                    if child
+                        .prev_sibling()
+                        .is_some_and(|prev| prev.kind() == SyntaxKind::LINE_BLOCK)
+                    {
+                        self.output.push_str(&blank_prefix);
+                        self.output.push('\n');
+                    }
                     self.output.push_str(&content_prefix);
                     let available_width =
                         self.config.line_width.saturating_sub(content_prefix.len());

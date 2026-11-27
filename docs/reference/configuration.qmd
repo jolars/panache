@@ -1133,7 +1133,8 @@ line-blocks = true
 ```
 
 `line-blocks`
-:   Line blocks for poetry with `|` prefix (default: enabled)
+:   Line blocks for poetry (enabled by default). Start each verse line with a
+    `|` followed by a space. Use a bare `|` for an empty line.
 
 #### Admonitions
 

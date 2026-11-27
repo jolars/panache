@@ -325,7 +325,11 @@ impl<'a> Parser<'a> {
                             });
                         }
 
-                        if !inner_blockquote_content.trim().is_empty() {
+                        if let Some(block_extras) =
+                            self.try_emit_quoted_body_block(inner_blockquote_content)
+                        {
+                            extras = block_extras;
+                        } else if !inner_blockquote_content.trim().is_empty() {
                             paragraphs::start_paragraph_if_needed(
                                 &mut self.containers,
                                 &mut self.builder,

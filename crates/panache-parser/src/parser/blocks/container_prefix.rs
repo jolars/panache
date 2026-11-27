@@ -756,6 +756,24 @@ impl ContainerPrefix {
         Self::strip_required_ops(line, &self.ops()[..=last])
     }
 
+    /// Strip as much of the enclosing quote prefix as a lazy line supplies.
+    pub(crate) fn strip_available_quote_prefix<'a>(&self, mut line: &'a str) -> &'a str {
+        let Some(last) = self
+            .ops()
+            .iter()
+            .rposition(|op| *op == StripOp::BlockQuoteMarker)
+        else {
+            return line;
+        };
+        for op in &self.ops()[..=last] {
+            let Some(tail) = Self::strip_required_ops(line, std::slice::from_ref(op)) else {
+                break;
+            };
+            line = tail;
+        }
+        line
+    }
+
     pub fn strip_required_ops<'a>(mut line: &'a str, ops: &[StripOp]) -> Option<&'a str> {
         for &op in ops {
             match op {
@@ -1406,10 +1424,10 @@ impl<'a, 'p> StrippedLines<'a, 'p> {
     #[cfg(feature = "experimental-block-parser")]
     pub(crate) fn with_dispatch_override(mut self, tail: &'a str, indent: &'a str) -> Self {
         self.strict_continuation = true;
-        self.with_table_dispatch(tail, indent)
+        self.with_dispatch_tail(tail, indent)
     }
 
-    pub(crate) fn with_table_dispatch(mut self, tail: &'a str, indent: &'a str) -> Self {
+    pub(crate) fn with_dispatch_tail(mut self, tail: &'a str, indent: &'a str) -> Self {
         self.dispatch_override = Some((tail, indent));
         self
     }
@@ -1713,8 +1731,7 @@ pub(crate) fn emit_blockquote_prefix_tokens(builder: &mut GreenNodeBuilder<'stat
 /// `bq_outer ? bq → list → content-indent : list → bq → content-indent`.
 ///
 /// Retained only for the marker-line (line 0) scalar emitters in
-/// `code_blocks.rs` / `line_blocks.rs` (`prepare_fence_open_line`,
-/// `emit_open_line_prefixes`, the hashpipe preamble helpers), which
+/// `code_blocks.rs` (`prepare_fence_open_line` and the hashpipe preamble helpers), which
 /// derive the same scalars and must stay byte-identical to this strip.
 /// Continuation lines go through [`StrippedLines::peek_prefix_at`] /
 /// [`StrippedLines::emit_prefix_at`], which walk

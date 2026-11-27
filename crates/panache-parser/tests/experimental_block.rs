@@ -976,21 +976,12 @@ fn quarto_wrapped_body_table_captions() {
 fn quarto_deferred_body_blocks_preserve_openers() {
     let mut options = ParserOptions::for_flavor(Flavor::Quarto);
     options.extensions.tex_math_gfm = true;
-    for (input, opener, expected) in [
-        ("> | line\n> :   definition\n", "| line", "line block"),
-        (
-            "[^n]: note\n\n    ```math\n    x\n    ```\n",
-            "```math",
-            "fenced math",
-        ),
-    ] {
-        let gap = experimental_block::try_parse_with_errors(input, &options).expect_err(input);
-        assert_eq!(
-            (gap.offset, gap.construct),
-            (input.find(opener).unwrap(), expected),
-            "{input}"
-        );
-    }
+    let input = "[^n]: note\n\n    ```math\n    x\n    ```\n";
+    let gap = experimental_block::try_parse_with_errors(input, &options).expect_err(input);
+    assert_eq!(
+        (gap.offset, gap.construct),
+        (input.find("```math").unwrap(), "fenced math")
+    );
 }
 
 #[test]
@@ -2030,4 +2021,246 @@ fn quarto_html_keeps_lazy_headings_in_lists_and_quotes() {
             normalize_native(expected)
         );
     }
+}
+
+#[test]
+fn pandoc_special_blocks_respect_extension_overrides() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    for (input, kind) in [
+        (
+            "% Title\n  continuation\n% Author\n% Date\n% Body\n",
+            K::PANDOC_TITLE_BLOCK,
+        ),
+        (
+            "| first\n  continued\n| second\n\nparagraph\n",
+            K::LINE_BLOCK,
+        ),
+        (
+            "\\newcommand{\\example}{\n  replacement\n}\n\\medskip\n\nparagraph\n",
+            K::TEX_BLOCK,
+        ),
+        (
+            "paragraph\n\\begin{tabular}{c}\nx\n\\end{tabular}\n\nfollowing\n",
+            K::TEX_BLOCK,
+        ),
+    ] {
+        for enabled in [true, false] {
+            let mut options = ParserOptions::for_flavor(Flavor::Quarto);
+            match kind {
+                K::PANDOC_TITLE_BLOCK => options.extensions.pandoc_title_block = enabled,
+                K::LINE_BLOCK => options.extensions.line_blocks = enabled,
+                K::TEX_BLOCK => options.extensions.raw_tex = enabled,
+                _ => unreachable!(),
+            }
+            let tree = check(input, &options);
+            assert_eq!(tree.children().any(|node| node.kind() == kind), enabled);
+        }
+    }
+}
+
+#[test]
+fn pandoc_special_block_fixtures_preserve_cst() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        include_str!("fixtures/cases/pandoc_title_block/input.md"),
+        include_str!("fixtures/cases/line_blocks/input.md"),
+        include_str!("fixtures/cases/line_block_indented_marker_continues/input.md"),
+        include_str!("fixtures/cases/line_block_in_list_blockquote/input.md"),
+        include_str!("fixtures/cases/line_block_on_list_marker_line/input.md"),
+        include_str!("fixtures/cases/line_block_in_list_item_lazy_pipe_line/input.md"),
+        include_str!("fixtures/cases/raw_tex_commands/input.md"),
+        include_str!("fixtures/cases/latex_environment/input.md"),
+        include_str!("fixtures/cases/raw_tex_math_environment_pandoc/input.md"),
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn pandoc_special_block_boundaries_preserve_cst() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "# Heading\n\n% Ordinary prose\n",
+        "Paragraph\n| still prose\n",
+        " |\nnext\n",
+        "Paragraph\n\\medskip\n",
+        "\\begin{equation}\nx\n\\end{equation}\n",
+    ] {
+        let tree = check(input, &options);
+        assert!(!tree.descendants().any(|node| matches!(
+            node.kind(),
+            K::PANDOC_TITLE_BLOCK | K::LINE_BLOCK | K::TEX_BLOCK
+        )));
+    }
+
+    for input in [
+        "|\r\n| a",
+        " \\medskip\r\n\\hfill",
+        "\\begin{tabular}{c}\r\nx\r\n\\end{tabular}",
+        "> - item\n>\n>   \\medskip\n",
+        "> alpha\n> \\begin{tabular}{c}\n> x\n> \\end{tabular}\n",
+        "> \\newcommand{\\example}{\n>   replacement\n> }\n",
+        "- item\n\n  \\begin{tabular}{c}\n  x\n  \\end{tabular}\n- sibling\n",
+        "Note[^a].\n\n[^a]: body\n\n    | first\n    | second\n",
+        "> | line\n> :   definition\n",
+        "> - item\n>\n>   | first\n>   | second\n",
+        "> - > | first\n>   > | second\n",
+        "- > - | first\n  >   | second\n",
+        "> - > \\medskip\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn pandoc_special_blocks_match_pinned_pandoc_native() {
+    use panache_parser::{pandoc_ast::normalize_native, to_pandoc_ast_with_options};
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    macro_rules! check_native {
+        ($fixture:literal) => {{
+            let input = include_str!(concat!(
+                "fixtures/pandoc-conformance/corpus/",
+                $fixture,
+                "/input.md"
+            ));
+            let expected = include_str!(concat!(
+                "fixtures/pandoc-conformance/corpus/",
+                $fixture,
+                "/expected.native"
+            ));
+            let tree = check(input, &options);
+            assert_eq!(
+                normalize_native(&to_pandoc_ast_with_options(&tree, &options)),
+                normalize_native(expected),
+                "{}",
+                $fixture,
+            );
+        }};
+    }
+    check_native!("0098-imported-line_blocks");
+    check_native!("0130-imported-pandoc_title_block");
+    check_native!("0141-imported-raw_tex_commands");
+    check_native!("0095-imported-latex_environment");
+
+    let quoted = "> \\begin{tabular}{c}\n> x\n> \\end{tabular}\n";
+    let tree = check(quoted, &options);
+    assert_eq!(
+        normalize_native(&to_pandoc_ast_with_options(&tree, &options)),
+        normalize_native(
+            r#"[ BlockQuote [ RawBlock (Format "tex") "\\begin{tabular}{c}\nx\n\\end{tabular}" ] ]"#
+        ),
+    );
+}
+
+#[test]
+fn pandoc_special_blocks_preserve_reviewed_container_boundaries() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "> - |\n>   # H\n",
+        "> - item\n>\n>   |\n>   * * *\n",
+        "Text[^n].\n\n[^n]: > \\medskip\n",
+        "Term\n:   > \\medskip\n",
+        "> \\medskip\n# Heading\n",
+        "- | a\n# Heading\n",
+        "- <!-- a -->\n  |\n  \\medskip\n",
+        "::: note\n> \\begin{tabular}{c}x\\end{tabular}\n:::\n",
+        "- <!-- a -->\n  |\n<div>\ntext\n</div>\n",
+        "- ::: note\n  |\n  # H\n  :::\n",
+        "- > text\n  >\n  > \\medskip\n",
+        "- | a\nb\n",
+        "> \\medskip\nb\n",
+        "- <!-- a -->\n  |\n",
+        "- <!-- a -->\n  |\n  b\n",
+        "- <!-- a -->\n  |\n  # H\n",
+        "- ::: note\n  |\n  b\n  :::\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn bare_line_block_stops_at_the_sibling_list_item() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let tree = check("- |\n - next\n", &options);
+    let list = tree.first_child().unwrap();
+    assert_eq!(
+        list.children()
+            .filter(|child| child.kind() == K::LIST_ITEM)
+            .count(),
+        2
+    );
+    assert_eq!(
+        list.first_child().unwrap().first_child().unwrap().kind(),
+        K::LINE_BLOCK
+    );
+}
+
+#[test]
+fn pandoc_native_normalizes_raw_tex_line_endings() {
+    use panache_parser::to_pandoc_ast_with_options;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in ["\\medskip\n", "\\begin{tabular}{c}\nx\n\\end{tabular}\n"] {
+        let crlf = input.replace('\n', "\r\n");
+        assert_eq!(
+            to_pandoc_ast_with_options(&check(&crlf, &options), &options),
+            to_pandoc_ast_with_options(&check(input, &options), &options),
+        );
+    }
+}
+
+#[test]
+fn reviewed_tex_and_verse_cases_are_lossless_and_match_the_incumbent() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for input in [
+        "\\begin{center}% \\end{center}\nbody\n\\end{center}\n",
+        "\\begin{center}\\verb|\\end{center}|\nbody\n\\end{center}\n",
+        "> \\begin{center}\n> body \\end{center}\n\n# outside\n",
+        "> > \\newcommand{\\x}{\n> hello\n> > }\n",
+        "Text[^n].\n\n[^n]: > \\newcommand{\\foo}{\n\n# Outside\n\nText\n",
+        "Term\n:   > \\newcommand{\\foo}{\n\n# Outside\n\nText\n",
+        "Term\n:   > \\medskip\n    > ::: note\n    > x\n    > :::\n",
+        "Text[^n].\n\n[^n]: > \\medskip\n    > ::: note\n    > x\n    > :::\n",
+        "> - | verse\n<div>\nbody\n</div>\n",
+        "> \\medskip\n| next\n",
+        "> | verse\n* * *\n",
+        "Term\n:   > | verse\n",
+        "Text[^n].\n\n[^n]: > | verse\n",
+        "- ::: note\n  \\medskip\n  :::\n",
+        "> - item\n>\n>   \\begin{center}\n>   body\n>   \\end{center}\n>   Heading\n>   =======\n",
+    ] {
+        check(input, &options);
+    }
+}
+
+#[test]
+fn bare_verse_does_not_absorb_indented_content() {
+    use panache_parser::syntax::SyntaxKind as K;
+
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    for (input, following) in [
+        ("|\n    code\n", K::CODE_BLOCK),
+        ("|\n  | next\n", K::PARAGRAPH),
+    ] {
+        let tree = check(input, &options);
+        assert_eq!(
+            tree.children().map(|node| node.kind()).collect::<Vec<_>>(),
+            [K::LINE_BLOCK, following]
+        );
+    }
+}
+
+#[test]
+fn planner_defers_raw_environment_inside_open_inline_math() {
+    let options = ParserOptions::for_flavor(Flavor::Quarto);
+    let input = "\\begin{equation}\n\\begin{bmatrix}1\\end{bmatrix}\n\\end{equation}\n";
+    let gap = experimental_block::try_parse_with_errors(input, &options).unwrap_err();
+    assert_eq!(gap.offset, "\\begin{equation}\n".len());
+    assert_eq!(gap.construct, "nested inline math environment");
 }

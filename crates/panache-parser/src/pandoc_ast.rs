@@ -1933,7 +1933,7 @@ fn parse_pandoc_blocks(text: &str) -> Vec<Block> {
 }
 
 fn tex_block(node: &SyntaxNode) -> Block {
-    let mut content = node.text().to_string();
+    let mut content = crate::syntax::text_without_line_prefixes(node).replace("\r\n", "\n");
     while content.ends_with('\n') {
         content.pop();
     }

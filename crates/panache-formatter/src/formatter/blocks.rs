@@ -8,6 +8,16 @@ use panache_parser::parser::blocks::tables::try_parse_pipe_separator;
 use panache_parser::parser::inlines::core::parse_inline_text_recursive;
 use rowan::{GreenNodeBuilder, NodeOrToken};
 
+pub(super) fn line_block_in_list_div(node: &SyntaxNode) -> bool {
+    node.kind() == SyntaxKind::LINE_BLOCK
+        && node.parent().is_some_and(|parent| {
+            parent.kind() == SyntaxKind::FENCED_DIV
+                && parent
+                    .ancestors()
+                    .any(|ancestor| ancestor.kind() == SyntaxKind::LIST_ITEM)
+        })
+}
+
 pub(super) fn logical_line_block_lines(block: &LineBlock) -> Vec<Vec<LineBlockLine>> {
     let mut lines: Vec<Vec<LineBlockLine>> = Vec::new();
     for line in block.syntax().children().filter_map(LineBlockLine::cast) {
@@ -315,7 +325,10 @@ impl Formatter {
 
     pub(super) fn format_line_block(&mut self, node: &SyntaxNode, indent: usize) {
         log::trace!("Formatting line block");
-        if !self.output.is_empty() && !self.output.ends_with("\n\n") {
+        // The div opener and the end of a verse already separate these
+        // blocks. An inserted blank can end a list item's buffered div.
+        let in_list_div = line_block_in_list_div(node);
+        if !in_list_div && !self.output.is_empty() && !self.output.ends_with("\n\n") {
             self.output.push('\n');
         }
 
@@ -345,7 +358,15 @@ impl Formatter {
             self.output.push('\n');
         }
 
-        if let Some(next) = node.next_sibling()
+        if !in_list_div
+            && let Some(next) = node.next_sibling()
+            && !(node
+                .parent()
+                .is_some_and(|parent| parent.kind() == SyntaxKind::LIST_ITEM)
+                && next.kind() == SyntaxKind::CODE_BLOCK
+                && next
+                    .children()
+                    .any(|child| child.kind() == SyntaxKind::CODE_FENCE_OPEN))
             && is_block_element(next.kind())
             && !self.output.ends_with("\n\n")
         {

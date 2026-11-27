@@ -15,8 +15,8 @@ use super::blocks::definition_lists;
 use super::blocks::fenced_divs;
 use super::blocks::figures::paragraph_is_standalone_image;
 use super::blocks::headings::{
-    emit_atx_heading, emit_setext_heading_body, emit_setext_heading_text, emit_setext_underline,
-    try_parse_atx_heading, try_parse_setext_heading,
+    emit_atx_heading, emit_setext_heading_body, emit_setext_underline, try_parse_atx_heading,
+    try_parse_setext_heading,
 };
 use super::blocks::horizontal_rules::try_parse_horizontal_rule;
 use super::blocks::html_blocks;
@@ -24,7 +24,7 @@ use super::blocks::line_blocks;
 use super::blocks::lists;
 use super::blocks::myst_directives::DirectiveCloser;
 use super::blocks::paragraphs;
-use super::blocks::raw_blocks::{extract_environment_name, is_inline_math_environment};
+use super::blocks::raw_blocks::{self, extract_environment_name, is_inline_math_environment};
 use super::blocks::tables;
 use super::blocks::tables::LineView;
 use super::blocks::vitepress_containers::{self, Boundary, OpenContainer};
@@ -43,7 +43,7 @@ use container_stack::{
     gobbled_indent_prefix_len, leading_indent,
 };
 use definition_lists::{emit_definition_marker, emit_term};
-use line_blocks::{parse_line_block, try_parse_line_block_start};
+use line_blocks::{is_bare_marker, parse_line_block, try_parse_line_block_start};
 use lists::{
     ListItemEmissionInput, ListMarker, is_content_nested_bullet_marker, start_nested_list,
     try_parse_list_marker,
@@ -728,6 +728,10 @@ impl<'a> Parser<'a> {
             });
         }
 
+        if let Some(extras) = self.try_emit_quoted_body_block(inner) {
+            return Some(extras);
+        }
+
         paragraphs::start_paragraph_if_needed(&mut self.containers, &mut self.builder);
         paragraphs::append_paragraph_line(
             &mut self.containers,
@@ -736,6 +740,32 @@ impl<'a> Parser<'a> {
             self.config,
         );
         Some(0)
+    }
+
+    pub(super) fn try_emit_quoted_body_block(&mut self, first: &str) -> Option<usize> {
+        let is_line_block =
+            self.config.extensions.line_blocks && try_parse_line_block_start(first).is_some();
+        if !is_line_block
+            && (!self.config.extensions.raw_tex || !first.trim_start().starts_with('\\'))
+        {
+            return None;
+        }
+        let prefix = ContainerPrefix::from_stack(&self.containers.stack, false, self.config);
+        let window =
+            StrippedLines::new(&self.lines, self.pos, &prefix).with_dispatch_tail(first, "");
+        if is_line_block {
+            let end = parse_line_block(&window, &mut self.builder, self.config);
+            return Some(end - self.pos - 1);
+        }
+        let end = if let Some(name) = raw_blocks::raw_tex_environment(first) {
+            raw_blocks::raw_tex_environment_end(&window, name)
+        } else if raw_blocks::can_start_raw_command(first) {
+            raw_blocks::raw_tex_commands_end(&window)
+        } else {
+            return None;
+        };
+        raw_blocks::emit_raw_tex_block(&mut self.builder, &window, end);
+        Some(end - self.pos - 1)
     }
 
     fn open_code_span_openers(&self) -> Vec<usize> {
@@ -2738,6 +2768,9 @@ impl<'a> Parser<'a> {
             && (has_blank_before || self.pos == 0)
             && try_parse_line_block_start(content).is_some()
             && try_parse_line_block_start(self.lines[self.pos]).is_some()
+            && (content.starts_with('|')
+                || self.pos == 0
+                || !is_bare_marker(self.lines[self.pos - 1]))
         {
             log::trace!("Parsed line block at line {}", self.pos);
             self.close_paragraph_if_open();

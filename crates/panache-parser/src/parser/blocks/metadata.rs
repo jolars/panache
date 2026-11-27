@@ -268,55 +268,39 @@ pub(crate) fn try_parse_pandoc_title_block(
     pos: usize,
     builder: &mut GreenNodeBuilder<'static>,
 ) -> Option<usize> {
-    if pos != 0 || lines.is_empty() {
+    if pos != 0 {
         return None;
     }
+    let end = pandoc_title_block_end(lines)?;
+    emit_pandoc_title_block(&lines[..end], builder);
+    Some(end)
+}
 
-    let first_line = lines[0];
-    if !first_line.trim_start().starts_with('%') {
-        return None;
-    }
-
-    builder.start_node(SyntaxKind::PANDOC_TITLE_BLOCK.into());
-
-    let mut current_pos = 0;
-    let mut field_count = 0;
-
-    while current_pos < lines.len() && field_count < 3 {
-        let line = lines[current_pos];
-
-        if line.trim_start().starts_with('%') {
-            emit_line_tokens(builder, line);
-            field_count += 1;
-            current_pos += 1;
-
-            while current_pos < lines.len() {
-                let cont_line = lines[current_pos];
-                if cont_line.is_empty() {
-                    break;
-                }
-                if cont_line.trim_start().starts_with('%') {
-                    break;
-                }
-                if cont_line.starts_with(' ') || cont_line.starts_with('\t') {
-                    emit_line_tokens(builder, cont_line);
-                    current_pos += 1;
-                } else {
-                    break;
-                }
-            }
-        } else {
+pub(crate) fn pandoc_title_block_end(lines: &[&str]) -> Option<usize> {
+    let mut end = 0;
+    for _ in 0..3 {
+        if !lines
+            .get(end)
+            .is_some_and(|line| line.trim_start().starts_with('%'))
+        {
             break;
         }
+        end += 1;
+        while lines.get(end).is_some_and(|line| {
+            line.starts_with([' ', '\t']) && !line.trim_start().starts_with('%')
+        }) {
+            end += 1;
+        }
     }
+    (end > 0).then_some(end)
+}
 
-    builder.finish_node(); // PandocTitleBlock
-
-    if field_count > 0 {
-        Some(current_pos)
-    } else {
-        None
+pub(crate) fn emit_pandoc_title_block(lines: &[&str], builder: &mut GreenNodeBuilder<'static>) {
+    builder.start_node(SyntaxKind::PANDOC_TITLE_BLOCK.into());
+    for line in lines {
+        emit_line_tokens(builder, line);
     }
+    builder.finish_node();
 }
 
 fn mmd_key_value(line: &str) -> Option<(String, String)> {

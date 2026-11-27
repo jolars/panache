@@ -85,9 +85,19 @@ impl Formatter {
                 .is_some_and(|prev| !prev.text().ends_with('\n'));
         if let Some((from, to)) = reindent
             && !self.directive_tracker.is_formatting_ignored()
-            && let Some(moved) = reindent_lines(&text, from, to, starts_on_marker_line)
         {
-            text = moved;
+            if let Some(moved) = reindent_lines(&text, from, to, starts_on_marker_line) {
+                text = moved;
+            } else if !node
+                .ancestors()
+                .any(|ancestor| ancestor.kind() == SyntaxKind::BLOCK_QUOTE)
+                && node
+                    .prev_sibling()
+                    .is_some_and(|prev| prev.kind() == SyntaxKind::LINE_BLOCK)
+                && let Some(moved) = reindent_lines(&text, 0, to, starts_on_marker_line)
+            {
+                text = moved;
+            }
         }
         self.output.push_str(&text);
         if !text.ends_with('\n') {
@@ -110,13 +120,29 @@ impl Formatter {
         self.output.push_str(&formatted);
     }
 
-    pub(super) fn format_tex_block(&mut self, node: &SyntaxNode) {
+    pub(super) fn format_tex_block(&mut self, node: &SyntaxNode, indent: usize) {
         log::trace!("Formatting TeX block");
-        for child in node.children_with_tokens() {
-            if let NodeOrToken::Token(token) = child {
-                self.output.push_str(token.text());
+        let mut text = text_without_line_prefixes(node);
+        if node
+            .parent()
+            .is_some_and(|parent| parent.kind() == SyntaxKind::LIST_ITEM)
+        {
+            if node
+                .prev_sibling()
+                .is_some_and(|prev| prev.kind() == SyntaxKind::LINE_BLOCK)
+                && !self.output.ends_with("\n\n")
+            {
+                self.output.push('\n');
+            }
+            if node
+                .first_token()
+                .is_some_and(|token| token.kind() == SyntaxKind::LINE_PREFIX)
+                && let Some(indented) = reindent_lines(&text, 0, indent, false)
+            {
+                text = indented;
             }
         }
+        self.output.push_str(&text);
         if !self.output.ends_with('\n') {
             self.output.push('\n');
         }
